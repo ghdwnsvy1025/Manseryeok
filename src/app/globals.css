@@ -1,0 +1,135 @@
+@import url('https://cdn.jsdelivr.net/npm/galmuri@latest/dist/galmuri.css');
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --px-bg:       #09090f;
+  --px-bg2:      #111119;
+  --px-bg3:      #18182a;
+  --px-border:   #2a2a4a;
+  --px-border2:  #4a4a7a;
+  --px-accent:   #c8a700;
+  --px-text:     #d0d0f0;
+  --px-text2:    #7070a0;
+
+  --wood:  #4ade80;
+  --fire:  #f87171;
+  --earth: #fbbf24;
+  --metal: #cbd5e1;
+  --water: #60a5fa;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Galmuri11', 'Noto Sans KR', monospace;
+  background-color: var(--px-bg);
+  color: var(--px-text);
+  -webkit-font-smoothing: none;
+  image-rendering: pixelated;
+}
+
+/* ── Pixel Card ── */
+.px-card {
+  background: var(--px-bg2);
+  border: 2px solid var(--px-border);
+  box-shadow: 4px 4px 0 #000;
+}
+
+.px-card-accent {
+  background: var(--px-bg2);
+  border: 2px solid var(--px-border2);
+  box-shadow: 4px 4px 0 #000014;
+}
+
+/* ── Pixel Input ── */
+.px-input {
+  background: var(--px-bg);
+  border: 2px solid var(--px-border2);
+  color: var(--px-text);
+  box-shadow: inset 2px 2px 0 #000;
+  outline: none;
+  font-family: inherit;
+}
+.px-input:focus {
+  border-color: var(--px-accent);
+  box-shadow: inset 2px 2px 0 #000, 0 0 0 2px #c8a70044;
+}
+
+/* ── Pixel Button ── */
+.px-btn {
+  background: var(--px-bg3);
+  border: 3px solid var(--px-accent);
+  color: var(--px-accent);
+  box-shadow: 4px 4px 0 #4a3a00;
+  cursor: pointer;
+  transition: transform 80ms, box-shadow 80ms;
+  font-family: inherit;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+.px-btn:hover {
+  box-shadow: 6px 6px 0 #4a3a00;
+  transform: translate(-1px, -1px);
+}
+.px-btn:active {
+  box-shadow: 2px 2px 0 #4a3a00;
+  transform: translate(2px, 2px);
+}
+.px-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: 4px 4px 0 #4a3a00;
+}
+
+/* ── Radio / Checkbox ── */
+.px-radio {
+  accent-color: var(--px-accent);
+  width: 14px;
+  height: 14px;
+}
+
+/* ── Pixel Select ── */
+.px-select {
+  appearance: none;
+  background: var(--px-bg) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%237070a0'/%3E%3C/svg%3E") no-repeat right 8px center;
+  background-size: 10px;
+  border: 2px solid var(--px-border2);
+  color: var(--px-text);
+  box-shadow: inset 2px 2px 0 #000;
+  outline: none;
+  font-family: inherit;
+  padding-right: 28px;
+}
+.px-select:focus {
+  border-color: var(--px-accent);
+}
+
+/* ── Glow utilities ── */
+.glow-wood  { text-shadow: 0 0 8px #4ade8099; }
+.glow-fire  { text-shadow: 0 0 8px #f8717199; }
+.glow-earth { text-shadow: 0 0 8px #fbbf2499; }
+.glow-metal { text-shadow: 0 0 8px #cbd5e199; }
+.glow-water { text-shadow: 0 0 8px #60a5fa99; }
+
+/* Scanline overlay for extra retro vibe */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.05) 2px,
+    rgba(0, 0, 0, 0.05) 4px
+  );
+  pointer-events: none;
+  z-index: 9999;
+}
