@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { SajuInput, SajuOptions, CalendarType, DayChangeRule, TimeCorrection } from "@/lib/saju/types";
 import type { Gender } from "@/lib/saju/daeun";
+import { useViewMode } from "@/contexts/ViewModeContext";
 
 interface SajuFormProps {
   onCalculate: (input: SajuInput) => void;
@@ -41,6 +42,7 @@ function toNumber(value: string): number {
 }
 
 export default function SajuForm({ onCalculate, isLoading }: SajuFormProps) {
+  const { isMobile } = useViewMode();
   const [initialDateTime] = useState(getCurrentDateTimeParts);
   const [year, setYear] = useState(initialDateTime.year);
   const [month, setMonth] = useState(initialDateTime.month);
@@ -94,7 +96,7 @@ export default function SajuForm({ onCalculate, isLoading }: SajuFormProps) {
   return (
     <form
       onSubmit={handleSubmit}
-      className="px-card p-5 space-y-5"
+      className={`px-card space-y-5 ${isMobile ? "p-3 space-y-4" : "p-5"}`}
       style={{ borderColor: "var(--px-border2)" }}
     >
       {/* ── 생년월일 ── */}

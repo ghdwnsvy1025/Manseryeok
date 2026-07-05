@@ -4,9 +4,11 @@ import { useState } from "react";
 import SajuForm from "@/components/SajuForm";
 import SajuResult from "@/components/SajuResult";
 import { calculateSaju } from "@/lib/saju/calculator";
+import { useViewMode } from "@/contexts/ViewModeContext";
 import type { SajuInput, SajuResult as SajuResultType } from "@/lib/saju/types";
 
 export default function HomePage() {
+  const { isMobile } = useViewMode();
   const [result, setResult] = useState<SajuResultType | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -38,14 +40,14 @@ export default function HomePage() {
   ];
 
   return (
-    <div className="space-y-8">
+    <div className={`space-y-6 sm:space-y-8 ${isMobile ? "space-y-5" : ""}`}>
       {/* ── TITLE ── */}
-      <div className="text-center space-y-4">
+      <div className="text-center space-y-3 sm:space-y-4">
         <div
-          className="inline-block px-4 py-2 border-2 text-sm font-bold"
+          className="inline-block px-3 sm:px-4 py-2 border-2 text-sm font-bold"
           style={{
             fontFamily: "'Press Start 2P', monospace",
-            fontSize: "10px",
+            fontSize: isMobile ? "8px" : "10px",
             color: "var(--px-accent)",
             borderColor: "var(--px-accent)",
             background: "var(--px-bg3)",
@@ -55,10 +57,10 @@ export default function HomePage() {
         >
           ★ SAJU CALCULATOR ★
         </div>
-        <p className="text-sm" style={{ color: "var(--px-text2)" }}>
+        <p className={`${isMobile ? "text-xs" : "text-sm"}`} style={{ color: "var(--px-text2)" }}>
           생년월일시를 입력하면 <strong style={{ color: "var(--px-text)" }}>년주·월주·일주·시주와 대운</strong>을 계산합니다.
         </p>
-        <div className="flex flex-wrap justify-center gap-2">
+        <div className={`flex flex-wrap justify-center gap-1.5 sm:gap-2 ${isMobile ? "px-1" : ""}`}>
           {FEATURES.map((f) => (
             <span
               key={f.text}
@@ -125,7 +127,7 @@ export default function HomePage() {
 
       {/* ── INFO CARDS ── */}
       {!result && !error && (
-        <div className="grid sm:grid-cols-3 gap-4 mt-2">
+        <div className={`grid gap-3 sm:gap-4 mt-2 ${isMobile ? "grid-cols-1" : "sm:grid-cols-3"}`}>
           {[
             {
               icon: "📅",

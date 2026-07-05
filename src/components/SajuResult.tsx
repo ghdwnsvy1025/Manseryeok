@@ -7,6 +7,7 @@ import type { Element } from "@/lib/saju/constants";
 import { BRANCH_META, ELEMENT_LABELS, STEM_META } from "@/lib/saju/constants";
 import { getTenGod, getHiddenStemsByBranch, type HiddenStemByPillar, type HiddenStemWithTenGod, type StemHanja } from "@/lib/saju/hiddenStems";
 import AiAnalysis from "@/components/AiAnalysis";
+import { useViewMode } from "@/contexts/ViewModeContext";
 
 // ── 오행별 픽셀 게임 색상 ──
 const ELEM: Record<Element, { text: string; bg: string; border: string }> = {
@@ -24,6 +25,48 @@ const ELEM_KO: Record<Element, string> = {
 type PillarKey = "year" | "month" | "day" | "hour";
 type AgeMode = "international" | "korean";
 
+type HighlightSelection =
+  | { kind: "stem"; source: "pillar" | "daeun-slot" | "daeun-table"; pillar: PillarKey | "all"; element: Element }
+  | { kind: "pillar-branch"; pillar: PillarKey }
+  | { kind: "daeun-branch"; pillar: PillarKey | "all" }
+  | null;
+
+function isSameHighlightSelection(a: HighlightSelection, b: HighlightSelection): boolean {
+  if (!a || !b) return false;
+  if (a.kind !== b.kind) return false;
+  if (a.kind === "stem" && b.kind === "stem") {
+    return a.source === b.source && a.pillar === b.pillar && a.element === b.element;
+  }
+  if (a.kind === "pillar-branch" && b.kind === "pillar-branch") {
+    return a.pillar === b.pillar;
+  }
+  if (a.kind === "daeun-branch" && b.kind === "daeun-branch") {
+    return a.pillar === b.pillar;
+  }
+  return false;
+}
+
+function isHiddenStemHighlighted(
+  selection: HighlightSelection,
+  context: "pillar" | "daeun",
+  pillarKey: PillarKey,
+  hiddenStem: HiddenStemWithTenGod,
+): boolean {
+  if (!selection) return false;
+  if (selection.kind === "stem") {
+    if (hiddenStem.element !== selection.element) return false;
+    if (context === "pillar") return true;
+    return selection.pillar === "all" || selection.pillar === pillarKey;
+  }
+  if (selection.kind === "pillar-branch") {
+    return context === "pillar" && pillarKey === selection.pillar;
+  }
+  if (selection.kind === "daeun-branch") {
+    return context === "daeun" && (selection.pillar === "all" || pillarKey === selection.pillar);
+  }
+  return false;
+}
+
 const PILLAR_META: Record<PillarKey, { ko: string; hanja: string }> = {
   year:  { ko: "년주", hanja: "年柱" },
   month: { ko: "월주", hanja: "月柱" },
@@ -36,14 +79,20 @@ const PILLAR_META: Record<PillarKey, { ko: string; hanja: string }> = {
 const DISPLAY_ORDER: PillarKey[] = ["hour", "day", "month", "year"];
 
 export default function SajuResult({ result }: { result: SajuResult }) {
+  const { isMobile } = useViewMode();
+  const charSize = isMobile ? "24px" : "36px";
+  const labelSize = isMobile ? "9px" : "10px";
   const [showDebug, setShowDebug] = useState(false);
   const [showDaeunDebug, setShowDaeunDebug] = useState(false);
   const [daeunAgeMode, setDaeunAgeMode] = useState<AgeMode>("international");
   const [showHiddenStemTenGod, setShowHiddenStemTenGod] = useState(false);
+  const [highlightSelection, setHighlightSelection] = useState<HighlightSelection>(null);
   const [selectedDaeunOrder, setSelectedDaeunOrder] = useState<number | null>(null);
-  const [comets, setComets] = useState<CometData[]>([]);
+  const [flyers, setFlyers] = useState<FlyerData[]>([]);
+  const [arrivedSlots, setArrivedSlots] = useState<Set<string>>(new Set());
   const [isMounted, setIsMounted] = useState(false);
-  const pillarRefs = useRef<(HTMLDivElement | null)[]>([null, null, null, null]);
+  const daeunStemSlotRefs = useRef<(HTMLDivElement | null)[]>([null, null, null, null]);
+  const daeunBranchSlotRefs = useRef<(HTMLDivElement | null)[]>([null, null, null, null]);
   const { pillars, debug, input } = result;
   const daeun = result.daeun;
   const hiddenStems = result.hiddenStems;
@@ -52,6 +101,10 @@ export default function SajuResult({ result }: { result: SajuResult }) {
   const hiddenStemItemsByPillar = Object.fromEntries(
     hiddenStems.items.map((item) => [item.pillar, item])
   ) as Partial<Record<PillarKey, HiddenStemByPillar>>;
+
+  const toggleHighlight = useCallback((next: Exclude<HighlightSelection, null>) => {
+    setHighlightSelection((prev) => (isSameHighlightSelection(prev, next) ? null : next));
+  }, []);
 
   // 오행 분포 집계
   const elemCount: Record<Element, number> = {
@@ -67,80 +120,146 @@ export default function SajuResult({ result }: { result: SajuResult }) {
 
   useEffect(() => { setIsMounted(true); }, []);
 
-  const launchComets = useCallback((
+  const handleFlyerArrive = useCallback((slotId: string, flyerId: string) => {
+    setArrivedSlots((prev) => new Set(prev).add(slotId));
+    setFlyers((prev) => prev.filter((f) => f.id !== flyerId));
+  }, []);
+
+  const launchFlyers = useCallback((
     sourceEl: HTMLElement,
-    stemChar: string, stemColor: string,
-    branchChar: string, branchColor: string,
+    stemChar: string,
+    stemColor: string,
+    stemElement: Element,
+    branchChar: string,
+    branchColor: string,
+    branchElement: Element,
   ) => {
-    const src = sourceEl.getBoundingClientRect();
-    const ox = src.left + src.width / 2;
-    const oy = src.top + src.height / 2;
-    const now = Date.now();
-    const list: CometData[] = [];
-
-    pillarRefs.current.forEach((el, i) => {
-      if (!el) return;
+    const getBottomCenter = (el: HTMLElement | null, fallback: DOMRect) => {
+      if (!el) return { x: fallback.left + fallback.width / 2, y: fallback.bottom };
       const r = el.getBoundingClientRect();
-      const cx = r.left + r.width / 2;
-      const idx = i; // closure capture
+      return { x: r.left + r.width / 2, y: r.bottom };
+    };
 
-      // 천간 → 각 기둥 카드 바로 위
-      list.push({
-        id: `st${idx}${now}`, char: stemChar, color: stemColor,
-        sx: ox, sy: oy, ex: cx, ey: r.top - 22,
-        getArrivalPos: () => {
-          const ref = pillarRefs.current[idx];
-          if (!ref) return { x: cx, y: r.top - 22 };
-          const rr = ref.getBoundingClientRect();
-          return { x: rr.left + rr.width / 2, y: rr.top - 22 };
-        },
-        delay: idx * 110,
-      });
+    const src = sourceEl.getBoundingClientRect();
+    const stemPart = sourceEl.querySelector('[data-ganji-part="stem"]') as HTMLElement | null;
+    const branchPart = sourceEl.querySelector('[data-ganji-part="branch"]') as HTMLElement | null;
+    const stemStart = getBottomCenter(stemPart, src);
+    const branchStart = getBottomCenter(branchPart, src);
+    const now = Date.now();
 
-      // 지지 → 각 기둥 카드 바로 아래
+    const list: FlyerData[] = [];
+
+    daeunStemSlotRefs.current.forEach((el, i) => {
+      if (!el) return;
       list.push({
-        id: `br${idx}${now}`, char: branchChar, color: branchColor,
-        sx: ox, sy: oy, ex: cx, ey: r.bottom + 6,
-        getArrivalPos: () => {
-          const ref = pillarRefs.current[idx];
-          if (!ref) return { x: cx, y: r.bottom + 6 };
-          const rr = ref.getBoundingClientRect();
-          return { x: rr.left + rr.width / 2, y: rr.bottom + 6 };
+        id: `st${i}-${now}`,
+        slotId: `stem-${i}`,
+        char: stemChar,
+        color: stemColor,
+        element: stemElement,
+        sx: stemStart.x,
+        sy: stemStart.y,
+        getTarget: () => {
+          const slot = daeunStemSlotRefs.current[i];
+          if (!slot) return stemStart;
+          const charEl = slot.querySelector("[data-flyer-char]") as HTMLElement | null;
+          if (charEl) {
+            const r = charEl.getBoundingClientRect();
+            return { x: r.left + r.width / 2, y: r.bottom };
+          }
+          const r = slot.getBoundingClientRect();
+          return { x: r.left + r.width / 2, y: r.bottom };
         },
-        delay: idx * 110 + 55,
+        delay: i * 90,
       });
     });
 
-    setComets(list);
-    // 사라지지 않음 - setComets([]) 호출 없음
+    daeunBranchSlotRefs.current.forEach((el, i) => {
+      if (!el) return;
+      list.push({
+        id: `br${i}-${now}`,
+        slotId: `branch-${i}`,
+        char: branchChar,
+        color: branchColor,
+        element: branchElement,
+        sx: branchStart.x,
+        sy: branchStart.y,
+        getTarget: () => {
+          const slot = daeunBranchSlotRefs.current[i];
+          if (!slot) return branchStart;
+          const charEl = slot.querySelector("[data-flyer-char]") as HTMLElement | null;
+          if (charEl) {
+            const r = charEl.getBoundingClientRect();
+            return { x: r.left + r.width / 2, y: r.bottom };
+          }
+          const r = slot.getBoundingClientRect();
+          return { x: r.left + r.width / 2, y: r.bottom };
+        },
+        delay: i * 90 + 45,
+      });
+    });
+
+    setFlyers(list);
   }, []);
+
+  const handleDaeunClick = useCallback((
+    cycleOrder: number,
+    isSelected: boolean,
+    sourceEl: HTMLElement,
+    stemChar: string,
+    stemColor: string,
+    stemElement: Element,
+    branchChar: string,
+    branchColor: string,
+    branchElement: Element,
+  ) => {
+    if (isSelected) {
+      setSelectedDaeunOrder(null);
+      setFlyers([]);
+      setArrivedSlots(new Set());
+      setHighlightSelection((prev) => {
+        if (!prev) return prev;
+        if (prev.kind === "stem" && (prev.source === "daeun-slot" || prev.source === "daeun-table")) return null;
+        if (prev.kind === "daeun-branch") return null;
+        return prev;
+      });
+      return;
+    }
+
+    setSelectedDaeunOrder(cycleOrder);
+    setArrivedSlots(new Set());
+    setFlyers([]);
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        launchFlyers(sourceEl, stemChar, stemColor, stemElement, branchChar, branchColor, branchElement);
+      });
+    });
+  }, [launchFlyers]);
 
   return (
     <>
-    <div className="space-y-4" style={{ border: "2px solid var(--px-accent)", boxShadow: "6px 6px 0 #4a3a00" }}>
+    <div className="space-y-4" style={{ border: "2px solid var(--px-accent)", boxShadow: isMobile ? "4px 4px 0 #4a3a00" : "6px 6px 0 #4a3a00" }}>
       <style>{`
-        @keyframes daeun-pulse {
-          0%, 100% { box-shadow: 3px 3px 0 #4a3a00, 0 0 10px #fbbf2444; }
-          50%       { box-shadow: 4px 4px 0 #4a3a00, 0 0 22px #fbbf24bb; }
-        }
-        @keyframes comet-arrive {
-          0%   { opacity: 0; transform: scale(0.4); }
-          40%  { opacity: 1; transform: scale(1.6); }
-          70%  { opacity: 0.9; transform: scale(0.9); }
-          100% { opacity: 0; transform: scale(1.2); }
-        }
         .daeun-card {
           transition: transform 0.13s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.13s, background 0.1s, border-color 0.1s;
           cursor: pointer;
         }
-        .daeun-card:hover  { transform: translateY(-4px); }
-        .daeun-card:active { transform: translateY(1px) scale(0.95) !important; transition: transform 0.05s !important; }
-        .daeun-selected    { transform: translateY(-4px); animation: daeun-pulse 1.8s ease-in-out infinite; }
-        .daeun-selected:hover { transform: translateY(-6px); }
+        .daeun-card:hover  { transform: translateY(-2px); }
+        .daeun-card:active { transform: translateY(1px) scale(0.97) !important; transition: transform 0.05s !important; }
+        .ganji-clickable {
+          cursor: pointer;
+          border-radius: 2px;
+          transition: background 0.1s, box-shadow 0.1s;
+        }
+        .ganji-clickable:hover { background: #ffffff11; }
+        .ganji-clickable-selected {
+          box-shadow: 0 0 0 2px #fbbf24, 0 0 12px #fbbf2488;
+          background: #fbbf2418;
+        }
       `}</style>
       {/* ── 입력 요약 바 ── */}
       <div
-        className="px-4 py-2 text-xs font-bold flex flex-wrap gap-x-4 gap-y-1"
+        className={`py-2 text-xs font-bold flex flex-wrap gap-x-4 gap-y-1 ${isMobile ? "px-2" : "px-4"}`}
         style={{ background: "var(--px-bg3)", color: "var(--px-text2)", borderBottom: "2px solid var(--px-border2)" }}
       >
         <span>
@@ -158,163 +277,215 @@ export default function SajuResult({ result }: { result: SajuResult }) {
         )}
       </div>
 
-      <div className="px-4 pb-4 space-y-5">
+      <div className={`pb-4 space-y-5 ${isMobile ? "px-2" : "px-4"}`}>
         {/* ── 4주 카드 (왼쪽: 시주 → 오른쪽: 년주) ── */}
-        <div className={`grid gap-2 ${selectedDaeun ? "grid-cols-5" : "grid-cols-4"}`}>
-          {DISPLAY_ORDER.map((key, i) => {
-            const pillar = pillars[key];
-            const meta = PILLAR_META[key];
+        {(() => {
+          const daeunStemEl  = selectedDaeun ? STEM_META[selectedDaeun.ganji[0]]?.element  : null;
+          const daeunBranchEl = selectedDaeun ? BRANCH_META[selectedDaeun.ganji[1]]?.element : null;
+          const daeunSc = daeunStemEl  ? ELEM[daeunStemEl]  : null;
+          const daeunBc = daeunBranchEl ? ELEM[daeunBranchEl] : null;
 
-            if (!pillar) {
-              return (
-                <div
-                  key={key}
-                  ref={(el) => { pillarRefs.current[i] = el; }}
-                  className="flex flex-col items-center justify-center min-h-[200px] p-2"
-                  style={{
-                    background: "var(--px-bg2)",
-                    border: "2px solid var(--px-border)",
-                    boxShadow: "3px 3px 0 #000",
-                  }}
-                >
-                  <p className="text-xs font-bold text-center" style={{ color: "var(--px-text2)" }}>
-                    {meta.ko}
-                    <br />
-                    <span style={{ fontSize: "10px" }}>{meta.hanja}</span>
-                  </p>
-                  <p className="text-xs mt-3 text-center leading-relaxed" style={{ color: "var(--px-border2)" }}>
-                    시간<br />없음
-                  </p>
-                </div>
-              );
+          const daeunBranchHiddenStems = selectedDaeun
+            ? getBranchHiddenStemsWithTenGod(selectedDaeun.ganji[1], dayStem)
+            : [];
+
+          let daeunStemTenGod = "";
+          let daeunBranchTenGod: string | null = null;
+          if (selectedDaeun) {
+            try {
+              daeunStemTenGod = getTenGod(dayStem, selectedDaeun.ganji[0] as StemHanja);
+              daeunBranchTenGod =
+                daeunBranchHiddenStems.find((s) => s.role === "main")?.tenGod ??
+                daeunBranchHiddenStems[daeunBranchHiddenStems.length - 1]?.tenGod ??
+                null;
+            } catch {
+              /* ignore */
             }
+          }
 
-            const sc = ELEM[pillar.stem.element];
-            const bc = ELEM[pillar.branch.element];
-            const stemTenGod = getTenGod(dayStem, pillar.stem.hanja as StemHanja);
-            const hiddenStemItem = hiddenStemItemsByPillar[key];
-            const branchTenGod =
-              hiddenStemItem?.hiddenStems.find((s) => s.role === "main")?.tenGod ??
-              hiddenStemItem?.hiddenStems[hiddenStemItem.hiddenStems.length - 1]?.tenGod ??
-              null;
+          return (
+            <div className={`grid grid-cols-4 ${isMobile ? "gap-1" : "gap-2"}`}>
+              {DISPLAY_ORDER.map((key, i) => {
+                const pillar = pillars[key];
+                const meta   = PILLAR_META[key];
+                const stemSlotId = `stem-${i}`;
+                const branchSlotId = `branch-${i}`;
+                const stemArrived = !selectedDaeun || arrivedSlots.has(stemSlotId);
+                const branchArrived = !selectedDaeun || arrivedSlots.has(branchSlotId);
 
-            return (
-              <div
-                key={key}
-                ref={(el) => { pillarRefs.current[i] = el; }}
-                className="flex flex-col items-center p-2 gap-1"
-                style={{
-                  background: "var(--px-bg2)",
-                  border: "2px solid var(--px-border)",
-                  boxShadow: "3px 3px 0 #000",
-                }}
-              >
-                {/* 주 라벨 */}
-                <div className="text-center pb-1 w-full" style={{ borderBottom: "1px solid var(--px-border)" }}>
-                  <p className="text-xs font-black" style={{ color: "var(--px-accent)" }}>
-                    {meta.ko}
-                  </p>
-                  <p className="text-xs" style={{ color: "var(--px-text2)", fontSize: "10px" }}>
-                    {meta.hanja}
-                  </p>
-                </div>
-
-                {/* ── 천간(天干) ── */}
-                <div className="flex flex-col items-center gap-0.5 py-1.5 w-full"
-                  style={{ borderBottom: "1px dashed var(--px-border)" }}>
-                  {/* 한자 — 오행 색상 */}
-                  <span
-                    className="font-black leading-none"
-                    style={{
-                      color: sc.text,
-                      fontSize: "36px",
-                      textShadow: `0 0 10px ${sc.text}88`,
-                    }}
-                  >
-                    {pillar.stem.hanja}
-                  </span>
-                  {/* 한글 */}
-                  <span className="text-xs font-bold" style={{ color: sc.text }}>
-                    {pillar.stem.ko}
-                  </span>
-                  {/* 일간 기준 십신 */}
-                  <div className="flex items-center gap-1 mt-0.5">
-                    <span
-                      className="text-xs px-1.5 py-0.5 font-bold border"
-                      style={{ color: sc.text, borderColor: sc.border, background: sc.bg }}
+                if (!pillar) {
+                  return (
+                    <div
+                      key={key}
+                      className="flex flex-col items-center justify-center p-1"
+                      style={{
+                        background: "var(--px-bg2)",
+                        border: "2px solid var(--px-border)",
+                        boxShadow: "3px 3px 0 #000",
+                        minHeight: isMobile ? "80px" : "200px",
+                      }}
                     >
-                      {stemTenGod}
-                    </span>
-                  </div>
-                </div>
+                      <p className="text-xs font-bold text-center" style={{ color: "var(--px-text2)" }}>
+                        {meta.ko}<br />
+                        <span style={{ fontSize: "10px" }}>{meta.hanja}</span>
+                      </p>
+                      <p className="text-xs mt-3 text-center leading-relaxed" style={{ color: "var(--px-border2)" }}>
+                        시간<br />없음
+                      </p>
+                    </div>
+                  );
+                }
 
-                {/* ── 지지(地支) ── */}
-                <div className="flex flex-col items-center gap-0.5 py-1.5 w-full">
-                  {/* 한자 — 오행 색상 */}
-                  <span
-                    className="font-black leading-none"
+                const sc = ELEM[pillar.stem.element];
+                const bc = ELEM[pillar.branch.element];
+                const stemTenGod = getTenGod(dayStem, pillar.stem.hanja as StemHanja);
+                const hiddenStemItem = hiddenStemItemsByPillar[key];
+                const branchTenGod =
+                  hiddenStemItem?.hiddenStems.find((s) => s.role === "main")?.tenGod ??
+                  hiddenStemItem?.hiddenStems[hiddenStemItem.hiddenStems.length - 1]?.tenGod ??
+                  null;
+                const stemSelected =
+                  highlightSelection?.kind === "stem" &&
+                  highlightSelection.source === "pillar" &&
+                  highlightSelection.pillar === key;
+                const branchSelected =
+                  highlightSelection?.kind === "pillar-branch" &&
+                  highlightSelection.pillar === key;
+                const daeunStemSelected =
+                  highlightSelection?.kind === "stem" &&
+                  highlightSelection.source === "daeun-slot" &&
+                  highlightSelection.pillar === key;
+                const daeunBranchSelected =
+                  highlightSelection?.kind === "daeun-branch" &&
+                  highlightSelection.pillar === key;
+
+                return (
+                  <div
+                    key={key}
+                    className={`flex flex-col items-center gap-0 w-full min-w-0 ${isMobile ? "p-0.5" : "p-2"}`}
                     style={{
-                      color: bc.text,
-                      fontSize: "36px",
-                      textShadow: `0 0 10px ${bc.text}88`,
+                      background: "var(--px-bg2)",
+                      border: "2px solid var(--px-border)",
+                      boxShadow: "3px 3px 0 #000",
                     }}
                   >
-                    {pillar.branch.hanja}
-                  </span>
-                  {/* 한글 */}
-                  <span className="text-xs font-bold" style={{ color: bc.text }}>
-                    {pillar.branch.ko}
-                  </span>
-                  {/* 지지 십신 (정기 기준) */}
-                  {branchTenGod && (
-                    <div className="flex items-center gap-1 mt-0.5">
-                      <span
-                        className="text-xs px-1.5 py-0.5 font-bold border"
-                        style={{ color: bc.text, borderColor: bc.border, background: bc.bg }}
-                      >
-                        {branchTenGod}
-                      </span>
+                    {/* 주 라벨 */}
+                    <div className="text-center pb-0.5 w-full" style={{ borderBottom: "1px solid var(--px-border)" }}>
+                      <p className="font-black leading-tight" style={{ color: "var(--px-accent)", fontSize: labelSize }}>{meta.ko}</p>
+                      {!isMobile && (
+                        <p style={{ color: "var(--px-text2)", fontSize: "10px" }}>{meta.hanja}</p>
+                      )}
                     </div>
-                  )}
-                  {/* 지장간 */}
-                  <div className="flex flex-wrap justify-center gap-1 mt-1">
-                    {hiddenStemItem?.hiddenStems.map((hiddenStem) => (
-                      <HiddenStemChip key={`${key}-${hiddenStem.role}-${hiddenStem.stem}`} hiddenStem={hiddenStem} />
-                    ))}
-                  </div>
-                </div>
 
-                {/* 간지 표기 */}
-                <div
-                  className="w-full pt-1 text-center"
-                  style={{ borderTop: "1px solid var(--px-border)" }}
-                >
-                  <span className="text-sm font-black">
-                    <span style={{ color: sc.text }}>{pillar.stem.hanja}</span>
-                    <span style={{ color: bc.text }}>{pillar.branch.hanja}</span>
-                  </span>
-                  <span className="text-xs ml-1" style={{ color: "var(--px-text2)" }}>
-                    {pillar.ganjiKo}
-                  </span>
-                </div>
-              </div>
-            );
-          })}
-          {/* 선택된 대운 카드 (5번째 열) */}
-          {selectedDaeun && (
-            <SelectedDaeunCard
-              cycle={selectedDaeun}
-              birthIso={input.normalizedSolarDateTime}
-              ageMode={daeunAgeMode}
-              dayStem={dayStem}
-              onClose={() => setSelectedDaeunOrder(null)}
-            />
-          )}
-        </div>
+                    {/* ── 선택된 대운 천간 ── */}
+                    {selectedDaeun && daeunSc && (
+                      <div
+                        ref={(el) => { daeunStemSlotRefs.current[i] = el; }}
+                        className={`flex flex-col items-center w-full ${isMobile ? "pt-0.5 pb-0 min-h-0" : "pt-1 pb-0.5 min-h-[52px]"}`}
+                        style={{ borderBottom: "1px dotted var(--px-border)" }}
+                      >
+                        <div style={{ visibility: stemArrived ? "visible" : "hidden" }}>
+                          <DaeunCharBox
+                            char={selectedDaeun.ganji[0]}
+                            tenGod={daeunStemTenGod}
+                            style={daeunSc}
+                            showBorder={stemArrived}
+                            charSize={charSize}
+                            labelSize={labelSize}
+                            selected={daeunStemSelected}
+                            onClick={() => {
+                              const el = STEM_META[selectedDaeun.ganji[0]]?.element;
+                              if (el) toggleHighlight({ kind: "stem", source: "daeun-slot", pillar: key, element: el });
+                            }}
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* ── 천간(天干) ── */}
+                    <div className={`flex flex-col items-center w-full ${isMobile ? "py-0.5 gap-0" : "gap-0.5 py-1.5"}`}
+                      style={{ borderBottom: "1px dashed var(--px-border)" }}>
+                      <button
+                        type="button"
+                        className={`ganji-clickable font-black leading-none bg-transparent border-0 p-0 ${stemSelected ? "ganji-clickable-selected" : ""}`}
+                        style={{ color: sc.text, fontSize: charSize, textShadow: `0 0 10px ${sc.text}88` }}
+                        onClick={() => toggleHighlight({ kind: "stem", source: "pillar", pillar: key, element: pillar.stem.element })}
+                        title="천간 클릭: 같은 오행 지장간 강조"
+                      >
+                        {pillar.stem.hanja}
+                      </button>
+                      <div className="flex items-center gap-1 mt-0.5">
+                        <span className="font-bold border leading-none"
+                          style={{ color: sc.text, borderColor: sc.border, background: sc.bg, fontSize: labelSize, padding: isMobile ? "1px 3px" : undefined }}>
+                          {stemTenGod}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* ── 지지(地支) ── */}
+                    <div className={`flex flex-col items-center w-full ${isMobile ? "py-0.5 gap-0" : "gap-0.5 py-1.5"}`}>
+                      <button
+                        type="button"
+                        className={`ganji-clickable font-black leading-none bg-transparent border-0 p-0 ${branchSelected ? "ganji-clickable-selected" : ""}`}
+                        style={{ color: bc.text, fontSize: charSize, textShadow: `0 0 10px ${bc.text}88` }}
+                        onClick={() => toggleHighlight({ kind: "pillar-branch", pillar: key })}
+                        title="지지 클릭: 해당 지장간 강조"
+                      >
+                        {pillar.branch.hanja}
+                      </button>
+                      {branchTenGod && (
+                        <div className="flex items-center gap-1 mt-0.5">
+                          <span className="font-bold border leading-none"
+                            style={{ color: bc.text, borderColor: bc.border, background: bc.bg, fontSize: labelSize, padding: isMobile ? "1px 3px" : undefined }}>
+                            {branchTenGod}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* ── 선택된 대운 지지 ── */}
+                    {selectedDaeun && daeunBc && (
+                      <div
+                        ref={(el) => { daeunBranchSlotRefs.current[i] = el; }}
+                        className={`flex flex-col items-center w-full ${isMobile ? "pt-0.5 pb-0 min-h-0" : "pt-0.5 pb-1 min-h-[52px]"}`}
+                        style={{ borderTop: "1px dotted var(--px-border)" }}
+                      >
+                        <div style={{ visibility: branchArrived ? "visible" : "hidden" }}>
+                          <DaeunCharBox
+                            char={selectedDaeun.ganji[1]}
+                            tenGod={daeunBranchTenGod ?? ""}
+                            style={daeunBc}
+                            showBorder={branchArrived}
+                            charSize={charSize}
+                            labelSize={labelSize}
+                            selected={daeunBranchSelected}
+                            onClick={() => toggleHighlight({ kind: "daeun-branch", pillar: key })}
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* ── 지장간 ── */}
+                    {(hiddenStemItem?.hiddenStems?.length || (selectedDaeun && daeunBranchHiddenStems.length)) ? (
+                      <HiddenStemPanel
+                        pillarStems={hiddenStemItem?.hiddenStems ?? []}
+                        daeunStems={selectedDaeun ? daeunBranchHiddenStems : undefined}
+                        highlightSelection={highlightSelection}
+                        pillarKey={key}
+                        split={!!selectedDaeun}
+                        isMobile={isMobile}
+                      />
+                    ) : null}
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })()}
 
         {/* ── 대운(大運) ── */}
         <div
-          className="p-3 space-y-4"
+          className={`space-y-4 ${isMobile ? "p-2" : "p-3"}`}
           style={{ background: "var(--px-bg3)", border: "2px solid var(--px-border)", boxShadow: "3px 3px 0 #000" }}
         >
           <div className="flex flex-wrap items-center justify-between gap-2">
@@ -345,92 +516,220 @@ export default function SajuResult({ result }: { result: SajuResult }) {
             </div>
           </div>
 
-          <p className="text-[10px]" style={{ color: "var(--px-text2)" }}>
-            ※ 클릭하면 사주 결과 옆에 나란히 표시됩니다.
-          </p>
+          {!isMobile && (
+            <p className="text-[10px]" style={{ color: "var(--px-text2)" }}>
+              ※ 대운 클릭 시 사주에 표시 · 천간/지지 클릭 시 지장간 강조
+            </p>
+          )}
 
-          <div className="overflow-x-auto">
-            <div className="flex gap-2 pb-1" style={{ minWidth: "max-content" }}>
+          <div className={`grid ${isMobile ? "grid-cols-5 gap-0.5" : "grid-cols-10 gap-1"}`}>
               {daeun.cycles.map((cycle, index) => {
                 const isSelected = selectedDaeunOrder === cycle.order;
+                const daeunCharSize = isMobile ? "16px" : "22px";
+                const daeunLabelSize = isMobile ? "9px" : "11px";
+                const daeunAgeSize = isMobile ? "9px" : "10px";
                 const stemEl = STEM_META[cycle.ganji[0]]?.element;
                 const branchEl = BRANCH_META[cycle.ganji[1]]?.element;
                 const sc = stemEl ? ELEM[stemEl] : ELEM.water;
                 const bc = branchEl ? ELEM[branchEl] : ELEM.water;
                 let stemTenGod: string = "";
+                let branchTenGod: string = "";
                 try {
                   stemTenGod = getTenGod(dayStem, cycle.ganji[0] as StemHanja);
+                  const branchHiddenStems = getBranchHiddenStemsWithTenGod(cycle.ganji[1], dayStem);
+                  branchTenGod =
+                    branchHiddenStems.find((s) => s.role === "main")?.tenGod ??
+                    branchHiddenStems[branchHiddenStems.length - 1]?.tenGod ??
+                    "";
                 } catch {
                   stemTenGod = "";
+                  branchTenGod = "";
                 }
+                const stemHighlightActive =
+                  highlightSelection?.kind === "stem" &&
+                  highlightSelection.source === "daeun-table" &&
+                  stemEl === highlightSelection.element;
+                const branchHighlightActive =
+                  highlightSelection?.kind === "daeun-branch" &&
+                  highlightSelection.pillar === "all";
+                const startAge = formatCycleAge(cycle.estimatedStartDate, input.normalizedSolarDateTime, daeunAgeMode);
+                const endAge = formatCycleAge(cycle.estimatedEndDate, input.normalizedSolarDateTime, daeunAgeMode);
                 return (
-                  <button
+                  <div
                     key={cycle.order}
-                    type="button"
+                    role="button"
+                    tabIndex={0}
                     onClick={(e) => {
-                      const nowSelected = !isSelected;
-                      setSelectedDaeunOrder(nowSelected ? cycle.order : null);
-                      if (nowSelected) {
-                        launchComets(
+                      if ((e.target as HTMLElement).closest("[data-ganji-part]")) return;
+                      handleDaeunClick(
+                        cycle.order,
+                        isSelected,
+                        e.currentTarget,
+                        cycle.ganji[0],
+                        sc.text,
+                        stemEl ?? "water",
+                        cycle.ganji[1],
+                        bc.text,
+                        branchEl ?? "water",
+                      );
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        if ((e.target as HTMLElement).closest("[data-ganji-part]")) return;
+                        e.preventDefault();
+                        handleDaeunClick(
+                          cycle.order,
+                          isSelected,
                           e.currentTarget,
-                          cycle.ganji[0], sc.text,
-                          cycle.ganji[1], bc.text,
+                          cycle.ganji[0],
+                          sc.text,
+                          stemEl ?? "water",
+                          cycle.ganji[1],
+                          bc.text,
+                          branchEl ?? "water",
                         );
-                      } else {
-                        setComets([]);
                       }
                     }}
-                    className={`daeun-card flex flex-col items-center gap-1 px-3 py-2 ${isSelected ? "daeun-selected" : ""}`}
+                    className={`daeun-card flex flex-col items-center w-full ${isMobile ? "gap-0.5 px-0.5 py-1" : "gap-1 px-1 py-1.5"}`}
                     style={{
-                      minWidth: "120px",
-                      background: isSelected ? "var(--px-bg2)" : (index % 2 === 0 ? "var(--px-bg2)" : "var(--px-bg3)"),
-                      border: isSelected ? "2px solid #fbbf24" : "1px solid var(--px-border)",
-                      boxShadow: isSelected ? "3px 3px 0 #4a3a00" : "2px 2px 0 #000",
+                      background: index % 2 === 0 ? "var(--px-bg2)" : "var(--px-bg3)",
+                      border: "1px solid var(--px-border)",
+                      boxShadow: "1px 1px 0 #000",
                     }}
                   >
-                    {/* 십신 */}
+                    <p
+                      className="font-bold leading-tight text-center w-full"
+                      style={{ color: "var(--px-accent)", fontSize: daeunAgeSize }}
+                    >
+                      {daeunAgeMode === "international" ? "만" : "한국"} {startAge}~{endAge}세
+                    </p>
                     {stemTenGod ? (
                       <span
-                        className="text-xs px-1.5 py-0.5 font-bold border"
+                        className="font-bold border leading-none"
                         style={{
+                          fontSize: daeunLabelSize,
+                          padding: "1px 3px",
                           color: sc.text,
-                          borderColor: isSelected ? "#fbbf2488" : sc.border,
-                          background: isSelected ? "#fbbf2411" : sc.bg,
+                          borderColor: sc.border,
+                          background: sc.bg,
                         }}
                       >
                         {stemTenGod}
                       </span>
                     ) : (
-                      <span className="text-xs font-bold" style={{ color: "var(--px-text2)" }}>
+                      <span className="font-bold leading-none" style={{ color: "var(--px-text2)", fontSize: daeunLabelSize }}>
                         {cycle.order}운
                       </span>
                     )}
-                    <ColoredGanji ganji={cycle.ganji} />
-                    <div className="text-[10px] text-center space-y-0.5 w-full">
-                      <p style={{ color: "var(--px-text2)" }}>
-                        {formatDateWithAge(cycle.estimatedStartDate, input.normalizedSolarDateTime, daeunAgeMode)}
-                      </p>
-                      <p style={{ color: "var(--px-border2)" }}>
-                        ~ {formatDateWithAge(cycle.estimatedEndDate, input.normalizedSolarDateTime, daeunAgeMode)}
-                      </p>
+                    <div className="flex items-center leading-none">
+                      <span
+                        data-ganji-part="stem"
+                        role="button"
+                        tabIndex={0}
+                        className={`ganji-clickable font-black ${stemHighlightActive ? "ganji-clickable-selected" : ""}`}
+                        style={{
+                          color: sc.text,
+                          fontSize: daeunCharSize,
+                          textShadow: `0 0 8px ${sc.text}66`,
+                          padding: "0 2px",
+                        }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const cardEl = e.currentTarget.closest("[role='button']") as HTMLElement | null;
+                          if (!isSelected) {
+                            handleDaeunClick(
+                              cycle.order,
+                              false,
+                              cardEl ?? e.currentTarget,
+                              cycle.ganji[0],
+                              sc.text,
+                              stemEl ?? "water",
+                              cycle.ganji[1],
+                              bc.text,
+                              branchEl ?? "water",
+                            );
+                          }
+                          if (stemEl) toggleHighlight({ kind: "stem", source: "daeun-table", pillar: "all", element: stemEl });
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            (e.currentTarget as HTMLElement).click();
+                          }
+                        }}
+                        title="대운 천간: 같은 오행 지장간 강조"
+                      >
+                        {cycle.ganji[0]}
+                      </span>
+                      <span
+                        data-ganji-part="branch"
+                        role="button"
+                        tabIndex={0}
+                        className={`ganji-clickable font-black ${branchHighlightActive ? "ganji-clickable-selected" : ""}`}
+                        style={{
+                          color: bc.text,
+                          fontSize: daeunCharSize,
+                          textShadow: `0 0 8px ${bc.text}66`,
+                          padding: "0 2px",
+                        }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const cardEl = e.currentTarget.closest("[role='button']") as HTMLElement | null;
+                          if (!isSelected) {
+                            handleDaeunClick(
+                              cycle.order,
+                              false,
+                              cardEl ?? e.currentTarget,
+                              cycle.ganji[0],
+                              sc.text,
+                              stemEl ?? "water",
+                              cycle.ganji[1],
+                              bc.text,
+                              branchEl ?? "water",
+                            );
+                          }
+                          toggleHighlight({ kind: "daeun-branch", pillar: "all" });
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            (e.currentTarget as HTMLElement).click();
+                          }
+                        }}
+                        title="대운 지지: 대운 지장간 강조"
+                      >
+                        {cycle.ganji[1]}
+                      </span>
                     </div>
-                  </button>
+                    {branchTenGod ? (
+                      <span
+                        className="font-bold border leading-none"
+                        style={{
+                          fontSize: daeunLabelSize,
+                          padding: "1px 3px",
+                          color: bc.text,
+                          borderColor: bc.border,
+                          background: bc.bg,
+                        }}
+                      >
+                        {branchTenGod}
+                      </span>
+                    ) : null}
+                    {!isMobile && (
+                      <div className="text-[9px] text-center leading-tight w-full">
+                        <p style={{ color: "var(--px-text2)" }}>
+                          {cycle.estimatedStartDate ? formatIsoDate(cycle.estimatedStartDate) : "-"}
+                        </p>
+                        <p style={{ color: "var(--px-border2)" }}>
+                          ~{cycle.estimatedEndDate ? formatIsoDate(cycle.estimatedEndDate) : "-"}
+                        </p>
+                      </div>
+                    )}
+                  </div>
                 );
               })}
-            </div>
-          </div>
-
-          <div className="grid sm:grid-cols-2 gap-2 text-xs">
-            <DaeunSummaryItem label="대운 방향" value={daeun.directionText} />
-            <DaeunSummaryItem label="대운수" value={`${daeun.startAge.years}년 ${daeun.startAge.months}개월 ${daeun.startAge.days}일`} />
-            <DaeunSummaryItem
-              label="기준 절기"
-              value={`${daeun.targetSolarTerm.nameKo} ${daeun.targetSolarTerm.nameHanja}, ${daeun.targetSolarTerm.datetime}`}
-            />
-            <DaeunSummaryItem
-              label="첫 대운 예상 시작일"
-              value={daeun.firstStartDate ? formatIsoDate(daeun.firstStartDate) : "계산 불가"}
-            />
           </div>
 
           <div style={{ border: "2px solid var(--px-border)", boxShadow: "3px 3px 0 #000" }}>
@@ -448,6 +747,18 @@ export default function SajuResult({ result }: { result: SajuResult }) {
                 className="px-4 pb-4 pt-3 space-y-3"
                 style={{ borderTop: "2px solid var(--px-border)", background: "var(--px-bg2)" }}
               >
+                <div className="grid sm:grid-cols-2 gap-2 text-xs">
+                  <DaeunSummaryItem label="대운 방향" value={daeun.directionText} />
+                  <DaeunSummaryItem label="대운수" value={`${daeun.startAge.years}년 ${daeun.startAge.months}개월 ${daeun.startAge.days}일`} />
+                  <DaeunSummaryItem
+                    label="기준 절기"
+                    value={`${daeun.targetSolarTerm.nameKo} ${daeun.targetSolarTerm.nameHanja}, ${daeun.targetSolarTerm.datetime}`}
+                  />
+                  <DaeunSummaryItem
+                    label="첫 대운 예상 시작일"
+                    value={daeun.firstStartDate ? formatIsoDate(daeun.firstStartDate) : "계산 불가"}
+                  />
+                </div>
                 <DebugTable
                   rows={[
                     ["성별", daeun.debug.gender === "male" ? "남자" : "여자"],
@@ -598,137 +909,247 @@ export default function SajuResult({ result }: { result: SajuResult }) {
       </div>
     </div>
 
-    {/* ── 혜성 오버레이 포털 ── */}
-    {isMounted && comets.length > 0 && createPortal(
+    {isMounted && flyers.length > 0 && createPortal(
       <>
-        {comets.map((c) => <CometSprite key={c.id} comet={c} />)}
+        {flyers.map((f) => (
+          <DaeunFlyer key={f.id} flyer={f} onArrive={handleFlyerArrive} />
+        ))}
       </>,
-      document.body
+      document.body,
     )}
+
     </>
   );
 }
 
-type CometData = {
+type FlyerData = {
   id: string;
+  slotId: string;
   char: string;
   color: string;
+  element: Element;
   sx: number;
   sy: number;
-  ex: number;
-  ey: number;
-  getArrivalPos: () => { x: number; y: number };
+  getTarget: () => { x: number; y: number };
   delay: number;
 };
 
-function CometSprite({ comet }: { comet: CometData }) {
-  // 0=hidden 1=ready 2=fly 3=arrived
-  const [phase, setPhase] = useState(0);
-  const arrivedRef = useRef<HTMLDivElement>(null);
+type StarParticle = {
+  id: number;
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  life: number;
+  size: number;
+  rotation: number;
+};
 
-  useEffect(() => {
-    const t1 = setTimeout(() => setPhase(1), comet.delay);
-    const t2 = setTimeout(() => setPhase(2), comet.delay + 20);
-    const t3 = setTimeout(() => setPhase(3), comet.delay + 760);
-    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
-  }, [comet.delay]);
+const STAR_CLIP =
+  "polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%)";
 
-  // 도착 후 스크롤 추적 - DOM 직접 조작 (리렌더링 없이)
-  useEffect(() => {
-    if (phase < 3) return;
-    const update = () => {
-      if (!arrivedRef.current) return;
-      const pos = comet.getArrivalPos();
-      arrivedRef.current.style.left = `${pos.x - 18}px`;
-      arrivedRef.current.style.top  = `${pos.y - 18}px`;
-    };
-    update();
-    window.addEventListener("scroll", update, { passive: true });
-    return () => window.removeEventListener("scroll", update);
-  }, [phase, comet]);
+function getBranchHiddenStemsWithTenGod(
+  branch: string,
+  dayStem: StemHanja,
+): HiddenStemWithTenGod[] {
+  try {
+    return getHiddenStemsByBranch(branch).map((hs) => ({
+      ...hs,
+      tenGod: getTenGod(dayStem, hs.stem),
+    }));
+  } catch {
+    return [];
+  }
+}
 
-  if (phase === 0) return null;
-
-  const dx = comet.ex - comet.sx;
-  const dy = comet.ey - comet.sy;
-  const motionAngle = Math.atan2(dy, dx) * (180 / Math.PI);
-  const tailAngle   = motionAngle + 180; // 꼬리는 진행 반대 방향
-
-  // ── 도착 후: 기둥 위/아래에 고정 표시 ──
-  if (phase === 3) {
-    const initPos = comet.getArrivalPos();
-    return (
-      <div
-        ref={arrivedRef}
+function DaeunCharBox({
+  char,
+  tenGod,
+  style,
+  showBorder,
+  charSize,
+  labelSize,
+  selected = false,
+  onClick,
+}: {
+  char: string;
+  tenGod: string;
+  style: { text: string; bg: string; border: string };
+  showBorder: boolean;
+  charSize: string;
+  labelSize: string;
+  selected?: boolean;
+  onClick?: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      className={`inline-flex flex-col items-center ganji-clickable bg-transparent border-0 ${selected ? "ganji-clickable-selected" : ""} ${charSize === "24px" ? "px-1 py-0.5" : "px-1.5 py-0.5"}`}
+      onClick={onClick}
+      style={{
+        border: showBorder ? `2px solid ${style.border}` : "2px solid transparent",
+        background: showBorder ? style.bg : "transparent",
+        boxShadow: showBorder ? `0 0 12px ${style.text}44, inset 0 0 6px ${style.text}11` : "none",
+        transition: "border-color 0.25s ease, box-shadow 0.25s ease, background 0.25s ease",
+      }}
+    >
+      <span
+        data-flyer-char
+        className="font-black leading-none block text-center"
         style={{
-          position: "fixed",
-          left: initPos.x - 18,
-          top:  initPos.y - 18,
-          zIndex: 1500,
-          pointerEvents: "none",
-          fontSize: "36px",
-          fontWeight: 900,
-          color: comet.color,
-          lineHeight: "1",
-          userSelect: "none",
-          textShadow: `0 0 10px ${comet.color}88`,
-          animation: "comet-arrive 280ms ease-out",
+          color: style.text,
+          fontSize: charSize,
+          textShadow: `0 0 14px ${style.text}, 0 0 6px ${style.text}88`,
         }}
       >
-        {comet.char}
-      </div>
-    );
-  }
+        {char}
+      </span>
+      {tenGod && (
+        <span
+          className="font-bold border px-1.5 py-0.5 mt-0.5"
+          style={{
+            color: style.text,
+            borderColor: style.border,
+            background: style.bg,
+            fontSize: labelSize,
+          }}
+        >
+          {tenGod}
+        </span>
+      )}
+    </button>
+  );
+}
 
-  // ── 비행 중 ──
-  const isFlying = phase === 2;
+function DaeunFlyer({
+  flyer,
+  onArrive,
+}: {
+  flyer: FlyerData;
+  onArrive: (slotId: string, flyerId: string) => void;
+}) {
+  const [pos, setPos] = useState({ x: flyer.sx, y: flyer.sy });
+  const [particles, setParticles] = useState<StarParticle[]>([]);
+  const [visible, setVisible] = useState(false);
+  const particleIdRef = useRef(0);
+
+  useEffect(() => {
+    const delayTimer = setTimeout(() => setVisible(true), flyer.delay);
+    return () => clearTimeout(delayTimer);
+  }, [flyer.delay]);
+
+  useEffect(() => {
+    if (!visible) return;
+
+    const duration = 720;
+    const startTime = performance.now();
+    let raf = 0;
+    let lastSpawn = 0;
+
+    const tick = (now: number) => {
+      const t = Math.min((now - startTime) / duration, 1);
+      const eased = 1 - Math.pow(1 - t, 2.8);
+      const target = flyer.getTarget();
+      const x = flyer.sx + (target.x - flyer.sx) * eased;
+      const y = flyer.sy + (target.y - flyer.sy) * eased;
+
+      setPos({ x, y });
+
+      const dx = target.x - x;
+      const dy = target.y - y;
+      const motionAngle = Math.atan2(dy, dx);
+      const oppAngle = motionAngle + Math.PI;
+
+      setParticles((prev) => {
+        let next = prev
+          .map((p) => ({
+            ...p,
+            x: p.x + p.vx,
+            y: p.y + p.vy,
+            vx: p.vx * 0.96,
+            vy: p.vy * 0.96,
+            life: p.life - 0.035,
+            rotation: p.rotation + 2.5,
+          }))
+          .filter((p) => p.life > 0);
+
+        if (now - lastSpawn > 28 && t < 0.95) {
+          lastSpawn = now;
+          for (let n = 0; n < 3; n++) {
+            const spread = (Math.random() - 0.5) * 0.7;
+            const speed = 1.2 + Math.random() * 2.2;
+            next.push({
+              id: particleIdRef.current++,
+              x: (Math.random() - 0.5) * 8,
+              y: (Math.random() - 0.5) * 8,
+              vx: Math.cos(oppAngle + spread) * speed,
+              vy: Math.sin(oppAngle + spread) * speed,
+              life: 1,
+              size: 5 + Math.random() * 7,
+              rotation: Math.random() * 360,
+            });
+          }
+        }
+
+        return next.slice(-45);
+      });
+
+      if (t < 1) {
+        raf = requestAnimationFrame(tick);
+      } else {
+        onArrive(flyer.slotId, flyer.id);
+      }
+    };
+
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [visible, flyer, onArrive]);
+
+  if (!visible) return null;
+
   return (
     <div
       style={{
         position: "fixed",
-        left: comet.sx - 18,
-        top:  comet.sy - 18,
+        left: pos.x,
+        top: pos.y,
+        transform: "translate(-50%, -100%)",
         zIndex: 10000,
         pointerEvents: "none",
         userSelect: "none",
-        willChange: "transform",
-        transform: isFlying ? `translate(${dx}px, ${dy}px)` : "translate(0,0)",
-        transition: isFlying
-          ? "transform 700ms cubic-bezier(0.15, 0.85, 0.35, 1)"
-          : "none",
       }}
     >
-      {/* 본 글자: 기둥 카드와 동일한 스타일(36px) */}
-      <span
-        style={{
-          display: "block",
-          fontSize: "36px",
-          fontWeight: 900,
-          color: comet.color,
-          lineHeight: "1",
-          textShadow: `0 0 10px ${comet.color}88`,
-        }}
-      >
-        {comet.char}
-      </span>
-      {/* 별 꼬리: 비행 방향 반대로 뻗는 그라데이션 선 */}
-      {isFlying && (
+      {particles.map((p) => (
         <div
+          key={p.id}
           style={{
             position: "absolute",
-            left: "18px",
-            top: "18px",
-            transform: `translateY(-50%) rotate(${tailAngle}deg)`,
-            transformOrigin: "0% 50%",
-            width: "50px",
-            height: "4px",
-            background: `linear-gradient(to right, ${comet.color}cc, transparent)`,
-            borderRadius: "2px",
-            filter: "blur(1.5px)",
+            left: p.x,
+            top: p.y,
+            width: p.size,
+            height: p.size,
+            transform: `translate(-50%, -50%) rotate(${p.rotation}deg)`,
+            background: flyer.color,
+            opacity: p.life * 0.85,
+            clipPath: STAR_CLIP,
+            boxShadow: `0 0 ${p.size}px ${flyer.color}, 0 0 ${p.size * 2}px ${flyer.color}66`,
             pointerEvents: "none",
           }}
         />
-      )}
+      ))}
+      <span
+        style={{
+          position: "relative",
+          display: "block",
+          fontSize: "36px",
+          fontWeight: 900,
+          lineHeight: 1,
+          color: flyer.color,
+          textShadow: `0 0 10px ${flyer.color}88`,
+        }}
+      >
+        {flyer.char}
+      </span>
     </div>
   );
 }
@@ -739,147 +1160,6 @@ type DaeunCycle = {
   estimatedStartDate: string | null;
   estimatedEndDate: string | null;
 };
-
-function SelectedDaeunCard({
-  cycle,
-  birthIso,
-  ageMode,
-  dayStem,
-  onClose,
-}: {
-  cycle: DaeunCycle;
-  birthIso: string;
-  ageMode: AgeMode;
-  dayStem: StemHanja;
-  onClose: () => void;
-}) {
-  const stem = cycle.ganji[0];
-  const branch = cycle.ganji[1];
-  const stemElement = STEM_META[stem]?.element;
-  const branchElement = BRANCH_META[branch]?.element;
-  const sc = stemElement ? ELEM[stemElement] : ELEM.water;
-  const bc = branchElement ? ELEM[branchElement] : ELEM.water;
-
-  let stemTenGod: string = "";
-  let branchTenGod: string | null = null;
-  let branchHiddenStems: HiddenStemWithTenGod[] = [];
-  try {
-    stemTenGod = getTenGod(dayStem, stem as StemHanja);
-    const rawHS = getHiddenStemsByBranch(branch);
-    branchHiddenStems = rawHS.map((hs) => ({
-      ...hs,
-      tenGod: getTenGod(dayStem, hs.stem),
-    }));
-    branchTenGod =
-      branchHiddenStems.find((s) => s.role === "main")?.tenGod ??
-      branchHiddenStems[branchHiddenStems.length - 1]?.tenGod ??
-      null;
-  } catch {
-    /* 계산 불가 시 무시 */
-  }
-
-  const ganjiKo = (STEM_META[stem]?.ko ?? "") + (BRANCH_META[branch]?.ko ?? "");
-
-  return (
-    <div
-      className="flex flex-col items-center p-2 gap-1 relative"
-      style={{
-        background: "var(--px-bg2)",
-        border: "2px solid #fbbf24",
-        boxShadow: "4px 4px 0 #4a3a00, 0 0 16px #fbbf2433",
-        animation: "daeun-pulse 1.8s ease-in-out infinite",
-      }}
-    >
-      {/* 닫기 */}
-      <button
-        type="button"
-        onClick={onClose}
-        className="absolute top-1 right-1 text-[10px] font-bold px-1 leading-none"
-        style={{ color: "var(--px-text2)" }}
-        title="닫기"
-      >
-        ✕
-      </button>
-
-      {/* 주 라벨 */}
-      <div className="text-center pb-1 w-full" style={{ borderBottom: "1px solid var(--px-border)" }}>
-        <p className="text-xs font-black" style={{ color: "#fbbf24" }}>
-          {cycle.order}운
-        </p>
-        <p style={{ color: "var(--px-text2)", fontSize: "10px" }}>大運</p>
-      </div>
-
-      {/* ── 천간(天干) ── */}
-      <div
-        className="flex flex-col items-center gap-0.5 py-1.5 w-full"
-        style={{ borderBottom: "1px dashed var(--px-border)" }}
-      >
-        <span
-          className="font-black leading-none"
-          style={{ color: sc.text, fontSize: "36px", textShadow: `0 0 10px ${sc.text}88` }}
-        >
-          {stem}
-        </span>
-        <span className="text-xs font-bold" style={{ color: sc.text }}>
-          {STEM_META[stem]?.ko ?? ""}
-        </span>
-        {stemTenGod && (
-          <div className="flex items-center gap-1 mt-0.5">
-            <span
-              className="text-xs px-1.5 py-0.5 font-bold border"
-              style={{ color: sc.text, borderColor: sc.border, background: sc.bg }}
-            >
-              {stemTenGod}
-            </span>
-          </div>
-        )}
-      </div>
-
-      {/* ── 지지(地支) ── */}
-      <div className="flex flex-col items-center gap-0.5 py-1.5 w-full">
-        <span
-          className="font-black leading-none"
-          style={{ color: bc.text, fontSize: "36px", textShadow: `0 0 10px ${bc.text}88` }}
-        >
-          {branch}
-        </span>
-        <span className="text-xs font-bold" style={{ color: bc.text }}>
-          {BRANCH_META[branch]?.ko ?? ""}
-        </span>
-        {branchTenGod && (
-          <div className="flex items-center gap-1 mt-0.5">
-            <span
-              className="text-xs px-1.5 py-0.5 font-bold border"
-              style={{ color: bc.text, borderColor: bc.border, background: bc.bg }}
-            >
-              {branchTenGod}
-            </span>
-          </div>
-        )}
-        {branchHiddenStems.length > 0 && (
-          <div className="flex flex-wrap justify-center gap-1 mt-1">
-            {branchHiddenStems.map((hs) => (
-              <HiddenStemChip key={`daeun-${hs.role}-${hs.stem}`} hiddenStem={hs} />
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* 간지 표기 + 기간 */}
-      <div className="w-full pt-1 text-center" style={{ borderTop: "1px solid #fbbf2455" }}>
-        <span className="text-sm font-black">
-          <span style={{ color: sc.text }}>{stem}</span>
-          <span style={{ color: bc.text }}>{branch}</span>
-        </span>
-        <span className="text-xs ml-1" style={{ color: "var(--px-text2)" }}>{ganjiKo}</span>
-        <div className="text-[10px] mt-0.5 space-y-0.5" style={{ color: "var(--px-text2)" }}>
-          <p>{formatDateWithAge(cycle.estimatedStartDate, birthIso, ageMode)}</p>
-          <p>~ {formatDateWithAge(cycle.estimatedEndDate, birthIso, ageMode)}</p>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 function DaeunSummaryItem({ label, value }: { label: string; value: string }) {
   return (
@@ -929,25 +1209,104 @@ function HiddenStemLine({
   );
 }
 
-function HiddenStemChip({ hiddenStem }: { hiddenStem: HiddenStemWithTenGod }) {
+function HiddenStemPanel({
+  pillarStems,
+  daeunStems,
+  highlightSelection,
+  pillarKey,
+  split,
+  isMobile,
+}: {
+  pillarStems: HiddenStemWithTenGod[];
+  daeunStems?: HiddenStemWithTenGod[];
+  highlightSelection: HighlightSelection;
+  pillarKey: PillarKey;
+  split: boolean;
+  isMobile: boolean;
+}) {
+  const chipSize = isMobile ? "8px" : "10px";
+
+  if (split && daeunStems) {
+    return (
+      <div
+        className="grid grid-cols-2 w-full pt-0.5"
+        style={{ borderTop: "1px solid var(--px-border)" }}
+      >
+        <div className={`flex flex-col items-center min-w-0 ${isMobile ? "gap-0 px-0 py-0.5" : "gap-0.5 px-0.5 py-1"}`}>
+          {pillarStems.map((hs) => (
+            <HiddenStemChip
+              key={`p-${hs.role}-${hs.stem}`}
+              hiddenStem={hs}
+              highlighted={isHiddenStemHighlighted(highlightSelection, "pillar", pillarKey, hs)}
+              fontSize={chipSize}
+            />
+          ))}
+        </div>
+        <div
+          className={`flex flex-col items-center min-w-0 ${isMobile ? "gap-0 px-0 py-0.5" : "gap-0.5 px-0.5 py-1"}`}
+          style={{ borderLeft: "1px solid var(--px-border)" }}
+        >
+          {daeunStems.map((hs) => (
+            <HiddenStemChip
+              key={`d-${hs.role}-${hs.stem}`}
+              hiddenStem={hs}
+              highlighted={isHiddenStemHighlighted(highlightSelection, "daeun", pillarKey, hs)}
+              fontSize={chipSize}
+            />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className={`flex flex-wrap justify-center w-full pt-0.5 ${isMobile ? "gap-0" : "gap-0.5"}`}
+      style={{ borderTop: "1px solid var(--px-border)" }}
+    >
+      {pillarStems.map((hs) => (
+        <HiddenStemChip
+          key={`p-${hs.role}-${hs.stem}`}
+          hiddenStem={hs}
+          highlighted={isHiddenStemHighlighted(highlightSelection, "pillar", pillarKey, hs)}
+          fontSize={chipSize}
+        />
+      ))}
+    </div>
+  );
+}
+
+function HiddenStemChip({
+  hiddenStem,
+  highlighted,
+  fontSize = "10px",
+}: {
+  hiddenStem: HiddenStemWithTenGod;
+  highlighted: boolean;
+  fontSize?: string;
+}) {
   const color = ELEM[hiddenStem.element].text;
+  const isMatch = highlighted;
 
   return (
     <span
-      className="text-[10px] px-1 py-0.5 font-bold border"
-      title={`${hiddenStem.roleKo}: ${hiddenStem.stem}${hiddenStem.stemKo}`}
+      className="font-bold leading-none"
+      title={`${hiddenStem.roleKo}: ${hiddenStem.stem} (${ELEM_KO[hiddenStem.element]})`}
       style={{
+        fontSize,
+        padding: "1px 2px",
         color,
-        borderColor: ELEM[hiddenStem.element].border,
-        background: ELEM[hiddenStem.element].bg,
+        border: isMatch ? `2px solid ${color}` : `1px solid ${ELEM[hiddenStem.element].border}`,
+        background: isMatch ? `${color}33` : ELEM[hiddenStem.element].bg,
+        boxShadow: isMatch ? `0 0 8px ${color}88, inset 0 0 4px ${color}22` : "none",
       }}
     >
-      {hiddenStem.stemKo} {hiddenStem.stem}
+      {hiddenStem.stem}
     </span>
   );
 }
 
-function ColoredGanji({ ganji }: { ganji: string }) {
+function ColoredGanji({ ganji, compact = false }: { ganji: string; compact?: boolean }) {
   const stem = ganji[0];
   const branch = ganji[1];
   const stemElement = STEM_META[stem]?.element;
@@ -956,11 +1315,19 @@ function ColoredGanji({ ganji }: { ganji: string }) {
   const branchColor = branchElement ? ELEM[branchElement].text : "var(--px-accent)";
 
   return (
-    <span className="font-black text-base">
+    <span className="font-black" style={{ fontSize: compact ? "13px" : undefined }}>
       <span style={{ color: stemColor, textShadow: `0 0 8px ${stemColor}66` }}>{stem}</span>
       <span style={{ color: branchColor, textShadow: `0 0 8px ${branchColor}66` }}>{branch}</span>
     </span>
   );
+}
+
+function formatCycleAge(iso: string | null, birthIso: string, ageMode: AgeMode): string {
+  if (!iso) return "-";
+  const age = ageMode === "international"
+    ? calculateInternationalAge(birthIso, iso)
+    : calculateKoreanAge(birthIso, iso);
+  return String(age);
 }
 
 function formatIsoDate(iso: string): string {
