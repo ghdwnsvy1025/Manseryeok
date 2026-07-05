@@ -27,8 +27,7 @@ type AgeMode = "international" | "korean";
 
 type HighlightSelection =
   | { kind: "stem"; source: "pillar" | "daeun-slot" | "daeun-table"; pillar: PillarKey | "all"; element: Element }
-  | { kind: "pillar-branch"; pillar: PillarKey }
-  | { kind: "daeun-branch"; pillar: PillarKey | "all" }
+  | { kind: "branch-stem-match"; scope: "pillar" | "daeun"; pillar: PillarKey }
   | null;
 
 function isSameHighlightSelection(a: HighlightSelection, b: HighlightSelection): boolean {
@@ -37,11 +36,8 @@ function isSameHighlightSelection(a: HighlightSelection, b: HighlightSelection):
   if (a.kind === "stem" && b.kind === "stem") {
     return a.source === b.source && a.pillar === b.pillar && a.element === b.element;
   }
-  if (a.kind === "pillar-branch" && b.kind === "pillar-branch") {
-    return a.pillar === b.pillar;
-  }
-  if (a.kind === "daeun-branch" && b.kind === "daeun-branch") {
-    return a.pillar === b.pillar;
+  if (a.kind === "branch-stem-match" && b.kind === "branch-stem-match") {
+    return a.scope === b.scope && a.pillar === b.pillar;
   }
   return false;
 }
@@ -51,6 +47,7 @@ function isHiddenStemHighlighted(
   context: "pillar" | "daeun",
   pillarKey: PillarKey,
   hiddenStem: HiddenStemWithTenGod,
+  stemElements: Set<Element>,
 ): boolean {
   if (!selection) return false;
   if (selection.kind === "stem") {
@@ -58,11 +55,10 @@ function isHiddenStemHighlighted(
     if (context === "pillar") return true;
     return selection.pillar === "all" || selection.pillar === pillarKey;
   }
-  if (selection.kind === "pillar-branch") {
-    return context === "pillar" && pillarKey === selection.pillar;
-  }
-  if (selection.kind === "daeun-branch") {
-    return context === "daeun" && (selection.pillar === "all" || pillarKey === selection.pillar);
+  if (selection.kind === "branch-stem-match") {
+    if (context !== selection.scope) return false;
+    if (selection.scope === "daeun" && pillarKey !== selection.pillar) return false;
+    return stemElements.has(hiddenStem.element);
   }
   return false;
 }
@@ -90,6 +86,9 @@ export default function SajuResult({ result }: { result: SajuResult }) {
   const [selectedDaeunOrder, setSelectedDaeunOrder] = useState<number | null>(null);
   const [flyers, setFlyers] = useState<FlyerData[]>([]);
   const [arrivedSlots, setArrivedSlots] = useState<Set<string>>(new Set());
+  const [pumpingSlots, setPumpingSlots] = useState<Set<string>>(new Set());
+  const [pumpGeneration, setPumpGeneration] = useState(0);
+  const pumpTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isMounted, setIsMounted] = useState(false);
   const daeunStemSlotRefs = useRef<(HTMLDivElement | null)[]>([null, null, null, null]);
   const daeunBranchSlotRefs = useRef<(HTMLDivElement | null)[]>([null, null, null, null]);
@@ -106,6 +105,12 @@ export default function SajuResult({ result }: { result: SajuResult }) {
     setHighlightSelection((prev) => (isSameHighlightSelection(prev, next) ? null : next));
   }, []);
 
+  const stemElements = new Set<Element>();
+  for (const k of DISPLAY_ORDER) {
+    const p = pillars[k];
+    if (p) stemElements.add(p.stem.element);
+  }
+
   // 오행 분포 집계
   const elemCount: Record<Element, number> = {
     wood: 0, fire: 0, earth: 0, metal: 0, water: 0,
@@ -117,6 +122,36 @@ export default function SajuResult({ result }: { result: SajuResult }) {
     elemCount[p.branch.element]++;
   }
   const totalElem = Object.values(elemCount).reduce((a, b) => a + b, 0);
+
+  const allDaeunSlotIds = useCallback(() => {
+    const ids: string[] = [];
+    for (let i = 0; i < 4; i++) {
+      ids.push(`stem-${i}`, `branch-${i}`);
+    }
+    return ids;
+  }, []);
+
+  const triggerMobilePump = useCallback(() => {
+    if (pumpTimerRef.current) clearTimeout(pumpTimerRef.current);
+    setPumpingSlots(new Set());
+
+    requestAnimationFrame(() => {
+      const slots = new Set(allDaeunSlotIds());
+      setPumpGeneration((g) => g + 1);
+      setArrivedSlots(slots);
+      setPumpingSlots(slots);
+      pumpTimerRef.current = setTimeout(() => {
+        setPumpingSlots(new Set());
+        pumpTimerRef.current = null;
+      }, 650);
+    });
+  }, [allDaeunSlotIds]);
+
+  useEffect(() => {
+    return () => {
+      if (pumpTimerRef.current) clearTimeout(pumpTimerRef.current);
+    };
+  }, []);
 
   useEffect(() => { setIsMounted(true); }, []);
 
@@ -205,7 +240,7 @@ export default function SajuResult({ result }: { result: SajuResult }) {
   const handleDaeunClick = useCallback((
     cycleOrder: number,
     isSelected: boolean,
-    sourceEl: HTMLElement,
+    sourceEl: HTMLElement | null,
     stemChar: string,
     stemColor: string,
     stemElement: Element,
@@ -217,24 +252,44 @@ export default function SajuResult({ result }: { result: SajuResult }) {
       setSelectedDaeunOrder(null);
       setFlyers([]);
       setArrivedSlots(new Set());
+      setPumpingSlots(new Set());
+      setPumpGeneration((g) => g + 1);
+      if (pumpTimerRef.current) {
+        clearTimeout(pumpTimerRef.current);
+        pumpTimerRef.current = null;
+      }
       setHighlightSelection((prev) => {
         if (!prev) return prev;
         if (prev.kind === "stem" && (prev.source === "daeun-slot" || prev.source === "daeun-table")) return null;
-        if (prev.kind === "daeun-branch") return null;
+        if (prev.kind === "branch-stem-match") return null;
         return prev;
       });
       return;
     }
 
     setSelectedDaeunOrder(cycleOrder);
+    setHighlightSelection((prev) => {
+      if (!prev) return prev;
+      if (prev.kind === "stem" && (prev.source === "daeun-slot" || prev.source === "daeun-table")) return null;
+      if (prev.kind === "branch-stem-match") return null;
+      return prev;
+    });
+
+    if (isMobile) {
+      setFlyers([]);
+      triggerMobilePump();
+      return;
+    }
+
     setArrivedSlots(new Set());
     setFlyers([]);
+    if (!sourceEl) return;
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         launchFlyers(sourceEl, stemChar, stemColor, stemElement, branchChar, branchColor, branchElement);
       });
     });
-  }, [launchFlyers]);
+  }, [launchFlyers, isMobile, triggerMobilePump]);
 
   return (
     <>
@@ -255,6 +310,14 @@ export default function SajuResult({ result }: { result: SajuResult }) {
         .ganji-clickable-selected {
           box-shadow: 0 0 0 2px #fbbf24, 0 0 12px #fbbf2488;
           background: #fbbf2418;
+        }
+        @keyframes daeun-slot-pump {
+          0%   { transform: scale(0.35); opacity: 0.2; }
+          55%  { transform: scale(1.18); opacity: 1; }
+          100% { transform: scale(1); opacity: 1; }
+        }
+        .daeun-slot-pump {
+          animation: daeun-slot-pump 0.55s cubic-bezier(0.34, 1.56, 0.64, 1);
         }
       `}</style>
       {/* ── 입력 요약 바 ── */}
@@ -277,7 +340,7 @@ export default function SajuResult({ result }: { result: SajuResult }) {
         )}
       </div>
 
-      <div className={`pb-4 space-y-5 ${isMobile ? "px-2" : "px-4"}`}>
+      <div className={`pb-4 space-y-6 ${isMobile ? "px-2" : "px-4"}`}>
         {/* ── 4주 카드 (왼쪽: 시주 → 오른쪽: 년주) ── */}
         {(() => {
           const daeunStemEl  = selectedDaeun ? STEM_META[selectedDaeun.ganji[0]]?.element  : null;
@@ -304,14 +367,16 @@ export default function SajuResult({ result }: { result: SajuResult }) {
           }
 
           return (
-            <div className={`grid grid-cols-4 ${isMobile ? "gap-1" : "gap-2"}`}>
+            <div className={`grid grid-cols-4 ${isMobile ? "gap-1.5" : "gap-2"}`}>
               {DISPLAY_ORDER.map((key, i) => {
                 const pillar = pillars[key];
                 const meta   = PILLAR_META[key];
                 const stemSlotId = `stem-${i}`;
                 const branchSlotId = `branch-${i}`;
-                const stemArrived = !selectedDaeun || arrivedSlots.has(stemSlotId);
-                const branchArrived = !selectedDaeun || arrivedSlots.has(branchSlotId);
+                const stemArrived = !selectedDaeun || arrivedSlots.has(stemSlotId) || (isMobile && !!selectedDaeun);
+                const branchArrived = !selectedDaeun || arrivedSlots.has(branchSlotId) || (isMobile && !!selectedDaeun);
+                const stemPumping = pumpingSlots.has(stemSlotId);
+                const branchPumping = pumpingSlots.has(branchSlotId);
 
                 if (!pillar) {
                   return (
@@ -322,7 +387,7 @@ export default function SajuResult({ result }: { result: SajuResult }) {
                         background: "var(--px-bg2)",
                         border: "2px solid var(--px-border)",
                         boxShadow: "3px 3px 0 #000",
-                        minHeight: isMobile ? "80px" : "200px",
+                        minHeight: isMobile ? "96px" : "200px",
                       }}
                     >
                       <p className="text-xs font-bold text-center" style={{ color: "var(--px-text2)" }}>
@@ -349,20 +414,22 @@ export default function SajuResult({ result }: { result: SajuResult }) {
                   highlightSelection.source === "pillar" &&
                   highlightSelection.pillar === key;
                 const branchSelected =
-                  highlightSelection?.kind === "pillar-branch" &&
+                  highlightSelection?.kind === "branch-stem-match" &&
+                  highlightSelection.scope === "pillar" &&
                   highlightSelection.pillar === key;
                 const daeunStemSelected =
                   highlightSelection?.kind === "stem" &&
                   highlightSelection.source === "daeun-slot" &&
                   highlightSelection.pillar === key;
                 const daeunBranchSelected =
-                  highlightSelection?.kind === "daeun-branch" &&
+                  highlightSelection?.kind === "branch-stem-match" &&
+                  highlightSelection.scope === "daeun" &&
                   highlightSelection.pillar === key;
 
                 return (
                   <div
                     key={key}
-                    className={`flex flex-col items-center gap-0 w-full min-w-0 ${isMobile ? "p-0.5" : "p-2"}`}
+                    className={`flex flex-col items-center gap-0 w-full min-w-0 ${isMobile ? "p-1" : "p-2"}`}
                     style={{
                       background: "var(--px-bg2)",
                       border: "2px solid var(--px-border)",
@@ -370,7 +437,7 @@ export default function SajuResult({ result }: { result: SajuResult }) {
                     }}
                   >
                     {/* 주 라벨 */}
-                    <div className="text-center pb-0.5 w-full" style={{ borderBottom: "1px solid var(--px-border)" }}>
+                    <div className="text-center pb-1 w-full" style={{ borderBottom: "1px solid var(--px-border)" }}>
                       <p className="font-black leading-tight" style={{ color: "var(--px-accent)", fontSize: labelSize }}>{meta.ko}</p>
                       {!isMobile && (
                         <p style={{ color: "var(--px-text2)", fontSize: "10px" }}>{meta.hanja}</p>
@@ -381,10 +448,10 @@ export default function SajuResult({ result }: { result: SajuResult }) {
                     {selectedDaeun && daeunSc && (
                       <div
                         ref={(el) => { daeunStemSlotRefs.current[i] = el; }}
-                        className={`flex flex-col items-center w-full ${isMobile ? "pt-0.5 pb-0 min-h-0" : "pt-1 pb-0.5 min-h-[52px]"}`}
+                        className={`flex flex-col items-center w-full ${isMobile ? "pt-1 pb-0.5 min-h-0" : "pt-1 pb-0.5 min-h-[52px]"}`}
                         style={{ borderBottom: "1px dotted var(--px-border)" }}
                       >
-                        <div style={{ visibility: stemArrived ? "visible" : "hidden" }}>
+                        <div key={`stem-${pumpGeneration}`} style={{ visibility: stemArrived ? "visible" : "hidden" }}>
                           <DaeunCharBox
                             char={selectedDaeun.ganji[0]}
                             tenGod={daeunStemTenGod}
@@ -393,6 +460,7 @@ export default function SajuResult({ result }: { result: SajuResult }) {
                             charSize={charSize}
                             labelSize={labelSize}
                             selected={daeunStemSelected}
+                            pumping={stemPumping}
                             onClick={() => {
                               const el = STEM_META[selectedDaeun.ganji[0]]?.element;
                               if (el) toggleHighlight({ kind: "stem", source: "daeun-slot", pillar: key, element: el });
@@ -403,7 +471,7 @@ export default function SajuResult({ result }: { result: SajuResult }) {
                     )}
 
                     {/* ── 천간(天干) ── */}
-                    <div className={`flex flex-col items-center w-full ${isMobile ? "py-0.5 gap-0" : "gap-0.5 py-1.5"}`}
+                    <div className={`flex flex-col items-center w-full ${isMobile ? "py-1 gap-0.5" : "gap-0.5 py-1.5"}`}
                       style={{ borderBottom: "1px dashed var(--px-border)" }}>
                       <button
                         type="button"
@@ -423,13 +491,13 @@ export default function SajuResult({ result }: { result: SajuResult }) {
                     </div>
 
                     {/* ── 지지(地支) ── */}
-                    <div className={`flex flex-col items-center w-full ${isMobile ? "py-0.5 gap-0" : "gap-0.5 py-1.5"}`}>
+                    <div className={`flex flex-col items-center w-full ${isMobile ? "py-1 gap-0.5" : "gap-0.5 py-1.5"}`}>
                       <button
                         type="button"
                         className={`ganji-clickable font-black leading-none bg-transparent border-0 p-0 ${branchSelected ? "ganji-clickable-selected" : ""}`}
                         style={{ color: bc.text, fontSize: charSize, textShadow: `0 0 10px ${bc.text}88` }}
-                        onClick={() => toggleHighlight({ kind: "pillar-branch", pillar: key })}
-                        title="지지 클릭: 해당 지장간 강조"
+                        onClick={() => toggleHighlight({ kind: "branch-stem-match", scope: "pillar", pillar: key })}
+                        title="지지 클릭: 천간 오행과 같은 지장간 강조"
                       >
                         {pillar.branch.hanja}
                       </button>
@@ -447,10 +515,10 @@ export default function SajuResult({ result }: { result: SajuResult }) {
                     {selectedDaeun && daeunBc && (
                       <div
                         ref={(el) => { daeunBranchSlotRefs.current[i] = el; }}
-                        className={`flex flex-col items-center w-full ${isMobile ? "pt-0.5 pb-0 min-h-0" : "pt-0.5 pb-1 min-h-[52px]"}`}
+                        className={`flex flex-col items-center w-full ${isMobile ? "pt-1 pb-0.5 min-h-0" : "pt-0.5 pb-1 min-h-[52px]"}`}
                         style={{ borderTop: "1px dotted var(--px-border)" }}
                       >
-                        <div style={{ visibility: branchArrived ? "visible" : "hidden" }}>
+                        <div key={`branch-${pumpGeneration}`} style={{ visibility: branchArrived ? "visible" : "hidden" }}>
                           <DaeunCharBox
                             char={selectedDaeun.ganji[1]}
                             tenGod={daeunBranchTenGod ?? ""}
@@ -459,7 +527,8 @@ export default function SajuResult({ result }: { result: SajuResult }) {
                             charSize={charSize}
                             labelSize={labelSize}
                             selected={daeunBranchSelected}
-                            onClick={() => toggleHighlight({ kind: "daeun-branch", pillar: key })}
+                            pumping={branchPumping}
+                            onClick={() => toggleHighlight({ kind: "branch-stem-match", scope: "daeun", pillar: key })}
                           />
                         </div>
                       </div>
@@ -471,6 +540,7 @@ export default function SajuResult({ result }: { result: SajuResult }) {
                         pillarStems={hiddenStemItem?.hiddenStems ?? []}
                         daeunStems={selectedDaeun ? daeunBranchHiddenStems : undefined}
                         highlightSelection={highlightSelection}
+                        stemElements={stemElements}
                         pillarKey={key}
                         split={!!selectedDaeun}
                         isMobile={isMobile}
@@ -485,7 +555,7 @@ export default function SajuResult({ result }: { result: SajuResult }) {
 
         {/* ── 대운(大運) ── */}
         <div
-          className={`space-y-4 ${isMobile ? "p-2" : "p-3"}`}
+          className={`space-y-4 ${isMobile ? "p-2.5" : "p-3"}`}
           style={{ background: "var(--px-bg3)", border: "2px solid var(--px-border)", boxShadow: "3px 3px 0 #000" }}
         >
           <div className="flex flex-wrap items-center justify-between gap-2">
@@ -522,7 +592,7 @@ export default function SajuResult({ result }: { result: SajuResult }) {
             </p>
           )}
 
-          <div className={`grid ${isMobile ? "grid-cols-5 gap-0.5" : "grid-cols-10 gap-1"}`}>
+          <div className={`grid ${isMobile ? "grid-cols-5 gap-1" : "grid-cols-10 gap-1"}`}>
               {daeun.cycles.map((cycle, index) => {
                 const isSelected = selectedDaeunOrder === cycle.order;
                 const daeunCharSize = isMobile ? "16px" : "22px";
@@ -545,13 +615,6 @@ export default function SajuResult({ result }: { result: SajuResult }) {
                   stemTenGod = "";
                   branchTenGod = "";
                 }
-                const stemHighlightActive =
-                  highlightSelection?.kind === "stem" &&
-                  highlightSelection.source === "daeun-table" &&
-                  stemEl === highlightSelection.element;
-                const branchHighlightActive =
-                  highlightSelection?.kind === "daeun-branch" &&
-                  highlightSelection.pillar === "all";
                 const startAge = formatCycleAge(cycle.estimatedStartDate, input.normalizedSolarDateTime, daeunAgeMode);
                 const endAge = formatCycleAge(cycle.estimatedEndDate, input.normalizedSolarDateTime, daeunAgeMode);
                 return (
@@ -560,11 +623,10 @@ export default function SajuResult({ result }: { result: SajuResult }) {
                     role="button"
                     tabIndex={0}
                     onClick={(e) => {
-                      if ((e.target as HTMLElement).closest("[data-ganji-part]")) return;
                       handleDaeunClick(
                         cycle.order,
                         isSelected,
-                        e.currentTarget,
+                        isMobile ? null : e.currentTarget,
                         cycle.ganji[0],
                         sc.text,
                         stemEl ?? "water",
@@ -575,12 +637,11 @@ export default function SajuResult({ result }: { result: SajuResult }) {
                     }}
                     onKeyDown={(e) => {
                       if (e.key === "Enter" || e.key === " ") {
-                        if ((e.target as HTMLElement).closest("[data-ganji-part]")) return;
                         e.preventDefault();
                         handleDaeunClick(
                           cycle.order,
                           isSelected,
-                          e.currentTarget,
+                          isMobile ? null : e.currentTarget,
                           cycle.ganji[0],
                           sc.text,
                           stemEl ?? "water",
@@ -590,18 +651,18 @@ export default function SajuResult({ result }: { result: SajuResult }) {
                         );
                       }
                     }}
-                    className={`daeun-card flex flex-col items-center w-full ${isMobile ? "gap-0.5 px-0.5 py-1" : "gap-1 px-1 py-1.5"}`}
+                    className={`daeun-card flex flex-col items-center w-full ${isSelected ? "daeun-card-selected" : ""} ${isMobile ? "gap-1 px-1 py-1.5" : "gap-1 px-1 py-1.5"}`}
                     style={{
-                      background: index % 2 === 0 ? "var(--px-bg2)" : "var(--px-bg3)",
-                      border: "1px solid var(--px-border)",
-                      boxShadow: "1px 1px 0 #000",
+                      background: "var(--px-bg2)",
+                      border: isSelected ? "2px solid #fbbf24" : "1px solid var(--px-border)",
+                      boxShadow: isSelected ? "2px 2px 0 #4a3a00, 0 0 10px #fbbf2444" : "1px 1px 0 #000",
                     }}
                   >
                     <p
                       className="font-bold leading-tight text-center w-full"
                       style={{ color: "var(--px-accent)", fontSize: daeunAgeSize }}
                     >
-                      {daeunAgeMode === "international" ? "만" : "한국"} {startAge}~{endAge}세
+                      {startAge}~{endAge}세
                     </p>
                     {stemTenGod ? (
                       <span
@@ -621,88 +682,7 @@ export default function SajuResult({ result }: { result: SajuResult }) {
                         {cycle.order}운
                       </span>
                     )}
-                    <div className="flex items-center leading-none">
-                      <span
-                        data-ganji-part="stem"
-                        role="button"
-                        tabIndex={0}
-                        className={`ganji-clickable font-black ${stemHighlightActive ? "ganji-clickable-selected" : ""}`}
-                        style={{
-                          color: sc.text,
-                          fontSize: daeunCharSize,
-                          textShadow: `0 0 8px ${sc.text}66`,
-                          padding: "0 2px",
-                        }}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          const cardEl = e.currentTarget.closest("[role='button']") as HTMLElement | null;
-                          if (!isSelected) {
-                            handleDaeunClick(
-                              cycle.order,
-                              false,
-                              cardEl ?? e.currentTarget,
-                              cycle.ganji[0],
-                              sc.text,
-                              stemEl ?? "water",
-                              cycle.ganji[1],
-                              bc.text,
-                              branchEl ?? "water",
-                            );
-                          }
-                          if (stemEl) toggleHighlight({ kind: "stem", source: "daeun-table", pillar: "all", element: stemEl });
-                        }}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" || e.key === " ") {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            (e.currentTarget as HTMLElement).click();
-                          }
-                        }}
-                        title="대운 천간: 같은 오행 지장간 강조"
-                      >
-                        {cycle.ganji[0]}
-                      </span>
-                      <span
-                        data-ganji-part="branch"
-                        role="button"
-                        tabIndex={0}
-                        className={`ganji-clickable font-black ${branchHighlightActive ? "ganji-clickable-selected" : ""}`}
-                        style={{
-                          color: bc.text,
-                          fontSize: daeunCharSize,
-                          textShadow: `0 0 8px ${bc.text}66`,
-                          padding: "0 2px",
-                        }}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          const cardEl = e.currentTarget.closest("[role='button']") as HTMLElement | null;
-                          if (!isSelected) {
-                            handleDaeunClick(
-                              cycle.order,
-                              false,
-                              cardEl ?? e.currentTarget,
-                              cycle.ganji[0],
-                              sc.text,
-                              stemEl ?? "water",
-                              cycle.ganji[1],
-                              bc.text,
-                              branchEl ?? "water",
-                            );
-                          }
-                          toggleHighlight({ kind: "daeun-branch", pillar: "all" });
-                        }}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" || e.key === " ") {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            (e.currentTarget as HTMLElement).click();
-                          }
-                        }}
-                        title="대운 지지: 대운 지장간 강조"
-                      >
-                        {cycle.ganji[1]}
-                      </span>
-                    </div>
+                    <ColoredGanji ganji={cycle.ganji} compact={isMobile} charSize={daeunCharSize} />
                     {branchTenGod ? (
                       <span
                         className="font-bold border leading-none"
@@ -909,7 +889,7 @@ export default function SajuResult({ result }: { result: SajuResult }) {
       </div>
     </div>
 
-    {isMounted && flyers.length > 0 && createPortal(
+    {isMounted && !isMobile && flyers.length > 0 && createPortal(
       <>
         {flyers.map((f) => (
           <DaeunFlyer key={f.id} flyer={f} onArrive={handleFlyerArrive} />
@@ -970,6 +950,7 @@ function DaeunCharBox({
   charSize,
   labelSize,
   selected = false,
+  pumping = false,
   onClick,
 }: {
   char: string;
@@ -979,12 +960,13 @@ function DaeunCharBox({
   charSize: string;
   labelSize: string;
   selected?: boolean;
+  pumping?: boolean;
   onClick?: () => void;
 }) {
   return (
     <button
       type="button"
-      className={`inline-flex flex-col items-center ganji-clickable bg-transparent border-0 ${selected ? "ganji-clickable-selected" : ""} ${charSize === "24px" ? "px-1 py-0.5" : "px-1.5 py-0.5"}`}
+      className={`inline-flex flex-col items-center ganji-clickable bg-transparent border-0 ${selected ? "ganji-clickable-selected" : ""} ${pumping ? "daeun-slot-pump" : ""} ${charSize === "24px" ? "px-1 py-0.5" : "px-1.5 py-0.5"}`}
       onClick={onClick}
       style={{
         border: showBorder ? `2px solid ${style.border}` : "2px solid transparent",
@@ -1213,6 +1195,7 @@ function HiddenStemPanel({
   pillarStems,
   daeunStems,
   highlightSelection,
+  stemElements,
   pillarKey,
   split,
   isMobile,
@@ -1220,11 +1203,12 @@ function HiddenStemPanel({
   pillarStems: HiddenStemWithTenGod[];
   daeunStems?: HiddenStemWithTenGod[];
   highlightSelection: HighlightSelection;
+  stemElements: Set<Element>;
   pillarKey: PillarKey;
   split: boolean;
   isMobile: boolean;
 }) {
-  const chipSize = isMobile ? "8px" : "10px";
+  const chipSize = isMobile ? "10px" : "11px";
 
   if (split && daeunStems) {
     return (
@@ -1232,25 +1216,25 @@ function HiddenStemPanel({
         className="grid grid-cols-2 w-full pt-0.5"
         style={{ borderTop: "1px solid var(--px-border)" }}
       >
-        <div className={`flex flex-col items-center min-w-0 ${isMobile ? "gap-0 px-0 py-0.5" : "gap-0.5 px-0.5 py-1"}`}>
+        <div className={`flex flex-col items-center min-w-0 ${isMobile ? "gap-0.5 px-0 py-1" : "gap-0.5 px-0.5 py-1"}`}>
           {pillarStems.map((hs) => (
             <HiddenStemChip
               key={`p-${hs.role}-${hs.stem}`}
               hiddenStem={hs}
-              highlighted={isHiddenStemHighlighted(highlightSelection, "pillar", pillarKey, hs)}
+              highlighted={isHiddenStemHighlighted(highlightSelection, "pillar", pillarKey, hs, stemElements)}
               fontSize={chipSize}
             />
           ))}
         </div>
         <div
-          className={`flex flex-col items-center min-w-0 ${isMobile ? "gap-0 px-0 py-0.5" : "gap-0.5 px-0.5 py-1"}`}
+          className={`flex flex-col items-center min-w-0 ${isMobile ? "gap-0.5 px-0 py-1" : "gap-0.5 px-0.5 py-1"}`}
           style={{ borderLeft: "1px solid var(--px-border)" }}
         >
           {daeunStems.map((hs) => (
             <HiddenStemChip
               key={`d-${hs.role}-${hs.stem}`}
               hiddenStem={hs}
-              highlighted={isHiddenStemHighlighted(highlightSelection, "daeun", pillarKey, hs)}
+              highlighted={isHiddenStemHighlighted(highlightSelection, "daeun", pillarKey, hs, stemElements)}
               fontSize={chipSize}
             />
           ))}
@@ -1261,14 +1245,14 @@ function HiddenStemPanel({
 
   return (
     <div
-      className={`flex flex-wrap justify-center w-full pt-0.5 ${isMobile ? "gap-0" : "gap-0.5"}`}
+      className={`flex flex-wrap justify-center w-full pt-1 ${isMobile ? "gap-0.5" : "gap-0.5"}`}
       style={{ borderTop: "1px solid var(--px-border)" }}
     >
       {pillarStems.map((hs) => (
         <HiddenStemChip
           key={`p-${hs.role}-${hs.stem}`}
           hiddenStem={hs}
-          highlighted={isHiddenStemHighlighted(highlightSelection, "pillar", pillarKey, hs)}
+          highlighted={isHiddenStemHighlighted(highlightSelection, "pillar", pillarKey, hs, stemElements)}
           fontSize={chipSize}
         />
       ))}
@@ -1290,13 +1274,15 @@ function HiddenStemChip({
 
   return (
     <span
-      className="font-bold leading-none"
+      className="font-bold leading-none inline-flex items-center justify-center box-border"
       title={`${hiddenStem.roleKo}: ${hiddenStem.stem} (${ELEM_KO[hiddenStem.element]})`}
       style={{
         fontSize,
-        padding: "1px 2px",
+        minWidth: "1.6em",
+        minHeight: "1.6em",
+        padding: "2px 3px",
         color,
-        border: isMatch ? `2px solid ${color}` : `1px solid ${ELEM[hiddenStem.element].border}`,
+        border: `2px solid ${isMatch ? color : ELEM[hiddenStem.element].border}`,
         background: isMatch ? `${color}33` : ELEM[hiddenStem.element].bg,
         boxShadow: isMatch ? `0 0 8px ${color}88, inset 0 0 4px ${color}22` : "none",
       }}
@@ -1306,7 +1292,15 @@ function HiddenStemChip({
   );
 }
 
-function ColoredGanji({ ganji, compact = false }: { ganji: string; compact?: boolean }) {
+function ColoredGanji({
+  ganji,
+  compact = false,
+  charSize,
+}: {
+  ganji: string;
+  compact?: boolean;
+  charSize?: string;
+}) {
   const stem = ganji[0];
   const branch = ganji[1];
   const stemElement = STEM_META[stem]?.element;
@@ -1315,7 +1309,7 @@ function ColoredGanji({ ganji, compact = false }: { ganji: string; compact?: boo
   const branchColor = branchElement ? ELEM[branchElement].text : "var(--px-accent)";
 
   return (
-    <span className="font-black" style={{ fontSize: compact ? "13px" : undefined }}>
+    <span className="font-black leading-none" style={{ fontSize: charSize ?? (compact ? "13px" : undefined) }}>
       <span style={{ color: stemColor, textShadow: `0 0 8px ${stemColor}66` }}>{stem}</span>
       <span style={{ color: branchColor, textShadow: `0 0 8px ${branchColor}66` }}>{branch}</span>
     </span>

@@ -41,6 +41,43 @@ function toNumber(value: string): number {
   return Number(value);
 }
 
+type DigitField = "year" | "month" | "day" | "hour" | "minute";
+
+const DIGIT_LIMITS: Record<DigitField, { max: number; label: string }> = {
+  year: { max: 4, label: "년" },
+  month: { max: 2, label: "월" },
+  day: { max: 2, label: "일" },
+  hour: { max: 2, label: "시" },
+  minute: { max: 2, label: "분" },
+};
+
+function getMaxDayInMonth(yearStr: string, monthStr: string): number {
+  const month = parseInt(monthStr, 10);
+  if (!month || month < 1 || month > 12) return 31;
+
+  const year = parseInt(yearStr, 10);
+  if (!yearStr || yearStr.length < 4 || !year) {
+    if ([4, 6, 9, 11].includes(month)) return 30;
+    if (month === 2) return 29;
+    return 31;
+  }
+
+  return new Date(year, month, 0).getDate();
+}
+
+function clampDayForMonth(dayStr: string, yearStr: string, monthStr: string): { value: string; hint: string | null } {
+  if (!dayStr) return { value: dayStr, hint: null };
+  const day = parseInt(dayStr, 10);
+  const maxDay = getMaxDayInMonth(yearStr, monthStr);
+  if (day > maxDay) {
+    return { value: String(maxDay), hint: `일은 1~${maxDay}까지 입력할 수 있습니다.` };
+  }
+  if (dayStr.length >= 1 && day < 1) {
+    return { value: "1", hint: "일은 1~31까지 입력할 수 있습니다." };
+  }
+  return { value: dayStr, hint: null };
+}
+
 export default function SajuForm({ onCalculate, isLoading }: SajuFormProps) {
   const { isMobile } = useViewMode();
   const [initialDateTime] = useState(getCurrentDateTimeParts);
@@ -60,6 +97,131 @@ export default function SajuForm({ onCalculate, isLoading }: SajuFormProps) {
   const [locationName, setLocationName] = useState("대한민국, 서울");
   const [longitude, setLongitude] = useState(126.98);
   const [latitude, setLatitude] = useState(37.57);
+  const [fieldHint, setFieldHint] = useState<string | null>(null);
+
+  const handleDigitChange = (
+    field: DigitField,
+    raw: string,
+    setter: (v: string) => void,
+    context?: { year?: string; month?: string },
+  ) => {
+    const { max, label } = DIGIT_LIMITS[field];
+    const digits = raw.replace(/\D/g, "");
+    if (digits.length > max) {
+      setter(digits.slice(0, max));
+      setFieldHint(`${label}은(는) 최대 ${max}자리까지 입력할 수 있습니다.`);
+      return;
+    }
+
+    if (!digits) {
+      setter("");
+      setFieldHint(null);
+      return;
+    }
+
+    const num = parseInt(digits, 10);
+
+    if (field === "month") {
+      if (num > 12) {
+        setter("12");
+        setFieldHint("월은 1~12까지 입력할 수 있습니다.");
+        return;
+      }
+      if (digits.length === 2 && num < 1) {
+        setter("1");
+        setFieldHint("월은 1~12까지 입력할 수 있습니다.");
+        return;
+      }
+    }
+
+    if (field === "day") {
+      const yearCtx = context?.year ?? year;
+      const monthCtx = context?.month ?? month;
+      const maxDay = getMaxDayInMonth(yearCtx, monthCtx);
+      if (num > maxDay) {
+        setter(String(maxDay));
+        setFieldHint(`일은 1~${maxDay}까지 입력할 수 있습니다.`);
+        return;
+      }
+      if (digits.length === 2 && num < 1) {
+        setter("1");
+        setFieldHint(`일은 1~${maxDay}까지 입력할 수 있습니다.`);
+        return;
+      }
+    }
+
+    if (field === "hour") {
+      if (num > 23) {
+        setter("23");
+        setFieldHint("시는 0~23까지 입력할 수 있습니다.");
+        return;
+      }
+    }
+
+    if (field === "minute") {
+      if (num > 59) {
+        setter("59");
+        setFieldHint("분은 0~59까지 입력할 수 있습니다.");
+        return;
+      }
+    }
+
+    setter(digits);
+    setFieldHint(null);
+  };
+
+  const handleYearChange = (raw: string) => {
+    const { max, label } = DIGIT_LIMITS.year;
+    const digits = raw.replace(/\D/g, "");
+    if (digits.length > max) {
+      setYear(digits.slice(0, max));
+      setFieldHint(`${label}은(는) 최대 ${max}자리까지 입력할 수 있습니다.`);
+      return;
+    }
+
+    const nextYear = digits;
+    setYear(nextYear);
+    const clamped = clampDayForMonth(day, nextYear, month);
+    if (clamped.value !== day) {
+      setDay(clamped.value);
+      setFieldHint(clamped.hint);
+      return;
+    }
+    setFieldHint(null);
+  };
+
+  const handleMonthChange = (raw: string) => {
+    const { max, label } = DIGIT_LIMITS.month;
+    const digits = raw.replace(/\D/g, "");
+    if (digits.length > max) {
+      setMonth(digits.slice(0, max));
+      setFieldHint(`${label}은(는) 최대 ${max}자리까지 입력할 수 있습니다.`);
+      return;
+    }
+
+    let nextMonth = digits;
+    let hint: string | null = null;
+
+    if (nextMonth) {
+      const num = parseInt(nextMonth, 10);
+      if (num > 12) {
+        nextMonth = "12";
+        hint = "월은 1~12까지 입력할 수 있습니다.";
+      } else if (nextMonth.length === 2 && num < 1) {
+        nextMonth = "1";
+        hint = "월은 1~12까지 입력할 수 있습니다.";
+      }
+    }
+
+    setMonth(nextMonth);
+    const clamped = clampDayForMonth(day, year, nextMonth);
+    if (clamped.value !== day) {
+      setDay(clamped.value);
+      setFieldHint(clamped.hint ?? hint);
+      return;
+    }
+    setFieldHint(hint);
+  };
 
   const handleLocationPresetChange = (presetId: (typeof LOCATION_PRESETS)[number]["id"]) => {
     const preset = LOCATION_PRESETS.find((item) => item.id === presetId);
@@ -96,7 +258,7 @@ export default function SajuForm({ onCalculate, isLoading }: SajuFormProps) {
   return (
     <form
       onSubmit={handleSubmit}
-      className={`px-card space-y-5 ${isMobile ? "p-3 space-y-4" : "p-5"}`}
+      className={`px-card space-y-5 ${isMobile ? "p-3.5 space-y-5" : "p-5"}`}
       style={{ borderColor: "var(--px-border2)" }}
     >
       {/* ── 생년월일 ── */}
@@ -106,10 +268,10 @@ export default function SajuForm({ onCalculate, isLoading }: SajuFormProps) {
           <div className="flex flex-col gap-1">
             <label style={LABEL_STYLE}>년</label>
             <input
-              type="number"
+              type="text"
+              inputMode="numeric"
               value={year}
-              onChange={(e) => setYear(e.target.value)}
-              min={1900} max={2100}
+              onChange={(e) => handleYearChange(e.target.value)}
               className="px-input px-3 py-2 text-sm w-24"
               required
             />
@@ -117,10 +279,10 @@ export default function SajuForm({ onCalculate, isLoading }: SajuFormProps) {
           <div className="flex flex-col gap-1">
             <label style={LABEL_STYLE}>월</label>
             <input
-              type="number"
+              type="text"
+              inputMode="numeric"
               value={month}
-              onChange={(e) => setMonth(e.target.value)}
-              min={1} max={12}
+              onChange={(e) => handleMonthChange(e.target.value)}
               className="px-input px-3 py-2 text-sm w-20"
               required
             />
@@ -128,15 +290,20 @@ export default function SajuForm({ onCalculate, isLoading }: SajuFormProps) {
           <div className="flex flex-col gap-1">
             <label style={LABEL_STYLE}>일</label>
             <input
-              type="number"
+              type="text"
+              inputMode="numeric"
               value={day}
-              onChange={(e) => setDay(e.target.value)}
-              min={1} max={31}
+              onChange={(e) => handleDigitChange("day", e.target.value, setDay, { year, month })}
               className="px-input px-3 py-2 text-sm w-20"
               required
             />
           </div>
         </div>
+        {fieldHint && (
+          <p className="mt-1.5 text-xs font-bold" style={{ color: "#fbbf24" }}>
+            ⚠ {fieldHint}
+          </p>
+        )}
       </div>
 
       {/* ── 달력 종류 ── */}
@@ -204,10 +371,10 @@ export default function SajuForm({ onCalculate, isLoading }: SajuFormProps) {
           <div className="flex flex-col gap-1">
             <label style={LABEL_STYLE}>시 (0-23)</label>
             <input
-              type="number"
+              type="text"
+              inputMode="numeric"
               value={hour}
-              onChange={(e) => setHour(e.target.value)}
-              min={0} max={23}
+              onChange={(e) => handleDigitChange("hour", e.target.value, setHour)}
               disabled={noTime}
               required={!noTime}
               className="px-input px-3 py-2 text-sm w-20 disabled:opacity-40"
@@ -216,10 +383,10 @@ export default function SajuForm({ onCalculate, isLoading }: SajuFormProps) {
           <div className="flex flex-col gap-1">
             <label style={LABEL_STYLE}>분 (0-59)</label>
             <input
-              type="number"
+              type="text"
+              inputMode="numeric"
               value={minute}
-              onChange={(e) => setMinute(e.target.value)}
-              min={0} max={59}
+              onChange={(e) => handleDigitChange("minute", e.target.value, setMinute)}
               disabled={noTime}
               required={!noTime}
               className="px-input px-3 py-2 text-sm w-20 disabled:opacity-40"

@@ -10,14 +10,17 @@ import type { SajuInput, SajuResult as SajuResultType } from "@/lib/saju/types";
 export default function HomePage() {
   const { isMobile } = useViewMode();
   const [result, setResult] = useState<SajuResultType | null>(null);
+  const [resultKey, setResultKey] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
   const handleCalculate = (input: SajuInput) => {
+    setResult(null);
     setError(null);
     setIsLoading(true);
     try {
       const res = calculateSaju(input);
+      setResultKey((k) => k + 1);
       setResult(res);
       setTimeout(() => {
         document.getElementById("result-section")?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -29,15 +32,6 @@ export default function HomePage() {
       setIsLoading(false);
     }
   };
-
-  const FEATURES = [
-    { icon: "▶", text: "절기 기준 월주" },
-    { icon: "▶", text: "입춘 기준 년주" },
-    { icon: "▶", text: "JDN 기반 일주" },
-    { icon: "▶", text: "야자시 옵션" },
-    { icon: "▶", text: "음력 입력" },
-    { icon: "▶", text: "대운 계산" },
-  ];
 
   return (
     <div className={`space-y-6 sm:space-y-8 ${isMobile ? "space-y-5" : ""}`}>
@@ -60,21 +54,6 @@ export default function HomePage() {
         <p className={`${isMobile ? "text-xs" : "text-sm"}`} style={{ color: "var(--px-text2)" }}>
           생년월일시를 입력하면 <strong style={{ color: "var(--px-text)" }}>년주·월주·일주·시주와 대운</strong>을 계산합니다.
         </p>
-        <div className={`flex flex-wrap justify-center gap-1.5 sm:gap-2 ${isMobile ? "px-1" : ""}`}>
-          {FEATURES.map((f) => (
-            <span
-              key={f.text}
-              className="text-xs px-2 py-1 border font-bold"
-              style={{
-                color: "var(--px-accent)",
-                borderColor: "var(--px-border2)",
-                background: "var(--px-bg3)",
-              }}
-            >
-              {f.icon} {f.text}
-            </span>
-          ))}
-        </div>
       </div>
 
       {/* ── INPUT PANEL ── */}
@@ -121,7 +100,7 @@ export default function HomePage() {
           >
             ★ 결과
           </div>
-          <SajuResult result={result} />
+          <SajuResult key={resultKey} result={result} />
         </div>
       )}
 
