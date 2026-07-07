@@ -1,7 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import { ViewModeProvider, useViewMode } from "@/contexts/ViewModeContext";
 import ViewModeToggle from "@/components/ViewModeToggle";
+import AppNav from "@/components/AppNav";
 
 function ShellInner({ children }: { children: React.ReactNode }) {
   const { isMobile } = useViewMode();
@@ -17,69 +19,60 @@ function ShellInner({ children }: { children: React.ReactNode }) {
         }}
       >
         <div
-          className={`mx-auto px-3 py-2 sm:px-4 sm:py-3 flex items-center gap-2 sm:gap-3 ${
-            isMobile ? "max-w-[480px]" : "max-w-[1400px]"
-          }`}
+          className={`mx-auto ${isMobile ? "max-w-[480px]" : "max-w-[1400px]"}`}
         >
-          <div
-            className="w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center border-2 text-xl font-black select-none shrink-0"
-            style={{
-              background: "var(--px-bg3)",
-              borderColor: "var(--px-accent)",
-              color: "var(--px-accent)",
-              boxShadow: "3px 3px 0 #4a3a00",
-              fontFamily: "'Press Start 2P', monospace",
-              fontSize: isMobile ? "11px" : "14px",
-            }}
-          >
-            命
-          </div>
-          <div className="min-w-0 flex-1">
-            <h1
-              className="font-black leading-tight tracking-wide truncate"
-              style={{ color: "var(--px-accent)", fontSize: isMobile ? "14px" : "16px" }}
+          <div className="px-3 py-2 sm:px-4 sm:py-3 flex items-center gap-2 sm:gap-3">
+            <Link
+              href="/"
+              className="w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center border-2 text-xl font-black select-none shrink-0"
+              style={{
+                background: "var(--px-bg3)",
+                borderColor: "var(--px-accent)",
+                color: "var(--px-accent)",
+                boxShadow: "3px 3px 0 #4a3a00",
+                fontFamily: "'Press Start 2P', monospace",
+                fontSize: isMobile ? "11px" : "14px",
+              }}
             >
-              사주 만세력
-            </h1>
-            <p className="text-[10px] sm:text-xs leading-tight truncate" style={{ color: "var(--px-text2)" }}>
-              절기 기준 사주팔자 계산기 v1.0
-            </p>
+              命
+            </Link>
+            <div className="min-w-0 flex-1">
+              <h1
+                className="font-black leading-tight tracking-wide truncate"
+                style={{ color: "var(--px-accent)", fontSize: isMobile ? "14px" : "16px" }}
+              >
+                사주 만세력
+              </h1>
+              <p className="text-[10px] sm:text-xs leading-tight truncate" style={{ color: "var(--px-text2)" }}>
+                절기 기준 사주팔자 · 일기 · AI 학습
+              </p>
+            </div>
+
+            <ViewModeToggle />
+
+            {!isMobile && (
+              <div className="hidden md:flex gap-1 shrink-0">
+                {["木", "火", "土", "金", "水"].map((ch, i) => {
+                  const colors = ["#4ade80", "#f87171", "#fbbf24", "#cbd5e1", "#60a5fa"];
+                  return (
+                    <span
+                      key={ch}
+                      className="text-xs font-bold w-6 h-6 flex items-center justify-center border"
+                      style={{
+                        color: colors[i],
+                        borderColor: colors[i] + "55",
+                        background: colors[i] + "11",
+                      }}
+                    >
+                      {ch}
+                    </span>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
-          <ViewModeToggle />
-
-          <a
-            href="/admin"
-            className="text-[10px] sm:text-xs font-bold px-2 py-1 border shrink-0"
-            style={{
-              color: "var(--px-text2)",
-              borderColor: "var(--px-border)",
-              background: "var(--px-bg3)",
-            }}
-          >
-            ⚙ 관리자
-          </a>
-
-          {!isMobile && (
-            <div className="hidden md:flex gap-1 shrink-0">
-              {["木", "火", "土", "金", "水"].map((ch, i) => {
-                const colors = ["#4ade80", "#f87171", "#fbbf24", "#cbd5e1", "#60a5fa"];
-                return (
-                  <span
-                    key={ch}
-                    className="text-xs font-bold w-6 h-6 flex items-center justify-center border"
-                    style={{
-                      color: colors[i],
-                      borderColor: colors[i] + "55",
-                      background: colors[i] + "11",
-                    }}
-                  >
-                    {ch}
-                  </span>
-                );
-              })}
-            </div>
-          )}
+          <AppNav />
         </div>
       </header>
 

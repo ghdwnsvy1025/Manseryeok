@@ -202,8 +202,8 @@ export function calculateElementDistribution(
     throw new Error("천간과 지지가 비어 있습니다.");
   }
 
-  const stemChars = [...stems];
-  const branchChars = [...branches];
+  const stemChars = Array.from(stems);
+  const branchChars = Array.from(branches);
 
   const branchBase = branchChars.map((b) => getBranchBaseDistribution(b));
   const branchWeighted = branchBase.map((_, i) =>

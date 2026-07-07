@@ -7,6 +7,7 @@ import type { Element } from "@/lib/saju/constants";
 import { BRANCH_META, ELEMENT_LABELS, STEM_META } from "@/lib/saju/constants";
 import { getTenGod, getHiddenStemsByBranch, type HiddenStemByPillar, type HiddenStemWithTenGod, type StemHanja } from "@/lib/saju/hiddenStems";
 import AiAnalysis from "@/components/AiAnalysis";
+import { useViewMode } from "@/contexts/ViewModeContext";
 import { ELEMENT_EN_TO_KO } from "@/lib/saju/elementDistribution";
 
 // ── 오행별 픽셀 게임 색상 ──
