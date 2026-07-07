@@ -1,5 +1,6 @@
 import type { Element, YinYang } from "./constants";
 import type { DaeunResult, Gender } from "./daeun";
+import type { ElementDistributionResult } from "./elementDistribution";
 import type { HiddenStemResult } from "./hiddenStems";
 
 // ============================================================
@@ -78,6 +79,7 @@ export interface SajuResult {
 
   daeun: DaeunResult;
   hiddenStems: HiddenStemResult;
+  elementDistribution: ElementDistributionResult | null;
 
   debug: {
     usedLichun: string;             // 사용한 입춘 시각 (KST ISO)

@@ -8,6 +8,7 @@ import { BRANCH_META, ELEMENT_LABELS, STEM_META } from "@/lib/saju/constants";
 import { getTenGod, getHiddenStemsByBranch, type HiddenStemByPillar, type HiddenStemWithTenGod, type StemHanja } from "@/lib/saju/hiddenStems";
 import AiAnalysis from "@/components/AiAnalysis";
 import { useViewMode } from "@/contexts/ViewModeContext";
+import { ELEMENT_EN_TO_KO } from "@/lib/saju/elementDistribution";
 
 // ── 오행별 픽셀 게임 색상 ──
 const ELEM: Record<Element, { text: string; bg: string; border: string }> = {
@@ -92,7 +93,7 @@ export default function SajuResult({ result }: { result: SajuResult }) {
   const [isMounted, setIsMounted] = useState(false);
   const daeunStemSlotRefs = useRef<(HTMLDivElement | null)[]>([null, null, null, null]);
   const daeunBranchSlotRefs = useRef<(HTMLDivElement | null)[]>([null, null, null, null]);
-  const { pillars, debug, input } = result;
+  const { pillars, debug, input, elementDistribution } = result;
   const daeun = result.daeun;
   const hiddenStems = result.hiddenStems;
   const dayStem = pillars.day.stem.hanja as StemHanja;
@@ -111,17 +112,16 @@ export default function SajuResult({ result }: { result: SajuResult }) {
     if (p) stemElements.add(p.stem.element);
   }
 
-  // 오행 분포 집계
-  const elemCount: Record<Element, number> = {
+  // 오행 분포 (천간·지지 가중합 기반)
+  const elemPct: Record<Element, number> = {
     wood: 0, fire: 0, earth: 0, metal: 0, water: 0,
   };
-  for (const key of (["year", "month", "day", "hour"] as PillarKey[])) {
-    const p = pillars[key];
-    if (!p) continue;
-    elemCount[p.stem.element]++;
-    elemCount[p.branch.element]++;
+  if (elementDistribution) {
+    for (const elem of Object.keys(elemPct) as Element[]) {
+      const ko = ELEMENT_EN_TO_KO[elem];
+      elemPct[elem] = elementDistribution.percentage[ko];
+    }
   }
-  const totalElem = Object.values(elemCount).reduce((a, b) => a + b, 0);
 
   const allDaeunSlotIds = useCallback(() => {
     const ids: string[] = [];
@@ -778,9 +778,8 @@ export default function SajuResult({ result }: { result: SajuResult }) {
             ■ 오행(五行) 분포
           </p>
           <div className="space-y-2">
-            {(Object.entries(elemCount) as [Element, number][]).map(([elem, count]) => {
+            {(Object.entries(elemPct) as [Element, number][]).map(([elem, pct]) => {
               const c = ELEM[elem];
-              const pct = totalElem > 0 ? (count / totalElem) * 100 : 0;
               return (
                 <div key={elem} className="flex items-center gap-2">
                   <span
@@ -803,8 +802,8 @@ export default function SajuResult({ result }: { result: SajuResult }) {
                       }}
                     />
                   </div>
-                  <span className="text-xs font-bold w-4" style={{ color: c.text }}>
-                    {count}
+                  <span className="text-xs font-bold w-12 text-right" style={{ color: c.text }}>
+                    {pct.toFixed(2)}%
                   </span>
                 </div>
               );

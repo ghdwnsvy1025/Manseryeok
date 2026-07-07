@@ -13,6 +13,7 @@ import { lunarToSolar } from "./lunarConverter";
 import { equationOfTime } from "./solarTerms";
 import { buildMajorJieSolarTermsForDaeun, calculateDaeun } from "./daeun";
 import { calculateHiddenStems } from "./hiddenStems";
+import { calculateElementDistributionFromPillars } from "./elementDistribution";
 
 export function calculateSaju(input: SajuInput): SajuResult {
   const { options } = input;
@@ -143,6 +144,15 @@ export function calculateSaju(input: SajuInput): SajuResult {
     hour: hourPillar,
   });
 
+  const pillars = {
+    year: yearResult.pillar,
+    month: monthResult2.pillar,
+    day: dayResult.pillar,
+    hour: hourPillar,
+  };
+
+  const elementDistribution = calculateElementDistributionFromPillars(pillars);
+
   // ── 11. 결과 조립 ────────────────────────────────────────
   return {
     input: {
@@ -153,14 +163,10 @@ export function calculateSaju(input: SajuInput): SajuResult {
       lunarConversion: lunarConversionInfo,
     },
     options,
-    pillars: {
-      year: yearResult.pillar,
-      month: monthResult2.pillar,
-      day: dayResult.pillar,
-      hour: hourPillar,
-    },
+    pillars,
     daeun,
     hiddenStems,
+    elementDistribution,
     debug: {
       usedLichun: yearResult.lichunKSTIso,
       usedMonthSolarTermStart: monthResult2.startTermKSTIso,
