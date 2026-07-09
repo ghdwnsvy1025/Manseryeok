@@ -15,6 +15,29 @@ import { buildMajorJieSolarTermsForDaeun, calculateDaeun } from "./daeun";
 import { calculateHiddenStems } from "./hiddenStems";
 import { calculateElementDistributionFromPillars } from "./elementDistribution";
 
+const MIN_SUPPORTED_YEAR = 1900;
+const MAX_SUPPORTED_YEAR = 2100;
+
+function isSupportedSolarDate(year: number, month: number, day: number): boolean {
+  if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)) return false;
+  if (year < MIN_SUPPORTED_YEAR || year > MAX_SUPPORTED_YEAR) return false;
+  if (month < 1 || month > 12) return false;
+  if (day < 1 || day > 31) return false;
+
+  const date = new Date(year, month - 1, day);
+  return (
+    date.getFullYear() === year &&
+    date.getMonth() === month - 1 &&
+    date.getDate() === day
+  );
+}
+
+function assertSupportedSolarDate(year: number, month: number, day: number): void {
+  if (!isSupportedSolarDate(year, month, day)) {
+    throw new Error("생년월일은 1900-2100 범위의 올바른 날짜로 입력해주세요.");
+  }
+}
+
 export function calculateSaju(input: SajuInput): SajuResult {
   const { options } = input;
   const warnings: string[] = [];
@@ -29,6 +52,8 @@ export function calculateSaju(input: SajuInput): SajuResult {
   let solarDay = input.day;
   let lunarConversionInfo: SajuResult["input"]["lunarConversion"] | undefined;
 
+  assertSupportedSolarDate(input.year, input.month, input.day);
+
   if (options.calendarType === "lunar") {
     const conv = lunarToSolar(
       input.year,
@@ -39,6 +64,8 @@ export function calculateSaju(input: SajuInput): SajuResult {
     solarYear = conv.outputSolar.year;
     solarMonth = conv.outputSolar.month;
     solarDay = conv.outputSolar.day;
+    assertSupportedSolarDate(solarYear, solarMonth, solarDay);
+
     lunarConversionInfo = {
       inputLunar: `음력 ${input.year}년 ${options.isLeapMonth ? "윤" : ""}${input.month}월 ${input.day}일`,
       outputSolar: conv.outputSolarString,

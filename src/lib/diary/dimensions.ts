@@ -2,6 +2,8 @@
 // 일기 감정 차원 정의 (UI · AI 프롬프트 공통 소스)
 // ============================================================
 
+import type { PsychologicalAnalysis } from "./psychology";
+
 /** 0–100 정수 (1점 단위) */
 export type ScaleScore = number;
 
@@ -84,6 +86,8 @@ export type DiaryAnalysis = {
   reason: string;
   confidence: number;
   score_reasons: ScoreReasons;
+  /** 심리학 이론 기반 심층 분석 (PANAS, Circumplex, PERMA, SDT, Appraisal) */
+  psychological_analysis?: PsychologicalAnalysis | null;
 };
 
 export function clampScore(value: number): ScaleScore {

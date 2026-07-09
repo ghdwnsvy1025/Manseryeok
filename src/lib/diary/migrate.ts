@@ -3,8 +3,13 @@ import { createEmptyScoreReasons } from "./dimensions";
 import type { DiaryEntry } from "./types";
 
 function normalizeAnalysis(analysis: DiaryAnalysis): DiaryAnalysis {
-  if (analysis.score_reasons) return analysis;
-  return { ...analysis, score_reasons: createEmptyScoreReasons() };
+  const withReasons = analysis.score_reasons
+    ? analysis
+    : { ...analysis, score_reasons: createEmptyScoreReasons() };
+  return {
+    ...withReasons,
+    psychological_analysis: withReasons.psychological_analysis ?? null,
+  };
 }
 
 /** 구버전 scores/aiSummary 필드를 analysis로 마이그레이션 */

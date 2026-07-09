@@ -14,7 +14,6 @@ export default function AiAnalysis({ result }: AiAnalysisProps) {
   const [analysis, setAnalysis] = useState<string>("");
   const [error, setError] = useState<string>("");
   const [question, setQuestion] = useState<string>("");
-  const [showQuestionInput, setShowQuestionInput] = useState(false);
 
   const handleAnalyze = async () => {
     setStatus("loading");
@@ -63,44 +62,31 @@ export default function AiAnalysis({ result }: AiAnalysisProps) {
         boxShadow: "3px 3px 0 #4a3a00",
       }}
     >
-      {/* 섹션 타이틀 */}
       <p className="text-xs font-bold" style={{ color: "var(--px-accent)" }}>
         ★ AI 사주 분석
       </p>
 
-      {/* 추가 질문 토글 */}
       {status === "idle" && (
         <div className="space-y-3">
-          <button
-            type="button"
-            onClick={() => setShowQuestionInput(!showQuestionInput)}
-            className="text-xs font-bold"
-            style={{ color: "var(--px-text2)" }}
-          >
-            {showQuestionInput ? "▲ 질문 닫기" : "▼ 특정 질문 입력 (선택)"}
-          </button>
-
-          {showQuestionInput && (
-            <div className="space-y-1">
-              <textarea
-                value={question}
-                onChange={(e) => setQuestion(e.target.value)}
-                placeholder="예: 직업운이 어떤가요? / 올해 운세는? / 배우자운을 알려주세요."
-                rows={2}
-                className="w-full p-2 text-xs border"
-                style={{
-                  background: "var(--px-bg2)",
-                  borderColor: "var(--px-border)",
-                  color: "var(--px-text)",
-                  resize: "vertical",
-                  outline: "none",
-                }}
-              />
-              <p className="text-[10px]" style={{ color: "var(--px-text2)" }}>
-                비워두면 종합 분석을 해드립니다.
-              </p>
-            </div>
-          )}
+          <div className="space-y-1">
+            <textarea
+              value={question}
+              onChange={(e) => setQuestion(e.target.value)}
+              placeholder="예: 직업운이 어떤가요? / 올해 운세는? / 배우자운을 알려주세요."
+              rows={2}
+              className="w-full p-2 text-xs border"
+              style={{
+                background: "var(--px-bg2)",
+                borderColor: "var(--px-border)",
+                color: "var(--px-text)",
+                resize: "vertical",
+                outline: "none",
+              }}
+            />
+            <p className="text-[10px]" style={{ color: "var(--px-text2)" }}>
+              비워두면 종합 분석을 해드립니다.
+            </p>
+          </div>
 
           <button
             type="button"
@@ -112,7 +98,6 @@ export default function AiAnalysis({ result }: AiAnalysisProps) {
         </div>
       )}
 
-      {/* 로딩 */}
       {status === "loading" && (
         <div className="text-center py-6 space-y-2">
           <p className="text-sm font-bold" style={{ color: "var(--px-accent)" }}>
@@ -124,7 +109,6 @@ export default function AiAnalysis({ result }: AiAnalysisProps) {
         </div>
       )}
 
-      {/* 오류 */}
       {status === "error" && (
         <div className="space-y-3">
           <div
@@ -153,7 +137,6 @@ export default function AiAnalysis({ result }: AiAnalysisProps) {
         </div>
       )}
 
-      {/* 분석 결과 */}
       {status === "done" && analysis && (
         <div className="space-y-3">
           <div

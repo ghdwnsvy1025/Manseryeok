@@ -1,6 +1,7 @@
 import { describe, expect, test } from "@jest/globals";
 import {
   getDayPillarForDate,
+  getPartialPillarsForFields,
   getPillarsForDate,
   isValidDateString,
   resolveDateString,
@@ -25,6 +26,48 @@ describe("getPillarsForDate", () => {
     const result = getPillarsForDate("2019-01-27");
     expect(result.dayPillar.ganjiKo).toBe("갑자");
     expect(result.monthPillarKo).toMatch(/^.+$/);
+  });
+});
+
+describe("getPartialPillarsForFields", () => {
+  test("년 4자리만 입력 시 년주만 반환", () => {
+    const result = getPartialPillarsForFields({ year: "2019", month: "", day: "" });
+    expect(result.yearPillar).not.toBeNull();
+    expect(result.monthPillar).toBeNull();
+    expect(result.dayPillar).toBeNull();
+  });
+
+  test("년+월 입력 시 년주와 월주 반환", () => {
+    const result = getPartialPillarsForFields({ year: "2019", month: "1", day: "" });
+    expect(result.yearPillar).not.toBeNull();
+    expect(result.monthPillar).not.toBeNull();
+    expect(result.dayPillar).toBeNull();
+  });
+
+  test("완성된 유효 날짜는 년·월·일주 모두 반환", () => {
+    const result = getPartialPillarsForFields({ year: "2019", month: "1", day: "27" });
+    expect(result.yearPillar).not.toBeNull();
+    expect(result.monthPillar).not.toBeNull();
+    expect(result.dayPillar?.ganjiKo).toBe("갑자");
+  });
+
+  test("무효 날짜는 일주 없이 년·월주만 반환", () => {
+    const result = getPartialPillarsForFields({ year: "2019", month: "2", day: "30" });
+    expect(result.yearPillar).not.toBeNull();
+    expect(result.monthPillar).not.toBeNull();
+    expect(result.dayPillar).toBeNull();
+  });
+
+  test("미완성 년도는 모두 null", () => {
+    const result = getPartialPillarsForFields({ year: "201", month: "1", day: "1" });
+    expect(result.yearPillar).toBeNull();
+    expect(result.monthPillar).toBeNull();
+    expect(result.dayPillar).toBeNull();
+  });
+
+  test("범위 밖 년도는 모두 null", () => {
+    const result = getPartialPillarsForFields({ year: "1899", month: "1", day: "1" });
+    expect(result.yearPillar).toBeNull();
   });
 });
 
