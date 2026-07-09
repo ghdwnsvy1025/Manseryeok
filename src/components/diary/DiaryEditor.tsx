@@ -1,44 +1,98 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import DayPillarBadge from "@/components/diary/DayPillarBadge";
-import DiaryCalendar from "@/components/diary/DiaryCalendar";
+import { useCallback, useEffect, useRef, useState } from "react";
 import AnalysisResult from "@/components/diary/AnalysisResult";
+import ManualScoreInput from "@/components/diary/ManualScoreInput";
+import SajuDepthPicker from "@/components/diary/SajuDepthPicker";
 import { createDiaryEntry } from "@/lib/diary/createEntry";
 import { getPillarsForDate, resolveDateString } from "@/lib/diary/dayPillar";
 import type { DiaryAnalysis } from "@/lib/diary/dimensions";
 import { getDiaryStorage } from "@/lib/diary/getStorage";
-import type { DiaryEntry } from "@/lib/diary/types";
+import {
+  analysisToManualState,
+  createManualScoreState,
+  formatManualDiaryContent,
+  inferInputMode,
+  manualStateToAnalysis,
+  type DiaryInputMode,
+  type ManualScoreState,
+} from "@/lib/diary/manualScores";
+import {
+  computeUserBirthPillars,
+  loadSajuSettings,
+  resolvePillarVisibility,
+  saveSajuSettings,
+  type BirthPillarSlot,
+  type DiaryPillarSlot,
+  type SajuSettings,
+} from "@/lib/diary/sajuSettings";
+import type { DiaryEntry, DiaryPillar } from "@/lib/diary/types";
 
 type Props = {
   initialDate?: string;
+  initialInputMode?: DiaryInputMode;
+  onChangeMode?: () => void;
 };
 
-export default function DiaryEditor({ initialDate }: Props) {
+const EMPTY_PILLAR: DiaryPillar = {
+  ganji: "??",
+  ganjiKo: "??",
+  stem: { hanja: "?", ko: "?" },
+  branch: { hanja: "?", ko: "?" },
+};
+
+export default function DiaryEditor({ initialDate, initialInputMode = "text", onChangeMode }: Props) {
   const [date, setDate] = useState(() => resolveDateString(initialDate));
+
+  // 현재 날짜의 사주 기둥 정보
+  const [monthPillar, setMonthPillar] = useState<DiaryPillar>(EMPTY_PILLAR);
+  const [yearPillar, setYearPillar] = useState<DiaryPillar>(EMPTY_PILLAR);
+
+  // 기록 모드 – ref로 최신값 추적해 날짜 이동 시 모드 유지
+  const [inputMode, setInputMode] = useState<DiaryInputMode>(initialInputMode);
+  const inputModeRef = useRef<DiaryInputMode>(initialInputMode);
+
   const [content, setContent] = useState("");
+  const [scoreState, setScoreState] = useState<ManualScoreState>(() => createManualScoreState());
   const [entry, setEntry] = useState<DiaryEntry | null>(null);
-  const [monthPillarKo, setMonthPillarKo] = useState<string>("");
+  const [dayPillar, setDayPillar] = useState<DiaryEntry["dayPillar"] | null>(null);
   const [dayPillarKo, setDayPillarKo] = useState<string>("");
+
+  // 사주 기록 범위 설정
+  const [sajuSettings, setSajuSettings] = useState<SajuSettings>(() => loadSajuSettings());
+
   const [status, setStatus] = useState<"idle" | "loading" | "saving" | "analyzing">("loading");
   const [message, setMessage] = useState("");
 
+  // ── 날짜 로드 ────────────────────────────────────────────
   const loadEntry = useCallback(async (targetDate: string) => {
     setStatus("loading");
     setMessage("");
     try {
       const pillars = getPillarsForDate(targetDate);
-      setMonthPillarKo(pillars.monthPillarKo);
+      setMonthPillar(pillars.monthPillar);
+      setYearPillar(pillars.yearPillar);
+      setDayPillar(pillars.dayPillar);
       setDayPillarKo(pillars.dayPillar.ganjiKo);
 
       const storage = await getDiaryStorage();
       const existing = await storage.getByDate(targetDate);
       if (existing) {
+        const mode = inferInputMode(existing);
         setEntry(existing);
+        setInputMode(mode);
+        inputModeRef.current = mode;
         setContent(existing.content);
+        setScoreState(
+          existing.analysis && mode === "scores"
+            ? analysisToManualState(existing.analysis)
+            : createManualScoreState()
+        );
       } else {
         setEntry(null);
         setContent("");
+        setInputMode(inputModeRef.current);
+        setScoreState(createManualScoreState());
       }
       setStatus("idle");
     } catch (err) {
@@ -51,27 +105,51 @@ export default function DiaryEditor({ initialDate }: Props) {
     loadEntry(date);
   }, [date, loadEntry]);
 
+  // ── 저장 페이로드 빌더 ────────────────────────────────────
+  const buildPayload = (
+    base: DiaryEntry,
+    analysis: DiaryAnalysis | null,
+    mode: DiaryInputMode,
+    now: string
+  ): DiaryEntry => {
+    const entryContent =
+      mode === "scores" ? formatManualDiaryContent(scoreState) : content.trim();
+    const userBirthPillars = sajuSettings.birthDate
+      ? computeUserBirthPillars(sajuSettings.birthDate, sajuSettings.birthHour, sajuSettings.birthMinute) ?? undefined
+      : undefined;
+
+    return {
+      ...base,
+      content: entryContent,
+      analysis,
+      inputMode: mode,
+      sajuDepth: "full",
+      monthPillarKo: monthPillar.ganjiKo,
+      yearPillarKo: yearPillar.ganjiKo,
+      userBirthPillars,
+      updatedAt: now,
+      createdAt: entry?.createdAt ?? now,
+    };
+  };
+
+  // ── 저장 ──────────────────────────────────────────────────
   const handleSave = async () => {
-    if (!content.trim()) {
+    if (inputMode === "text" && !content.trim()) {
       setMessage("일기 내용을 입력해주세요.");
       return;
     }
-
     setStatus("saving");
     setMessage("");
     try {
       const storage = await getDiaryStorage();
       const now = new Date().toISOString();
-      const base = entry ?? createDiaryEntry(date, content.trim());
-      const updated: DiaryEntry = {
-        ...base,
-        content: content.trim(),
-        updatedAt: now,
-        createdAt: entry?.createdAt ?? now,
-      };
+      const base = entry ?? createDiaryEntry(date, "");
+      const analysis =
+        inputMode === "scores" ? manualStateToAnalysis(scoreState) : entry?.analysis ?? null;
+      const updated = buildPayload(base, analysis, inputMode, now);
       await storage.save(updated);
       setEntry(updated);
-      setMessage("저장되었습니다.");
+      setMessage(inputMode === "scores" ? "점수가 저장되었습니다." : "저장되었습니다.");
       setStatus("idle");
     } catch (err) {
       setMessage(err instanceof Error ? err.message : "저장에 실패했습니다.");
@@ -79,39 +157,27 @@ export default function DiaryEditor({ initialDate }: Props) {
     }
   };
 
+  // ── AI 분석 ───────────────────────────────────────────────
   const handleAnalyze = async () => {
     if (!content.trim()) {
       setMessage("분석할 일기 내용을 입력해주세요.");
       return;
     }
-
     setStatus("analyzing");
     setMessage("AI가 감정을 분석 중입니다...");
     try {
       const res = await fetch("/api/diary/classify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          content: content.trim(),
-          date,
-          dayPillarKo,
-        }),
+        body: JSON.stringify({ content: content.trim(), date, dayPillarKo }),
       });
       const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error ?? "분석에 실패했습니다.");
-      }
+      if (!res.ok) throw new Error(data.error ?? "분석에 실패했습니다.");
 
       const storage = await getDiaryStorage();
       const now = new Date().toISOString();
       const base = entry ?? createDiaryEntry(date, content.trim());
-      const updated: DiaryEntry = {
-        ...base,
-        content: content.trim(),
-        analysis: data.analysis as DiaryAnalysis,
-        updatedAt: now,
-        createdAt: entry?.createdAt ?? now,
-      };
+      const updated = buildPayload(base, data.analysis as DiaryAnalysis, "text", now);
       await storage.save(updated);
       setEntry(updated);
       setMessage("AI 분석이 완료되어 저장되었습니다.");
@@ -122,45 +188,154 @@ export default function DiaryEditor({ initialDate }: Props) {
     }
   };
 
+  // ── 삭제 ──────────────────────────────────────────────────
   const handleDelete = async () => {
-    if (!entry) return;
-    if (!confirm("이 날짜의 일기를 삭제할까요?")) return;
-
+    if (!entry || !confirm("이 날짜의 일기를 삭제할까요?")) return;
     try {
       const storage = await getDiaryStorage();
       await storage.delete(entry.id);
       setEntry(null);
       setContent("");
+      setScoreState(createManualScoreState());
+      setInputMode(inputModeRef.current);
       setMessage("삭제되었습니다.");
     } catch (err) {
       setMessage(err instanceof Error ? err.message : "삭제에 실패했습니다.");
     }
   };
 
-  const pillars = entry?.dayPillar ?? getPillarsForDate(date).dayPillar;
-  const monthKo = entry?.monthPillarKo ?? monthPillarKo;
+  const handleModeChange = (mode: DiaryInputMode) => {
+    setInputMode(mode);
+    inputModeRef.current = mode;
+    setMessage("");
+  };
+
+  const handleBirthDateChange = useCallback((birthDate: string) => {
+    setSajuSettings((prev) => {
+      const next = { ...prev, birthDate };
+      saveSajuSettings(next);
+      return next;
+    });
+  }, []);
+
+  const handleBirthHourChange = useCallback((birthHour: number | undefined) => {
+    setSajuSettings((prev) => {
+      const next = { ...prev, birthHour };
+      saveSajuSettings(next);
+      return next;
+    });
+  }, []);
+
+  const handleBirthMinuteChange = useCallback((birthMinute: number | undefined) => {
+    setSajuSettings((prev) => {
+      const next = { ...prev, birthMinute };
+      saveSajuSettings(next);
+      return next;
+    });
+  }, []);
+
+  const handleDiaryDateChange = useCallback((nextDate: string) => {
+    setDate(resolveDateString(nextDate));
+  }, []);
+
+  const handleToggleBirthPillar = useCallback((slot: BirthPillarSlot) => {
+    setSajuSettings((prev) => {
+      const visibility = resolvePillarVisibility(prev);
+      const next: SajuSettings = {
+        ...prev,
+        pillarVisibility: {
+          ...visibility,
+          birth: { ...visibility.birth, [slot]: !visibility.birth[slot] },
+        },
+      };
+      saveSajuSettings(next);
+      return next;
+    });
+  }, []);
+
+  const handleToggleDiaryPillar = useCallback((slot: DiaryPillarSlot) => {
+    setSajuSettings((prev) => {
+      const visibility = resolvePillarVisibility(prev);
+      const next: SajuSettings = {
+        ...prev,
+        pillarVisibility: {
+          ...visibility,
+          diary: { ...visibility.diary, [slot]: !visibility.diary[slot] },
+        },
+      };
+      saveSajuSettings(next);
+      return next;
+    });
+  }, []);
+
   const isBusy = status === "loading" || status === "saving" || status === "analyzing";
+  const displayAnalysis = inputMode === "text" ? entry?.analysis ?? null : null;
 
   return (
     <div className="space-y-4">
-      <DiaryCalendar date={date} onChange={(d) => setDate(resolveDateString(d))} />
-
-      <DayPillarBadge monthPillarKo={monthKo} dayPillar={pillars} />
-
-      <textarea
-        value={content}
-        onChange={(e) => setContent(e.target.value)}
-        placeholder="오늘 하루는 어땠나요? 자유롭게 적어주세요."
-        rows={10}
-        disabled={isBusy}
-        className="w-full px-3 py-2 text-sm border-2 resize-y"
-        style={{
-          background: "var(--px-bg2)",
-          borderColor: "var(--px-border)",
-          color: "var(--px-text)",
-        }}
+      {/* ① 만세력 + 일기 날짜 */}
+      <SajuDepthPicker
+        diaryDate={date}
+        onDiaryDateChange={handleDiaryDateChange}
+        sajuSettings={sajuSettings}
+        onBirthDateChange={handleBirthDateChange}
+        onBirthHourChange={handleBirthHourChange}
+        onBirthMinuteChange={handleBirthMinuteChange}
+        onToggleBirthPillar={handleToggleBirthPillar}
+        onToggleDiaryPillar={handleToggleDiaryPillar}
       />
 
+      {/* ② 기록 방식 토글 */}
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={() => handleModeChange("scores")}
+          disabled={isBusy}
+          className="flex-1 px-3 py-2.5 text-xs font-bold border-2"
+          style={{
+            background: inputMode === "scores" ? "var(--px-accent)" : "var(--px-bg2)",
+            borderColor: inputMode === "scores" ? "#000" : "var(--px-border)",
+            color: inputMode === "scores" ? "#000" : "var(--px-text2)",
+            boxShadow: inputMode === "scores" ? "3px 3px 0 #000" : "none",
+          }}
+        >
+          점수로 기록
+        </button>
+        <button
+          type="button"
+          onClick={() => handleModeChange("text")}
+          disabled={isBusy}
+          className="flex-1 px-3 py-2.5 text-xs font-bold border-2"
+          style={{
+            background: inputMode === "text" ? "var(--px-accent)" : "var(--px-bg2)",
+            borderColor: inputMode === "text" ? "#000" : "var(--px-border)",
+            color: inputMode === "text" ? "#000" : "var(--px-text2)",
+            boxShadow: inputMode === "text" ? "3px 3px 0 #000" : "none",
+          }}
+        >
+          글로 기록
+        </button>
+      </div>
+
+      {inputMode === "scores" ? (
+        <ManualScoreInput state={scoreState} onChange={setScoreState} disabled={isBusy} />
+      ) : (
+        <textarea
+          value={content}
+          onChange={(e) => setContent(e.target.value)}
+          placeholder="오늘 하루는 어땠나요? 자유롭게 적어주세요."
+          rows={10}
+          disabled={isBusy}
+          className="w-full px-3 py-2 text-sm border-2 resize-y"
+          style={{
+            background: "var(--px-bg2)",
+            borderColor: "var(--px-border)",
+            color: "var(--px-text)",
+          }}
+        />
+      )}
+
+      {/* 액션 버튼 */}
       <div className="flex flex-wrap gap-2">
         <button
           type="button"
@@ -177,21 +352,23 @@ export default function DiaryEditor({ initialDate }: Props) {
         >
           {status === "saving" ? "저장 중..." : "저장"}
         </button>
-        <button
-          type="button"
-          onClick={handleAnalyze}
-          disabled={isBusy}
-          className="px-4 py-2 text-xs font-bold border-2"
-          style={{
-            background: "var(--px-bg3)",
-            borderColor: "var(--px-border2)",
-            color: "var(--px-accent)",
-            boxShadow: "3px 3px 0 #000",
-            opacity: isBusy ? 0.6 : 1,
-          }}
-        >
-          {status === "analyzing" ? "분석 중..." : "AI 분석"}
-        </button>
+        {inputMode === "text" && (
+          <button
+            type="button"
+            onClick={handleAnalyze}
+            disabled={isBusy}
+            className="px-4 py-2 text-xs font-bold border-2"
+            style={{
+              background: "var(--px-bg3)",
+              borderColor: "var(--px-border2)",
+              color: "var(--px-accent)",
+              boxShadow: "3px 3px 0 #000",
+              opacity: isBusy ? 0.6 : 1,
+            }}
+          >
+            {status === "analyzing" ? "분석 중..." : "AI 분석"}
+          </button>
+        )}
         {entry && (
           <button
             type="button"
@@ -215,7 +392,7 @@ export default function DiaryEditor({ initialDate }: Props) {
         </p>
       )}
 
-      {entry?.analysis && (
+      {displayAnalysis && (
         <div
           className="p-3 border-2 space-y-3"
           style={{ background: "var(--px-bg3)", borderColor: "var(--px-border)" }}
@@ -223,7 +400,7 @@ export default function DiaryEditor({ initialDate }: Props) {
           <p className="text-xs font-bold" style={{ color: "var(--px-accent)" }}>
             ■ AI 감정 분석
           </p>
-          <AnalysisResult analysis={entry.analysis} />
+          <AnalysisResult analysis={displayAnalysis} />
         </div>
       )}
     </div>

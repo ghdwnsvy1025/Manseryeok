@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo, useLayoutEffect } from "react";
 import { createPortal } from "react-dom";
 import type { SajuResult } from "@/lib/saju/types";
 import type { Element } from "@/lib/saju/constants";
@@ -8,7 +8,10 @@ import { BRANCH_META, ELEMENT_LABELS, STEM_META } from "@/lib/saju/constants";
 import { getTenGod, getHiddenStemsByBranch, type HiddenStemByPillar, type HiddenStemWithTenGod, type StemHanja } from "@/lib/saju/hiddenStems";
 import AiAnalysis from "@/components/AiAnalysis";
 import { useViewMode } from "@/contexts/ViewModeContext";
-import { ELEMENT_EN_TO_KO } from "@/lib/saju/elementDistribution";
+import {
+  calculateElementDistributionFromPillars,
+  ELEMENT_EN_TO_KO,
+} from "@/lib/saju/elementDistribution";
 
 // ── 오행별 픽셀 게임 색상 ──
 const ELEM: Record<Element, { text: string; bg: string; border: string }> = {
@@ -58,7 +61,7 @@ function isHiddenStemHighlighted(
   }
   if (selection.kind === "branch-stem-match") {
     if (context !== selection.scope) return false;
-    if (selection.scope === "daeun" && pillarKey !== selection.pillar) return false;
+    if (pillarKey !== selection.pillar) return false;
     return stemElements.has(hiddenStem.element);
   }
   return false;
@@ -90,14 +93,23 @@ export default function SajuResult({ result }: { result: SajuResult }) {
   const [pumpingSlots, setPumpingSlots] = useState<Set<string>>(new Set());
   const [pumpGeneration, setPumpGeneration] = useState(0);
   const pumpTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const daeunSectionRef = useRef<HTMLDivElement>(null);
+  const scrollAnchorTopRef = useRef<number | null>(null);
   const [isMounted, setIsMounted] = useState(false);
   const daeunStemSlotRefs = useRef<(HTMLDivElement | null)[]>([null, null, null, null]);
   const daeunBranchSlotRefs = useRef<(HTMLDivElement | null)[]>([null, null, null, null]);
-  const { pillars, debug, input, elementDistribution } = result;
+  const { pillars, debug, input } = result;
   const daeun = result.daeun;
   const hiddenStems = result.hiddenStems;
   const dayStem = pillars.day.stem.hanja as StemHanja;
   const selectedDaeun = daeun.cycles.find((c) => c.order === selectedDaeunOrder) ?? null;
+
+  const elementDistribution = useMemo(() => {
+    const daewoonInput = selectedDaeun
+      ? { stem: selectedDaeun.ganji[0], branch: selectedDaeun.ganji[1] }
+      : null;
+    return calculateElementDistributionFromPillars(pillars, daewoonInput);
+  }, [pillars, selectedDaeun]);
   const hiddenStemItemsByPillar = Object.fromEntries(
     hiddenStems.items.map((item) => [item.pillar, item])
   ) as Partial<Record<PillarKey, HiddenStemByPillar>>;
@@ -154,6 +166,26 @@ export default function SajuResult({ result }: { result: SajuResult }) {
   }, []);
 
   useEffect(() => { setIsMounted(true); }, []);
+
+  const captureScrollAnchor = useCallback(() => {
+    if (daeunSectionRef.current) {
+      scrollAnchorTopRef.current = daeunSectionRef.current.getBoundingClientRect().top;
+    }
+  }, []);
+
+  const compensateScrollAnchor = useCallback(() => {
+    if (scrollAnchorTopRef.current === null || !daeunSectionRef.current) return;
+    const newTop = daeunSectionRef.current.getBoundingClientRect().top;
+    const delta = newTop - scrollAnchorTopRef.current;
+    scrollAnchorTopRef.current = null;
+    if (Math.abs(delta) > 0.5) {
+      window.scrollBy(0, delta);
+    }
+  }, []);
+
+  useLayoutEffect(() => {
+    compensateScrollAnchor();
+  }, [selectedDaeunOrder, compensateScrollAnchor]);
 
   const handleFlyerArrive = useCallback((slotId: string, flyerId: string) => {
     setArrivedSlots((prev) => new Set(prev).add(slotId));
@@ -248,6 +280,8 @@ export default function SajuResult({ result }: { result: SajuResult }) {
     branchColor: string,
     branchElement: Element,
   ) => {
+    captureScrollAnchor();
+
     if (isSelected) {
       setSelectedDaeunOrder(null);
       setFlyers([]);
@@ -289,11 +323,11 @@ export default function SajuResult({ result }: { result: SajuResult }) {
         launchFlyers(sourceEl, stemChar, stemColor, stemElement, branchChar, branchColor, branchElement);
       });
     });
-  }, [launchFlyers, isMobile, triggerMobilePump]);
+  }, [launchFlyers, isMobile, triggerMobilePump, captureScrollAnchor]);
 
   return (
     <>
-    <div className="space-y-4" style={{ border: "2px solid var(--px-accent)", boxShadow: isMobile ? "4px 4px 0 #4a3a00" : "6px 6px 0 #4a3a00" }}>
+    <div className="space-y-4" style={{ border: "2px solid var(--px-accent)", boxShadow: isMobile ? "4px 4px 0 #4a3a00" : "6px 6px 0 #4a3a00", overflowAnchor: "none" }}>
       <style>{`
         .daeun-card {
           transition: transform 0.13s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.13s, background 0.1s, border-color 0.1s;
@@ -340,8 +374,9 @@ export default function SajuResult({ result }: { result: SajuResult }) {
         )}
       </div>
 
-      <div className={`pb-4 space-y-6 ${isMobile ? "px-2" : "px-4"}`}>
-        {/* ── 4주 카드 (왼쪽: 시주 → 오른쪽: 년주) ── */}
+      <div className={`pb-4 space-y-2 ${isMobile ? "px-2" : "px-4"}`}>
+        {/* ── 사주 + 대운 + 오행 (밀착 레이아웃) ── */}
+        <div className="space-y-1">
         {(() => {
           const daeunStemEl  = selectedDaeun ? STEM_META[selectedDaeun.ganji[0]]?.element  : null;
           const daeunBranchEl = selectedDaeun ? BRANCH_META[selectedDaeun.ganji[1]]?.element : null;
@@ -448,7 +483,7 @@ export default function SajuResult({ result }: { result: SajuResult }) {
                     {selectedDaeun && daeunSc && (
                       <div
                         ref={(el) => { daeunStemSlotRefs.current[i] = el; }}
-                        className={`flex flex-col items-center w-full ${isMobile ? "pt-1 pb-0.5 min-h-0" : "pt-1 pb-0.5 min-h-[52px]"}`}
+                        className={`flex flex-col items-center w-full ${isMobile ? "pt-0.5 pb-0" : "pt-1 pb-0.5"}`}
                         style={{ borderBottom: "1px dotted var(--px-border)" }}
                       >
                         <div key={`stem-${pumpGeneration}`} style={{ visibility: stemArrived ? "visible" : "hidden" }}>
@@ -497,7 +532,7 @@ export default function SajuResult({ result }: { result: SajuResult }) {
                         className={`ganji-clickable font-black leading-none bg-transparent border-0 p-0 ${branchSelected ? "ganji-clickable-selected" : ""}`}
                         style={{ color: bc.text, fontSize: charSize, textShadow: `0 0 10px ${bc.text}88` }}
                         onClick={() => toggleHighlight({ kind: "branch-stem-match", scope: "pillar", pillar: key })}
-                        title="지지 클릭: 천간 오행과 같은 지장간 강조"
+                        title="지지 클릭: 해당 지지의 지장간 강조"
                       >
                         {pillar.branch.hanja}
                       </button>
@@ -515,7 +550,7 @@ export default function SajuResult({ result }: { result: SajuResult }) {
                     {selectedDaeun && daeunBc && (
                       <div
                         ref={(el) => { daeunBranchSlotRefs.current[i] = el; }}
-                        className={`flex flex-col items-center w-full ${isMobile ? "pt-1 pb-0.5 min-h-0" : "pt-0.5 pb-1 min-h-[52px]"}`}
+                        className={`flex flex-col items-center w-full ${isMobile ? "pt-0.5 pb-0" : "pt-0.5 pb-1"}`}
                         style={{ borderTop: "1px dotted var(--px-border)" }}
                       >
                         <div key={`branch-${pumpGeneration}`} style={{ visibility: branchArrived ? "visible" : "hidden" }}>
@@ -553,47 +588,13 @@ export default function SajuResult({ result }: { result: SajuResult }) {
           );
         })()}
 
-        {/* ── 대운(大運) ── */}
+        {/* ── 대운(大運) + 오행 분포 ── */}
         <div
-          className={`space-y-4 ${isMobile ? "p-2.5" : "p-3"}`}
-          style={{ background: "var(--px-bg3)", border: "2px solid var(--px-border)", boxShadow: "3px 3px 0 #000" }}
+          ref={daeunSectionRef}
+          style={{ background: "var(--px-bg3)", border: "2px solid var(--px-border)", boxShadow: "3px 3px 0 #000", overflowAnchor: "none" }}
         >
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="text-xs font-bold" style={{ color: "var(--px-accent)" }}>
-              ■ 대운(大運)
-            </p>
-            <div className="flex flex-wrap items-center gap-2 text-xs">
-              <span className="font-bold" style={{ color: "var(--px-text2)" }}>나이 표시</span>
-              {([
-                ["international", "만나이"],
-                ["korean", "한국 나이"],
-              ] as [AgeMode, string][]).map(([mode, label]) => (
-                <button
-                  key={mode}
-                  type="button"
-                  onClick={() => setDaeunAgeMode(mode)}
-                  className="px-3 py-1 font-bold border-2"
-                  style={{
-                    color: daeunAgeMode === mode ? "var(--px-bg)" : "var(--px-text2)",
-                    background: daeunAgeMode === mode ? "var(--px-accent)" : "var(--px-bg2)",
-                    borderColor: daeunAgeMode === mode ? "var(--px-accent)" : "var(--px-border)",
-                    boxShadow: daeunAgeMode === mode ? "2px 2px 0 #4a3a00" : "none",
-                  }}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {!isMobile && (
-            <p className="text-[10px]" style={{ color: "var(--px-text2)" }}>
-              ※ 대운 클릭 시 사주에 표시 · 천간/지지 클릭 시 지장간 강조
-            </p>
-          )}
-
-          <div className={`grid ${isMobile ? "grid-cols-5 gap-1" : "grid-cols-10 gap-1"}`}>
-              {daeun.cycles.map((cycle, index) => {
+          <div className={`grid ${isMobile ? "grid-cols-5 gap-1 p-2" : "grid-cols-10 gap-1 p-2"}`}>
+              {daeun.cycles.map((cycle) => {
                 const isSelected = selectedDaeunOrder === cycle.order;
                 const daeunCharSize = isMobile ? "16px" : "22px";
                 const daeunLabelSize = isMobile ? "9px" : "11px";
@@ -622,6 +623,7 @@ export default function SajuResult({ result }: { result: SajuResult }) {
                     key={cycle.order}
                     role="button"
                     tabIndex={0}
+                    onMouseDown={(e) => e.preventDefault()}
                     onClick={(e) => {
                       handleDaeunClick(
                         cycle.order,
@@ -651,19 +653,13 @@ export default function SajuResult({ result }: { result: SajuResult }) {
                         );
                       }
                     }}
-                    className={`daeun-card flex flex-col items-center w-full ${isSelected ? "daeun-card-selected" : ""} ${isMobile ? "gap-1 px-1 py-1.5" : "gap-1 px-1 py-1.5"}`}
+                    className={`daeun-card flex flex-col items-center w-full ${isSelected ? "daeun-card-selected" : ""} ${isMobile ? "gap-0.5 px-1 py-1" : "gap-0.5 px-1 py-1"}`}
                     style={{
                       background: "var(--px-bg2)",
                       border: isSelected ? "2px solid #fbbf24" : "1px solid var(--px-border)",
                       boxShadow: isSelected ? "2px 2px 0 #4a3a00, 0 0 10px #fbbf2444" : "1px 1px 0 #000",
                     }}
                   >
-                    <p
-                      className="font-bold leading-tight text-center w-full"
-                      style={{ color: "var(--px-accent)", fontSize: daeunAgeSize }}
-                    >
-                      {startAge}~{endAge}세
-                    </p>
                     {stemTenGod ? (
                       <span
                         className="font-bold border leading-none"
@@ -697,6 +693,12 @@ export default function SajuResult({ result }: { result: SajuResult }) {
                         {branchTenGod}
                       </span>
                     ) : null}
+                    <p
+                      className="font-bold leading-tight text-center w-full"
+                      style={{ color: "var(--px-accent)", fontSize: daeunAgeSize }}
+                    >
+                      {startAge}~{endAge}세
+                    </p>
                     {!isMobile && (
                       <div className="text-[9px] text-center leading-tight w-full">
                         <p style={{ color: "var(--px-text2)" }}>
@@ -712,103 +714,70 @@ export default function SajuResult({ result }: { result: SajuResult }) {
               })}
           </div>
 
-          <div style={{ border: "2px solid var(--px-border)", boxShadow: "3px 3px 0 #000" }}>
-            <button
-              type="button"
-              onClick={() => setShowDaeunDebug(!showDaeunDebug)}
-              className="w-full flex items-center justify-between px-4 py-3 text-xs font-bold transition-colors"
-              style={{ background: "var(--px-bg2)", color: "var(--px-text2)" }}
-            >
-              <span>■ 대운 계산 근거 보기</span>
-              <span style={{ color: "var(--px-accent)" }}>{showDaeunDebug ? "▲ 닫기" : "▼ 펼치기"}</span>
-            </button>
-            {showDaeunDebug && (
-              <div
-                className="px-4 pb-4 pt-3 space-y-3"
-                style={{ borderTop: "2px solid var(--px-border)", background: "var(--px-bg2)" }}
+          {/* ── 오행 분포 ── */}
+          <div
+            className={isMobile ? "px-2 pt-1" : "px-3 pt-1"}
+            style={{ borderTop: "1px solid var(--px-border)" }}
+          >
+            <div className="space-y-1.5">
+              {(Object.entries(elemPct) as [Element, number][]).map(([elem, pct]) => {
+                const c = ELEM[elem];
+                return (
+                  <div key={elem} className="flex items-center gap-2">
+                    <span
+                      className="text-xs font-black w-6 text-center"
+                      style={{ color: c.text }}
+                    >
+                      {ELEMENT_LABELS[elem]}
+                    </span>
+                    <span className="text-xs w-8" style={{ color: "var(--px-text2)" }}>
+                      {ELEM_KO[elem]}
+                    </span>
+                    <div className="flex-1 h-4 border" style={{ borderColor: "var(--px-border)", background: "var(--px-bg2)" }}>
+                      <div
+                        className="h-full transition-all"
+                        style={{
+                          width: `${pct}%`,
+                          background: c.text,
+                          boxShadow: `0 0 6px ${c.text}88`,
+                        }}
+                      />
+                    </div>
+                    <span className="text-xs font-bold w-12 text-right" style={{ color: c.text }}>
+                      {pct.toFixed(2)}%
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <div
+            className={`flex flex-wrap items-center justify-end gap-2 ${isMobile ? "px-2 py-1.5 pb-2" : "px-3 py-2 pb-3"}`}
+            style={{ borderTop: "1px solid var(--px-border)" }}
+          >
+            <span className="text-xs font-bold" style={{ color: "var(--px-text2)" }}>나이 표시</span>
+            {([
+              ["international", "만나이"],
+              ["korean", "한국 나이"],
+            ] as [AgeMode, string][]).map(([mode, label]) => (
+              <button
+                key={mode}
+                type="button"
+                onClick={() => setDaeunAgeMode(mode)}
+                className="px-3 py-1 text-xs font-bold border-2"
+                style={{
+                  color: daeunAgeMode === mode ? "var(--px-bg)" : "var(--px-text2)",
+                  background: daeunAgeMode === mode ? "var(--px-accent)" : "var(--px-bg2)",
+                  borderColor: daeunAgeMode === mode ? "var(--px-accent)" : "var(--px-border)",
+                  boxShadow: daeunAgeMode === mode ? "2px 2px 0 #4a3a00" : "none",
+                }}
               >
-                <div className="grid sm:grid-cols-2 gap-2 text-xs">
-                  <DaeunSummaryItem label="대운 방향" value={daeun.directionText} />
-                  <DaeunSummaryItem label="대운수" value={`${daeun.startAge.years}년 ${daeun.startAge.months}개월 ${daeun.startAge.days}일`} />
-                  <DaeunSummaryItem
-                    label="기준 절기"
-                    value={`${daeun.targetSolarTerm.nameKo} ${daeun.targetSolarTerm.nameHanja}, ${daeun.targetSolarTerm.datetime}`}
-                  />
-                  <DaeunSummaryItem
-                    label="첫 대운 예상 시작일"
-                    value={daeun.firstStartDate ? formatIsoDate(daeun.firstStartDate) : "계산 불가"}
-                  />
-                </div>
-                <DebugTable
-                  rows={[
-                    ["성별", daeun.debug.gender === "male" ? "남자" : "여자"],
-                    ["년간", daeun.debug.yearStem],
-                    ["년간 음양", daeun.debug.yearStemYinYang === "yang" ? "양" : "음"],
-                    ["판정 결과", daeun.direction === "forward" ? "양남음녀" : "음남양녀"],
-                    ["순행/역행", daeun.directionText],
-                    ["방향 기준", daeun.debug.directionBasis],
-                    ["기준 절기", `${daeun.targetSolarTerm.nameKo}(${daeun.targetSolarTerm.nameHanja}) ${daeun.targetSolarTerm.datetime}`],
-                    ["출생 시각", daeun.debug.birthDateTime],
-                    ["기준 절기 시각", daeun.debug.targetTermDateTime],
-                    ["시간 차이", `${daeun.debug.diffDays.toFixed(6)}일 (${daeun.debug.diffSeconds.toFixed(0)}초)`],
-                    ["3일=1년 환산", `${daeun.startAge.decimalYears.toFixed(6)}년 = ${daeun.startAge.years}년 ${daeun.startAge.months}개월 ${daeun.startAge.days}일`],
-                    ["월주 기준 간지 배열", `${daeun.debug.monthPillarGanji}에서 ${daeun.directionText}으로 다음/이전 간지를 10년 단위 배열`],
-                    ["절기 모드", daeun.debug.termMode],
-                    ["나이 계산 모드", daeun.debug.ageCalculationMode],
-                    ["표시 반올림", daeun.debug.roundingMode],
-                    ["계산 규칙", daeun.debug.ruleSummary],
-                  ]}
-                />
-                <div className="text-xs leading-relaxed space-y-1" style={{ color: "var(--px-border2)" }}>
-                  {daeun.debug.warnings.map((warning) => (
-                    <p key={warning}>※ {warning}</p>
-                  ))}
-                </div>
-              </div>
-            )}
+                {label}
+              </button>
+            ))}
           </div>
         </div>
-
-        {/* ── 오행 분포 ── */}
-        <div
-          className="p-3"
-          style={{ background: "var(--px-bg3)", border: "2px solid var(--px-border)", boxShadow: "3px 3px 0 #000" }}
-        >
-          <p className="text-xs font-bold mb-3" style={{ color: "var(--px-accent)" }}>
-            ■ 오행(五行) 분포
-          </p>
-          <div className="space-y-2">
-            {(Object.entries(elemPct) as [Element, number][]).map(([elem, pct]) => {
-              const c = ELEM[elem];
-              return (
-                <div key={elem} className="flex items-center gap-2">
-                  <span
-                    className="text-xs font-black w-6 text-center"
-                    style={{ color: c.text }}
-                  >
-                    {ELEMENT_LABELS[elem]}
-                  </span>
-                  <span className="text-xs w-8" style={{ color: "var(--px-text2)" }}>
-                    {ELEM_KO[elem]}
-                  </span>
-                  {/* 픽셀 바 */}
-                  <div className="flex-1 h-4 border" style={{ borderColor: "var(--px-border)", background: "var(--px-bg2)" }}>
-                    <div
-                      className="h-full transition-all"
-                      style={{
-                        width: `${pct}%`,
-                        background: c.text,
-                        boxShadow: `0 0 6px ${c.text}88`,
-                      }}
-                    />
-                  </div>
-                  <span className="text-xs font-bold w-12 text-right" style={{ color: c.text }}>
-                    {pct.toFixed(2)}%
-                  </span>
-                </div>
-              );
-            })}
-          </div>
         </div>
 
         {/* ── AI 분석 ── */}
@@ -882,6 +851,63 @@ export default function SajuResult({ result }: { result: SajuResult }) {
               <p className="text-xs leading-relaxed" style={{ color: "var(--px-border2)" }}>
                 ※ 절기 시각은 Jean Meeus 천문 계산 기반(±15~45분). 경계 근처 출생자는 KASI 공식 데이터 교차 검증 권장.
               </p>
+            </div>
+          )}
+        </div>
+
+        {/* ── 대운 계산 근거 (맨 아래) ── */}
+        <div style={{ border: "2px solid var(--px-border)", boxShadow: "3px 3px 0 #000" }}>
+          <button
+            type="button"
+            onClick={() => setShowDaeunDebug(!showDaeunDebug)}
+            className="w-full flex items-center justify-between px-4 py-3 text-xs font-bold transition-colors"
+            style={{ background: "var(--px-bg2)", color: "var(--px-text2)" }}
+          >
+            <span>■ 대운 계산 근거 보기</span>
+            <span style={{ color: "var(--px-accent)" }}>{showDaeunDebug ? "▲ 닫기" : "▼ 펼치기"}</span>
+          </button>
+          {showDaeunDebug && (
+            <div
+              className="px-4 pb-4 pt-3 space-y-3"
+              style={{ borderTop: "2px solid var(--px-border)", background: "var(--px-bg2)" }}
+            >
+              <div className="grid sm:grid-cols-2 gap-2 text-xs">
+                <DaeunSummaryItem label="대운 방향" value={daeun.directionText} />
+                <DaeunSummaryItem label="대운수" value={`${daeun.startAge.years}년 ${daeun.startAge.months}개월 ${daeun.startAge.days}일`} />
+                <DaeunSummaryItem
+                  label="기준 절기"
+                  value={`${daeun.targetSolarTerm.nameKo} ${daeun.targetSolarTerm.nameHanja}, ${daeun.targetSolarTerm.datetime}`}
+                />
+                <DaeunSummaryItem
+                  label="첫 대운 예상 시작일"
+                  value={daeun.firstStartDate ? formatIsoDate(daeun.firstStartDate) : "계산 불가"}
+                />
+              </div>
+              <DebugTable
+                rows={[
+                  ["성별", daeun.debug.gender === "male" ? "남자" : "여자"],
+                  ["년간", daeun.debug.yearStem],
+                  ["년간 음양", daeun.debug.yearStemYinYang === "yang" ? "양" : "음"],
+                  ["판정 결과", daeun.direction === "forward" ? "양남음녀" : "음남양녀"],
+                  ["순행/역행", daeun.directionText],
+                  ["방향 기준", daeun.debug.directionBasis],
+                  ["기준 절기", `${daeun.targetSolarTerm.nameKo}(${daeun.targetSolarTerm.nameHanja}) ${daeun.targetSolarTerm.datetime}`],
+                  ["출생 시각", daeun.debug.birthDateTime],
+                  ["기준 절기 시각", daeun.debug.targetTermDateTime],
+                  ["시간 차이", `${daeun.debug.diffDays.toFixed(6)}일 (${daeun.debug.diffSeconds.toFixed(0)}초)`],
+                  ["3일=1년 환산", `${daeun.startAge.decimalYears.toFixed(6)}년 = ${daeun.startAge.years}년 ${daeun.startAge.months}개월 ${daeun.startAge.days}일`],
+                  ["월주 기준 간지 배열", `${daeun.debug.monthPillarGanji}에서 ${daeun.directionText}으로 다음/이전 간지를 10년 단위 배열`],
+                  ["절기 모드", daeun.debug.termMode],
+                  ["나이 계산 모드", daeun.debug.ageCalculationMode],
+                  ["표시 반올림", daeun.debug.roundingMode],
+                  ["계산 규칙", daeun.debug.ruleSummary],
+                ]}
+              />
+              <div className="text-xs leading-relaxed space-y-1" style={{ color: "var(--px-border2)" }}>
+                {daeun.debug.warnings.map((warning) => (
+                  <p key={warning}>※ {warning}</p>
+                ))}
+              </div>
             </div>
           )}
         </div>
@@ -1208,26 +1234,33 @@ function HiddenStemPanel({
   isMobile: boolean;
 }) {
   const chipSize = isMobile ? "10px" : "11px";
+  const chipRowMinHeight = isMobile ? "18px" : "20px";
 
-  if (split && daeunStems) {
-    return (
+  return (
+    <div
+      className="flex flex-col w-full pt-0.5 gap-0.5"
+      style={{ borderTop: "1px solid var(--px-border)" }}
+    >
       <div
-        className="grid grid-cols-2 w-full pt-0.5"
-        style={{ borderTop: "1px solid var(--px-border)" }}
+        className={`flex flex-wrap justify-center w-full ${isMobile ? "gap-0.5 px-0 py-0.5" : "gap-0.5 px-0.5 py-0.5"}`}
+        style={{ minHeight: chipRowMinHeight }}
       >
-        <div className={`flex flex-col items-center min-w-0 ${isMobile ? "gap-0.5 px-0 py-1" : "gap-0.5 px-0.5 py-1"}`}>
-          {pillarStems.map((hs) => (
-            <HiddenStemChip
-              key={`p-${hs.role}-${hs.stem}`}
-              hiddenStem={hs}
-              highlighted={isHiddenStemHighlighted(highlightSelection, "pillar", pillarKey, hs, stemElements)}
-              fontSize={chipSize}
-            />
-          ))}
-        </div>
+        {pillarStems.map((hs) => (
+          <HiddenStemChip
+            key={`p-${hs.role}-${hs.stem}`}
+            hiddenStem={hs}
+            highlighted={isHiddenStemHighlighted(highlightSelection, "pillar", pillarKey, hs, stemElements)}
+            fontSize={chipSize}
+          />
+        ))}
+      </div>
+      {split && daeunStems ? (
         <div
-          className={`flex flex-col items-center min-w-0 ${isMobile ? "gap-0.5 px-0 py-1" : "gap-0.5 px-0.5 py-1"}`}
-          style={{ borderLeft: "1px solid var(--px-border)" }}
+          className={`flex flex-wrap justify-center w-full ${isMobile ? "gap-0.5 px-0 py-0.5" : "gap-0.5 px-0.5 py-0.5"}`}
+          style={{
+            borderTop: "1px dashed var(--px-border)",
+            minHeight: chipRowMinHeight,
+          }}
         >
           {daeunStems.map((hs) => (
             <HiddenStemChip
@@ -1238,23 +1271,7 @@ function HiddenStemPanel({
             />
           ))}
         </div>
-      </div>
-    );
-  }
-
-  return (
-    <div
-      className={`flex flex-wrap justify-center w-full pt-1 ${isMobile ? "gap-0.5" : "gap-0.5"}`}
-      style={{ borderTop: "1px solid var(--px-border)" }}
-    >
-      {pillarStems.map((hs) => (
-        <HiddenStemChip
-          key={`p-${hs.role}-${hs.stem}`}
-          hiddenStem={hs}
-          highlighted={isHiddenStemHighlighted(highlightSelection, "pillar", pillarKey, hs, stemElements)}
-          fontSize={chipSize}
-        />
-      ))}
+      ) : null}
     </div>
   );
 }

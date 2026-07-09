@@ -1,30 +1,38 @@
 "use client";
 
-import { Suspense } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { isValidDateString, resolveDateString } from "@/lib/diary/dayPillar";
-
+import { isValidDateString } from "@/lib/diary/dayPillar";
 import DiaryEditor from "@/components/diary/DiaryEditor";
+import { getDiaryStorage } from "@/lib/diary/getStorage";
+import { inferInputMode, type DiaryInputMode } from "@/lib/diary/manualScores";
 
 function DiaryPageContent() {
   const searchParams = useSearchParams();
   const dateParam = searchParams.get("date");
   const initialDate = dateParam && isValidDateString(dateParam) ? dateParam : undefined;
+  const [initialInputMode, setInitialInputMode] = useState<DiaryInputMode>("scores");
+
+  useEffect(() => {
+    if (!initialDate) return;
+    getDiaryStorage()
+      .then((s) => s.getByDate(initialDate))
+      .then((entry) => { if (entry) setInitialInputMode(inferInputMode(entry)); })
+      .catch(() => {});
+  }, [initialDate]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div
         className="p-4 border-2"
         style={{ background: "var(--px-bg3)", borderColor: "var(--px-border)", boxShadow: "4px 4px 0 #000" }}
       >
-        <h2 className="text-lg font-black mb-1" style={{ color: "var(--px-accent)" }}>
-          ■ 일기 × 일주
+        <h2 className="text-lg font-black mb-4" style={{ color: "var(--px-accent)" }}>
+          ■ 일기 × 간지 통계
         </h2>
-        <p className="text-xs mb-4" style={{ color: "var(--px-text2)" }}>
-          그날의 일주(日柱)와 함께 일기를 기록하고, AI가 감정을 분류합니다.
-        </p>
-        <DiaryEditor initialDate={initialDate} />
+
+        <DiaryEditor initialDate={initialDate} initialInputMode={initialInputMode} />
       </div>
 
       <div className="flex flex-wrap gap-2 text-xs font-bold">
