@@ -318,7 +318,7 @@ export function stemHelpValue(stemKo: string, branchDist: ElementVector): number
 }
 
 function computeOriginalBanghap(branchChars: string[]): BanghapDetail {
-  const uniqueBranches = [...new Set(branchChars)];
+  const uniqueBranches = Array.from(new Set(branchChars));
   const branchMultipliers: Record<string, number> = {};
   const groups: BanghapGroupDetail[] = [];
 
@@ -499,7 +499,7 @@ function getDaewoonBranchBanghap(
   originalBranches: string[]
 ): { multiplier: number; detail: BanghapGroupDetail | null } {
   const allBranches = [...originalBranches, daewoonBranch];
-  const uniqueBranches = [...new Set(allBranches)];
+  const uniqueBranches = Array.from(new Set(allBranches));
 
   for (const group of BANGHAP_GROUPS) {
     if (!(group.branches as readonly string[]).includes(daewoonBranch)) continue;
