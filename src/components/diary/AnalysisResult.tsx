@@ -49,7 +49,7 @@ type Props = {
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
-    <p className="text-xs font-bold" style={{ color: "var(--px-accent)" }}>
+    <p className="ui-section-title">
       {children}
     </p>
   );
@@ -138,7 +138,7 @@ function AppraisalBlock({
         </span>
         <ConfidenceBadge value={confidence} />
       </div>
-      <p className="text-[10px] leading-relaxed" style={{ color: "var(--px-text2)" }}>
+      <p className="ui-guide">
         {text}
       </p>
     </div>
@@ -157,7 +157,7 @@ export default function AnalysisResult({ analysis, hideDetailScores = false }: P
         style={{ borderColor: "var(--px-accent)", background: "var(--px-bg2)" }}
       >
         <div>
-          <p className="text-[10px] font-bold" style={{ color: "var(--px-text2)" }}>
+          <p className="ui-list-label">
             종합 행복 점수
           </p>
           <p className="text-3xl font-black" style={{ color: "var(--px-accent)" }}>
@@ -172,7 +172,7 @@ export default function AnalysisResult({ analysis, hideDetailScores = false }: P
           >
             {emotionKo}
           </span>
-          <p className="text-[10px] mt-1" style={{ color: "var(--px-text2)" }}>
+          <p className="ui-hint mt-1">
             신뢰도 {analysis.confidence}%
           </p>
         </div>
@@ -213,10 +213,10 @@ export default function AnalysisResult({ analysis, hideDetailScores = false }: P
 
       {analysis.key_events.length > 0 && (
         <div>
-          <p className="text-xs font-bold mb-1" style={{ color: "var(--px-accent)" }}>
+          <p className="ui-section-title mb-1">
             주요 사건
           </p>
-          <ul className="text-xs space-y-0.5" style={{ color: "var(--px-text2)" }}>
+          <ul className="ui-guide space-y-0.5">
             {analysis.key_events.map((ev) => (
               <li key={ev}>· {ev}</li>
             ))}

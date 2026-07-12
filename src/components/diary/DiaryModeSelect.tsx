@@ -9,11 +9,11 @@ type Props = {
 export default function DiaryModeSelect({ onSelect }: Props) {
   return (
     <div className="space-y-4 py-6">
-      <div className="text-center space-y-1 mb-6">
-        <p className="text-sm font-bold" style={{ color: "var(--px-text)" }}>
+      <div className="text-center space-y-2 mb-6">
+        <p className="ui-page-title" style={{ fontSize: "1rem" }}>
           오늘 하루를 어떻게 기록할까요?
         </p>
-        <p className="text-[10px]" style={{ color: "var(--px-text2)" }}>
+        <p className="ui-hint">
           편한 방식을 골라주세요
         </p>
       </div>
@@ -28,10 +28,10 @@ export default function DiaryModeSelect({ onSelect }: Props) {
           boxShadow: "4px 4px 0 #000",
         }}
       >
-        <p className="text-sm font-black mb-1" style={{ color: "var(--px-accent)" }}>
+        <p className="text-base font-black mb-2" style={{ color: "var(--px-accent)" }}>
           점수로 기록
         </p>
-        <p className="text-[10px] leading-relaxed" style={{ color: "var(--px-text2)" }}>
+        <p className="ui-guide leading-relaxed">
           슬라이더만 움직여서 빠르게 기록해요. 글쓰기가 부담스러울 때 추천합니다.
         </p>
       </button>
@@ -46,10 +46,10 @@ export default function DiaryModeSelect({ onSelect }: Props) {
           boxShadow: "4px 4px 0 #000",
         }}
       >
-        <p className="text-sm font-black mb-1" style={{ color: "var(--px-text)" }}>
+        <p className="text-base font-black mb-2" style={{ color: "var(--px-text)" }}>
           글로 기록
         </p>
-        <p className="text-[10px] leading-relaxed" style={{ color: "var(--px-text2)" }}>
+        <p className="ui-guide leading-relaxed">
           자유롭게 글을 쓰고 AI 심리 분석을 받을 수 있어요.
         </p>
       </button>

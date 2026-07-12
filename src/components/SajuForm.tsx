@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { SajuInput, SajuOptions, CalendarType, DayChangeRule, TimeCorrection } from "@/lib/saju/types";
 import type { Gender } from "@/lib/saju/daeun";
+import { getBirthPrefillForForm } from "@/lib/diary/sajuSettings";
 import { useViewMode } from "@/contexts/ViewModeContext";
 
 interface SajuFormProps {
@@ -78,15 +79,21 @@ function clampDayForMonth(dayStr: string, yearStr: string, monthStr: string): { 
   return { value: dayStr, hint: null };
 }
 
+function getInitialDateTimeParts() {
+  const prefill = getBirthPrefillForForm();
+  if (prefill) return prefill;
+  return getCurrentDateTimeParts();
+}
+
 export default function SajuForm({ onCalculate, isLoading }: SajuFormProps) {
   const { isMobile } = useViewMode();
-  const [initialDateTime] = useState(getCurrentDateTimeParts);
+  const [initialDateTime] = useState(getInitialDateTimeParts);
   const [year, setYear] = useState(initialDateTime.year);
   const [month, setMonth] = useState(initialDateTime.month);
   const [day, setDay] = useState(initialDateTime.day);
   const [hour, setHour] = useState(initialDateTime.hour);
   const [minute, setMinute] = useState(initialDateTime.minute);
-  const [noTime, setNoTime] = useState(false);
+  const [noTime, setNoTime] = useState(() => !initialDateTime.hour);
   const [calendarType, setCalendarType] = useState<CalendarType>("solar");
   const [gender, setGender] = useState<Gender>("male");
   const [isLeapMonth, setIsLeapMonth] = useState(false);

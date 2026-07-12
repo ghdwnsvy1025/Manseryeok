@@ -32,10 +32,10 @@ export default function ScoreSlider({
   return (
     <div className={`space-y-1 ${disabled ? "opacity-50" : ""}`}>
       <div className="flex items-center justify-between gap-2">
-        <span className="text-xs font-bold" style={{ color }}>
+        <span className="ui-list-label" style={{ color }}>
           {label}
         </span>
-        <span className="text-sm font-black tabular-nums" style={{ color }}>
+        <span className="text-base font-black tabular-nums" style={{ color }}>
           {value}
         </span>
       </div>
@@ -63,7 +63,7 @@ export default function ScoreSlider({
       </div>
 
       {hint && (
-        <p className="text-[10px]" style={{ color: "var(--px-text2)" }}>
+        <p className="ui-hint">
           {hint}
         </p>
       )}

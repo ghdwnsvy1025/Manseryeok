@@ -17,7 +17,7 @@ export function createDiaryEntry(
     id?: string;
   }
 ): DiaryEntry {
-  const { dayPillar, monthPillarKo } = getPillarsForDate(date);
+  const { dayPillar, monthPillarKo, yearPillarKo } = getPillarsForDate(date);
   const now = new Date().toISOString();
 
   return {
@@ -26,6 +26,7 @@ export function createDiaryEntry(
     content,
     dayPillar,
     monthPillarKo,
+    yearPillarKo,
     analysis: opts?.analysis ?? null,
     createdAt: now,
     updatedAt: now,

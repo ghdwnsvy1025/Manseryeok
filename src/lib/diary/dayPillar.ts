@@ -63,6 +63,24 @@ export function parseDateString(dateStr: string): { year: number; month: number;
   return { year, month, day };
 }
 
+const WEEKDAY_KO = ["일", "월", "화", "수", "목", "금", "토"] as const;
+
+/** 일기 화면용 날짜 표시 (초보 사용자용) */
+export function formatDiaryDateDisplay(dateStr: string): {
+  full: string;
+  short: string;
+  weekday: string;
+} | null {
+  if (!isValidDateString(dateStr)) return null;
+  const { year, month, day } = parseDateString(dateStr);
+  const weekday = WEEKDAY_KO[new Date(year, month - 1, day).getDay()];
+  return {
+    full: `${year}년 ${month}월 ${day}일 (${weekday})`,
+    short: `${month}월 ${day}일`,
+    weekday,
+  };
+}
+
 export function toDiaryDayPillar(result: DayPillarResult): DiaryDayPillar {
   const { pillar, ganjiIndex } = result;
   return {

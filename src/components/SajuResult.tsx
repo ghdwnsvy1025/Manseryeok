@@ -7,6 +7,18 @@ import type { Element } from "@/lib/saju/constants";
 import { BRANCH_META, ELEMENT_LABELS, STEM_META } from "@/lib/saju/constants";
 import { getTenGod, getHiddenStemsByBranch, type HiddenStemByPillar, type HiddenStemWithTenGod, type StemHanja } from "@/lib/saju/hiddenStems";
 import AiAnalysis from "@/components/AiAnalysis";
+import CoachmarkOverlay from "@/components/CoachmarkOverlay";
+import FeatureCallout from "@/components/FeatureCallout";
+import Link from "next/link";
+import {
+  hasSeenExploreGuide,
+  hasSeenSajuViewModeHint,
+  loadSajuViewMode,
+  markExploreGuideSeen,
+  markSajuViewModeHintSeen,
+  saveSajuViewMode,
+  type SajuViewMode,
+} from "@/lib/diary/onboarding";
 import { useViewMode } from "@/contexts/ViewModeContext";
 import {
   calculateElementDistributionFromPillars,
@@ -82,10 +94,12 @@ export default function SajuResult({ result }: { result: SajuResult }) {
   const { isMobile } = useViewMode();
   const charSize = isMobile ? "24px" : "36px";
   const labelSize = isMobile ? "9px" : "10px";
-  const [showDebug, setShowDebug] = useState(false);
-  const [showDaeunDebug, setShowDaeunDebug] = useState(false);
+  const [showCalcDebug, setShowCalcDebug] = useState(false);
   const [daeunAgeMode, setDaeunAgeMode] = useState<AgeMode>("international");
-  const [showHiddenStemTenGod, setShowHiddenStemTenGod] = useState(false);
+  const [viewMode, setViewMode] = useState<SajuViewMode>("simple");
+  const [showExploreGuide, setShowExploreGuide] = useState(false);
+  const [showViewModeHint, setShowViewModeHint] = useState(false);
+  const [highlightHint, setHighlightHint] = useState<string | null>(null);
   const [highlightSelection, setHighlightSelection] = useState<HighlightSelection>(null);
   const [selectedDaeunOrder, setSelectedDaeunOrder] = useState<number | null>(null);
   const [flyers, setFlyers] = useState<FlyerData[]>([]);
@@ -102,7 +116,59 @@ export default function SajuResult({ result }: { result: SajuResult }) {
   const daeun = result.daeun;
   const hiddenStems = result.hiddenStems;
   const dayStem = pillars.day.stem.hanja as StemHanja;
-  const selectedDaeun = daeun.cycles.find((c) => c.order === selectedDaeunOrder) ?? null;
+  const exploreMode = viewMode === "explore";
+  const selectedDaeun = exploreMode
+    ? daeun.cycles.find((c) => c.order === selectedDaeunOrder) ?? null
+    : null;
+
+  useEffect(() => {
+    setViewMode(loadSajuViewMode());
+    setShowViewModeHint(!hasSeenSajuViewModeHint());
+  }, []);
+
+  const dismissViewModeHint = () => {
+    markSajuViewModeHintSeen();
+    setShowViewModeHint(false);
+  };
+
+  useEffect(() => {
+    if (!exploreMode) {
+      setSelectedDaeunOrder(null);
+      setHighlightSelection(null);
+      setFlyers([]);
+    }
+  }, [exploreMode]);
+
+  const handleViewModeChange = (mode: SajuViewMode) => {
+    setViewMode(mode);
+    saveSajuViewMode(mode);
+    if (mode === "explore") {
+      dismissViewModeHint();
+      if (!hasSeenExploreGuide()) {
+        setShowExploreGuide(true);
+      }
+    }
+  };
+
+  const completeExploreGuide = () => {
+    markExploreGuideSeen();
+    setShowExploreGuide(false);
+  };
+
+  const toggleHighlightWithHint = useCallback((next: Exclude<HighlightSelection, null>) => {
+    setHighlightSelection((prev) => {
+      const clearing = isSameHighlightSelection(prev, next);
+      if (!clearing) {
+        if (next.kind === "stem") {
+          setHighlightHint(`같은 오행(${ELEM_KO[next.element]})의 지장간을 강조했어요`);
+        } else {
+          setHighlightHint("이 지지에 숨은 오행(지장간)을 강조했어요");
+        }
+        window.setTimeout(() => setHighlightHint(null), 2800);
+      }
+      return clearing ? null : next;
+    });
+  }, []);
 
   const elementDistribution = useMemo(() => {
     const daewoonInput = selectedDaeun
@@ -115,8 +181,9 @@ export default function SajuResult({ result }: { result: SajuResult }) {
   ) as Partial<Record<PillarKey, HiddenStemByPillar>>;
 
   const toggleHighlight = useCallback((next: Exclude<HighlightSelection, null>) => {
-    setHighlightSelection((prev) => (isSameHighlightSelection(prev, next) ? null : next));
-  }, []);
+    if (!exploreMode) return;
+    toggleHighlightWithHint(next);
+  }, [exploreMode, toggleHighlightWithHint]);
 
   const stemElements = new Set<Element>();
   for (const k of DISPLAY_ORDER) {
@@ -280,6 +347,7 @@ export default function SajuResult({ result }: { result: SajuResult }) {
     branchColor: string,
     branchElement: Element,
   ) => {
+    if (!exploreMode) return;
     captureScrollAnchor();
 
     if (isSelected) {
@@ -323,7 +391,7 @@ export default function SajuResult({ result }: { result: SajuResult }) {
         launchFlyers(sourceEl, stemChar, stemColor, stemElement, branchChar, branchColor, branchElement);
       });
     });
-  }, [launchFlyers, isMobile, triggerMobilePump, captureScrollAnchor]);
+  }, [exploreMode, launchFlyers, isMobile, triggerMobilePump, captureScrollAnchor]);
 
   return (
     <>
@@ -373,6 +441,55 @@ export default function SajuResult({ result }: { result: SajuResult }) {
           </span>
         )}
       </div>
+
+      <div
+        className={`flex flex-wrap items-center gap-2 ${isMobile ? "px-2 py-2" : "px-4 py-2"}`}
+        style={{ background: "var(--px-bg2)", borderBottom: "2px solid var(--px-border)" }}
+      >
+        <span className="ui-list-label">
+          보기
+        </span>
+        {([
+          ["simple", "쉬운 보기"],
+          ["explore", "탐험 모드"],
+        ] as [SajuViewMode, string][]).map(([mode, label]) => (
+          <button
+            key={mode}
+            type="button"
+            onClick={() => handleViewModeChange(mode)}
+            className={
+              viewMode === mode
+                ? "ui-action-btn ui-action-btn-selected"
+                : mode === "explore"
+                  ? `ui-action-btn${showViewModeHint ? " ui-action-btn-pulse" : ""}`
+                  : "ui-action-btn ui-action-btn-muted"
+            }
+          >
+            {label}
+          </button>
+        ))}
+        <span className="ui-hint ml-auto">
+          {exploreMode ? "대운·지장간 탐색 가능" : "기본 사주만 표시"}
+        </span>
+      </div>
+
+      {showViewModeHint && viewMode === "simple" && (
+        <div className={isMobile ? "px-2 pb-1" : "px-4 pb-1"}>
+          <FeatureCallout
+            message="탐험 모드를 누르면 대운·지장간을 직접 눌러볼 수 있어요."
+            onDismiss={dismissViewModeHint}
+          />
+        </div>
+      )}
+
+      {highlightHint && (
+        <p
+          className={`ui-guide-strong text-center ${isMobile ? "px-2" : "px-4"}`}
+          style={{ color: "var(--px-accent)" }}
+        >
+          {highlightHint}
+        </p>
+      )}
 
       <div className={`pb-4 space-y-2 ${isMobile ? "px-2" : "px-4"}`}>
         {/* ── 사주 + 대운 + 오행 (밀착 레이아웃) ── */}
@@ -508,15 +625,24 @@ export default function SajuResult({ result }: { result: SajuResult }) {
                     {/* ── 천간(天干) ── */}
                     <div className={`flex flex-col items-center w-full ${isMobile ? "py-1 gap-0.5" : "gap-0.5 py-1.5"}`}
                       style={{ borderBottom: "1px dashed var(--px-border)" }}>
-                      <button
-                        type="button"
-                        className={`ganji-clickable font-black leading-none bg-transparent border-0 p-0 ${stemSelected ? "ganji-clickable-selected" : ""}`}
-                        style={{ color: sc.text, fontSize: charSize, textShadow: `0 0 10px ${sc.text}88` }}
-                        onClick={() => toggleHighlight({ kind: "stem", source: "pillar", pillar: key, element: pillar.stem.element })}
-                        title="천간 클릭: 같은 오행 지장간 강조"
-                      >
-                        {pillar.stem.hanja}
-                      </button>
+                      {exploreMode ? (
+                        <button
+                          type="button"
+                          className={`ganji-clickable font-black leading-none bg-transparent border-0 p-0 ${stemSelected ? "ganji-clickable-selected" : ""}`}
+                          style={{ color: sc.text, fontSize: charSize, textShadow: `0 0 10px ${sc.text}88` }}
+                          onClick={() => toggleHighlight({ kind: "stem", source: "pillar", pillar: key, element: pillar.stem.element })}
+                          title="천간 클릭: 같은 오행 지장간 강조"
+                        >
+                          {pillar.stem.hanja}
+                        </button>
+                      ) : (
+                        <span
+                          className="font-black leading-none"
+                          style={{ color: sc.text, fontSize: charSize, textShadow: `0 0 10px ${sc.text}88` }}
+                        >
+                          {pillar.stem.hanja}
+                        </span>
+                      )}
                       <div className="flex items-center gap-1 mt-0.5">
                         <span className="font-bold border leading-none"
                           style={{ color: sc.text, borderColor: sc.border, background: sc.bg, fontSize: labelSize, padding: isMobile ? "1px 3px" : undefined }}>
@@ -527,15 +653,24 @@ export default function SajuResult({ result }: { result: SajuResult }) {
 
                     {/* ── 지지(地支) ── */}
                     <div className={`flex flex-col items-center w-full ${isMobile ? "py-1 gap-0.5" : "gap-0.5 py-1.5"}`}>
-                      <button
-                        type="button"
-                        className={`ganji-clickable font-black leading-none bg-transparent border-0 p-0 ${branchSelected ? "ganji-clickable-selected" : ""}`}
-                        style={{ color: bc.text, fontSize: charSize, textShadow: `0 0 10px ${bc.text}88` }}
-                        onClick={() => toggleHighlight({ kind: "branch-stem-match", scope: "pillar", pillar: key })}
-                        title="지지 클릭: 해당 지지의 지장간 강조"
-                      >
-                        {pillar.branch.hanja}
-                      </button>
+                      {exploreMode ? (
+                        <button
+                          type="button"
+                          className={`ganji-clickable font-black leading-none bg-transparent border-0 p-0 ${branchSelected ? "ganji-clickable-selected" : ""}`}
+                          style={{ color: bc.text, fontSize: charSize, textShadow: `0 0 10px ${bc.text}88` }}
+                          onClick={() => toggleHighlight({ kind: "branch-stem-match", scope: "pillar", pillar: key })}
+                          title="지지 클릭: 해당 지지의 지장간 강조"
+                        >
+                          {pillar.branch.hanja}
+                        </button>
+                      ) : (
+                        <span
+                          className="font-black leading-none"
+                          style={{ color: bc.text, fontSize: charSize, textShadow: `0 0 10px ${bc.text}88` }}
+                        >
+                          {pillar.branch.hanja}
+                        </span>
+                      )}
                       {branchTenGod && (
                         <div className="flex items-center gap-1 mt-0.5">
                           <span className="font-bold border leading-none"
@@ -570,7 +705,8 @@ export default function SajuResult({ result }: { result: SajuResult }) {
                     )}
 
                     {/* ── 지장간 ── */}
-                    {(hiddenStemItem?.hiddenStems?.length || (selectedDaeun && daeunBranchHiddenStems.length)) ? (
+                    {exploreMode &&
+                    (hiddenStemItem?.hiddenStems?.length || (selectedDaeun && daeunBranchHiddenStems.length)) ? (
                       <HiddenStemPanel
                         pillarStems={hiddenStemItem?.hiddenStems ?? []}
                         daeunStems={selectedDaeun ? daeunBranchHiddenStems : undefined}
@@ -591,11 +727,17 @@ export default function SajuResult({ result }: { result: SajuResult }) {
         {/* ── 대운(大運) + 오행 분포 ── */}
         <div
           ref={daeunSectionRef}
+          id="saju-daeun-section"
           style={{ background: "var(--px-bg3)", border: "2px solid var(--px-border)", boxShadow: "3px 3px 0 #000", overflowAnchor: "none" }}
         >
+          <p className={`ui-guide px-3 pt-2 ${isMobile ? "px-2" : ""}`}>
+            {exploreMode
+              ? "대운 카드를 터치하면 그 시기 기운이 사주에 겹쳐지고, 아래 오행 막대가 바뀝니다."
+              : "10년 단위 운 흐름입니다. 탐험 모드에서 카드를 눌러 사주에 겹쳐볼 수 있어요."}
+          </p>
           <div className={`grid ${isMobile ? "grid-cols-5 gap-1 p-2" : "grid-cols-10 gap-1 p-2"}`}>
               {daeun.cycles.map((cycle) => {
-                const isSelected = selectedDaeunOrder === cycle.order;
+                const isSelected = exploreMode && selectedDaeunOrder === cycle.order;
                 const daeunCharSize = isMobile ? "16px" : "22px";
                 const daeunLabelSize = isMobile ? "9px" : "11px";
                 const daeunAgeSize = isMobile ? "9px" : "10px";
@@ -621,43 +763,52 @@ export default function SajuResult({ result }: { result: SajuResult }) {
                 return (
                   <div
                     key={cycle.order}
-                    role="button"
-                    tabIndex={0}
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={(e) => {
-                      handleDaeunClick(
-                        cycle.order,
-                        isSelected,
-                        isMobile ? null : e.currentTarget,
-                        cycle.ganji[0],
-                        sc.text,
-                        stemEl ?? "water",
-                        cycle.ganji[1],
-                        bc.text,
-                        branchEl ?? "water",
-                      );
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
-                        handleDaeunClick(
-                          cycle.order,
-                          isSelected,
-                          isMobile ? null : e.currentTarget,
-                          cycle.ganji[0],
-                          sc.text,
-                          stemEl ?? "water",
-                          cycle.ganji[1],
-                          bc.text,
-                          branchEl ?? "water",
-                        );
-                      }
-                    }}
-                    className={`daeun-card flex flex-col items-center w-full ${isSelected ? "daeun-card-selected" : ""} ${isMobile ? "gap-0.5 px-1 py-1" : "gap-0.5 px-1 py-1"}`}
+                    role={exploreMode ? "button" : undefined}
+                    tabIndex={exploreMode ? 0 : undefined}
+                    onMouseDown={exploreMode ? (e) => e.preventDefault() : undefined}
+                    onClick={
+                      exploreMode
+                        ? (e) => {
+                            handleDaeunClick(
+                              cycle.order,
+                              isSelected,
+                              isMobile ? null : e.currentTarget,
+                              cycle.ganji[0],
+                              sc.text,
+                              stemEl ?? "water",
+                              cycle.ganji[1],
+                              bc.text,
+                              branchEl ?? "water",
+                            );
+                          }
+                        : undefined
+                    }
+                    onKeyDown={
+                      exploreMode
+                        ? (e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              handleDaeunClick(
+                                cycle.order,
+                                isSelected,
+                                isMobile ? null : e.currentTarget,
+                                cycle.ganji[0],
+                                sc.text,
+                                stemEl ?? "water",
+                                cycle.ganji[1],
+                                bc.text,
+                                branchEl ?? "water",
+                              );
+                            }
+                          }
+                        : undefined
+                    }
+                    className={`${exploreMode ? "daeun-card" : ""} flex flex-col items-center w-full ${isSelected ? "daeun-card-selected" : ""} ${isMobile ? "gap-0.5 px-1 py-1" : "gap-0.5 px-1 py-1"}`}
                     style={{
                       background: "var(--px-bg2)",
                       border: isSelected ? "2px solid #fbbf24" : "1px solid var(--px-border)",
                       boxShadow: isSelected ? "2px 2px 0 #4a3a00, 0 0 10px #fbbf2444" : "1px 1px 0 #000",
+                      cursor: exploreMode ? "pointer" : "default",
                     }}
                   >
                     {stemTenGod ? (
@@ -780,6 +931,19 @@ export default function SajuResult({ result }: { result: SajuResult }) {
         </div>
         </div>
 
+        <Link
+          href="/diary"
+          className="block text-center px-4 py-3 text-xs font-bold border-2"
+          style={{
+            background: "var(--px-accent)",
+            borderColor: "#000",
+            color: "#000",
+            boxShadow: "4px 4px 0 #000",
+          }}
+        >
+          이 사주로 오늘 기분 기록하기 →
+        </Link>
+
         {/* ── AI 분석 ── */}
         <AiAnalysis result={result} />
 
@@ -795,27 +959,25 @@ export default function SajuResult({ result }: { result: SajuResult }) {
           </div>
         )}
 
-        {/* ── 계산 근거 ── */}
-        <div style={{ border: "2px solid var(--px-border)", boxShadow: "3px 3px 0 #000" }}>
+        {/* ── 계산 근거 (통합 · 접힘) ── */}
+        <div className="ui-calc-debug">
           <button
             type="button"
-            onClick={() => setShowDebug(!showDebug)}
-            className="w-full flex items-center justify-between px-4 py-3 text-xs font-bold transition-colors"
-            style={{
-              background: "var(--px-bg3)",
-              color: "var(--px-text2)",
-            }}
+            onClick={() => setShowCalcDebug(!showCalcDebug)}
+            className="ui-calc-debug-toggle"
           >
-            <span>■ 계산 근거 (절기 시각 · 적용 옵션)</span>
-            <span style={{ color: "var(--px-accent)" }}>{showDebug ? "▲ 닫기" : "▼ 펼치기"}</span>
+            <span>계산 근거 (고급)</span>
+            <span>{showCalcDebug ? "▲" : "▼"}</span>
           </button>
 
-          {showDebug && (
-            <div
-              className="px-4 pb-4 pt-3 space-y-3"
-              style={{ borderTop: "2px solid var(--px-border)", background: "var(--px-bg2)" }}
-            >
+          {showCalcDebug && (
+            <div className="ui-calc-debug-body space-y-2">
+              <p className="leading-relaxed">
+                절기·옵션·대운 등 계산 세부값입니다. 일반 사용 시 펼칠 필요 없습니다.
+              </p>
+              <p className="ui-calc-debug-subtitle">사주팔자</p>
               <DebugTable
+                compact
                 rows={[
                   ["기준 시간대",             result.options.timezone],
                   ["계산 기준 양력 날짜",       input.normalizedSolarDate],
@@ -848,71 +1010,84 @@ export default function SajuResult({ result }: { result: SajuResult }) {
                     : []),
                 ]}
               />
-              <p className="text-xs leading-relaxed" style={{ color: "var(--px-border2)" }}>
+
+              {exploreMode && (
+                <>
+                  <p className="ui-calc-debug-subtitle" style={{ borderTop: "1px solid var(--px-border)", paddingTop: 10 }}>
+                    대운
+                  </p>
+                  <div className="grid sm:grid-cols-2 gap-2">
+                    <DaeunSummaryItem label="대운 방향" value={daeun.directionText} compact />
+                    <DaeunSummaryItem label="대운수" value={`${daeun.startAge.years}년 ${daeun.startAge.months}개월 ${daeun.startAge.days}일`} compact />
+                    <DaeunSummaryItem
+                      label="기준 절기"
+                      value={`${daeun.targetSolarTerm.nameKo} ${daeun.targetSolarTerm.nameHanja}, ${daeun.targetSolarTerm.datetime}`}
+                      compact
+                    />
+                    <DaeunSummaryItem
+                      label="첫 대운 예상 시작일"
+                      value={daeun.firstStartDate ? formatIsoDate(daeun.firstStartDate) : "계산 불가"}
+                      compact
+                    />
+                  </div>
+                  <DebugTable
+                    compact
+                    rows={[
+                      ["성별", daeun.debug.gender === "male" ? "남자" : "여자"],
+                      ["년간", daeun.debug.yearStem],
+                      ["년간 음양", daeun.debug.yearStemYinYang === "yang" ? "양" : "음"],
+                      ["판정 결과", daeun.direction === "forward" ? "양남음녀" : "음남양녀"],
+                      ["순행/역행", daeun.directionText],
+                      ["방향 기준", daeun.debug.directionBasis],
+                      ["기준 절기", `${daeun.targetSolarTerm.nameKo}(${daeun.targetSolarTerm.nameHanja}) ${daeun.targetSolarTerm.datetime}`],
+                      ["출생 시각", daeun.debug.birthDateTime],
+                      ["기준 절기 시각", daeun.debug.targetTermDateTime],
+                      ["시간 차이", `${daeun.debug.diffDays.toFixed(6)}일 (${daeun.debug.diffSeconds.toFixed(0)}초)`],
+                      ["3일=1년 환산", `${daeun.startAge.decimalYears.toFixed(6)}년 = ${daeun.startAge.years}년 ${daeun.startAge.months}개월 ${daeun.startAge.days}일`],
+                      ["월주 기준 간지 배열", `${daeun.debug.monthPillarGanji}에서 ${daeun.directionText}으로 다음/이전 간지를 10년 단위 배열`],
+                      ["절기 모드", daeun.debug.termMode],
+                      ["나이 계산 모드", daeun.debug.ageCalculationMode],
+                      ["표시 반올림", daeun.debug.roundingMode],
+                      ["계산 규칙", daeun.debug.ruleSummary],
+                    ]}
+                  />
+                  {daeun.debug.warnings.map((warning) => (
+                    <p key={warning} className="leading-relaxed">
+                      ※ {warning}
+                    </p>
+                  ))}
+                </>
+              )}
+
+              <p className="leading-relaxed pt-1">
                 ※ 절기 시각은 Jean Meeus 천문 계산 기반(±15~45분). 경계 근처 출생자는 KASI 공식 데이터 교차 검증 권장.
               </p>
             </div>
           )}
         </div>
-
-        {/* ── 대운 계산 근거 (맨 아래) ── */}
-        <div style={{ border: "2px solid var(--px-border)", boxShadow: "3px 3px 0 #000" }}>
-          <button
-            type="button"
-            onClick={() => setShowDaeunDebug(!showDaeunDebug)}
-            className="w-full flex items-center justify-between px-4 py-3 text-xs font-bold transition-colors"
-            style={{ background: "var(--px-bg2)", color: "var(--px-text2)" }}
-          >
-            <span>■ 대운 계산 근거 보기</span>
-            <span style={{ color: "var(--px-accent)" }}>{showDaeunDebug ? "▲ 닫기" : "▼ 펼치기"}</span>
-          </button>
-          {showDaeunDebug && (
-            <div
-              className="px-4 pb-4 pt-3 space-y-3"
-              style={{ borderTop: "2px solid var(--px-border)", background: "var(--px-bg2)" }}
-            >
-              <div className="grid sm:grid-cols-2 gap-2 text-xs">
-                <DaeunSummaryItem label="대운 방향" value={daeun.directionText} />
-                <DaeunSummaryItem label="대운수" value={`${daeun.startAge.years}년 ${daeun.startAge.months}개월 ${daeun.startAge.days}일`} />
-                <DaeunSummaryItem
-                  label="기준 절기"
-                  value={`${daeun.targetSolarTerm.nameKo} ${daeun.targetSolarTerm.nameHanja}, ${daeun.targetSolarTerm.datetime}`}
-                />
-                <DaeunSummaryItem
-                  label="첫 대운 예상 시작일"
-                  value={daeun.firstStartDate ? formatIsoDate(daeun.firstStartDate) : "계산 불가"}
-                />
-              </div>
-              <DebugTable
-                rows={[
-                  ["성별", daeun.debug.gender === "male" ? "남자" : "여자"],
-                  ["년간", daeun.debug.yearStem],
-                  ["년간 음양", daeun.debug.yearStemYinYang === "yang" ? "양" : "음"],
-                  ["판정 결과", daeun.direction === "forward" ? "양남음녀" : "음남양녀"],
-                  ["순행/역행", daeun.directionText],
-                  ["방향 기준", daeun.debug.directionBasis],
-                  ["기준 절기", `${daeun.targetSolarTerm.nameKo}(${daeun.targetSolarTerm.nameHanja}) ${daeun.targetSolarTerm.datetime}`],
-                  ["출생 시각", daeun.debug.birthDateTime],
-                  ["기준 절기 시각", daeun.debug.targetTermDateTime],
-                  ["시간 차이", `${daeun.debug.diffDays.toFixed(6)}일 (${daeun.debug.diffSeconds.toFixed(0)}초)`],
-                  ["3일=1년 환산", `${daeun.startAge.decimalYears.toFixed(6)}년 = ${daeun.startAge.years}년 ${daeun.startAge.months}개월 ${daeun.startAge.days}일`],
-                  ["월주 기준 간지 배열", `${daeun.debug.monthPillarGanji}에서 ${daeun.directionText}으로 다음/이전 간지를 10년 단위 배열`],
-                  ["절기 모드", daeun.debug.termMode],
-                  ["나이 계산 모드", daeun.debug.ageCalculationMode],
-                  ["표시 반올림", daeun.debug.roundingMode],
-                  ["계산 규칙", daeun.debug.ruleSummary],
-                ]}
-              />
-              <div className="text-xs leading-relaxed space-y-1" style={{ color: "var(--px-border2)" }}>
-                {daeun.debug.warnings.map((warning) => (
-                  <p key={warning}>※ {warning}</p>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
       </div>
     </div>
+
+    {showExploreGuide && (
+      <CoachmarkOverlay
+        steps={[
+          {
+            title: "대운 카드를 눌러보세요",
+            body: "10년 단위 운 카드를 터치하면 그 시기의 기운이 위 사주에 겹쳐집니다.",
+          },
+          {
+            title: "천간·지지를 눌러보세요",
+            body: "글자를 터치하면 지장간(지지 속 숨은 오행)이 강조됩니다.",
+          },
+          {
+            title: "오행 막대를 확인하세요",
+            body: "대운을 선택하면 아래 오행 분포 막대가 함께 바뀝니다.",
+          },
+        ]}
+        onComplete={completeExploreGuide}
+        onSkip={completeExploreGuide}
+      />
+    )}
 
     {isMounted && !isMobile && flyers.length > 0 && createPortal(
       <>
@@ -1168,14 +1343,14 @@ type DaeunCycle = {
   estimatedEndDate: string | null;
 };
 
-function DaeunSummaryItem({ label, value }: { label: string; value: string }) {
+function DaeunSummaryItem({ label, value, compact = false }: { label: string; value: string; compact?: boolean }) {
   return (
     <div
-      className="p-2"
+      className={compact ? "p-1.5" : "p-2"}
       style={{ background: "var(--px-bg2)", border: "1px solid var(--px-border)" }}
     >
-      <p className="font-bold mb-1" style={{ color: "var(--px-text2)" }}>{label}</p>
-      <p className="font-bold leading-relaxed" style={{ color: "var(--px-text)" }}>{value}</p>
+      <p className={`font-bold mb-1 ${compact ? "text-[10px]" : "text-xs"}`} style={{ color: "var(--px-text2)" }}>{label}</p>
+      <p className={`font-bold leading-relaxed ${compact ? "text-[10px]" : "text-xs"}`} style={{ color: "var(--px-text)" }}>{value}</p>
     </div>
   );
 }
@@ -1241,6 +1416,9 @@ function HiddenStemPanel({
       className="flex flex-col w-full pt-0.5 gap-0.5"
       style={{ borderTop: "1px solid var(--px-border)" }}
     >
+      <p className="text-center font-bold" style={{ fontSize: isMobile ? "8px" : "9px", color: "var(--px-text2)" }}>
+        지장간
+      </p>
       <div
         className={`flex flex-wrap justify-center w-full ${isMobile ? "gap-0.5 px-0 py-0.5" : "gap-0.5 px-0.5 py-0.5"}`}
         style={{ minHeight: chipRowMinHeight }}
@@ -1382,10 +1560,10 @@ function calculateKoreanAge(birthIso: string, targetIso: string): number {
   return Math.max(target.getFullYear() - birth.getFullYear() + 1, 1);
 }
 
-function DebugTable({ rows }: { rows: [string, string][] }) {
+function DebugTable({ rows, compact = false }: { rows: [string, string][]; compact?: boolean }) {
   return (
     <div className="overflow-x-auto">
-      <table className="w-full text-xs" style={{ borderCollapse: "collapse" }}>
+      <table className={`w-full ${compact ? "text-[10px]" : "text-xs"}`} style={{ borderCollapse: "collapse" }}>
         <tbody>
           {rows.map(([label, value], i) => (
             <tr

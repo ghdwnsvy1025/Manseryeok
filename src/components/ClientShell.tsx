@@ -5,32 +5,41 @@ import { ViewModeProvider, useViewMode } from "@/contexts/ViewModeContext";
 import ViewModeToggle from "@/components/ViewModeToggle";
 import AppNav from "@/components/AppNav";
 
-function ShellInner({ children }: { children: React.ReactNode }) {
-  const { isMobile } = useViewMode();
+function ShellContent({ children }: { children: React.ReactNode }) {
+  const { isMobile, isCompactViewport, showPhoneFrame } = useViewMode();
+
+  const widthClass = showPhoneFrame
+    ? "w-full"
+    : isMobile
+      ? "w-full max-w-none"
+      : "w-full max-w-[1400px] mx-auto";
+
+  const mainPadding = isCompactViewport
+    ? "px-2 py-2"
+    : isMobile
+      ? "px-3 py-3"
+      : "px-4 sm:py-8";
 
   return (
     <>
       <header
-        className="sticky top-0 z-50 border-b-2"
+        className="sticky top-0 z-50 border-b-2 shrink-0"
         style={{
           background: "var(--px-bg2)",
           borderColor: "var(--px-border2)",
           boxShadow: "0 4px 0 #000",
         }}
       >
-        <div
-          className={`mx-auto ${isMobile ? "max-w-[480px]" : "max-w-[1400px]"}`}
-        >
-          <div className="px-3 py-2 sm:px-4 sm:py-3 flex items-center gap-2 sm:gap-3">
+        <div className={`${widthClass} w-full`}>
+          <div className={`flex items-center gap-2 ${isCompactViewport ? "px-2 py-1.5" : "px-3 py-2"}`}>
             <Link
-              href="/"
-              className="w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center border-2 text-xl font-black select-none shrink-0"
+              href="/diary"
+              className="w-9 h-9 flex items-center justify-center border-2 text-xl font-black select-none shrink-0 pixel-font"
               style={{
                 background: "var(--px-bg3)",
                 borderColor: "var(--px-accent)",
                 color: "var(--px-accent)",
                 boxShadow: "3px 3px 0 #4a3a00",
-                fontFamily: "'Press Start 2P', monospace",
                 fontSize: isMobile ? "11px" : "14px",
               }}
             >
@@ -43,12 +52,12 @@ function ShellInner({ children }: { children: React.ReactNode }) {
               >
                 사주 만세력
               </h1>
-              <p className="text-[10px] sm:text-xs leading-tight truncate" style={{ color: "var(--px-text2)" }}>
-                절기 기준 사주팔자 · 일기 · AI 학습
+              <p className="text-[10px] leading-tight truncate" style={{ color: "var(--px-text2)" }}>
+                감정 일기 × 간지 · 내 사주 · AI
               </p>
             </div>
 
-            <ViewModeToggle />
+            {!isCompactViewport && <ViewModeToggle />}
 
             {!isMobile && (
               <div className="hidden md:flex gap-1 shrink-0">
@@ -77,20 +86,19 @@ function ShellInner({ children }: { children: React.ReactNode }) {
       </header>
 
       <main
-        className={`mx-auto py-4 sm:py-8 ${isMobile ? "max-w-[480px] px-3" : "max-w-[1400px] px-4"}`}
+        className={`flex-1 min-w-0 overflow-x-hidden ${mainPadding} ${widthClass}`}
         data-view-mode={isMobile ? "mobile" : "desktop"}
+        data-compact={isCompactViewport ? "true" : undefined}
       >
         {children}
       </main>
 
       <footer
-        className="mt-8 sm:mt-12 border-t-2"
+        className={`mt-auto border-t-2 shrink-0 ${isCompactViewport ? "hidden" : ""}`}
         style={{ background: "var(--px-bg2)", borderColor: "var(--px-border)" }}
       >
         <div
-          className={`mx-auto px-3 py-3 sm:px-4 sm:py-5 text-center text-[10px] sm:text-xs space-y-1 ${
-            isMobile ? "max-w-[480px]" : "max-w-[1400px]"
-          }`}
+          className={`px-3 py-3 text-center text-[10px] space-y-1 ${widthClass}`}
           style={{ color: "var(--px-text2)" }}
         >
           <p>절기 시각: Jean Meeus 「Astronomical Algorithms」 기반 천문 계산 (±15~45분)</p>
@@ -101,6 +109,32 @@ function ShellInner({ children }: { children: React.ReactNode }) {
       </footer>
     </>
   );
+}
+
+function ShellInner({ children }: { children: React.ReactNode }) {
+  const { showPhoneFrame, isCompactViewport } = useViewMode();
+
+  if (showPhoneFrame) {
+    return (
+      <div className="app-phone-preview">
+        <div className="app-mobile-device">
+          <div className="app-mobile-device-scroll app-hide-scrollbar flex flex-col min-h-full">
+            <ShellContent>{children}</ShellContent>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (isCompactViewport) {
+    return (
+      <div className="app-compact-root app-hide-scrollbar flex flex-col min-h-dvh w-full max-w-[100vw] overflow-x-hidden">
+        <ShellContent>{children}</ShellContent>
+      </div>
+    );
+  }
+
+  return <ShellContent>{children}</ShellContent>;
 }
 
 export default function ClientShell({ children }: { children: React.ReactNode }) {

@@ -23,15 +23,11 @@ function DiaryPageContent() {
   }, [initialDate]);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <div
-        className="p-4 border-2"
+        className="p-2 sm:p-4 border-2"
         style={{ background: "var(--px-bg3)", borderColor: "var(--px-border)", boxShadow: "4px 4px 0 #000" }}
       >
-        <h2 className="text-lg font-black mb-4" style={{ color: "var(--px-accent)" }}>
-          ■ 일기 × 간지 통계
-        </h2>
-
         <DiaryEditor initialDate={initialDate} initialInputMode={initialInputMode} />
       </div>
 
@@ -44,11 +40,18 @@ function DiaryPageContent() {
           과거 일기
         </Link>
         <Link
+          href="/diary/collection"
+          className="px-3 py-1.5 border-2"
+          style={{ borderColor: "var(--px-border)", color: "var(--px-text2)", background: "var(--px-bg2)" }}
+        >
+          간지 도감
+        </Link>
+        <Link
           href="/diary/stats"
           className="px-3 py-1.5 border-2"
-          style={{ borderColor: "var(--px-accent)", color: "var(--px-accent)", background: "var(--px-bg3)" }}
+          style={{ borderColor: "var(--px-accent)", color: "var(--px-text-on-panel)", background: "var(--px-bg2)" }}
         >
-          일주별 통계
+          간지별 행복도
         </Link>
       </div>
     </div>

@@ -46,15 +46,15 @@ export default function ManualScoreInput({ state, onChange, disabled }: Props) {
   return (
     <div className="space-y-4">
       <div className="space-y-3">
-        <p className="text-xs font-bold" style={{ color: "var(--px-text2)" }}>
-          세부 점수 (0–100, 1점 단위)
+        <p className="ui-section-title">
+          세부 점수 (0–100)
         </p>
         {DETAIL_SCORE_DIMENSIONS.map((dim) => {
           if (dim.id === "relationship_score") {
             const relValue = state.details.relationship_score;
             return (
               <div key={dim.id} className="space-y-1">
-                <label className="flex items-center gap-2 text-[10px] cursor-pointer">
+                <label className="flex items-center gap-2 ui-list-label cursor-pointer">
                   <input
                     type="checkbox"
                     checked={relValue !== null}
@@ -62,7 +62,7 @@ export default function ManualScoreInput({ state, onChange, disabled }: Props) {
                     disabled={disabled}
                     className="accent-[var(--px-accent)]"
                   />
-                  <span style={{ color: "var(--px-text2)" }}>관계 점수 입력</span>
+                  <span className="ui-list-label">관계 점수 입력</span>
                 </label>
                 {relValue !== null && (
                   <ScoreSlider
@@ -96,14 +96,14 @@ export default function ManualScoreInput({ state, onChange, disabled }: Props) {
         className="p-3 border-2 space-y-1"
         style={{ background: "var(--px-bg2)", borderColor: "var(--px-accent)" }}
       >
-        <p className="text-[10px] font-bold" style={{ color: "var(--px-accent)" }}>
+        <p className="ui-section-title">
           종합 행복도
         </p>
         <p className="text-lg font-black" style={{ color: "var(--px-accent)" }}>
           {preview.daily_wellbeing_score}
           <span className="text-xs ml-1">/ 100</span>
         </p>
-        <p className="text-[10px]" style={{ color: "var(--px-text2)" }}>
+        <p className="ui-hint">
           위 세부 점수를 바탕으로 자동 계산됩니다.
         </p>
       </div>

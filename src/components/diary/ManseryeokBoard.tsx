@@ -27,9 +27,21 @@ function getBranchColor(hanja: string): string {
 type PillarDisplay = {
   label: string;
   hint?: string;
+  /** compact 등에서 표시용 라벨 (예: 내 일주, 오늘의 일주) */
+  displayLabel?: string;
   stemHanja: string;
   branchHanja: string;
   ganjiKo: string;
+};
+
+const GROUP_BORDER: Record<"birth" | "diary", string> = {
+  birth: "var(--px-accent)",
+  diary: "#60a5fa",
+};
+
+const GROUP_LABEL_COLOR: Record<"birth" | "diary", string> = {
+  birth: "var(--px-accent)",
+  diary: "#60a5fa",
 };
 
 type BoardColumn = {
@@ -57,25 +69,81 @@ function toDisplayFromDiary(
 ): PillarDisplay {
   return {
     label,
-    hint: "일기",
+    hint: "오늘",
     stemHanja: pillar.stem.hanja,
     branchHanja: pillar.branch.hanja,
     ganjiKo: pillar.ganjiKo,
   };
 }
 
-function getSizeStyles(totalColumns: number): string {
+function getSizeStyles(totalColumns: number, compact: boolean): string {
+  if (compact && totalColumns === 3) return "1.65rem";
+  if (compact && totalColumns <= 2) return "2.25rem";
   if (totalColumns <= 4) return "1.75rem";
   if (totalColumns === 5) return "1.5rem";
   if (totalColumns === 6) return "1.3rem";
   return "1.15rem";
 }
 
+function getLabelText(pillar: PillarDisplay): string {
+  if (pillar.displayLabel) return pillar.displayLabel;
+  if (pillar.hint) return `${pillar.hint} ${pillar.label}`;
+  return `내 ${pillar.label}`;
+}
+
+type Props = {
+  birthPillars: UserBirthPillars | null;
+  diaryPillars: PartialDiaryPillars;
+  pillarVisibility: PillarVisibility;
+  /** true면 세운·월운·일운(년·월·일) 3기둥 표시 */
+  compact?: boolean;
+  dateDisplay?: { full: string; short: string; weekday: string } | null;
+};
+
 function buildColumns(
   birthPillars: UserBirthPillars | null,
   diaryPillars: PartialDiaryPillars,
-  pillarVisibility: PillarVisibility
+  pillarVisibility: PillarVisibility,
+  compact: boolean
 ): BoardColumn[] {
+  if (compact) {
+    const columns: BoardColumn[] = [];
+    if (diaryPillars.yearPillar) {
+      columns.push({
+        id: "fortune-year",
+        group: "diary",
+        pillar: {
+          ...toDisplayFromDiary("년주", diaryPillars.yearPillar),
+          displayLabel: "년",
+        },
+        visible: true,
+      });
+    }
+    if (diaryPillars.monthPillar) {
+      columns.push({
+        id: "fortune-month",
+        group: "diary",
+        pillar: {
+          ...toDisplayFromDiary("월주", diaryPillars.monthPillar),
+          displayLabel: "월",
+        },
+        visible: true,
+      });
+    }
+    if (diaryPillars.dayPillar) {
+      columns.push({
+        id: "fortune-day",
+        group: "diary",
+        pillar: {
+          ...toDisplayFromDiary("일주", diaryPillars.dayPillar),
+          displayLabel: "일",
+        },
+        visible: true,
+      });
+    }
+    return columns;
+  }
+
   const columns: BoardColumn[] = [];
 
   if (birthPillars) {
@@ -140,24 +208,32 @@ function buildColumns(
 function PillarColumn({
   pillar,
   totalColumns,
+  group,
+  compact = false,
 }: {
   pillar: PillarDisplay;
   totalColumns: number;
+  group: "birth" | "diary";
+  compact?: boolean;
 }) {
   const stemColor = getStemColor(pillar.stemHanja);
   const branchColor = getBranchColor(pillar.branchHanja);
-  const hanjaSize = getSizeStyles(totalColumns);
+  const hanjaSize = getSizeStyles(totalColumns, compact);
+  const borderColor = GROUP_BORDER[group];
+  const labelColor = GROUP_LABEL_COLOR[group];
+  const labelSize = compact ? "14px" : "11px";
+  const ganjiSize = compact ? "13px" : "10px";
 
   return (
     <div
       className="manseryeok-pillar-inner flex flex-col items-center border-2 w-full"
       style={{
         background: "var(--px-bg2)",
-        borderColor: "var(--px-border)",
-        boxShadow: "2px 2px 0 #000",
+        borderColor,
+        boxShadow: `2px 2px 0 ${group === "birth" ? "#4a3a00" : "#1e3a5f"}`,
         padding: 0,
       }}
-      title={`${pillar.label} ${pillar.ganjiKo}`}
+      title={`${getLabelText(pillar)} ${pillar.ganjiKo}`}
     >
       <div
         className="flex items-center justify-center w-full border-b"
@@ -187,13 +263,12 @@ function PillarColumn({
       </div>
       <div
         className="w-full text-center border-t"
-        style={{ borderColor: "var(--px-border)", padding: "3px 2px" }}
+        style={{ borderColor: borderColor, padding: compact ? "6px 4px" : "4px 2px" }}
       >
-        <p className="font-black leading-tight" style={{ fontSize: "7px", color: "var(--px-accent)" }}>
-          {pillar.hint ? `${pillar.hint} ` : "내 "}
-          {pillar.label}
+        <p className="font-black leading-tight" style={{ fontSize: labelSize, color: labelColor }}>
+          {getLabelText(pillar)}
         </p>
-        <p className="font-semibold leading-tight mt-0.5" style={{ fontSize: "6px", color: "var(--px-text2)" }}>
+        <p className="font-bold leading-tight mt-0.5" style={{ fontSize: ganjiSize, color: "var(--px-text-on-panel)" }}>
           {pillar.ganjiKo}
         </p>
       </div>
@@ -205,10 +280,12 @@ function AnimatedPillarSlot({
   column,
   totalColumns,
   staggerIndex,
+  compact = false,
 }: {
   column: BoardColumn;
   totalColumns: number;
   staggerIndex: number;
+  compact?: boolean;
 }) {
   return (
     <div
@@ -216,19 +293,29 @@ function AnimatedPillarSlot({
       data-visible={column.visible ? "true" : "false"}
       style={{ "--pillar-stagger": `${staggerIndex * 30}ms` } as React.CSSProperties}
     >
-      <PillarColumn pillar={column.pillar} totalColumns={totalColumns} />
+      <PillarColumn
+        pillar={column.pillar}
+        totalColumns={totalColumns}
+        group={column.group}
+        compact={compact}
+      />
     </div>
   );
 }
 
-type Props = {
-  birthPillars: UserBirthPillars | null;
-  diaryPillars: PartialDiaryPillars;
-  pillarVisibility: PillarVisibility;
-};
-
-export default function ManseryeokBoard({ birthPillars, diaryPillars, pillarVisibility }: Props) {
-  const columns = buildColumns(birthPillars, diaryPillars, pillarVisibility);
+export default function ManseryeokBoard({
+  birthPillars,
+  diaryPillars,
+  pillarVisibility,
+  compact = false,
+  dateDisplay,
+}: Props) {
+  const columns = buildColumns(
+    birthPillars,
+    diaryPillars,
+    pillarVisibility,
+    compact
+  );
 
   if (columns.length === 0) return null;
 
@@ -237,26 +324,49 @@ export default function ManseryeokBoard({ birthPillars, diaryPillars, pillarVisi
 
   const birthHasVisible = visibleColumns.some((col) => col.group === "birth");
   const diaryHasVisible = visibleColumns.some((col) => col.group === "diary");
-  const showDivider = birthHasVisible && diaryHasVisible;
+  const showDivider = !compact && birthHasVisible && diaryHasVisible;
 
-  const birthColumns = columns.filter((col) => col.group === "birth");
-  const diaryColumns = columns.filter((col) => col.group === "diary");
+  const birthColumns = compact ? [] : columns.filter((col) => col.group === "birth");
+  const diaryColumns = compact
+    ? visibleColumns
+    : columns.filter((col) => col.group === "diary");
 
   let staggerCounter = 0;
 
   if (visibleCount === 0) {
     return (
-      <p
-        className="text-[9px] font-bold transition-opacity duration-300"
-        style={{ color: "var(--px-text2)" }}
-      >
+      <p className="ui-guide">
         표시할 간지를 선택해주세요. (날짜 아래 눈 아이콘 터치)
       </p>
     );
   }
 
   return (
-    <div className="space-y-1.5">
+    <div className="space-y-2">
+      {compact && dateDisplay && (
+        <div
+          className="text-center p-3 border-2"
+          style={{
+            borderColor: "#60a5fa",
+            background: "color-mix(in srgb, #60a5fa 10%, var(--px-bg2))",
+            boxShadow: "2px 2px 0 #1e3a5f",
+          }}
+        >
+          <p className="text-lg font-black leading-snug" style={{ color: "var(--px-text-on-panel)" }}>
+            {dateDisplay.full}
+          </p>
+          {diaryPillars.dayPillar && (
+            <p className="mt-1.5 leading-snug">
+              <span className="text-sm font-bold" style={{ color: "var(--px-text2)" }}>
+                오늘의 기운 ·{" "}
+              </span>
+              <span className="text-lg font-black" style={{ color: "#60a5fa" }}>
+                {diaryPillars.dayPillar.ganjiKo}일
+              </span>
+            </p>
+          )}
+        </div>
+      )}
       <div className="flex gap-1 items-stretch min-w-0">
         {birthColumns.map((col) => {
           const staggerIndex = col.visible ? staggerCounter++ : staggerCounter;
@@ -266,13 +376,14 @@ export default function ManseryeokBoard({ birthPillars, diaryPillars, pillarVisi
               column={col}
               totalColumns={visibleCount}
               staggerIndex={staggerIndex}
+              compact={compact}
             />
           );
         })}
-        {diaryColumns.length > 0 && (
+        {showDivider && (
           <div
             className="manseryeok-divider flex items-center shrink-0 px-0.5 text-xs font-bold self-stretch"
-            data-visible={showDivider ? "true" : "false"}
+            data-visible="true"
             style={{ color: "var(--px-border)" }}
           >
             |
@@ -286,6 +397,7 @@ export default function ManseryeokBoard({ birthPillars, diaryPillars, pillarVisi
               column={col}
               totalColumns={visibleCount}
               staggerIndex={staggerIndex}
+              compact={compact}
             />
           );
         })}

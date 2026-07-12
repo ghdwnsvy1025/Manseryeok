@@ -11,6 +11,7 @@ type DbRow = {
   content: string;
   day_pillar: DiaryEntry["dayPillar"];
   month_pillar_ko: string | null;
+  year_pillar_ko: string | null;
   scores: DiaryAnalysis | null;
   ai_summary: string | null;
   created_at: string;
@@ -24,6 +25,7 @@ function rowToEntry(row: DbRow): DiaryEntry {
     content: row.content,
     dayPillar: row.day_pillar,
     monthPillarKo: row.month_pillar_ko ?? undefined,
+    yearPillarKo: row.year_pillar_ko ?? undefined,
     analysis: row.scores,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -38,6 +40,7 @@ function entryToRow(entry: DiaryEntry, userId: string): Omit<DbRow, "user_id"> &
     content: entry.content,
     day_pillar: entry.dayPillar,
     month_pillar_ko: entry.monthPillarKo ?? null,
+    year_pillar_ko: entry.yearPillarKo ?? null,
     scores: entry.analysis,
     ai_summary: entry.analysis?.summary ?? null,
     created_at: entry.createdAt,

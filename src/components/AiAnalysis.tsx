@@ -63,7 +63,7 @@ export default function AiAnalysis({ result }: AiAnalysisProps) {
       }}
     >
       <p className="text-xs font-bold" style={{ color: "var(--px-accent)" }}>
-        ★ AI 사주 분석
+        ★ 사주 AI
       </p>
 
       {status === "idle" && (
@@ -83,7 +83,7 @@ export default function AiAnalysis({ result }: AiAnalysisProps) {
                 outline: "none",
               }}
             />
-            <p className="text-[10px]" style={{ color: "var(--px-text2)" }}>
+            <p className="ui-hint">
               비워두면 종합 분석을 해드립니다.
             </p>
           </div>

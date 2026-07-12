@@ -61,6 +61,21 @@ export type DiaryEntry = {
   updatedAt: string;
 };
 
+export type StatsGroupType = "year" | "month" | "ganji" | "stem" | "branch";
+
+export type GroupStats = {
+  groupType: StatsGroupType;
+  key: string;
+  label: string;
+  entryCount: number;
+  analyzedCount: number;
+  avgDailyWellbeing: number;
+  avgScores: Partial<Record<keyof DiaryAnalysis, number>>;
+  dates: string[];
+  deltaFromOverall?: number;
+};
+
+/** @deprecated GroupStats(ganji) 사용 권장 */
 export type DayPillarStats = {
   ganjiKo: string;
   entryCount: number;

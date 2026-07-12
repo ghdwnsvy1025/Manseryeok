@@ -1,9 +1,19 @@
 import { describe, expect, test } from "@jest/globals";
 import type { DiaryAnalysis } from "@/lib/diary/dimensions";
 import { createEmptyScoreReasons } from "@/lib/diary/dimensions";
+import { getPillarsForDate } from "@/lib/diary/dayPillar";
 import {
   aggregateByDayPillar,
+  aggregateByGroup,
+  getDaysUntilInsight,
+  getGroupLabel,
+  getOverallAvgWellbeing,
+  getStatsForGroup,
   getStatsForPillar,
+  getUniqueEntryDays,
+  getWellbeingInsightCards,
+  resolveMonthPillarKo,
+  resolveYearPillarKo,
 } from "@/lib/diary/stats";
 import type { DiaryEntry } from "@/lib/diary/types";
 
@@ -34,22 +44,28 @@ function makeAnalysis(overrides: Partial<DiaryAnalysis> = {}): DiaryAnalysis {
 function makeEntry(
   date: string,
   ganjiKo: string,
-  analysis: DiaryAnalysis | null
+  analysis: DiaryAnalysis | null,
+  overrides: Partial<DiaryEntry> = {}
 ): DiaryEntry {
+  const pillars = getPillarsForDate(date);
+  const stemKo = ganjiKo[0] ?? "?";
+  const branchKo = ganjiKo[1] ?? "?";
   return {
     id: `id-${date}`,
     date,
     content: "test",
     dayPillar: {
-      ganji: "test",
+      ...pillars.dayPillar,
       ganjiKo,
-      ganjiIndex: 0,
-      stem: { hanja: "甲", ko: "갑" },
-      branch: { hanja: "子", ko: "자" },
+      stem: { ...pillars.dayPillar.stem, ko: stemKo },
+      branch: { ...pillars.dayPillar.branch, ko: branchKo },
     },
+    monthPillarKo: pillars.monthPillarKo,
+    yearPillarKo: pillars.yearPillarKo,
     analysis,
     createdAt: date,
     updatedAt: date,
+    ...overrides,
   };
 }
 
@@ -73,5 +89,80 @@ describe("getStatsForPillar", () => {
     const all = aggregateByDayPillar(entries);
     expect(all[0].ganjiKo).toBe("임오");
     expect(all[0].entryCount).toBe(2);
+  });
+
+  test("getUniqueEntryDays는 서로 다른 날짜 수", () => {
+    expect(getUniqueEntryDays(entries)).toBe(3);
+  });
+
+  test("getDaysUntilInsight는 7일 기준 남은 일수", () => {
+    expect(getDaysUntilInsight(entries, 7)).toBe(4);
+  });
+
+  test("getWellbeingInsightCards는 2회 이상 기록 일주만", () => {
+    const cards = getWellbeingInsightCards(entries, 3);
+    expect(cards).toHaveLength(1);
+    expect(cards[0].key).toBe("임오");
+  });
+});
+
+describe("aggregateByGroup", () => {
+  const entries: DiaryEntry[] = [
+    makeEntry("2026-01-01", "임오", makeAnalysis({ daily_wellbeing_score: 80 })),
+    makeEntry("2026-03-02", "임오", makeAnalysis({ daily_wellbeing_score: 60 })),
+    makeEntry("2026-02-01", "갑자", makeAnalysis({ daily_wellbeing_score: 50 })),
+  ];
+
+  test("천간별 집계", () => {
+    const stems = aggregateByGroup(entries, "stem");
+    const imStem = stems.find((s) => s.key === "임");
+    expect(imStem?.entryCount).toBe(2);
+    expect(imStem?.label).toBe("임");
+  });
+
+  test("지지별 집계", () => {
+    const branches = aggregateByGroup(entries, "branch");
+    const oBranch = branches.find((s) => s.key === "오");
+    expect(oBranch?.entryCount).toBe(2);
+  });
+
+  test("년운별 집계", () => {
+    const years = aggregateByGroup(entries, "year");
+    expect(years.length).toBeGreaterThan(0);
+    expect(years[0].label).toMatch(/년$/);
+  });
+
+  test("월운별 집계", () => {
+    const months = aggregateByGroup(entries, "month");
+    expect(months.length).toBeGreaterThan(0);
+    expect(months[0].label).toMatch(/월$/);
+  });
+
+  test("deltaFromOverall 계산", () => {
+    const overall = getOverallAvgWellbeing(entries);
+    const stats = getStatsForGroup("임오", "ganji", entries, overall);
+    expect(stats.deltaFromOverall).toBe(stats.avgDailyWellbeing - overall);
+  });
+});
+
+describe("resolveYearPillarKo", () => {
+  test("저장된 값 우선", () => {
+    const entry = makeEntry("2026-01-01", "임오", null, { yearPillarKo: "병오" });
+    expect(resolveYearPillarKo(entry)).toBe("병오");
+  });
+
+  test("없으면 날짜로 재계산", () => {
+    const entry = makeEntry("2026-01-01", "임오", null, { yearPillarKo: undefined });
+    expect(resolveYearPillarKo(entry)).toBe(getPillarsForDate("2026-01-01").yearPillarKo);
+    expect(resolveMonthPillarKo(entry)).toBe(getPillarsForDate("2026-01-01").monthPillarKo);
+  });
+});
+
+describe("getGroupLabel", () => {
+  test("그룹 타입별 라벨", () => {
+    expect(getGroupLabel("병오", "year")).toBe("병오년");
+    expect(getGroupLabel("갑인", "month")).toBe("갑인월");
+    expect(getGroupLabel("임오", "ganji")).toBe("임오일");
+    expect(getGroupLabel("임", "stem")).toBe("임");
   });
 });

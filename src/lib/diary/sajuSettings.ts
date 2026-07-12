@@ -16,6 +16,7 @@ import { getMonthPillar } from "@/lib/saju/monthPillar";
 import { getHourPillar } from "@/lib/saju/hourPillar";
 import { kstToJDE, mod } from "@/lib/saju/jdn";
 import type { SajuDepth, UserBirthPillarDetail, UserBirthPillars } from "./types";
+import type { SajuResult } from "@/lib/saju/types";
 
 const STORAGE_KEY = "manseryeok_saju_settings";
 const MIN_SUPPORTED_YEAR = 1900;
@@ -254,6 +255,43 @@ export function loadSajuSettings(): SajuSettings {
 export function saveSajuSettings(settings: SajuSettings): void {
   if (typeof window === "undefined") return;
   localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...settings, depth: "full" }));
+}
+
+/** 만세력 계산 결과에서 생년월일시를 일기 설정과 공유 */
+export function saveBirthFromSajuResult(result: SajuResult): void {
+  const current = loadSajuSettings();
+  const date = result.input.normalizedSolarDate;
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
+  if (!match) return;
+
+  const birthDate = date;
+  const hour = result.input.original.hour;
+  const minute = result.input.original.minute;
+
+  saveSajuSettings({
+    ...current,
+    birthDate,
+    birthHour: hour !== undefined ? hour : undefined,
+    birthMinute: minute !== undefined && hour !== undefined ? minute : undefined,
+  });
+}
+
+/** 일기에 저장된 생년월일시를 만세력 입력 폼 초기값으로 */
+export function getBirthPrefillForForm(): {
+  year: string;
+  month: string;
+  day: string;
+  hour: string;
+  minute: string;
+} | null {
+  const settings = loadSajuSettings();
+  if (!settings.birthDate) return null;
+  const parts = splitBirthDate(settings.birthDate);
+  return {
+    ...parts,
+    hour: settings.birthHour !== undefined ? String(settings.birthHour) : "",
+    minute: settings.birthMinute !== undefined ? String(settings.birthMinute) : "",
+  };
 }
 
 function toPillarDetail(pillar: {

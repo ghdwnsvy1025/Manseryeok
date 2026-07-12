@@ -4,8 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const NAV_ITEMS = [
-  { href: "/", label: "만세력", icon: "命", isActive: (path: string) => path === "/" },
-  { href: "/diary", label: "일기", icon: "記", isActive: (path: string) => path.startsWith("/diary") },
+  { href: "/diary", label: "일기", icon: "記", isActive: (path: string) => path === "/diary" || path.startsWith("/diary/") },
+  { href: "/saju", label: "내 사주", icon: "命", isActive: (path: string) => path.startsWith("/saju") },
   { href: "/admin", label: "학습", icon: "學", isActive: (path: string) => path.startsWith("/admin") },
 ] as const;
 
@@ -34,12 +34,12 @@ export default function AppNav() {
               }}
             >
               <span
-                className="text-sm sm:text-base font-black leading-none"
-                style={{ fontFamily: "'Press Start 2P', monospace", fontSize: "11px" }}
+                className="text-sm font-black leading-none pixel-font"
+                style={{ fontSize: "11px" }}
               >
                 {item.icon}
               </span>
-              <span className="text-[10px] sm:text-xs font-bold">{item.label}</span>
+              <span className="text-xs font-bold">{item.label}</span>
             </Link>
           );
         })}

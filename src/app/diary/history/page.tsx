@@ -22,13 +22,22 @@ export default function DiaryHistoryPage() {
         <h2 className="text-lg font-black" style={{ color: "var(--px-accent)" }}>
           ■ 과거 일기
         </h2>
-        <Link
-          href="/diary"
-          className="text-xs font-bold px-2 py-1 border"
-          style={{ borderColor: "var(--px-border)", color: "var(--px-text2)" }}
-        >
-          ← 일기 쓰기
-        </Link>
+        <div className="flex gap-2">
+          <Link
+            href="/diary/stats"
+            className="text-xs font-bold px-2 py-1 border"
+            style={{ borderColor: "var(--px-accent)", color: "var(--px-accent)" }}
+          >
+            간지별 행복도
+          </Link>
+          <Link
+            href="/diary"
+            className="text-xs font-bold px-2 py-1 border"
+            style={{ borderColor: "var(--px-border)", color: "var(--px-text2)" }}
+          >
+            ← 일기 쓰기
+          </Link>
+        </div>
       </div>
 
       {loading && (

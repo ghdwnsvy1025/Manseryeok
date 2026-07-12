@@ -3,14 +3,15 @@ import "./globals.css";
 import ClientShell from "@/components/ClientShell";
 
 export const metadata: Metadata = {
-  title: "사주 만세력 — 사주팔자 계산기",
+  title: "사주 만세력 — 감정 일기 × 간지",
   description:
-    "생년월일시를 입력하면 년주·월주·일주·시주를 절기 기준으로 정확히 계산합니다.",
+    "매일 기분을 기록하고 일주(日柱) 패턴을 발견하세요. 사주팔자 계산과 AI 분석도 제공합니다.",
 };
 
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -21,7 +22,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link rel="preconnect" href="https://cdn.jsdelivr.net" />
       </head>
-      <body className="min-h-screen" style={{ background: "var(--px-bg)" }}>
+      <body className="min-h-dvh overflow-x-hidden app-body">
         <ClientShell>{children}</ClientShell>
       </body>
     </html>
