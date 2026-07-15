@@ -392,8 +392,19 @@ describe("calculateElementDistribution — peer·화수·분포 기준", () => {
     expect(result.detail.daewoon.influenceRate).toBe(0.5);
     expect(result.detail.daewoon.selfRate).toBe(0.4);
     expect(result.detail.daewoon.pillarInteractionRate).toBe(0.6);
+    expect(result.detail.daewoon.selfStemWeight).toBe(0.5);
+    expect(result.detail.daewoon.selfBranchWeight).toBe(0.5);
+    expect(result.detail.daewoon.pillarStemInteractionWeight).toBe(0.5);
+    expect(result.detail.daewoon.pillarBranchInteractionWeight).toBe(0.5);
+    expect(result.detail.daewoon.sameElementMultiplier).toBe(1.05);
+    expect(result.detail.daewoon.generatedSideMultiplier).toBe(1.3);
+    expect(result.detail.daewoon.generatingSideMultiplier).toBe(0.95);
+    expect(result.detail.daewoon.controlledSideMultiplier).toBe(0.7);
+    expect(result.detail.daewoon.controllingSideMultiplier).toBe(1);
     expect(result.detail.daewoon.relation).toBe("branch_controls_stem");
-    expect(result.detail.daewoon.stemFinalMultiplier).toBeCloseTo(0.9, 10);
+    expect(result.detail.daewoon.stemGanjiMultiplier).toBe(0.7);
+    expect(result.detail.daewoon.branchGanjiMultiplier).toBe(1);
+    expect(result.detail.daewoon.stemFinalMultiplier).toBeCloseTo(0.84, 10);
     expect(result.detail.daewoon.branchFinalMultiplier).toBeCloseTo(1.15, 10);
     expect(result.detail.daewoon.stemPolarityMultiplier).toBe(0.96);
     expect(result.detail.daewoon.branchPolarityMultiplier).toBe(1.03);
@@ -406,6 +417,8 @@ describe("calculateElementDistribution — peer·화수·분포 기준", () => {
       month: 0.25,
       year: 0.25,
     });
+    expect(result.detail.daewoon.pillarInteraction?.stemInteractionWeight).toBe(0.5);
+    expect(result.detail.daewoon.pillarInteraction?.branchInteractionWeight).toBe(0.5);
     expect(result.detail.daewoon.pillarInteraction?.byPillar[0]).toMatchObject({
       pillar: "time",
       nativeStem: "신",
@@ -419,9 +432,10 @@ describe("calculateElementDistribution — peer·화수·분포 기준", () => {
     expect(timeBranchMult.화).not.toBe(timeBranchMult.토);
     expect(timeBranchMult.목).toBeDefined();
 
+    // 천간/지지 0.50 + branch_controls_stem 천간 0.70
     expectVecCloseTo(
       result.detail.daewoon.daewoonSelfRaw!,
-      vec(0, 0.901352823760246, 0.3495245901639344, 0.864, 0),
+      vec(0, 0.450676411880123, 0.1747622950819672, 0.4032, 0),
       4
     );
 
@@ -438,7 +452,7 @@ describe("calculateElementDistribution — peer·화수·분포 기준", () => {
       ),
       2
     );
-    expect(result.percentage).toEqual(vec(13.41, 21.17, 32.3, 21.39, 11.74));
+    expect(result.percentage).toEqual(vec(14.22, 22.08, 31.89, 21.47, 10.36));
   });
 
   test("대운 한자 간지 입력도 처리한다", () => {
@@ -450,7 +464,7 @@ describe("calculateElementDistribution — peer·화수·분포 기준", () => {
     expect(result.detail.daewoon.applied).toBe(true);
     expect(result.detail.daewoon.stem).toBe("신");
     expect(result.detail.daewoon.branch).toBe("오");
-    expect(result.percentage).toEqual(vec(13.41, 21.17, 32.3, 21.39, 11.74));
+    expect(result.percentage).toEqual(vec(14.22, 22.08, 31.89, 21.47, 10.36));
   });
 
   test('테스트 3: 대운 "갑축"', () => {
@@ -463,19 +477,51 @@ describe("calculateElementDistribution — peer·화수·분포 기준", () => {
 
     expect(result.detail.daewoon.applied).toBe(true);
     expect(result.detail.daewoon.influenceRate).toBe(0.5);
+    expect(result.detail.daewoon.selfStemWeight).toBe(0.5);
+    expect(result.detail.daewoon.selfBranchWeight).toBe(0.5);
+    expect(result.detail.daewoon.relation).toBe("stem_controls_branch");
+    expect(result.detail.daewoon.stemGanjiMultiplier).toBe(1);
+    expect(result.detail.daewoon.branchGanjiMultiplier).toBe(0.7);
     expect(result.detail.daewoon.stemFinalMultiplier).toBe(1);
-    expect(result.detail.daewoon.branchFinalMultiplier).toBeCloseTo(0.9, 10);
+    expect(result.detail.daewoon.branchFinalMultiplier).toBeCloseTo(0.84, 10);
     expect(result.detail.daewoon.stemPolarityMultiplier).toBe(1.04);
     expect(result.detail.daewoon.branchPolarityMultiplier).toBe(0.97);
 
     expect(result.detail.daewoon.branchSamhapDetail?.applied).toBe(false);
+    // 천간/지지 0.50, stem_controls_branch는 지지 0.70
     expectVecCloseTo(
       result.detail.daewoon.daewoonSelfRaw!,
-      vec(1.04, 0, 0.3492, 0.21825, 0.29191483124999995),
+      vec(0.52, 0, 0.16296, 0.10185, 0.13622692125),
       5
     );
 
-    expect(result.percentage).toEqual(vec(24.56, 12.61, 32.39, 15.6, 14.85));
+    expect(result.percentage).toEqual(vec(25.78, 13.31, 31.72, 15.84, 13.36));
+  });
+
+  test('테스트 4: 대운 "계미" — 지지가 천간을 극할 때 수 과대반영 완화', () => {
+    const result = calculateElementDistribution(stems, branches, {
+      stem: "계",
+      branch: "미",
+    });
+
+    expect(result.detail.daewoon.applied).toBe(true);
+    expect(result.detail.daewoon.selfStemWeight).toBe(0.5);
+    expect(result.detail.daewoon.selfBranchWeight).toBe(0.5);
+    expect(result.detail.daewoon.pillarStemInteractionWeight).toBe(0.5);
+    expect(result.detail.daewoon.pillarBranchInteractionWeight).toBe(0.5);
+    expect(result.detail.daewoon.controlledSideMultiplier).toBe(0.7);
+    expect(result.detail.daewoon.controllingSideMultiplier).toBe(1);
+    expect(result.detail.daewoon.relation).toBe("branch_controls_stem");
+    expect(result.detail.daewoon.stemGanjiMultiplier).toBe(0.7);
+    expect(result.detail.daewoon.branchGanjiMultiplier).toBe(1);
+
+    // 계수 천간은 살아 있으나, 미토 극으로 수 증가폭은 억제
+    expect(result.percentage.수).toBeGreaterThan(result.originalPercentage.수);
+    expect(result.percentage.수 - result.originalPercentage.수).toBeLessThan(3.5);
+    // 미 지장간(목·화) 반영
+    expect(result.percentage.화).toBeGreaterThan(result.originalPercentage.화);
+    expect(result.percentage.목).toBeGreaterThan(result.originalPercentage.목);
+    expect(result.percentage).toEqual(vec(18, 17.3, 33.66, 13.51, 17.55));
   });
 });
 

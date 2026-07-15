@@ -609,10 +609,15 @@ export default function SajuResult({ result }: { result: SajuResult }) {
 
       {/* 클릭 안내 — 기본 문구 / 연구 모드 선택 시 뿌리·투출 설명 */}
       <div
-        className={`ui-guide-strong text-center ${isMobile ? "px-2" : "px-4"}`}
+        className={`text-center font-bold ${isMobile ? "px-2" : "px-4"}`}
         style={{
-          color: "var(--px-accent)",
-          minHeight: "1.25rem",
+          color: "#7dd3fc",
+          fontSize: isMobile ? "16px" : "17px",
+          lineHeight: 1.55,
+          minHeight: "1.5rem",
+          textShadow: "0 0 10px #7dd3fc66",
+          fontFamily: '"Noto Sans KR", "Malgun Gothic", "Apple SD Gothic Neo", sans-serif',
+          letterSpacing: "0.02em",
         }}
       >
         {highlightHint ? (

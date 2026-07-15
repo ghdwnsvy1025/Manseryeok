@@ -119,8 +119,22 @@ export const NATIVE_BRANCH_CONTROLS_DAEWOON_BONUS = 0.04;
 export const DAEWOON_PILLAR_BRANCH_MULTIPLIER_MIN = 0.88;
 export const DAEWOON_PILLAR_BRANCH_MULTIPLIER_MAX = 1.12;
 
-const DAEWOON_GENERATED_MULTIPLIER = 1.25;
-const DAEWOON_CONTROLLED_MULTIPLIER = 0.75;
+/** 대운 간지 내부 생극 — 같은 오행 */
+export const DAEWOON_SAME_ELEMENT_MULTIPLIER = 1.05;
+/** 생을 받는 쪽 / 생하는 쪽 */
+export const DAEWOON_GENERATED_SIDE_MULTIPLIER = 1.3;
+export const DAEWOON_GENERATING_SIDE_MULTIPLIER = 0.95;
+/** 극을 받는 쪽 / 극하는 쪽 */
+export const DAEWOON_CONTROLLED_SIDE_MULTIPLIER = 0.7;
+export const DAEWOON_CONTROLLING_SIDE_MULTIPLIER = 1.0;
+
+/** 대운 자체 계산: 천간·지지 기본 비중 동일 */
+export const DAEWOON_SELF_STEM_WEIGHT = 0.5;
+export const DAEWOON_SELF_BRANCH_WEIGHT = 0.5;
+
+/** 대운–원국 기둥 작용: 천간·지지 비중 동일 */
+export const DAEWOON_PILLAR_STEM_INTERACTION_WEIGHT = 0.5;
+export const DAEWOON_PILLAR_BRANCH_INTERACTION_WEIGHT = 0.5;
 
 const DAEWOON_SAME_STEM_MULTIPLIER = 1.2;
 const DAEWOON_SAME_BRANCH_MULTIPLIER = 1.2;
@@ -528,6 +542,13 @@ export type DaewoonPillarInteractionDetail = {
   applied: boolean;
   pillarWeights: typeof PILLAR_INFLUENCE_WEIGHTS;
   byPillar: DaewoonPillarInteractionByPillar[];
+  stemInteractionWeight: number;
+  branchInteractionWeight: number;
+  stemRaw: ElementVector;
+  branchRaw: ElementVector;
+  stemPercentage: ElementVector;
+  branchPercentage: ElementVector;
+  /** @deprecated stem/branch 분리 후 percentage 가중 합산 결과 사용 */
   raw: ElementVector;
   percentage: ElementVector;
 };
@@ -537,6 +558,15 @@ export type DaewoonDetail = {
   influenceRate: number;
   selfRate?: number;
   pillarInteractionRate?: number;
+  selfStemWeight?: number;
+  selfBranchWeight?: number;
+  pillarStemInteractionWeight?: number;
+  pillarBranchInteractionWeight?: number;
+  sameElementMultiplier?: number;
+  generatedSideMultiplier?: number;
+  generatingSideMultiplier?: number;
+  controlledSideMultiplier?: number;
+  controllingSideMultiplier?: number;
   stem?: string;
   branch?: string;
   stemElement?: ElementKo;
@@ -786,7 +816,8 @@ export function computeDaewoonPillarInteraction(
   const daewoonStemElement = getStemElement(daewoonStem);
   const daewoonBranchBase = getBranchBaseDistribution(daewoonBranch);
   const slots = resolvePillarSlots(stemChars.length);
-  const total = emptyVector();
+  const stemTotal = emptyVector();
+  const branchTotal = emptyVector();
   const byPillar: DaewoonPillarInteractionByPillar[] = [];
 
   for (let i = 0; i < stemChars.length; i++) {
@@ -803,7 +834,7 @@ export function computeDaewoonPillarInteraction(
         pillarWeight
       );
     const adjustedStemScore = nativeStemBaseScore * stemMultiplier;
-    total[nativeStemElement] += adjustedStemScore;
+    stemTotal[nativeStemElement] += adjustedStemScore;
 
     const nativeBranch = branchChars[i];
     const nativeBranchBaseContribution = { ...(branchWeighted[i] ?? emptyVector()) };
@@ -823,7 +854,7 @@ export function computeDaewoonPillarInteraction(
       branchElementStrengths[el] = strengths;
       branchElementMultipliers[el] = multiplier;
       adjustedBranchContribution[el] = nativeBranchBaseContribution[el] * multiplier;
-      total[el] += adjustedBranchContribution[el];
+      branchTotal[el] += adjustedBranchContribution[el];
     }
 
     byPillar.push({
@@ -844,15 +875,36 @@ export function computeDaewoonPillarInteraction(
     });
   }
 
-  const sum = vectorSum(total);
-  const percentage =
-    sum > 0 ? toPercentage(total) : { ...originalPercentage };
+  const stemSum = vectorSum(stemTotal);
+  const branchSum = vectorSum(branchTotal);
+  const stemPercentage =
+    stemSum > 0 ? toPercentage(stemTotal) : { ...originalPercentage };
+  const branchPercentage =
+    branchSum > 0 ? toPercentage(branchTotal) : { ...originalPercentage };
+
+  const percentage = emptyVector();
+  for (const el of ELEMENT_ORDER) {
+    percentage[el] = round2(
+      stemPercentage[el] * DAEWOON_PILLAR_STEM_INTERACTION_WEIGHT +
+        branchPercentage[el] * DAEWOON_PILLAR_BRANCH_INTERACTION_WEIGHT
+    );
+  }
+
+  const raw = emptyVector();
+  addScaled(raw, stemTotal, 1);
+  addScaled(raw, branchTotal, 1);
 
   return {
     applied: true,
     pillarWeights: { ...PILLAR_INFLUENCE_WEIGHTS },
     byPillar,
-    raw: total,
+    stemInteractionWeight: DAEWOON_PILLAR_STEM_INTERACTION_WEIGHT,
+    branchInteractionWeight: DAEWOON_PILLAR_BRANCH_INTERACTION_WEIGHT,
+    stemRaw: { ...stemTotal },
+    branchRaw: { ...branchTotal },
+    stemPercentage,
+    branchPercentage,
+    raw,
     percentage,
   };
 }
@@ -1919,43 +1971,43 @@ function getDaewoonRelation(
   if (stemElement === branchMainElement) {
     return {
       relation: "same_element",
-      stemGanjiMultiplier: 1,
-      branchGanjiMultiplier: 1,
+      stemGanjiMultiplier: DAEWOON_SAME_ELEMENT_MULTIPLIER,
+      branchGanjiMultiplier: DAEWOON_SAME_ELEMENT_MULTIPLIER,
     };
   }
   if (generates[stemElement] === branchMainElement) {
     return {
       relation: "stem_generates_branch",
-      stemGanjiMultiplier: 1,
-      branchGanjiMultiplier: DAEWOON_GENERATED_MULTIPLIER,
+      stemGanjiMultiplier: DAEWOON_GENERATING_SIDE_MULTIPLIER,
+      branchGanjiMultiplier: DAEWOON_GENERATED_SIDE_MULTIPLIER,
     };
   }
   if (generates[branchMainElement] === stemElement) {
     return {
       relation: "branch_generates_stem",
-      stemGanjiMultiplier: DAEWOON_GENERATED_MULTIPLIER,
-      branchGanjiMultiplier: 1,
+      stemGanjiMultiplier: DAEWOON_GENERATED_SIDE_MULTIPLIER,
+      branchGanjiMultiplier: DAEWOON_GENERATING_SIDE_MULTIPLIER,
     };
   }
   if (controls[stemElement] === branchMainElement) {
     return {
       relation: "stem_controls_branch",
-      stemGanjiMultiplier: 1,
-      branchGanjiMultiplier: DAEWOON_CONTROLLED_MULTIPLIER,
+      stemGanjiMultiplier: DAEWOON_CONTROLLING_SIDE_MULTIPLIER,
+      branchGanjiMultiplier: DAEWOON_CONTROLLED_SIDE_MULTIPLIER,
     };
   }
   if (controls[branchMainElement] === stemElement) {
     return {
       relation: "branch_controls_stem",
-      stemGanjiMultiplier: DAEWOON_CONTROLLED_MULTIPLIER,
-      branchGanjiMultiplier: 1,
+      stemGanjiMultiplier: DAEWOON_CONTROLLED_SIDE_MULTIPLIER,
+      branchGanjiMultiplier: DAEWOON_CONTROLLING_SIDE_MULTIPLIER,
     };
   }
 
   return {
     relation: "same_element",
-    stemGanjiMultiplier: 1,
-    branchGanjiMultiplier: 1,
+    stemGanjiMultiplier: DAEWOON_SAME_ELEMENT_MULTIPLIER,
+    branchGanjiMultiplier: DAEWOON_SAME_ELEMENT_MULTIPLIER,
   };
 }
 
@@ -2081,7 +2133,11 @@ function computeDaewoonDistribution(
   }
 
   const raw = emptyVector();
-  raw[stemElement] += 1 * stemFinalMultiplier * stemPolarityMultiplier;
+  raw[stemElement] +=
+    1 *
+    stemFinalMultiplier *
+    stemPolarityMultiplier *
+    DAEWOON_SELF_STEM_WEIGHT;
 
   for (const el of ELEMENT_ORDER) {
     raw[el] +=
@@ -2089,7 +2145,8 @@ function computeDaewoonDistribution(
       branchFinalMultiplier *
       daewoonSamhapElementMult[el] *
       branchPolarityMultiplier *
-      branchFireWaterElementMultiplier[el];
+      branchFireWaterElementMultiplier[el] *
+      DAEWOON_SELF_BRANCH_WEIGHT;
   }
 
   return {
@@ -2099,6 +2156,15 @@ function computeDaewoonDistribution(
       influenceRate: DAEWOON_INFLUENCE_RATE,
       selfRate: DAEWOON_SELF_RATE,
       pillarInteractionRate: DAEWOON_PILLAR_INTERACTION_RATE,
+      selfStemWeight: DAEWOON_SELF_STEM_WEIGHT,
+      selfBranchWeight: DAEWOON_SELF_BRANCH_WEIGHT,
+      pillarStemInteractionWeight: DAEWOON_PILLAR_STEM_INTERACTION_WEIGHT,
+      pillarBranchInteractionWeight: DAEWOON_PILLAR_BRANCH_INTERACTION_WEIGHT,
+      sameElementMultiplier: DAEWOON_SAME_ELEMENT_MULTIPLIER,
+      generatedSideMultiplier: DAEWOON_GENERATED_SIDE_MULTIPLIER,
+      generatingSideMultiplier: DAEWOON_GENERATING_SIDE_MULTIPLIER,
+      controlledSideMultiplier: DAEWOON_CONTROLLED_SIDE_MULTIPLIER,
+      controllingSideMultiplier: DAEWOON_CONTROLLING_SIDE_MULTIPLIER,
       stem,
       branch,
       stemElement,
