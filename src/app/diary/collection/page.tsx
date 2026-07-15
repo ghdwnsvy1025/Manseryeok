@@ -66,11 +66,11 @@ export default function CollectionPage() {
           ■ 간지 도감
         </h2>
         <Link
-          href="/diary"
+          href="/diary/stats"
           className="text-xs font-bold px-2 py-1 border"
           style={{ borderColor: "var(--px-border)", color: "var(--px-text2)" }}
         >
-          ← 일기 쓰기
+          ← 통계
         </Link>
       </div>
 
@@ -81,9 +81,9 @@ export default function CollectionPage() {
           className="p-4 border-2 space-y-2"
           style={{ background: "var(--px-bg2)", borderColor: "var(--px-border)" }}
         >
-          <p className="ui-guide">일기를 기록하면 간지 도감에 도장이 찍혀요.</p>
+          <p className="ui-guide">일진을 기록하면 간지 도감에 도장이 찍혀요.</p>
           <Link href="/diary" className="ui-primary-btn inline-block px-4 py-2 text-xs">
-            오늘 기록하기
+            오늘 일진 기록하기
           </Link>
         </div>
       )}

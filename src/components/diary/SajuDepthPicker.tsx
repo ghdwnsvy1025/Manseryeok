@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import ManseryeokBoard from "@/components/diary/ManseryeokBoard";
-import PillarVisibilityToggle from "@/components/diary/PillarVisibilityToggle";
+import PillarVisibilityToggle, {
+  PillarVisibilityToggleSpacer,
+} from "@/components/diary/PillarVisibilityToggle";
 import FeatureCallout from "@/components/FeatureCallout";
 import {
   hasSeenBoardExpandHint,
@@ -12,26 +13,13 @@ import {
   markBoardExpandHintSeen,
   markJourneyHintSeen,
   setBoardExpanded,
-  STATS_INSIGHT_MIN_ENTRIES,
 } from "@/lib/diary/onboarding";
 import SameGanjiHint from "@/components/diary/stats/SameGanjiHint";
-import TodayVibeLine from "@/components/diary/journey/TodayVibeLine";
-import QuestProgressBar from "@/components/diary/journey/QuestProgressBar";
-import NextGanjiCountdown from "@/components/diary/journey/NextGanjiCountdown";
-import CollectionPreviewCard from "@/components/diary/journey/CollectionPreviewCard";
-import TodayGanjiLesson from "@/components/diary/journey/TodayGanjiLesson";
 import BirthDateNudge from "@/components/diary/journey/BirthDateNudge";
-import {
-  getCollectedGanjiIndices,
-  getCollectionSummary,
-} from "@/lib/diary/collection";
-import { getNextSameGanjiDate, getNextUncollectedGanjiDate } from "@/lib/diary/nextGanjiDay";
-import { getSeason1Quests, getStreakDays } from "@/lib/diary/quests";
-import { getTodayVibe } from "@/lib/diary/todayVibe";
+import ElementDistributionBars from "@/components/diary/ElementDistributionBars";
 import type { DiaryEntry } from "@/lib/diary/types";
 import {
   getPartialPillarsForFields,
-  formatDiaryDateDisplay,
   isValidDateString,
 } from "@/lib/diary/dayPillar";
 import {
@@ -46,9 +34,6 @@ import {
 } from "@/lib/diary/sajuSettings";
 
 const INPUT_STYLE: React.CSSProperties = {
-  background: "var(--px-bg3)",
-  borderColor: "var(--px-border)",
-  color: "var(--px-text)",
   textAlign: "center",
 };
 
@@ -56,6 +41,21 @@ const FIELD_LABEL_STYLE: React.CSSProperties = {
   fontSize: "13px",
   color: "var(--px-text-on-panel)",
 };
+
+function findScrollParent(el: HTMLElement | null): HTMLElement | null {
+  let node = el?.parentElement ?? null;
+  while (node) {
+    const { overflowY } = getComputedStyle(node);
+    if (
+      (overflowY === "auto" || overflowY === "scroll" || overflowY === "overlay") &&
+      node.scrollHeight > node.clientHeight + 1
+    ) {
+      return node;
+    }
+    node = node.parentElement;
+  }
+  return null;
+}
 
 function LabeledDateField({
   label,
@@ -66,6 +66,7 @@ function LabeledDateField({
   placeholder,
   pillarEnabled = true,
   onTogglePillar,
+  reserveToggleSpace = false,
 }: {
   label: string;
   value: string;
@@ -75,6 +76,8 @@ function LabeledDateField({
   placeholder?: string;
   pillarEnabled?: boolean;
   onTogglePillar?: () => void;
+  /** 눈 없는 칸도 높이 맞춤 (분 등) */
+  reserveToggleSpace?: boolean;
 }) {
   const [togglePop, setTogglePop] = useState(false);
 
@@ -86,7 +89,7 @@ function LabeledDateField({
   };
 
   return (
-    <div className="flex flex-col items-center gap-0.5">
+    <div className="flex flex-col items-center gap-0.5 shrink-0">
       <input
         type="text"
         inputMode="numeric"
@@ -94,24 +97,26 @@ function LabeledDateField({
         value={value}
         onChange={(e) => onChange(e.target.value.replace(/\D/g, "").slice(0, maxLength))}
         placeholder={placeholder}
-        className="px-2 py-2 text-sm border-2"
+        className="px-input px-1 py-2 text-sm"
         style={{
           ...INPUT_STYLE,
           width,
-          borderColor: pillarEnabled ? "var(--px-accent)" : "var(--px-border)",
-          opacity: pillarEnabled ? 1 : 0.55,
-          boxShadow: pillarEnabled ? "0 0 8px color-mix(in srgb, var(--px-accent) 35%, transparent)" : "none",
-          transition: "border-color 0.2s ease, opacity 0.2s ease, box-shadow 0.22s ease",
+          opacity: pillarEnabled ? 1 : 0.45,
+          transition: "opacity 0.2s ease",
         }}
       />
       <span className="font-bold" style={FIELD_LABEL_STYLE}>
         {label}
       </span>
-      {onTogglePillar && (
+      {onTogglePillar ? (
         <div className="h-[18px] flex items-center justify-center">
           <PillarVisibilityToggle visible={pillarEnabled} onClick={handleToggle} popping={togglePop} />
         </div>
-      )}
+      ) : reserveToggleSpace ? (
+        <div className="h-[18px] flex items-center justify-center">
+          <PillarVisibilityToggleSpacer />
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -210,22 +215,18 @@ function BirthDateInput({
       <p className="ui-section-title">
         {compact ? "내 생년월일·시간" : "■ 내 생년월일"}
       </p>
-      {compact ? (
+      {compact && (
         <p className="ui-hint text-center">
           시간을 모르면 비워두셔도 돼요.
         </p>
-      ) : (
-        <p className="ui-guide">
-          입력하면 내 일주와 오늘 일주를 비교할 수 있어요.
-        </p>
       )}
-      <div className="flex items-start gap-2 flex-wrap justify-center sm:justify-start">
+      <div className="flex flex-nowrap items-start gap-1 w-full justify-between">
         <LabeledDateField
           label="년"
           value={yearStr}
           onChange={setYearStr}
           maxLength={4}
-          width="4.5rem"
+          width="3.4rem"
           placeholder="년도"
           pillarEnabled={pillarVisibility.birth.year}
           onTogglePillar={showPillarToggles ? () => onToggleBirthPillar("year") : undefined}
@@ -235,7 +236,7 @@ function BirthDateInput({
           value={monthStr}
           onChange={setMonthStr}
           maxLength={2}
-          width="3rem"
+          width="2.35rem"
           placeholder="월"
           pillarEnabled={pillarVisibility.birth.month}
           onTogglePillar={showPillarToggles ? () => onToggleBirthPillar("month") : undefined}
@@ -245,13 +246,13 @@ function BirthDateInput({
           value={dayStr}
           onChange={setDayStr}
           maxLength={2}
-          width="3rem"
+          width="2.35rem"
           placeholder="일"
           pillarEnabled={pillarVisibility.birth.day}
           onTogglePillar={showPillarToggles ? () => onToggleBirthPillar("day") : undefined}
         />
         <div
-          className="flex items-center justify-center text-xs font-bold shrink-0"
+          className="flex items-center justify-center text-xs font-bold shrink-0 self-start"
           style={{ height: "2.125rem", color: "var(--px-border)" }}
         >
           |
@@ -261,7 +262,7 @@ function BirthDateInput({
           value={hourStr}
           onChange={setHourStr}
           maxLength={2}
-          width="3rem"
+          width="2.35rem"
           placeholder="시"
           pillarEnabled={pillarVisibility.birth.hour}
           onTogglePillar={showPillarToggles ? () => onToggleBirthPillar("hour") : undefined}
@@ -271,8 +272,9 @@ function BirthDateInput({
           value={minuteStr}
           onChange={setMinuteStr}
           maxLength={2}
-          width="3rem"
+          width="2.35rem"
           placeholder="분"
+          reserveToggleSpace={showPillarToggles}
         />
       </div>
       {errorMessage && (
@@ -291,6 +293,7 @@ function DiaryDateInput({
   onDiaryDateChange,
   onFieldsChange,
   showPillarToggles = true,
+  hideTitle = false,
 }: {
   date: string;
   pillarVisibility: PillarVisibility;
@@ -298,6 +301,7 @@ function DiaryDateInput({
   onDiaryDateChange: (date: string) => void;
   onFieldsChange: (fields: { year: string; month: string; day: string }) => void;
   showPillarToggles?: boolean;
+  hideTitle?: boolean;
 }) {
   const initParts = splitBirthDate(date);
   const [yearStr, setYearStr] = useState(initParts.year);
@@ -339,15 +343,12 @@ function DiaryDateInput({
 
   return (
     <div className="space-y-2">
-      <p className="ui-section-title">
-        ■ 일기 날짜
-      </p>
-      {showPillarToggles && (
-        <p className="ui-hint">
-          눈 아이콘으로 간지 표시/숨김을 선택하세요.
+      {!hideTitle && (
+        <p className="ui-section-title">
+          ■ 일기 날짜
         </p>
       )}
-      <div className="flex items-start gap-1.5 flex-wrap">
+      <div className={`flex items-start gap-1.5 flex-wrap ${hideTitle ? "justify-center" : ""}`}>
         <LabeledDateField
           label="년"
           value={yearStr}
@@ -442,6 +443,8 @@ export default function SajuDepthPicker({
   const [showBoardExpandHint, setShowBoardExpandHint] = useState(false);
   const [showJourneyHint, setShowJourneyHint] = useState(false);
   const [dismissBirthNudge, setDismissBirthNudge] = useState(false);
+  const scrollAnchorRef = useRef<HTMLDivElement>(null);
+  const cardHeightBeforeRef = useRef<number | null>(null);
 
   useEffect(() => {
     setBoardExpandedState(isBoardExpanded());
@@ -449,25 +452,21 @@ export default function SajuDepthPicker({
     setShowJourneyHint(!hasSeenJourneyHint());
   }, []);
 
-  const userBirthPillars = birthPillars;
-  const todayVibe = useMemo(() => {
-    if (!diaryPillars.dayPillar) return null;
-    return getTodayVibe(diaryPillars.dayPillar, userBirthPillars);
-  }, [diaryPillars.dayPillar, userBirthPillars]);
+  useLayoutEffect(() => {
+    if (cardHeightBeforeRef.current === null || !scrollAnchorRef.current) return;
+    const heightAfter = scrollAnchorRef.current.offsetHeight;
+    const delta = heightAfter - cardHeightBeforeRef.current;
+    cardHeightBeforeRef.current = null;
+    if (Math.abs(delta) <= 0.5) return;
 
-  const questSeason = useMemo(() => getSeason1Quests(entries), [entries]);
-  const streakDays = useMemo(() => getStreakDays(entries), [entries]);
-  const collectionSummary = useMemo(() => getCollectionSummary(entries), [entries]);
-
-  const nextSameGanji = useMemo(() => {
-    if (!diaryPillars.dayPillar) return null;
-    return getNextSameGanjiDate(diaryDate, diaryPillars.dayPillar.ganjiIndex);
-  }, [diaryDate, diaryPillars.dayPillar]);
-
-  const nextUncollected = useMemo(() => {
-    const collected = getCollectedGanjiIndices(entries);
-    return getNextUncollectedGanjiDate(diaryDate, collected);
-  }, [diaryDate, entries]);
+    // 칸 높이가 변한 만큼 스크롤을 보정 → 아래 내용(카메라)이 튀지 않음
+    const scrollParent = findScrollParent(scrollAnchorRef.current);
+    if (scrollParent) {
+      scrollParent.scrollTop += delta;
+    } else {
+      window.scrollBy(0, delta);
+    }
+  }, [boardExpanded]);
 
   const showBirthNudge =
     !boardExpanded &&
@@ -486,6 +485,9 @@ export default function SajuDepthPicker({
   };
 
   const toggleBoardExpanded = () => {
+    if (scrollAnchorRef.current) {
+      cardHeightBeforeRef.current = scrollAnchorRef.current.offsetHeight;
+    }
     setBoardExpandedState((prev) => {
       const next = !prev;
       setBoardExpanded(next);
@@ -496,42 +498,15 @@ export default function SajuDepthPicker({
 
   const showBoard = birthPillars || diaryPillars.dayPillar || diaryPillars.yearPillar;
 
-  const dateDisplay = formatDiaryDateDisplay(diaryDate);
-
-  const statsLink =
-    totalEntryDays >= STATS_INSIGHT_MIN_ENTRIES ? (
-      <Link href="/diary/stats" className="font-bold" style={{ color: "var(--px-accent)" }}>
-        간지별 행복도 통계
-      </Link>
-    ) : (
-      <strong style={{ color: "var(--px-accent)" }}>간지별 행복도 통계</strong>
-    );
-
-  const introHint = (
-    <p className="ui-hint">
-      매일 기록하면 {statsLink}를 볼 수 있어요.
-    </p>
-  );
-
   const boardSection = showBoard ? (
     <div className="space-y-3">
       {!boardExpanded && (
-        <div className="text-center space-y-1.5 px-1">
-          <h2 className="ui-page-title text-base sm:text-lg">■ 오늘의 사주</h2>
-          {introHint}
+        <div className="text-center px-1">
+          <h2 className="ui-page-title text-base sm:text-lg">■ 날짜</h2>
         </div>
       )}
       {boardExpanded && (
-        <div className="flex items-center justify-between gap-2">
-          <p className="ui-section-title">만세력</p>
-          <button
-            type="button"
-            onClick={toggleBoardExpanded}
-            className="ui-action-btn ui-action-btn-muted"
-          >
-            간단히
-          </button>
-        </div>
+        <p className="ui-section-title">만세력</p>
       )}
       {showBoardExpandHint && !boardExpanded && (
         <FeatureCallout
@@ -545,45 +520,32 @@ export default function SajuDepthPicker({
           onDismiss={dismissJourneyHint}
         />
       )}
-      {todayVibe && !boardExpanded && <TodayVibeLine vibe={todayVibe} />}
+      {!boardExpanded && (
+        <DiaryDateInput
+          date={diaryDate}
+          pillarVisibility={pillarVisibility}
+          onToggleDiaryPillar={onToggleDiaryPillar}
+          onDiaryDateChange={onDiaryDateChange}
+          onFieldsChange={setDiaryFields}
+          showPillarToggles={false}
+          hideTitle
+        />
+      )}
       <ManseryeokBoard
         birthPillars={birthPillars}
         diaryPillars={diaryPillars}
         pillarVisibility={pillarVisibility}
         compact={!boardExpanded}
-        dateDisplay={dateDisplay}
       />
-      {!boardExpanded && nextSameGanji && diaryPillars.dayPillar && (
-        <NextGanjiCountdown
-          ganjiKo={nextSameGanji.ganjiKo}
-          daysUntil={nextSameGanji.daysUntil}
-          nextDate={nextSameGanji.date}
-        />
-      )}
+      {!boardExpanded && <ElementDistributionBars diaryPillars={diaryPillars} />}
       {!boardExpanded && diaryPillars.dayPillar && (
         <SameGanjiHint
           ganjiKo={diaryPillars.dayPillar.ganjiKo}
           currentDate={diaryDate}
         />
       )}
-      {!boardExpanded && !questSeason.allComplete && (
-        <QuestProgressBar season={questSeason} streakDays={streakDays} />
-      )}
       {!boardExpanded && showBirthNudge && (
         <BirthDateNudge onDismiss={() => setDismissBirthNudge(true)} />
-      )}
-      {!boardExpanded && diaryPillars.dayPillar && totalEntryDays >= 1 && (
-        <TodayGanjiLesson dayPillar={diaryPillars.dayPillar} />
-      )}
-      {!boardExpanded && entries.length > 0 && (
-        <CollectionPreviewCard
-          summary={collectionSummary}
-          nextUncollected={
-            nextUncollected
-              ? { ganjiKo: nextUncollected.ganjiKo, daysUntil: nextUncollected.daysUntil }
-              : null
-          }
-        />
       )}
       {!boardExpanded && (
         <div className="flex justify-center">
@@ -599,10 +561,18 @@ export default function SajuDepthPicker({
     </div>
   ) : !boardExpanded ? (
     <div className="space-y-3">
-      <div className="text-center space-y-1.5 px-1">
-        <h2 className="ui-page-title text-base sm:text-lg">■ 오늘의 사주</h2>
-        {introHint}
+      <div className="text-center px-1">
+        <h2 className="ui-page-title text-base sm:text-lg">■ 날짜</h2>
       </div>
+      <DiaryDateInput
+        date={diaryDate}
+        pillarVisibility={pillarVisibility}
+        onToggleDiaryPillar={onToggleDiaryPillar}
+        onDiaryDateChange={onDiaryDateChange}
+        onFieldsChange={setDiaryFields}
+        showPillarToggles={false}
+        hideTitle
+      />
       <div className="flex justify-center">
         <button
           type="button"
@@ -617,6 +587,7 @@ export default function SajuDepthPicker({
 
   return (
     <div
+      ref={scrollAnchorRef}
       className="p-2 sm:p-3 border-2 space-y-3 sm:space-y-4"
       style={{ background: "var(--px-bg2)", borderColor: "var(--px-accent)" }}
     >
@@ -642,6 +613,20 @@ export default function SajuDepthPicker({
             onFieldsChange={setDiaryFields}
             showPillarToggles={boardExpanded}
           />
+          <div className="space-y-2 pt-1">
+            <p className="ui-hint text-center">
+              눈 아이콘으로 간지 표시/숨김을 선택하세요.
+            </p>
+            <div className="flex justify-center">
+              <button
+                type="button"
+                onClick={toggleBoardExpanded}
+                className="ui-action-btn ui-action-btn-muted"
+              >
+                간단히
+              </button>
+            </div>
+          </div>
         </>
       ) : (
         boardSection

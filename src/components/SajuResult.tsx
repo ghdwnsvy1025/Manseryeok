@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback, useMemo, useLayoutEffect } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo, useLayoutEffect, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import type { SajuResult } from "@/lib/saju/types";
 import type { Element } from "@/lib/saju/constants";
@@ -8,11 +8,9 @@ import { BRANCH_META, ELEMENT_LABELS, STEM_META } from "@/lib/saju/constants";
 import { getTenGod, getHiddenStemsByBranch, type HiddenStemByPillar, type HiddenStemWithTenGod, type StemHanja } from "@/lib/saju/hiddenStems";
 import AiAnalysis from "@/components/AiAnalysis";
 import CoachmarkOverlay from "@/components/CoachmarkOverlay";
-import FeatureCallout from "@/components/FeatureCallout";
 import Link from "next/link";
 import {
   hasSeenExploreGuide,
-  hasSeenSajuViewModeHint,
   loadSajuViewMode,
   markExploreGuideSeen,
   markSajuViewModeHintSeen,
@@ -42,9 +40,15 @@ type PillarKey = "year" | "month" | "day" | "hour";
 type AgeMode = "international" | "korean";
 
 type HighlightSelection =
-  | { kind: "stem"; source: "pillar" | "daeun-slot" | "daeun-table"; pillar: PillarKey | "all"; element: Element }
-  | { kind: "branch-stem-match"; scope: "pillar" | "daeun"; pillar: PillarKey }
+  | { kind: "stem"; source: "pillar" | "daeun-slot" | "daeun-table"; pillar: PillarKey | "all"; element: Element; label: string }
+  | { kind: "branch-stem-match"; scope: "pillar" | "daeun"; pillar: PillarKey; label: string; element: Element }
   | null;
+
+type HighlightHintState = {
+  char: string;
+  kind: "뿌리" | "투출";
+  color: string;
+};
 
 function isSameHighlightSelection(a: HighlightSelection, b: HighlightSelection): boolean {
   if (!a || !b) return false;
@@ -58,25 +62,76 @@ function isSameHighlightSelection(a: HighlightSelection, b: HighlightSelection):
   return false;
 }
 
+/** 지지 지장간 → 천간 투출 (같은 오행이면 투출로 간주) */
 function isHiddenStemHighlighted(
   selection: HighlightSelection,
   context: "pillar" | "daeun",
   pillarKey: PillarKey,
   hiddenStem: HiddenStemWithTenGod,
-  stemElements: Set<Element>,
+  touchoElements: Set<Element>,
 ): boolean {
   if (!selection) return false;
   if (selection.kind === "stem") {
-    if (hiddenStem.element !== selection.element) return false;
-    if (context === "pillar") return true;
-    return selection.pillar === "all" || selection.pillar === pillarKey;
+    // 천간 클릭 → 같은 오행 지장간 = 뿌리 (원국·대운 지장간 모두)
+    return hiddenStem.element === selection.element;
   }
   if (selection.kind === "branch-stem-match") {
+    // 지지 클릭 → 해당 지지의 투출된 지장간 (같은 오행)
     if (context !== selection.scope) return false;
-    if (pillarKey !== selection.pillar) return false;
-    return stemElements.has(hiddenStem.element);
+    if (selection.scope === "pillar" && pillarKey !== selection.pillar) return false;
+    return touchoElements.has(hiddenStem.element);
   }
   return false;
+}
+
+/** 지지 클릭 시, 해당 지장간 오행이 천간으로 투출했는지 */
+function isStemTouchoOfBranch(
+  selection: HighlightSelection,
+  stemElement: Element,
+  branchHiddenStems: HiddenStemWithTenGod[] | undefined,
+): boolean {
+  if (!selection || selection.kind !== "branch-stem-match") return false;
+  if (!branchHiddenStems?.length) return false;
+  return branchHiddenStems.some((hs) => hs.element === stemElement);
+}
+
+/** 천간 클릭 시, 해당 지지(원국/대운)가 뿌리를 가진 경우 */
+function branchHasStemRoot(
+  selection: HighlightSelection,
+  branchHiddenStems: HiddenStemWithTenGod[] | undefined,
+): boolean {
+  if (!selection || selection.kind !== "stem") return false;
+  if (!branchHiddenStems?.length) return false;
+  return branchHiddenStems.some((hs) => hs.element === selection.element);
+}
+
+type HighlightTone = "source" | "related" | null;
+
+function highlightToneClass(tone: HighlightTone): string {
+  if (tone === "source") return "ganji-clickable-source";
+  if (tone === "related") return "ganji-clickable-related";
+  return "";
+}
+
+function daeunGroupHighlightStyle(tone: HighlightTone): CSSProperties {
+  if (tone === "source") {
+    return {
+      border: "2px solid #fbbf24",
+      boxShadow: "0 0 14px #fbbf2499",
+      background: "#fbbf2422",
+    };
+  }
+  if (tone === "related") {
+    return {
+      border: "2px solid #c084fc",
+      boxShadow: "0 0 14px #c084fc99",
+      background: "#c084fc22",
+    };
+  }
+  return {
+    border: "1px solid transparent",
+    background: "transparent",
+  };
 }
 
 const PILLAR_META: Record<PillarKey, { ko: string; hanja: string }> = {
@@ -92,14 +147,14 @@ const DISPLAY_ORDER: PillarKey[] = ["hour", "day", "month", "year"];
 
 export default function SajuResult({ result }: { result: SajuResult }) {
   const { isMobile } = useViewMode();
-  const charSize = isMobile ? "24px" : "36px";
+  const charSize = isMobile ? "28px" : "40px";
   const labelSize = isMobile ? "9px" : "10px";
+  const pillarTitleSize = isMobile ? "13px" : "15px";
   const [showCalcDebug, setShowCalcDebug] = useState(false);
   const [daeunAgeMode, setDaeunAgeMode] = useState<AgeMode>("international");
   const [viewMode, setViewMode] = useState<SajuViewMode>("simple");
   const [showExploreGuide, setShowExploreGuide] = useState(false);
-  const [showViewModeHint, setShowViewModeHint] = useState(false);
-  const [highlightHint, setHighlightHint] = useState<string | null>(null);
+  const [highlightHint, setHighlightHint] = useState<HighlightHintState | null>(null);
   const [highlightSelection, setHighlightSelection] = useState<HighlightSelection>(null);
   const [selectedDaeunOrder, setSelectedDaeunOrder] = useState<number | null>(null);
   const [flyers, setFlyers] = useState<FlyerData[]>([]);
@@ -108,7 +163,9 @@ export default function SajuResult({ result }: { result: SajuResult }) {
   const [pumpGeneration, setPumpGeneration] = useState(0);
   const pumpTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const daeunSectionRef = useRef<HTMLDivElement>(null);
+  const chartAnchorRef = useRef<HTMLDivElement>(null);
   const scrollAnchorTopRef = useRef<number | null>(null);
+  const chartHeightBeforeRef = useRef<number | null>(null);
   const [isMounted, setIsMounted] = useState(false);
   const daeunStemSlotRefs = useRef<(HTMLDivElement | null)[]>([null, null, null, null]);
   const daeunBranchSlotRefs = useRef<(HTMLDivElement | null)[]>([null, null, null, null]);
@@ -117,33 +174,38 @@ export default function SajuResult({ result }: { result: SajuResult }) {
   const hiddenStems = result.hiddenStems;
   const dayStem = pillars.day.stem.hanja as StemHanja;
   const exploreMode = viewMode === "explore";
-  const selectedDaeun = exploreMode
-    ? daeun.cycles.find((c) => c.order === selectedDaeunOrder) ?? null
-    : null;
+  /** 대운 선택 — 기본/연구 모드 공통 */
+  const selectedDaeun = daeun.cycles.find((c) => c.order === selectedDaeunOrder) ?? null;
+  /** 연구 모드: 각 기둥에 대운 겹침 / 기본 모드: 년주 오른쪽 별도 칸 */
+  const overlayDaeun = exploreMode && !!selectedDaeun;
+  const sideDaeun = !exploreMode && !!selectedDaeun;
 
   useEffect(() => {
     setViewMode(loadSajuViewMode());
-    setShowViewModeHint(!hasSeenSajuViewModeHint());
   }, []);
 
-  const dismissViewModeHint = () => {
-    markSajuViewModeHintSeen();
-    setShowViewModeHint(false);
-  };
-
-  useEffect(() => {
-    if (!exploreMode) {
-      setSelectedDaeunOrder(null);
-      setHighlightSelection(null);
-      setFlyers([]);
+  const resetInteractionState = useCallback(() => {
+    setHighlightSelection(null);
+    setHighlightHint(null);
+    setSelectedDaeunOrder(null);
+    setFlyers([]);
+    setArrivedSlots(new Set());
+    setPumpingSlots(new Set());
+    setPumpGeneration((g) => g + 1);
+    if (pumpTimerRef.current) {
+      clearTimeout(pumpTimerRef.current);
+      pumpTimerRef.current = null;
     }
-  }, [exploreMode]);
+  }, []);
 
   const handleViewModeChange = (mode: SajuViewMode) => {
+    if (mode === viewMode) return;
+    captureScrollAnchor();
+    resetInteractionState();
     setViewMode(mode);
     saveSajuViewMode(mode);
     if (mode === "explore") {
-      dismissViewModeHint();
+      markSajuViewModeHintSeen();
       if (!hasSeenExploreGuide()) {
         setShowExploreGuide(true);
       }
@@ -158,15 +220,24 @@ export default function SajuResult({ result }: { result: SajuResult }) {
   const toggleHighlightWithHint = useCallback((next: Exclude<HighlightSelection, null>) => {
     setHighlightSelection((prev) => {
       const clearing = isSameHighlightSelection(prev, next);
-      if (!clearing) {
-        if (next.kind === "stem") {
-          setHighlightHint(`같은 오행(${ELEM_KO[next.element]})의 지장간을 강조했어요`);
-        } else {
-          setHighlightHint("이 지지에 숨은 오행(지장간)을 강조했어요");
-        }
-        window.setTimeout(() => setHighlightHint(null), 2800);
+      if (clearing) {
+        setHighlightHint(null);
+        return null;
       }
-      return clearing ? null : next;
+      if (next.kind === "stem") {
+        setHighlightHint({
+          char: next.label,
+          kind: "뿌리",
+          color: ELEM[next.element].text,
+        });
+      } else {
+        setHighlightHint({
+          char: next.label,
+          kind: "투출",
+          color: ELEM[next.element].text,
+        });
+      }
+      return next;
     });
   }, []);
 
@@ -185,11 +256,36 @@ export default function SajuResult({ result }: { result: SajuResult }) {
     toggleHighlightWithHint(next);
   }, [exploreMode, toggleHighlightWithHint]);
 
-  const stemElements = new Set<Element>();
-  for (const k of DISPLAY_ORDER) {
-    const p = pillars[k];
-    if (p) stemElements.add(p.stem.element);
-  }
+  const visibleStemElements = useMemo(() => {
+    const set = new Set<Element>();
+    for (const k of DISPLAY_ORDER) {
+      const p = pillars[k];
+      if (p) set.add(p.stem.element);
+    }
+    if (selectedDaeun) {
+      const el = STEM_META[selectedDaeun.ganji[0]]?.element;
+      if (el) set.add(el);
+    }
+    return set;
+  }, [pillars, selectedDaeun]);
+
+  const highlightBranchHiddenStems = useMemo(() => {
+    if (!highlightSelection || highlightSelection.kind !== "branch-stem-match") return undefined;
+    if (highlightSelection.scope === "daeun") {
+      if (!selectedDaeun) return undefined;
+      return getBranchHiddenStemsWithTenGod(selectedDaeun.ganji[1], dayStem);
+    }
+    return hiddenStemItemsByPillar[highlightSelection.pillar]?.hiddenStems;
+  }, [highlightSelection, selectedDaeun, dayStem, hiddenStemItemsByPillar]);
+
+  const touchoElements = useMemo(() => {
+    const set = new Set<Element>();
+    if (!highlightBranchHiddenStems) return set;
+    for (const hs of highlightBranchHiddenStems) {
+      if (visibleStemElements.has(hs.element)) set.add(hs.element);
+    }
+    return set;
+  }, [highlightBranchHiddenStems, visibleStemElements]);
 
   // 오행 분포 (천간·지지 가중합 기반)
   const elemPct: Record<Element, number> = {
@@ -234,25 +330,56 @@ export default function SajuResult({ result }: { result: SajuResult }) {
 
   useEffect(() => { setIsMounted(true); }, []);
 
-  const captureScrollAnchor = useCallback(() => {
-    if (daeunSectionRef.current) {
-      scrollAnchorTopRef.current = daeunSectionRef.current.getBoundingClientRect().top;
+  const findScrollParent = useCallback((el: HTMLElement | null): HTMLElement | null => {
+    let node = el?.parentElement ?? null;
+    while (node) {
+      const { overflowY } = getComputedStyle(node);
+      if (
+        (overflowY === "auto" || overflowY === "scroll" || overflowY === "overlay") &&
+        node.scrollHeight > node.clientHeight + 1
+      ) {
+        return node;
+      }
+      node = node.parentElement;
     }
+    return null;
+  }, []);
+
+  const captureScrollAnchor = useCallback(() => {
+    const el = chartAnchorRef.current ?? daeunSectionRef.current;
+    if (!el) return;
+    chartHeightBeforeRef.current = el.offsetHeight;
+    scrollAnchorTopRef.current = el.getBoundingClientRect().top;
   }, []);
 
   const compensateScrollAnchor = useCallback(() => {
-    if (scrollAnchorTopRef.current === null || !daeunSectionRef.current) return;
-    const newTop = daeunSectionRef.current.getBoundingClientRect().top;
-    const delta = newTop - scrollAnchorTopRef.current;
-    scrollAnchorTopRef.current = null;
-    if (Math.abs(delta) > 0.5) {
-      window.scrollBy(0, delta);
+    const el = chartAnchorRef.current ?? daeunSectionRef.current;
+    if (!el) return;
+    const scrollParent = findScrollParent(el);
+    const applyDelta = (delta: number) => {
+      if (Math.abs(delta) <= 0.5) return;
+      if (scrollParent) scrollParent.scrollTop += delta;
+      else window.scrollBy(0, delta);
+    };
+
+    // 높이 변화만큼 스크롤 보정 → 아래 내용(카메라)이 튀지 않음
+    if (chartHeightBeforeRef.current !== null) {
+      const deltaH = el.offsetHeight - chartHeightBeforeRef.current;
+      chartHeightBeforeRef.current = null;
+      applyDelta(deltaH);
+    } else if (scrollAnchorTopRef.current !== null) {
+      const newTop = el.getBoundingClientRect().top;
+      const delta = newTop - scrollAnchorTopRef.current;
+      scrollAnchorTopRef.current = null;
+      applyDelta(delta);
+    } else {
+      scrollAnchorTopRef.current = null;
     }
-  }, []);
+  }, [findScrollParent]);
 
   useLayoutEffect(() => {
     compensateScrollAnchor();
-  }, [selectedDaeunOrder, compensateScrollAnchor]);
+  }, [selectedDaeunOrder, exploreMode, compensateScrollAnchor]);
 
   const handleFlyerArrive = useCallback((slotId: string, flyerId: string) => {
     setArrivedSlots((prev) => new Set(prev).add(slotId));
@@ -347,7 +474,6 @@ export default function SajuResult({ result }: { result: SajuResult }) {
     branchColor: string,
     branchElement: Element,
   ) => {
-    if (!exploreMode) return;
     captureScrollAnchor();
 
     if (isSelected) {
@@ -376,6 +502,14 @@ export default function SajuResult({ result }: { result: SajuResult }) {
       if (prev.kind === "branch-stem-match") return null;
       return prev;
     });
+
+    // 기본 모드: 년주 옆 칸에 바로 표시 (비행 연출 없음)
+    if (!exploreMode) {
+      setFlyers([]);
+      setArrivedSlots(new Set());
+      setPumpingSlots(new Set());
+      return;
+    }
 
     if (isMobile) {
       setFlyers([]);
@@ -406,12 +540,20 @@ export default function SajuResult({ result }: { result: SajuResult }) {
         .ganji-clickable {
           cursor: pointer;
           border-radius: 2px;
+          /* 항상 동일 아웃라인 폭을 확보해 선택 시 레이아웃 흔들림 방지 */
+          box-shadow: 0 0 0 2px transparent;
           transition: background 0.1s, box-shadow 0.1s;
         }
         .ganji-clickable:hover { background: #ffffff11; }
-        .ganji-clickable-selected {
-          box-shadow: 0 0 0 2px #fbbf24, 0 0 12px #fbbf2488;
-          background: #fbbf2418;
+        /* 직접 클릭한 글자 */
+        .ganji-clickable-source {
+          box-shadow: 0 0 0 2px #fbbf24, 0 0 14px #fbbf2499;
+          background: #fbbf2422;
+        }
+        /* 뿌리·투출 관련 글자 */
+        .ganji-clickable-related {
+          box-shadow: 0 0 0 2px #c084fc, 0 0 14px #c084fc99;
+          background: #c084fc22;
         }
         @keyframes daeun-slot-pump {
           0%   { transform: scale(0.35); opacity: 0.2; }
@@ -443,15 +585,12 @@ export default function SajuResult({ result }: { result: SajuResult }) {
       </div>
 
       <div
-        className={`flex flex-wrap items-center gap-2 ${isMobile ? "px-2 py-2" : "px-4 py-2"}`}
+        className={`flex flex-wrap items-center justify-center gap-2 ${isMobile ? "px-2 py-2" : "px-4 py-2"}`}
         style={{ background: "var(--px-bg2)", borderBottom: "2px solid var(--px-border)" }}
       >
-        <span className="ui-list-label">
-          보기
-        </span>
         {([
-          ["simple", "쉬운 보기"],
-          ["explore", "탐험 모드"],
+          ["simple", "기본 모드"],
+          ["explore", "연구 모드"],
         ] as [SajuViewMode, string][]).map(([mode, label]) => (
           <button
             key={mode}
@@ -460,40 +599,39 @@ export default function SajuResult({ result }: { result: SajuResult }) {
             className={
               viewMode === mode
                 ? "ui-action-btn ui-action-btn-selected"
-                : mode === "explore"
-                  ? `ui-action-btn${showViewModeHint ? " ui-action-btn-pulse" : ""}`
-                  : "ui-action-btn ui-action-btn-muted"
+                : "ui-action-btn ui-action-btn-muted"
             }
           >
             {label}
           </button>
         ))}
-        <span className="ui-hint ml-auto">
-          {exploreMode ? "대운·지장간 탐색 가능" : "기본 사주만 표시"}
-        </span>
       </div>
 
-      {showViewModeHint && viewMode === "simple" && (
-        <div className={isMobile ? "px-2 pb-1" : "px-4 pb-1"}>
-          <FeatureCallout
-            message="탐험 모드를 누르면 대운·지장간을 직접 눌러볼 수 있어요."
-            onDismiss={dismissViewModeHint}
-          />
-        </div>
-      )}
+      {/* 클릭 안내 — 기본 문구 / 연구 모드 선택 시 뿌리·투출 설명 */}
+      <div
+        className={`ui-guide-strong text-center ${isMobile ? "px-2" : "px-4"}`}
+        style={{
+          color: "var(--px-accent)",
+          minHeight: "1.25rem",
+        }}
+      >
+        {highlightHint ? (
+          <>
+            <span style={{ color: highlightHint.color, textShadow: `0 0 8px ${highlightHint.color}88` }}>
+              {highlightHint.char}
+            </span>
+            <span>의 {highlightHint.kind} 표시</span>
+          </>
+        ) : exploreMode ? (
+          "글자나 대운을 클릭하세요"
+        ) : (
+          "대운을 클릭하세요"
+        )}
+      </div>
 
-      {highlightHint && (
-        <p
-          className={`ui-guide-strong text-center ${isMobile ? "px-2" : "px-4"}`}
-          style={{ color: "var(--px-accent)" }}
-        >
-          {highlightHint}
-        </p>
-      )}
-
-      <div className={`pb-4 space-y-2 ${isMobile ? "px-2" : "px-4"}`}>
+      <div className={`pb-4 ${isMobile ? "px-2" : "px-4"}`}>
         {/* ── 사주 + 대운 + 오행 (밀착 레이아웃) ── */}
-        <div className="space-y-1">
+        <div className="space-y-0" ref={chartAnchorRef}>
         {(() => {
           const daeunStemEl  = selectedDaeun ? STEM_META[selectedDaeun.ganji[0]]?.element  : null;
           const daeunBranchEl = selectedDaeun ? BRANCH_META[selectedDaeun.ganji[1]]?.element : null;
@@ -518,17 +656,89 @@ export default function SajuResult({ result }: { result: SajuResult }) {
             }
           }
 
+          const daeunStemElForGroup = selectedDaeun
+            ? STEM_META[selectedDaeun.ganji[0]]?.element
+            : undefined;
+          const daeunStemGroupTone: HighlightTone =
+            highlightSelection?.kind === "stem" && highlightSelection.source === "daeun-slot"
+              ? "source"
+              : !!daeunStemElForGroup &&
+                  isStemTouchoOfBranch(
+                    highlightSelection,
+                    daeunStemElForGroup,
+                    highlightBranchHiddenStems
+                  )
+              ? "related"
+              : null;
+          const daeunBranchGroupTone: HighlightTone =
+            highlightSelection?.kind === "branch-stem-match" &&
+            highlightSelection.scope === "daeun"
+              ? "source"
+              : branchHasStemRoot(highlightSelection, daeunBranchHiddenStems)
+              ? "related"
+              : null;
+
+          const colClass = `grid ${sideDaeun ? "grid-cols-5" : "grid-cols-4"} ${isMobile ? "gap-1.5" : "gap-2"}`;
+
           return (
-            <div className={`grid grid-cols-4 ${isMobile ? "gap-1.5" : "gap-2"}`}>
-              {DISPLAY_ORDER.map((key, i) => {
+            <>
+            {/* 연구 모드: 대운 천간 — 4글자 한 박스 강조 */}
+            {overlayDaeun && selectedDaeun && daeunSc && (
+              <div
+                className={`${colClass} mb-1.5 px-0.5 py-0.5`}
+                style={daeunGroupHighlightStyle(daeunStemGroupTone)}
+              >
+                {DISPLAY_ORDER.map((key, i) => {
+                  const stemArrived =
+                    !selectedDaeun || arrivedSlots.has(`stem-${i}`) || (isMobile && !!selectedDaeun);
+                  const stemPumping = pumpingSlots.has(`stem-${i}`);
+                  return (
+                    <div
+                      key={`daeun-stem-${key}`}
+                      ref={(el) => {
+                        daeunStemSlotRefs.current[i] = el;
+                      }}
+                      className="flex flex-col items-center justify-center min-w-0"
+                    >
+                      <div
+                        key={`stem-${pumpGeneration}`}
+                        style={{ visibility: stemArrived ? "visible" : "hidden" }}
+                      >
+                        <DaeunCharBox
+                          char={selectedDaeun.ganji[0]}
+                          tenGod={daeunStemTenGod}
+                          style={daeunSc}
+                          showBorder={false}
+                          charSize={charSize}
+                          labelSize={labelSize}
+                          tone={null}
+                          pumping={stemPumping}
+                          onClick={() => {
+                            const meta = STEM_META[selectedDaeun.ganji[0]];
+                            const el = meta?.element;
+                            if (el) {
+                              toggleHighlight({
+                                kind: "stem",
+                                source: "daeun-slot",
+                                pillar: key,
+                                element: el,
+                                label: meta.ko,
+                              });
+                            }
+                          }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+                {sideDaeun ? <div /> : null}
+              </div>
+            )}
+
+            <div className={colClass}>
+              {DISPLAY_ORDER.map((key) => {
                 const pillar = pillars[key];
-                const meta   = PILLAR_META[key];
-                const stemSlotId = `stem-${i}`;
-                const branchSlotId = `branch-${i}`;
-                const stemArrived = !selectedDaeun || arrivedSlots.has(stemSlotId) || (isMobile && !!selectedDaeun);
-                const branchArrived = !selectedDaeun || arrivedSlots.has(branchSlotId) || (isMobile && !!selectedDaeun);
-                const stemPumping = pumpingSlots.has(stemSlotId);
-                const branchPumping = pumpingSlots.has(branchSlotId);
+                const meta = PILLAR_META[key];
 
                 if (!pillar) {
                   return (
@@ -561,22 +771,26 @@ export default function SajuResult({ result }: { result: SajuResult }) {
                   hiddenStemItem?.hiddenStems.find((s) => s.role === "main")?.tenGod ??
                   hiddenStemItem?.hiddenStems[hiddenStemItem.hiddenStems.length - 1]?.tenGod ??
                   null;
-                const stemSelected =
+                const stemTone: HighlightTone =
                   highlightSelection?.kind === "stem" &&
                   highlightSelection.source === "pillar" &&
-                  highlightSelection.pillar === key;
-                const branchSelected =
+                  highlightSelection.pillar === key
+                    ? "source"
+                    : isStemTouchoOfBranch(
+                        highlightSelection,
+                        pillar.stem.element,
+                        highlightBranchHiddenStems
+                      )
+                    ? "related"
+                    : null;
+                const branchTone: HighlightTone =
                   highlightSelection?.kind === "branch-stem-match" &&
                   highlightSelection.scope === "pillar" &&
-                  highlightSelection.pillar === key;
-                const daeunStemSelected =
-                  highlightSelection?.kind === "stem" &&
-                  highlightSelection.source === "daeun-slot" &&
-                  highlightSelection.pillar === key;
-                const daeunBranchSelected =
-                  highlightSelection?.kind === "branch-stem-match" &&
-                  highlightSelection.scope === "daeun" &&
-                  highlightSelection.pillar === key;
+                  highlightSelection.pillar === key
+                    ? "source"
+                    : branchHasStemRoot(highlightSelection, hiddenStemItem?.hiddenStems)
+                    ? "related"
+                    : null;
 
                 return (
                   <div
@@ -588,50 +802,30 @@ export default function SajuResult({ result }: { result: SajuResult }) {
                       boxShadow: "3px 3px 0 #000",
                     }}
                   >
-                    {/* 주 라벨 */}
                     <div className="text-center pb-1 w-full" style={{ borderBottom: "1px solid var(--px-border)" }}>
-                      <p className="font-black leading-tight" style={{ color: "var(--px-accent)", fontSize: labelSize }}>{meta.ko}</p>
+                      <p className="font-black leading-tight" style={{ color: "var(--px-accent)", fontSize: pillarTitleSize }}>{meta.ko}</p>
                       {!isMobile && (
                         <p style={{ color: "var(--px-text2)", fontSize: "10px" }}>{meta.hanja}</p>
                       )}
                     </div>
 
-                    {/* ── 선택된 대운 천간 ── */}
-                    {selectedDaeun && daeunSc && (
-                      <div
-                        ref={(el) => { daeunStemSlotRefs.current[i] = el; }}
-                        className={`flex flex-col items-center w-full ${isMobile ? "pt-0.5 pb-0" : "pt-1 pb-0.5"}`}
-                        style={{ borderBottom: "1px dotted var(--px-border)" }}
-                      >
-                        <div key={`stem-${pumpGeneration}`} style={{ visibility: stemArrived ? "visible" : "hidden" }}>
-                          <DaeunCharBox
-                            char={selectedDaeun.ganji[0]}
-                            tenGod={daeunStemTenGod}
-                            style={daeunSc}
-                            showBorder={stemArrived}
-                            charSize={charSize}
-                            labelSize={labelSize}
-                            selected={daeunStemSelected}
-                            pumping={stemPumping}
-                            onClick={() => {
-                              const el = STEM_META[selectedDaeun.ganji[0]]?.element;
-                              if (el) toggleHighlight({ kind: "stem", source: "daeun-slot", pillar: key, element: el });
-                            }}
-                          />
-                        </div>
-                      </div>
-                    )}
-
-                    {/* ── 천간(天干) ── */}
                     <div className={`flex flex-col items-center w-full ${isMobile ? "py-1 gap-0.5" : "gap-0.5 py-1.5"}`}
                       style={{ borderBottom: "1px dashed var(--px-border)" }}>
                       {exploreMode ? (
                         <button
                           type="button"
-                          className={`ganji-clickable font-black leading-none bg-transparent border-0 p-0 ${stemSelected ? "ganji-clickable-selected" : ""}`}
+                          className={`ganji-clickable font-black leading-none bg-transparent border-0 p-0 ${highlightToneClass(stemTone)}`}
                           style={{ color: sc.text, fontSize: charSize, textShadow: `0 0 10px ${sc.text}88` }}
-                          onClick={() => toggleHighlight({ kind: "stem", source: "pillar", pillar: key, element: pillar.stem.element })}
-                          title="천간 클릭: 같은 오행 지장간 강조"
+                          onClick={() =>
+                            toggleHighlight({
+                              kind: "stem",
+                              source: "pillar",
+                              pillar: key,
+                              element: pillar.stem.element,
+                              label: STEM_META[pillar.stem.hanja]?.ko ?? pillar.stem.ko,
+                            })
+                          }
+                          title="천간 클릭: 뿌리 표시"
                         >
                           {pillar.stem.hanja}
                         </button>
@@ -651,15 +845,22 @@ export default function SajuResult({ result }: { result: SajuResult }) {
                       </div>
                     </div>
 
-                    {/* ── 지지(地支) ── */}
                     <div className={`flex flex-col items-center w-full ${isMobile ? "py-1 gap-0.5" : "gap-0.5 py-1.5"}`}>
                       {exploreMode ? (
                         <button
                           type="button"
-                          className={`ganji-clickable font-black leading-none bg-transparent border-0 p-0 ${branchSelected ? "ganji-clickable-selected" : ""}`}
+                          className={`ganji-clickable font-black leading-none bg-transparent border-0 p-0 ${highlightToneClass(branchTone)}`}
                           style={{ color: bc.text, fontSize: charSize, textShadow: `0 0 10px ${bc.text}88` }}
-                          onClick={() => toggleHighlight({ kind: "branch-stem-match", scope: "pillar", pillar: key })}
-                          title="지지 클릭: 해당 지지의 지장간 강조"
+                          onClick={() =>
+                            toggleHighlight({
+                              kind: "branch-stem-match",
+                              scope: "pillar",
+                              pillar: key,
+                              label: BRANCH_META[pillar.branch.hanja]?.ko ?? pillar.branch.ko,
+                              element: pillar.branch.element,
+                            })
+                          }
+                          title="지지 클릭: 투출 표시"
                         >
                           {pillar.branch.hanja}
                         </button>
@@ -681,46 +882,174 @@ export default function SajuResult({ result }: { result: SajuResult }) {
                       )}
                     </div>
 
-                    {/* ── 선택된 대운 지지 ── */}
-                    {selectedDaeun && daeunBc && (
-                      <div
-                        ref={(el) => { daeunBranchSlotRefs.current[i] = el; }}
-                        className={`flex flex-col items-center w-full ${isMobile ? "pt-0.5 pb-0" : "pt-0.5 pb-1"}`}
-                        style={{ borderTop: "1px dotted var(--px-border)" }}
-                      >
-                        <div key={`branch-${pumpGeneration}`} style={{ visibility: branchArrived ? "visible" : "hidden" }}>
-                          <DaeunCharBox
-                            char={selectedDaeun.ganji[1]}
-                            tenGod={daeunBranchTenGod ?? ""}
-                            style={daeunBc}
-                            showBorder={branchArrived}
-                            charSize={charSize}
-                            labelSize={labelSize}
-                            selected={daeunBranchSelected}
-                            pumping={branchPumping}
-                            onClick={() => toggleHighlight({ kind: "branch-stem-match", scope: "daeun", pillar: key })}
-                          />
-                        </div>
-                      </div>
-                    )}
-
-                    {/* ── 지장간 ── */}
-                    {exploreMode &&
-                    (hiddenStemItem?.hiddenStems?.length || (selectedDaeun && daeunBranchHiddenStems.length)) ? (
+                    {hiddenStemItem?.hiddenStems?.length ? (
                       <HiddenStemPanel
-                        pillarStems={hiddenStemItem?.hiddenStems ?? []}
-                        daeunStems={selectedDaeun ? daeunBranchHiddenStems : undefined}
+                        pillarStems={hiddenStemItem.hiddenStems}
                         highlightSelection={highlightSelection}
-                        stemElements={stemElements}
+                        touchoElements={touchoElements}
                         pillarKey={key}
-                        split={!!selectedDaeun}
                         isMobile={isMobile}
                       />
                     ) : null}
                   </div>
                 );
               })}
+
+              {/* 기본 모드: 선택한 대운을 년주 오른쪽에 표시 (만세력 기둥과 동일 크기) */}
+              {sideDaeun && selectedDaeun && daeunSc && daeunBc && (
+                <div
+                  className={`flex flex-col items-center gap-0 w-full min-w-0 ${isMobile ? "p-1" : "p-2"}`}
+                  style={{
+                    background: "color-mix(in srgb, #fbbf24 10%, var(--px-bg2))",
+                    border: "2px solid #fbbf24",
+                    boxShadow: "3px 3px 0 #4a3a00",
+                  }}
+                >
+                  <div className="text-center pb-1 w-full" style={{ borderBottom: "1px solid var(--px-border)" }}>
+                    <p className="font-black leading-tight whitespace-nowrap" style={{ color: "#fbbf24", fontSize: labelSize }}>
+                      대운
+                    </p>
+                    {!isMobile && (
+                      <p style={{ color: "var(--px-text2)", fontSize: "10px" }}>大運</p>
+                    )}
+                  </div>
+                  <div
+                    className={`flex flex-col items-center w-full ${isMobile ? "py-1 gap-0.5" : "gap-0.5 py-1.5"}`}
+                    style={{ borderBottom: "1px dashed var(--px-border)" }}
+                  >
+                    <span
+                      className="font-black leading-none"
+                      style={{ color: daeunSc.text, fontSize: charSize, textShadow: `0 0 10px ${daeunSc.text}88` }}
+                    >
+                      {selectedDaeun.ganji[0]}
+                    </span>
+                    <div className="flex items-center gap-1 mt-0.5">
+                      <span
+                        className="font-bold border leading-none"
+                        style={{
+                          color: daeunSc.text,
+                          borderColor: daeunSc.border,
+                          background: daeunSc.bg,
+                          fontSize: labelSize,
+                          padding: isMobile ? "1px 3px" : undefined,
+                        }}
+                      >
+                        {daeunStemTenGod}
+                      </span>
+                    </div>
+                  </div>
+                  <div className={`flex flex-col items-center w-full ${isMobile ? "py-1 gap-0.5" : "gap-0.5 py-1.5"}`}>
+                    <span
+                      className="font-black leading-none"
+                      style={{ color: daeunBc.text, fontSize: charSize, textShadow: `0 0 10px ${daeunBc.text}88` }}
+                    >
+                      {selectedDaeun.ganji[1]}
+                    </span>
+                    {daeunBranchTenGod && (
+                      <div className="flex items-center gap-1 mt-0.5">
+                        <span
+                          className="font-bold border leading-none"
+                          style={{
+                            color: daeunBc.text,
+                            borderColor: daeunBc.border,
+                            background: daeunBc.bg,
+                            fontSize: labelSize,
+                            padding: isMobile ? "1px 3px" : undefined,
+                          }}
+                        >
+                          {daeunBranchTenGod}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                  {daeunBranchHiddenStems.length > 0 && (
+                    <HiddenStemPanel
+                      pillarStems={daeunBranchHiddenStems}
+                      highlightSelection={null}
+                      touchoElements={touchoElements}
+                      pillarKey="year"
+                      isMobile={isMobile}
+                    />
+                  )}
+                </div>
+              )}
             </div>
+
+            {/* 연구 모드: 대운 지지 — 4글자 한 박스 강조 */}
+            {overlayDaeun && selectedDaeun && daeunBc && (
+              <div
+                className={`${colClass} mt-1.5 px-0.5 py-0.5`}
+                style={daeunGroupHighlightStyle(daeunBranchGroupTone)}
+              >
+                {DISPLAY_ORDER.map((key, i) => {
+                  const branchArrived =
+                    !selectedDaeun || arrivedSlots.has(`branch-${i}`) || (isMobile && !!selectedDaeun);
+                  const branchPumping = pumpingSlots.has(`branch-${i}`);
+                  return (
+                    <div
+                      key={`daeun-branch-${key}`}
+                      ref={(el) => {
+                        daeunBranchSlotRefs.current[i] = el;
+                      }}
+                      className="flex flex-col items-center justify-center min-w-0"
+                    >
+                      <div
+                        key={`branch-${pumpGeneration}`}
+                        style={{ visibility: branchArrived ? "visible" : "hidden" }}
+                      >
+                        <DaeunCharBox
+                          char={selectedDaeun.ganji[1]}
+                          tenGod={daeunBranchTenGod ?? ""}
+                          style={daeunBc}
+                          showBorder={false}
+                          charSize={charSize}
+                          labelSize={labelSize}
+                          tone={null}
+                          pumping={branchPumping}
+                          onClick={() =>
+                            toggleHighlight({
+                              kind: "branch-stem-match",
+                              scope: "daeun",
+                              pillar: key,
+                              label: BRANCH_META[selectedDaeun.ganji[1]]?.ko ?? selectedDaeun.ganji[1],
+                              element: BRANCH_META[selectedDaeun.ganji[1]]?.element ?? "earth",
+                            })
+                          }
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+                {sideDaeun ? <div /> : null}
+              </div>
+            )}
+
+            {/* 연구 모드: 대운 지장간 (가운데 한 칸) */}
+            {overlayDaeun && daeunBranchHiddenStems.length > 0 && (
+              <div className={`flex justify-center ${isMobile ? "mt-1" : "mt-1.5"}`}>
+                <div
+                  className={`w-full ${isMobile ? "max-w-[46%]" : "max-w-[28%]"}`}
+                  style={{
+                    background: "color-mix(in srgb, #fbbf24 10%, var(--px-bg2))",
+                    border: "2px solid #fbbf24",
+                    boxShadow: "3px 3px 0 #4a3a00",
+                    padding: isMobile ? "1px 2px" : "2px 3px",
+                  }}
+                >
+                  <HiddenStemPanel
+                    pillarStems={daeunBranchHiddenStems}
+                    highlightSelection={highlightSelection}
+                    touchoElements={touchoElements}
+                    pillarKey="day"
+                    context="daeun"
+                    isMobile={isMobile}
+                    showTitle={false}
+                    largeChips
+                  />
+                </div>
+              </div>
+            )}
+          </>
           );
         })()}
 
@@ -730,14 +1059,9 @@ export default function SajuResult({ result }: { result: SajuResult }) {
           id="saju-daeun-section"
           style={{ background: "var(--px-bg3)", border: "2px solid var(--px-border)", boxShadow: "3px 3px 0 #000", overflowAnchor: "none" }}
         >
-          <p className={`ui-guide px-3 pt-2 ${isMobile ? "px-2" : ""}`}>
-            {exploreMode
-              ? "대운 카드를 터치하면 그 시기 기운이 사주에 겹쳐지고, 아래 오행 막대가 바뀝니다."
-              : "10년 단위 운 흐름입니다. 탐험 모드에서 카드를 눌러 사주에 겹쳐볼 수 있어요."}
-          </p>
           <div className={`grid ${isMobile ? "grid-cols-5 gap-1 p-2" : "grid-cols-10 gap-1 p-2"}`}>
               {daeun.cycles.map((cycle) => {
-                const isSelected = exploreMode && selectedDaeunOrder === cycle.order;
+                const isSelected = selectedDaeunOrder === cycle.order;
                 const daeunCharSize = isMobile ? "16px" : "22px";
                 const daeunLabelSize = isMobile ? "9px" : "11px";
                 const daeunAgeSize = isMobile ? "9px" : "10px";
@@ -763,52 +1087,44 @@ export default function SajuResult({ result }: { result: SajuResult }) {
                 return (
                   <div
                     key={cycle.order}
-                    role={exploreMode ? "button" : undefined}
-                    tabIndex={exploreMode ? 0 : undefined}
-                    onMouseDown={exploreMode ? (e) => e.preventDefault() : undefined}
-                    onClick={
-                      exploreMode
-                        ? (e) => {
-                            handleDaeunClick(
-                              cycle.order,
-                              isSelected,
-                              isMobile ? null : e.currentTarget,
-                              cycle.ganji[0],
-                              sc.text,
-                              stemEl ?? "water",
-                              cycle.ganji[1],
-                              bc.text,
-                              branchEl ?? "water",
-                            );
-                          }
-                        : undefined
-                    }
-                    onKeyDown={
-                      exploreMode
-                        ? (e) => {
-                            if (e.key === "Enter" || e.key === " ") {
-                              e.preventDefault();
-                              handleDaeunClick(
-                                cycle.order,
-                                isSelected,
-                                isMobile ? null : e.currentTarget,
-                                cycle.ganji[0],
-                                sc.text,
-                                stemEl ?? "water",
-                                cycle.ganji[1],
-                                bc.text,
-                                branchEl ?? "water",
-                              );
-                            }
-                          }
-                        : undefined
-                    }
-                    className={`${exploreMode ? "daeun-card" : ""} flex flex-col items-center w-full ${isSelected ? "daeun-card-selected" : ""} ${isMobile ? "gap-0.5 px-1 py-1" : "gap-0.5 px-1 py-1"}`}
+                    role="button"
+                    tabIndex={0}
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={(e) => {
+                      handleDaeunClick(
+                        cycle.order,
+                        isSelected,
+                        isMobile ? null : e.currentTarget,
+                        cycle.ganji[0],
+                        sc.text,
+                        stemEl ?? "water",
+                        cycle.ganji[1],
+                        bc.text,
+                        branchEl ?? "water",
+                      );
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        handleDaeunClick(
+                          cycle.order,
+                          isSelected,
+                          isMobile ? null : e.currentTarget,
+                          cycle.ganji[0],
+                          sc.text,
+                          stemEl ?? "water",
+                          cycle.ganji[1],
+                          bc.text,
+                          branchEl ?? "water",
+                        );
+                      }
+                    }}
+                    className={`daeun-card flex flex-col items-center w-full ${isSelected ? "daeun-card-selected" : ""} ${isMobile ? "gap-0.5 px-1 py-1" : "gap-0.5 px-1 py-1"}`}
                     style={{
                       background: "var(--px-bg2)",
                       border: isSelected ? "2px solid #fbbf24" : "1px solid var(--px-border)",
                       boxShadow: isSelected ? "2px 2px 0 #4a3a00, 0 0 10px #fbbf2444" : "1px 1px 0 #000",
-                      cursor: exploreMode ? "pointer" : "default",
+                      cursor: "pointer",
                     }}
                   >
                     {stemTenGod ? (
@@ -1072,16 +1388,16 @@ export default function SajuResult({ result }: { result: SajuResult }) {
       <CoachmarkOverlay
         steps={[
           {
-            title: "대운 카드를 눌러보세요",
-            body: "10년 단위 운 카드를 터치하면 그 시기의 기운이 위 사주에 겹쳐집니다.",
+            title: "대운 선택",
+            body: "대운을 누르면 사주에 겹쳐집니다.",
           },
           {
-            title: "천간·지지를 눌러보세요",
-            body: "글자를 터치하면 지장간(지지 속 숨은 오행)이 강조됩니다.",
+            title: "글자 클릭",
+            body: "천간·지지를 누르면 지장간이 강조됩니다.",
           },
           {
-            title: "오행 막대를 확인하세요",
-            body: "대운을 선택하면 아래 오행 분포 막대가 함께 바뀝니다.",
+            title: "오행 막대",
+            body: "대운에 맞춰 오행 비중이 바뀝니다.",
           },
         ]}
         onComplete={completeExploreGuide}
@@ -1149,7 +1465,7 @@ function DaeunCharBox({
   showBorder,
   charSize,
   labelSize,
-  selected = false,
+  tone = null,
   pumping = false,
   onClick,
 }: {
@@ -1159,19 +1475,27 @@ function DaeunCharBox({
   showBorder: boolean;
   charSize: string;
   labelSize: string;
-  selected?: boolean;
+  tone?: HighlightTone;
   pumping?: boolean;
   onClick?: () => void;
 }) {
   return (
     <button
       type="button"
-      className={`inline-flex flex-col items-center ganji-clickable bg-transparent border-0 ${selected ? "ganji-clickable-selected" : ""} ${pumping ? "daeun-slot-pump" : ""} ${charSize === "24px" ? "px-1 py-0.5" : "px-1.5 py-0.5"}`}
+      className={`inline-flex flex-col items-center ganji-clickable bg-transparent border-0 ${highlightToneClass(tone)} ${pumping ? "daeun-slot-pump" : ""} ${charSize === "28px" ? "px-1 py-0.5" : "px-1.5 py-0.5"}`}
       onClick={onClick}
       style={{
-        border: showBorder ? `2px solid ${style.border}` : "2px solid transparent",
-        background: showBorder ? style.bg : "transparent",
-        boxShadow: showBorder ? `0 0 12px ${style.text}44, inset 0 0 6px ${style.text}11` : "none",
+        border: tone
+          ? "2px solid transparent"
+          : showBorder
+            ? `2px solid ${style.border}`
+            : "2px solid transparent",
+        background: tone ? undefined : showBorder ? style.bg : "transparent",
+        boxShadow: tone
+          ? undefined
+          : showBorder
+            ? `0 0 12px ${style.text}44, inset 0 0 6px ${style.text}11`
+            : "none",
         transition: "border-color 0.25s ease, box-shadow 0.25s ease, background 0.25s ease",
       }}
     >
@@ -1393,63 +1717,60 @@ function HiddenStemLine({
 
 function HiddenStemPanel({
   pillarStems,
-  daeunStems,
   highlightSelection,
-  stemElements,
+  touchoElements,
   pillarKey,
-  split,
+  context = "pillar",
   isMobile,
+  title = "지장간",
+  showTitle = false,
+  largeChips = false,
 }: {
   pillarStems: HiddenStemWithTenGod[];
-  daeunStems?: HiddenStemWithTenGod[];
   highlightSelection: HighlightSelection;
-  stemElements: Set<Element>;
+  touchoElements: Set<Element>;
   pillarKey: PillarKey;
-  split: boolean;
+  context?: "pillar" | "daeun";
   isMobile: boolean;
+  title?: string;
+  showTitle?: boolean;
+  largeChips?: boolean;
 }) {
-  const chipSize = isMobile ? "10px" : "11px";
-  const chipRowMinHeight = isMobile ? "18px" : "20px";
+  const chipSize = largeChips
+    ? isMobile
+      ? "14px"
+      : "16px"
+    : isMobile
+      ? "10px"
+      : "11px";
 
   return (
     <div
-      className="flex flex-col w-full pt-0.5 gap-0.5"
-      style={{ borderTop: "1px solid var(--px-border)" }}
+      className={`flex flex-col w-full ${showTitle ? "gap-0.5 pt-0.5" : ""}`}
+      style={{
+        borderTop: showTitle ? "1px solid var(--px-border)" : "none",
+      }}
     >
-      <p className="text-center font-bold" style={{ fontSize: isMobile ? "8px" : "9px", color: "var(--px-text2)" }}>
-        지장간
-      </p>
+      {showTitle && (
+        <p
+          className="text-center font-bold"
+          style={{ fontSize: isMobile ? "8px" : "9px", color: "var(--px-text2)" }}
+        >
+          {title}
+        </p>
+      )}
       <div
-        className={`flex flex-wrap justify-center w-full ${isMobile ? "gap-0.5 px-0 py-0.5" : "gap-0.5 px-0.5 py-0.5"}`}
-        style={{ minHeight: chipRowMinHeight }}
+        className={`flex flex-wrap justify-center items-center w-full ${isMobile ? "gap-0.5 px-0 py-0" : "gap-0.5 px-0 py-0"}`}
       >
         {pillarStems.map((hs) => (
           <HiddenStemChip
-            key={`p-${hs.role}-${hs.stem}`}
+            key={`${context}-${hs.role}-${hs.stem}`}
             hiddenStem={hs}
-            highlighted={isHiddenStemHighlighted(highlightSelection, "pillar", pillarKey, hs, stemElements)}
+            highlighted={isHiddenStemHighlighted(highlightSelection, context, pillarKey, hs, touchoElements)}
             fontSize={chipSize}
           />
         ))}
       </div>
-      {split && daeunStems ? (
-        <div
-          className={`flex flex-wrap justify-center w-full ${isMobile ? "gap-0.5 px-0 py-0.5" : "gap-0.5 px-0.5 py-0.5"}`}
-          style={{
-            borderTop: "1px dashed var(--px-border)",
-            minHeight: chipRowMinHeight,
-          }}
-        >
-          {daeunStems.map((hs) => (
-            <HiddenStemChip
-              key={`d-${hs.role}-${hs.stem}`}
-              hiddenStem={hs}
-              highlighted={isHiddenStemHighlighted(highlightSelection, "daeun", pillarKey, hs, stemElements)}
-              fontSize={chipSize}
-            />
-          ))}
-        </div>
-      ) : null}
     </div>
   );
 }
@@ -1465,6 +1786,7 @@ function HiddenStemChip({
 }) {
   const color = ELEM[hiddenStem.element].text;
   const isMatch = highlighted;
+  const purple = "#c084fc";
 
   return (
     <span
@@ -1472,13 +1794,13 @@ function HiddenStemChip({
       title={`${hiddenStem.roleKo}: ${hiddenStem.stem} (${ELEM_KO[hiddenStem.element]})`}
       style={{
         fontSize,
-        minWidth: "1.6em",
-        minHeight: "1.6em",
-        padding: "2px 3px",
+        minWidth: "1.4em",
+        minHeight: "1.4em",
+        padding: "1px 2px",
         color,
-        border: `2px solid ${isMatch ? color : ELEM[hiddenStem.element].border}`,
-        background: isMatch ? `${color}33` : ELEM[hiddenStem.element].bg,
-        boxShadow: isMatch ? `0 0 8px ${color}88, inset 0 0 4px ${color}22` : "none",
+        border: `2px solid ${isMatch ? purple : ELEM[hiddenStem.element].border}`,
+        background: isMatch ? `${purple}33` : ELEM[hiddenStem.element].bg,
+        boxShadow: isMatch ? `0 0 8px ${purple}88, inset 0 0 4px ${purple}22` : "none",
       }}
     >
       {hiddenStem.stem}

@@ -4,9 +4,29 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const NAV_ITEMS = [
-  { href: "/diary", label: "일기", icon: "記", isActive: (path: string) => path === "/diary" || path.startsWith("/diary/") },
-  { href: "/saju", label: "내 사주", icon: "命", isActive: (path: string) => path.startsWith("/saju") },
-  { href: "/admin", label: "학습", icon: "學", isActive: (path: string) => path.startsWith("/admin") },
+  {
+    href: "/saju",
+    label: "내 사주",
+    icon: "命",
+    main: false,
+    isActive: (path: string) => path.startsWith("/saju"),
+  },
+  {
+    href: "/diary",
+    label: "일기",
+    icon: "記",
+    main: true,
+    isActive: (path: string) =>
+      path === "/diary" || path === "/diary/history" || path === "/diary/login",
+  },
+  {
+    href: "/diary/stats",
+    label: "통계",
+    icon: "統",
+    main: false,
+    isActive: (path: string) =>
+      path.startsWith("/diary/stats") || path.startsWith("/diary/collection"),
+  },
 ] as const;
 
 export default function AppNav() {
@@ -14,32 +34,46 @@ export default function AppNav() {
 
   return (
     <nav
-      className="border-t-2"
-      style={{ borderColor: "var(--px-border)", background: "var(--px-bg3)" }}
+      className="app-bottom-nav shrink-0 border-t-2 z-50"
+      style={{
+        borderColor: "var(--px-border2)",
+        background: "var(--px-bg2)",
+        boxShadow: "0 -4px 0 #000",
+        paddingBottom: "env(safe-area-inset-bottom, 0px)",
+      }}
       aria-label="메인 메뉴"
     >
-      <div className="flex">
+      <div className="flex items-stretch">
         {NAV_ITEMS.map((item) => {
           const active = item.isActive(pathname);
           return (
             <Link
               key={item.href}
               href={item.href}
-              className="flex-1 flex flex-col items-center justify-center gap-0.5 py-2 sm:py-2.5 border-r last:border-r-0 transition-colors"
+              className={`flex-1 flex flex-col items-center justify-center gap-0.5 border-r last:border-r-0 transition-colors ${
+                item.main ? "py-3 -mt-1" : "py-2.5"
+              }`}
               style={{
                 borderColor: "var(--px-border)",
-                background: active ? "var(--px-bg2)" : "transparent",
-                color: active ? "var(--px-accent)" : "var(--px-text2)",
-                boxShadow: active ? "inset 0 -3px 0 var(--px-accent)" : "none",
+                background: active ? "var(--px-bg3)" : item.main ? "var(--px-bg3)" : "transparent",
+                color: active || item.main ? "var(--px-accent)" : "var(--px-text2)",
+                boxShadow: active
+                  ? "inset 0 3px 0 var(--px-accent)"
+                  : item.main
+                    ? "inset 0 2px 0 var(--px-border2)"
+                    : "none",
               }}
+              aria-current={active ? "page" : undefined}
             >
               <span
-                className="text-sm font-black leading-none pixel-font"
-                style={{ fontSize: "11px" }}
+                className="font-black leading-none pixel-font"
+                style={{ fontSize: item.main ? "13px" : "11px" }}
               >
                 {item.icon}
               </span>
-              <span className="text-xs font-bold">{item.label}</span>
+              <span className={`font-bold ${item.main ? "text-sm" : "text-xs"}`}>
+                {item.label}
+              </span>
             </Link>
           );
         })}

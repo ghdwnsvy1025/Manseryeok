@@ -97,7 +97,6 @@ type Props = {
   pillarVisibility: PillarVisibility;
   /** true면 세운·월운·일운(년·월·일) 3기둥 표시 */
   compact?: boolean;
-  dateDisplay?: { full: string; short: string; weekday: string } | null;
 };
 
 function buildColumns(
@@ -107,14 +106,15 @@ function buildColumns(
   compact: boolean
 ): BoardColumn[] {
   if (compact) {
+    // 왼쪽부터 일 · 월 · 년
     const columns: BoardColumn[] = [];
-    if (diaryPillars.yearPillar) {
+    if (diaryPillars.dayPillar) {
       columns.push({
-        id: "fortune-year",
+        id: "fortune-day",
         group: "diary",
         pillar: {
-          ...toDisplayFromDiary("년주", diaryPillars.yearPillar),
-          displayLabel: "년",
+          ...toDisplayFromDiary("일주", diaryPillars.dayPillar),
+          displayLabel: "일",
         },
         visible: true,
       });
@@ -130,13 +130,13 @@ function buildColumns(
         visible: true,
       });
     }
-    if (diaryPillars.dayPillar) {
+    if (diaryPillars.yearPillar) {
       columns.push({
-        id: "fortune-day",
+        id: "fortune-year",
         group: "diary",
         pillar: {
-          ...toDisplayFromDiary("일주", diaryPillars.dayPillar),
-          displayLabel: "일",
+          ...toDisplayFromDiary("년주", diaryPillars.yearPillar),
+          displayLabel: "년",
         },
         visible: true,
       });
@@ -146,12 +146,50 @@ function buildColumns(
 
   const columns: BoardColumn[] = [];
 
+  // 왼쪽부터: 일운 → 월운 → 세운 → 시주 → 일주 → 월주 → 년주
+  if (diaryPillars.dayPillar) {
+    columns.push({
+      id: "diary-day",
+      group: "diary",
+      pillar: {
+        ...toDisplayFromDiary("일주", diaryPillars.dayPillar),
+        displayLabel: "일운",
+      },
+      visible: pillarVisibility.diary.day,
+    });
+  }
+  if (diaryPillars.monthPillar) {
+    columns.push({
+      id: "diary-month",
+      group: "diary",
+      pillar: {
+        ...toDisplayFromDiary("월주", diaryPillars.monthPillar),
+        displayLabel: "월운",
+      },
+      visible: pillarVisibility.diary.month,
+    });
+  }
+  if (diaryPillars.yearPillar) {
+    columns.push({
+      id: "diary-year",
+      group: "diary",
+      pillar: {
+        ...toDisplayFromDiary("년주", diaryPillars.yearPillar),
+        displayLabel: "세운",
+      },
+      visible: pillarVisibility.diary.year,
+    });
+  }
+
   if (birthPillars) {
     if (birthPillars.hour) {
       columns.push({
         id: "birth-hour",
         group: "birth",
-        pillar: toDisplayFromBirth("시주", birthPillars.hour),
+        pillar: {
+          ...toDisplayFromBirth("시주", birthPillars.hour),
+          displayLabel: "시주",
+        },
         visible: pillarVisibility.birth.hour,
       });
     }
@@ -159,47 +197,31 @@ function buildColumns(
       {
         id: "birth-day",
         group: "birth",
-        pillar: toDisplayFromBirth("일주", birthPillars.day),
+        pillar: {
+          ...toDisplayFromBirth("일주", birthPillars.day),
+          displayLabel: "일주",
+        },
         visible: pillarVisibility.birth.day,
       },
       {
         id: "birth-month",
         group: "birth",
-        pillar: toDisplayFromBirth("월주", birthPillars.month),
+        pillar: {
+          ...toDisplayFromBirth("월주", birthPillars.month),
+          displayLabel: "월주",
+        },
         visible: pillarVisibility.birth.month,
       },
       {
         id: "birth-year",
         group: "birth",
-        pillar: toDisplayFromBirth("년주", birthPillars.year),
+        pillar: {
+          ...toDisplayFromBirth("년주", birthPillars.year),
+          displayLabel: "년주",
+        },
         visible: pillarVisibility.birth.year,
       }
     );
-  }
-
-  if (diaryPillars.yearPillar) {
-    columns.push({
-      id: "diary-year",
-      group: "diary",
-      pillar: toDisplayFromDiary("년주", diaryPillars.yearPillar),
-      visible: pillarVisibility.diary.year,
-    });
-  }
-  if (diaryPillars.monthPillar) {
-    columns.push({
-      id: "diary-month",
-      group: "diary",
-      pillar: toDisplayFromDiary("월주", diaryPillars.monthPillar),
-      visible: pillarVisibility.diary.month,
-    });
-  }
-  if (diaryPillars.dayPillar) {
-    columns.push({
-      id: "diary-day",
-      group: "diary",
-      pillar: toDisplayFromDiary("일주", diaryPillars.dayPillar),
-      visible: pillarVisibility.diary.day,
-    });
   }
 
   return columns;
@@ -210,27 +232,34 @@ function PillarColumn({
   totalColumns,
   group,
   compact = false,
+  emphasized = false,
 }: {
   pillar: PillarDisplay;
   totalColumns: number;
   group: "birth" | "diary";
   compact?: boolean;
+  /** compact 일주는 파란색 테두리로 강조 */
+  emphasized?: boolean;
 }) {
   const stemColor = getStemColor(pillar.stemHanja);
   const branchColor = getBranchColor(pillar.branchHanja);
   const hanjaSize = getSizeStyles(totalColumns, compact);
-  const borderColor = GROUP_BORDER[group];
+  const borderColor = emphasized ? "#60a5fa" : GROUP_BORDER[group];
   const labelColor = GROUP_LABEL_COLOR[group];
-  const labelSize = compact ? "14px" : "11px";
+  const labelSize = compact ? "14px" : "12px";
   const ganjiSize = compact ? "13px" : "10px";
 
   return (
     <div
       className="manseryeok-pillar-inner flex flex-col items-center border-2 w-full"
       style={{
-        background: "var(--px-bg2)",
+        background: emphasized
+          ? "color-mix(in srgb, #60a5fa 12%, var(--px-bg2))"
+          : "var(--px-bg2)",
         borderColor,
-        boxShadow: `2px 2px 0 ${group === "birth" ? "#4a3a00" : "#1e3a5f"}`,
+        boxShadow: emphasized
+          ? "3px 3px 0 #1e3a5f"
+          : `2px 2px 0 ${group === "birth" ? "#4a3a00" : "#1e3a5f"}`,
         padding: 0,
       }}
       title={`${getLabelText(pillar)} ${pillar.ganjiKo}`}
@@ -265,7 +294,10 @@ function PillarColumn({
         className="w-full text-center border-t"
         style={{ borderColor: borderColor, padding: compact ? "6px 4px" : "4px 2px" }}
       >
-        <p className="font-black leading-tight" style={{ fontSize: labelSize, color: labelColor }}>
+        <p
+          className="font-black leading-tight whitespace-nowrap"
+          style={{ fontSize: labelSize, color: labelColor }}
+        >
           {getLabelText(pillar)}
         </p>
         <p className="font-bold leading-tight mt-0.5" style={{ fontSize: ganjiSize, color: "var(--px-text-on-panel)" }}>
@@ -287,6 +319,8 @@ function AnimatedPillarSlot({
   staggerIndex: number;
   compact?: boolean;
 }) {
+  const emphasized = compact && column.id === "fortune-day";
+
   return (
     <div
       className="manseryeok-pillar-slot"
@@ -298,6 +332,7 @@ function AnimatedPillarSlot({
         totalColumns={totalColumns}
         group={column.group}
         compact={compact}
+        emphasized={emphasized}
       />
     </div>
   );
@@ -308,7 +343,6 @@ export default function ManseryeokBoard({
   diaryPillars,
   pillarVisibility,
   compact = false,
-  dateDisplay,
 }: Props) {
   const columns = buildColumns(
     birthPillars,
@@ -343,32 +377,8 @@ export default function ManseryeokBoard({
 
   return (
     <div className="space-y-2">
-      {compact && dateDisplay && (
-        <div
-          className="text-center p-3 border-2"
-          style={{
-            borderColor: "#60a5fa",
-            background: "color-mix(in srgb, #60a5fa 10%, var(--px-bg2))",
-            boxShadow: "2px 2px 0 #1e3a5f",
-          }}
-        >
-          <p className="text-lg font-black leading-snug" style={{ color: "var(--px-text-on-panel)" }}>
-            {dateDisplay.full}
-          </p>
-          {diaryPillars.dayPillar && (
-            <p className="mt-1.5 leading-snug">
-              <span className="text-sm font-bold" style={{ color: "var(--px-text2)" }}>
-                오늘의 기운 ·{" "}
-              </span>
-              <span className="text-lg font-black" style={{ color: "#60a5fa" }}>
-                {diaryPillars.dayPillar.ganjiKo}일
-              </span>
-            </p>
-          )}
-        </div>
-      )}
       <div className="flex gap-1 items-stretch min-w-0">
-        {birthColumns.map((col) => {
+        {diaryColumns.map((col) => {
           const staggerIndex = col.visible ? staggerCounter++ : staggerCounter;
           return (
             <AnimatedPillarSlot
@@ -389,7 +399,7 @@ export default function ManseryeokBoard({
             |
           </div>
         )}
-        {diaryColumns.map((col) => {
+        {birthColumns.map((col) => {
           const staggerIndex = col.visible ? staggerCounter++ : staggerCounter;
           return (
             <AnimatedPillarSlot

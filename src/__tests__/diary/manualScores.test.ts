@@ -3,6 +3,7 @@ import { computeDailyWellbeing } from "@/lib/diary/dimensions";
 import {
   createManualScoreState,
   manualStateToAnalysis,
+  wellbeingToAnalysis,
   wellbeingToEmotionLabel,
 } from "@/lib/diary/manualScores";
 
@@ -11,6 +12,13 @@ describe("manual scores wellbeing", () => {
     const state = createManualScoreState();
     const analysis = manualStateToAnalysis(state);
     expect(analysis.daily_wellbeing_score).toBe(computeDailyWellbeing(analysis));
+  });
+
+  test("행복도만으로 분석 생성", () => {
+    const analysis = wellbeingToAnalysis(72, "positive");
+    expect(analysis.daily_wellbeing_score).toBe(72);
+    expect(analysis.emotion_label).toBe("positive");
+    expect(analysis.summary).toContain("72");
   });
 });
 

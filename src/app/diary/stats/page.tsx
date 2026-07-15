@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import FeatureCallout from "@/components/FeatureCallout";
+import CollectionNavButton from "@/components/diary/CollectionNavButton";
+import MissionSection from "@/components/diary/MissionSection";
 import FortuneTimeline from "@/components/diary/stats/FortuneTimeline";
 import GanjiRanking from "@/components/diary/stats/GanjiRanking";
 import MonthFortuneList from "@/components/diary/stats/MonthFortuneList";
@@ -126,141 +127,140 @@ export default function DiaryStatsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between gap-2">
+      {!loading && <MissionSection entries={entries} />}
+
+      {!loading && <CollectionNavButton entries={entries} />}
+
+      <section className="space-y-4" aria-label="통계">
         <h2 className="text-lg font-black" style={{ color: "var(--px-accent)" }}>
           ■ 간지별 행복도
         </h2>
-        <Link
-          href="/diary"
-          className="text-xs font-bold px-2 py-1 border"
-          style={{ borderColor: "var(--px-border)", color: "var(--px-text2)" }}
-        >
-          ← 일기 쓰기
-        </Link>
-      </div>
 
-      {loading && (
-        <p className="text-xs" style={{ color: "var(--px-text2)" }}>
-          불러오는 중...
-        </p>
-      )}
-
-      {!loading && entries.length === 0 && <StatsEmptyState />}
-
-      {!loading && entries.length > 0 && uniqueDays < STATS_INSIGHT_MIN_ENTRIES && (
-        <div
-          className="p-3 border-2 space-y-2"
-          style={{ background: "var(--px-bg2)", borderColor: "var(--px-accent)" }}
-        >
-          <p className="ui-section-title">
-            통계 미리보기 {uniqueDays}/{STATS_INSIGHT_MIN_ENTRIES}일
+        {loading && (
+          <p className="text-xs" style={{ color: "var(--px-text2)" }}>
+            불러오는 중...
           </p>
+        )}
+
+        {!loading && entries.length === 0 && <StatsEmptyState />}
+
+        {!loading && entries.length > 0 && uniqueDays < STATS_INSIGHT_MIN_ENTRIES && (
           <div
-            className="h-2 border overflow-hidden"
-            style={{ borderColor: "var(--px-border)", background: "var(--px-bg3)" }}
+            className="p-3 border-2 space-y-2"
+            style={{ background: "var(--px-bg2)", borderColor: "var(--px-accent)" }}
           >
-            <div
-              className="h-full"
-              style={{
-                width: `${Math.round((uniqueDays / STATS_INSIGHT_MIN_ENTRIES) * 100)}%`,
-                background: "var(--px-accent)",
-              }}
-            />
-          </div>
-          <p className="ui-guide">
-            아래에서 기록된 항목을 눌러볼 수 있어요. 인사이트 카드는 {STATS_INSIGHT_MIN_ENTRIES}일부터 열려요.
-          </p>
-        </div>
-      )}
-
-      {!loading && entries.length > 0 && (
-        <>
-          {showStatsGuide && (
-            <FeatureCallout
-              message="기록이 쌓일수록 타일 색이 진해져요. 2회 이상 기록된 항목을 눌러 세부 점수를 확인하세요."
-              onDismiss={dismissGuide}
-            />
-          )}
-
-          <StatsSummaryHeader
-            entries={entries}
-            uniqueDays={uniqueDays}
-            daysUntilInsight={daysUntilInsight}
-            recentWellbeing={recentWellbeing}
-            groupLabel={groupLabel}
-          />
-
-          <StatsFortuneTabs
-            fortuneTab={fortuneTab}
-            daySubTab={daySubTab}
-            onFortuneChange={handleFortuneChange}
-            onDaySubChange={handleDaySubChange}
-          />
-
-          <div
-            className="p-3 border-2 space-y-3"
-            style={{ background: "var(--px-bg2)", borderColor: "var(--px-border)" }}
-          >
-            {fortuneTab === "year" && (
-              <FortuneTimeline
-                groups={groups}
-                selectedKey={selectedKey}
-                onSelect={setSelectedKey}
-              />
-            )}
-
-            {fortuneTab === "month" && (
-              <MonthFortuneList
-                groups={groups}
-                selectedKey={selectedKey}
-                onSelect={setSelectedKey}
-              />
-            )}
-
-            {fortuneTab === "day" && daySubTab === "ganji" && (
-              <GanjiRanking
-                groups={groups}
-                insightCards={insightCards}
-                selectedKey={selectedKey}
-                onSelect={setSelectedKey}
-                uniqueDays={uniqueDays}
-              />
-            )}
-
-            {fortuneTab === "day" && daySubTab === "stem" && (
-              <StemBranchHeatmap
-                type="stem"
-                groups={groups}
-                selectedKey={selectedKey}
-                onSelect={setSelectedKey}
-              />
-            )}
-
-            {fortuneTab === "day" && daySubTab === "branch" && (
-              <StemBranchHeatmap
-                type="branch"
-                groups={groups}
-                selectedKey={selectedKey}
-                onSelect={setSelectedKey}
-              />
-            )}
-          </div>
-
-          {selectedStats && selectedStats.entryCount > 0 && selectedStats.entryCount >= 2 && (
-            <StatsDetailPanel
-              stats={selectedStats}
-              entries={selectedEntries}
-              overallAvg={overallAvg}
-            />
-          )}
-
-          {selectedStats && selectedStats.entryCount > 0 && selectedStats.entryCount < 2 && (
-            <p className="ui-guide text-center">
-              {selectedStats.label}은(는) 아직 {selectedStats.entryCount}회만 기록됐어요. 2회 이상 기록하면 패턴을 볼 수 있어요.
+            <p className="ui-section-title">
+              통계 미리보기 {uniqueDays}/{STATS_INSIGHT_MIN_ENTRIES}일
             </p>
-          )}
-        </>
-      )}
+            <div
+              className="h-2 border overflow-hidden"
+              style={{ borderColor: "var(--px-border)", background: "var(--px-bg3)" }}
+            >
+              <div
+                className="h-full"
+                style={{
+                  width: `${Math.round((uniqueDays / STATS_INSIGHT_MIN_ENTRIES) * 100)}%`,
+                  background: "var(--px-accent)",
+                }}
+              />
+            </div>
+            <p className="ui-guide">
+              아래에서 기록된 항목을 눌러볼 수 있어요. 인사이트 카드는 {STATS_INSIGHT_MIN_ENTRIES}일부터
+              열려요.
+            </p>
+          </div>
+        )}
+
+        {!loading && entries.length > 0 && (
+          <>
+            {showStatsGuide && (
+              <FeatureCallout
+                message="기록이 쌓일수록 타일 색이 진해져요. 2회 이상 기록된 항목을 눌러 세부 점수를 확인하세요."
+                onDismiss={dismissGuide}
+              />
+            )}
+
+            <StatsSummaryHeader
+              entries={entries}
+              uniqueDays={uniqueDays}
+              daysUntilInsight={daysUntilInsight}
+              recentWellbeing={recentWellbeing}
+              groupLabel={groupLabel}
+            />
+
+            <StatsFortuneTabs
+              fortuneTab={fortuneTab}
+              daySubTab={daySubTab}
+              onFortuneChange={handleFortuneChange}
+              onDaySubChange={handleDaySubChange}
+            />
+
+            <div
+              className="p-3 border-2 space-y-3"
+              style={{ background: "var(--px-bg2)", borderColor: "var(--px-border)" }}
+            >
+              {fortuneTab === "year" && (
+                <FortuneTimeline
+                  groups={groups}
+                  selectedKey={selectedKey}
+                  onSelect={setSelectedKey}
+                />
+              )}
+
+              {fortuneTab === "month" && (
+                <MonthFortuneList
+                  groups={groups}
+                  selectedKey={selectedKey}
+                  onSelect={setSelectedKey}
+                />
+              )}
+
+              {fortuneTab === "day" && daySubTab === "ganji" && (
+                <GanjiRanking
+                  groups={groups}
+                  insightCards={insightCards}
+                  selectedKey={selectedKey}
+                  onSelect={setSelectedKey}
+                  uniqueDays={uniqueDays}
+                />
+              )}
+
+              {fortuneTab === "day" && daySubTab === "stem" && (
+                <StemBranchHeatmap
+                  type="stem"
+                  groups={groups}
+                  selectedKey={selectedKey}
+                  onSelect={setSelectedKey}
+                />
+              )}
+
+              {fortuneTab === "day" && daySubTab === "branch" && (
+                <StemBranchHeatmap
+                  type="branch"
+                  groups={groups}
+                  selectedKey={selectedKey}
+                  onSelect={setSelectedKey}
+                />
+              )}
+            </div>
+
+            {selectedStats && selectedStats.entryCount > 0 && selectedStats.entryCount >= 2 && (
+              <StatsDetailPanel
+                stats={selectedStats}
+                entries={selectedEntries}
+                overallAvg={overallAvg}
+              />
+            )}
+
+            {selectedStats && selectedStats.entryCount > 0 && selectedStats.entryCount < 2 && (
+              <p className="ui-guide text-center">
+                {selectedStats.label}은(는) 아직 {selectedStats.entryCount}회만 기록됐어요. 2회 이상
+                기록하면 패턴을 볼 수 있어요.
+              </p>
+            )}
+          </>
+        )}
+      </section>
     </div>
   );
 }

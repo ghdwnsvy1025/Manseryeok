@@ -30,15 +30,19 @@ type Props = {
 };
 
 export default function PillarVisibilityToggle({ visible, onClick, popping }: Props) {
+  // 표시=하늘색, 숨김=회색 — 노란 accent와 구분해 잘 보이게
+  const active = "#60a5fa";
+  const inactive = "#6b7280";
+
   return (
     <button
       type="button"
       onClick={onClick}
       className={`pillar-visibility-btn flex items-center justify-center border w-[22px] h-[18px] ${popping ? "is-popping" : ""}`}
       style={{
-        borderColor: visible ? "var(--px-accent)" : "var(--px-text2)",
-        color: visible ? "var(--px-accent)" : "var(--px-text2)",
-        background: visible ? "var(--px-bg3)" : "var(--px-bg2)",
+        borderColor: visible ? active : inactive,
+        color: visible ? active : inactive,
+        background: visible ? "color-mix(in srgb, #60a5fa 18%, var(--px-bg2))" : "var(--px-bg2)",
       }}
       aria-label={visible ? "간지 숨기기" : "간지 표시하기"}
       aria-pressed={visible}

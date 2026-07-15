@@ -145,6 +145,40 @@ export function formatManualDiaryContent(state: ManualScoreState): string {
   return `오늘의 행복도: ${analysis.daily_wellbeing_score}점`;
 }
 
+/** 행복도(+선택 mood)만으로 분석 객체 생성 — 홈 단순 기록용 */
+export function wellbeingToAnalysis(
+  wellbeing: number,
+  emotionLabel?: EmotionLabel
+): DiaryAnalysis {
+  const w = clampScore(wellbeing);
+  const negative = 100 - w;
+  const analysis = manualStateToAnalysis({
+    details: {
+      depression_score: negative,
+      anxiety_score: negative,
+      stress_score: negative,
+      achievement_score: w,
+      meaning_score: w,
+      energy_score: w,
+      relationship_score: w,
+      gratitude_score: w,
+      self_acceptance_score: w,
+    },
+  });
+  return {
+    ...analysis,
+    happiness_score: w,
+    daily_wellbeing_score: w,
+    emotion_label: emotionLabel ?? wellbeingToEmotionLabel(w),
+    summary: `오늘의 행복도는 ${w}점이에요.`,
+  };
+}
+
+export function analysisToWellbeing(analysis: DiaryAnalysis | null | undefined): number {
+  if (!analysis) return DEFAULT_WELLBEING;
+  return clampScore(analysis.daily_wellbeing_score);
+}
+
 export function inferInputMode(entry: {
   inputMode?: DiaryInputMode;
   content: string;

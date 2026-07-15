@@ -3,9 +3,9 @@ import "./globals.css";
 import ClientShell from "@/components/ClientShell";
 
 export const metadata: Metadata = {
-  title: "사주 만세력 — 감정 일기 × 간지",
+  title: "사주 만세력 — 일진 기록 × 간지 통계",
   description:
-    "매일 기분을 기록하고 일주(日柱) 패턴을 발견하세요. 사주팔자 계산과 AI 분석도 제공합니다.",
+    "오늘의 일주를 기록하고 간지별 행복도 패턴을 발견하세요. 사주 만세력 계산도 제공합니다.",
 };
 
 export const viewport: Viewport = {

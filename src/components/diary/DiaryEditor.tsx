@@ -1,30 +1,27 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import AnalysisResult from "@/components/diary/AnalysisResult";
-import DiaryModeSelect from "@/components/diary/DiaryModeSelect";
+import CollectionPreviewCard from "@/components/diary/journey/CollectionPreviewCard";
 import DiaryValueIntro from "@/components/diary/journey/DiaryValueIntro";
 import SaveCelebrationModal from "@/components/diary/journey/SaveCelebrationModal";
 import Day7MilestoneModal from "@/components/diary/journey/Day7MilestoneModal";
 import TodayMiniReport from "@/components/diary/journey/TodayMiniReport";
-import ManualScoreInput from "@/components/diary/ManualScoreInput";
+import DiaryWriteSheet from "@/components/diary/DiaryWriteSheet";
+import MoodChips from "@/components/diary/MoodChips";
 import SajuDepthPicker from "@/components/diary/SajuDepthPicker";
+import ScoreSlider from "@/components/diary/ScoreSlider";
 import { createDiaryEntry } from "@/lib/diary/createEntry";
 import { getPillarsForDate, resolveDateString } from "@/lib/diary/dayPillar";
-import type { DiaryAnalysis } from "@/lib/diary/dimensions";
+import type { DiaryAnalysis, EmotionLabel } from "@/lib/diary/dimensions";
 import { getDiaryStorage } from "@/lib/diary/getStorage";
 import {
-  analysisToManualState,
-  createManualScoreState,
-  formatManualDiaryContent,
-  inferInputMode,
-  manualStateToAnalysis,
-  type DiaryInputMode,
-  type ManualScoreState,
+  analysisToWellbeing,
+  DEFAULT_WELLBEING,
+  wellbeingToAnalysis,
+  wellbeingToEmotionLabel,
 } from "@/lib/diary/manualScores";
 import {
-  hasSelectedDiaryMode,
   hasSeenDiaryValueProp,
   hasSeenDay7Milestone,
   markDiaryModeSelected,
@@ -32,8 +29,8 @@ import {
   markDay7MilestoneSeen,
   STATS_INSIGHT_MIN_ENTRIES,
 } from "@/lib/diary/onboarding";
-import { getCollectionSummary } from "@/lib/diary/collection";
-import { getNextSameGanjiDate } from "@/lib/diary/nextGanjiDay";
+import { getCollectedGanjiIndices, getCollectionSummary } from "@/lib/diary/collection";
+import { getNextSameGanjiDate, getNextUncollectedGanjiDate } from "@/lib/diary/nextGanjiDay";
 import { computeSaveCelebration, type SaveCelebration } from "@/lib/diary/saveCelebration";
 import { getUniqueEntryDays } from "@/lib/diary/stats";
 import {
@@ -49,8 +46,6 @@ import type { DiaryEntry, DiaryPillar } from "@/lib/diary/types";
 
 type Props = {
   initialDate?: string;
-  initialInputMode?: DiaryInputMode;
-  onChangeMode?: () => void;
 };
 
 const EMPTY_PILLAR: DiaryPillar = {
@@ -60,30 +55,25 @@ const EMPTY_PILLAR: DiaryPillar = {
   branch: { hanja: "?", ko: "?" },
 };
 
-export default function DiaryEditor({ initialDate, initialInputMode = "text", onChangeMode }: Props) {
-  const [date, setDate] = useState(() => resolveDateString(initialDate));
+function isDiaryBody(content: string): boolean {
+  return Boolean(content.trim()) && !/^오늘의 행복도:\s*\d+점/.test(content.trim());
+}
 
-  // 현재 날짜의 사주 기둥 정보
+export default function DiaryEditor({ initialDate }: Props) {
+  const [date, setDate] = useState(() => resolveDateString(initialDate));
   const [monthPillar, setMonthPillar] = useState<DiaryPillar>(EMPTY_PILLAR);
   const [yearPillar, setYearPillar] = useState<DiaryPillar>(EMPTY_PILLAR);
-
-  // 기록 모드 – ref로 최신값 추적해 날짜 이동 시 모드 유지
-  const [inputMode, setInputMode] = useState<DiaryInputMode>(initialInputMode);
-  const inputModeRef = useRef<DiaryInputMode>(initialInputMode);
-
   const [content, setContent] = useState("");
-  const [scoreState, setScoreState] = useState<ManualScoreState>(() => createManualScoreState());
+  const [wellbeing, setWellbeing] = useState(DEFAULT_WELLBEING);
+  const [mood, setMood] = useState<EmotionLabel | null>(null);
   const [entry, setEntry] = useState<DiaryEntry | null>(null);
   const [dayPillar, setDayPillar] = useState<DiaryEntry["dayPillar"] | null>(null);
-  const [dayPillarKo, setDayPillarKo] = useState<string>("");
-
-  // 사주 기록 범위 설정
+  const [dayPillarKo, setDayPillarKo] = useState("");
   const [sajuSettings, setSajuSettings] = useState<SajuSettings>(() => loadSajuSettings());
-
   const [status, setStatus] = useState<"idle" | "loading" | "saving" | "analyzing">("loading");
   const [message, setMessage] = useState("");
-  const [showModeSelect, setShowModeSelect] = useState(false);
   const [showValueIntro, setShowValueIntro] = useState(false);
+  const [showWriteSheet, setShowWriteSheet] = useState(false);
   const [totalEntryDays, setTotalEntryDays] = useState(0);
   const [allEntries, setAllEntries] = useState<DiaryEntry[]>([]);
   const [saveCelebration, setSaveCelebration] = useState<SaveCelebration | null>(null);
@@ -95,13 +85,7 @@ export default function DiaryEditor({ initialDate, initialInputMode = "text", on
   } | null>(null);
 
   useEffect(() => {
-    if (!hasSeenDiaryValueProp()) {
-      setShowValueIntro(true);
-      setShowModeSelect(false);
-    } else {
-      setShowValueIntro(false);
-      setShowModeSelect(!hasSelectedDiaryMode());
-    }
+    setShowValueIntro(!hasSeenDiaryValueProp());
   }, []);
 
   const refreshAllEntries = useCallback(async () => {
@@ -119,7 +103,6 @@ export default function DiaryEditor({ initialDate, initialInputMode = "text", on
     refreshAllEntries();
   }, [refreshAllEntries]);
 
-  // ── 날짜 로드 ────────────────────────────────────────────
   const loadEntry = useCallback(async (targetDate: string) => {
     setStatus("loading");
     setMessage("");
@@ -133,21 +116,15 @@ export default function DiaryEditor({ initialDate, initialInputMode = "text", on
       const storage = await getDiaryStorage();
       const existing = await storage.getByDate(targetDate);
       if (existing) {
-        const mode = inferInputMode(existing);
         setEntry(existing);
-        setInputMode(mode);
-        inputModeRef.current = mode;
-        setContent(existing.content);
-        setScoreState(
-          existing.analysis && mode === "scores"
-            ? analysisToManualState(existing.analysis)
-            : createManualScoreState()
-        );
+        setContent(isDiaryBody(existing.content) ? existing.content : "");
+        setWellbeing(analysisToWellbeing(existing.analysis));
+        setMood(existing.analysis?.emotion_label ?? null);
       } else {
         setEntry(null);
         setContent("");
-        setInputMode(inputModeRef.current);
-        setScoreState(createManualScoreState());
+        setWellbeing(DEFAULT_WELLBEING);
+        setMood(null);
       }
       setStatus("idle");
       setLastMiniReport(null);
@@ -161,24 +138,25 @@ export default function DiaryEditor({ initialDate, initialInputMode = "text", on
     loadEntry(date);
   }, [date, loadEntry]);
 
-  // ── 저장 페이로드 빌더 ────────────────────────────────────
   const buildPayload = (
     base: DiaryEntry,
     analysis: DiaryAnalysis | null,
-    mode: DiaryInputMode,
-    now: string
+    now: string,
+    entryContent: string
   ): DiaryEntry => {
-    const entryContent =
-      mode === "scores" ? formatManualDiaryContent(scoreState) : content.trim();
     const userBirthPillars = sajuSettings.birthDate
-      ? computeUserBirthPillars(sajuSettings.birthDate, sajuSettings.birthHour, sajuSettings.birthMinute) ?? undefined
+      ? computeUserBirthPillars(
+          sajuSettings.birthDate,
+          sajuSettings.birthHour,
+          sajuSettings.birthMinute
+        ) ?? undefined
       : undefined;
 
     return {
       ...base,
       content: entryContent,
       analysis,
-      inputMode: mode,
+      inputMode: "scores",
       sajuDepth: "full",
       monthPillarKo: monthPillar.ganjiKo,
       yearPillarKo: yearPillar.ganjiKo,
@@ -188,10 +166,9 @@ export default function DiaryEditor({ initialDate, initialInputMode = "text", on
     };
   };
 
-  // ── 저장 ──────────────────────────────────────────────────
   const handleSave = async () => {
-    if (inputMode === "text" && !content.trim()) {
-      setMessage("일기 내용을 입력해주세요.");
+    if (!mood) {
+      setMessage("기분을 선택해주세요.");
       return;
     }
     setStatus("saving");
@@ -201,9 +178,9 @@ export default function DiaryEditor({ initialDate, initialInputMode = "text", on
       const now = new Date().toISOString();
       const listBefore = await storage.list();
       const base = entry ?? createDiaryEntry(date, "");
-      const analysis =
-        inputMode === "scores" ? manualStateToAnalysis(scoreState) : entry?.analysis ?? null;
-      const updated = buildPayload(base, analysis, inputMode, now);
+      const analysis = wellbeingToAnalysis(wellbeing, mood);
+      const entryContent = content.trim() || `오늘의 행복도: ${analysis.daily_wellbeing_score}점`;
+      const updated = buildPayload(base, analysis, now, entryContent);
       await storage.save(updated);
       setEntry(updated);
 
@@ -225,18 +202,12 @@ export default function DiaryEditor({ initialDate, initialInputMode = "text", on
         markDay7MilestoneSeen();
       }
 
-      const wellbeing =
-        inputMode === "scores"
-          ? manualStateToAnalysis(scoreState).daily_wellbeing_score
-          : updated.analysis?.daily_wellbeing_score ?? null;
-
       setLastMiniReport({
         ganjiKo: dayPillarKo,
-        wellbeing,
-        analysis: updated.analysis,
+        wellbeing: analysis.daily_wellbeing_score,
+        analysis,
       });
-
-      setMessage(inputMode === "scores" ? "점수가 저장되었습니다." : "저장되었습니다.");
+      setMessage("저장되었습니다.");
       setStatus("idle");
     } catch (err) {
       setMessage(err instanceof Error ? err.message : "저장에 실패했습니다.");
@@ -244,7 +215,6 @@ export default function DiaryEditor({ initialDate, initialInputMode = "text", on
     }
   };
 
-  // ── AI 분석 ───────────────────────────────────────────────
   const handleAnalyze = async () => {
     if (!content.trim()) {
       setMessage("분석할 일기 내용을 입력해주세요.");
@@ -261,43 +231,39 @@ export default function DiaryEditor({ initialDate, initialInputMode = "text", on
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "분석에 실패했습니다.");
 
+      const analysis = data.analysis as DiaryAnalysis;
       const storage = await getDiaryStorage();
       const now = new Date().toISOString();
       const base = entry ?? createDiaryEntry(date, content.trim());
-      const updated = buildPayload(base, data.analysis as DiaryAnalysis, "text", now);
+      const updated = buildPayload(base, analysis, now, content.trim());
       await storage.save(updated);
       setEntry(updated);
+      setWellbeing(analysisToWellbeing(analysis));
+      setMood(analysis.emotion_label);
       await refreshAllEntries();
       setMessage("AI 분석이 완료되어 저장되었습니다.");
       setStatus("idle");
+      setShowWriteSheet(false);
     } catch (err) {
       setMessage(err instanceof Error ? err.message : "분석에 실패했습니다.");
       setStatus("idle");
     }
   };
 
-  // ── 삭제 ──────────────────────────────────────────────────
   const handleDelete = async () => {
-    if (!entry || !confirm("이 날짜의 일기를 삭제할까요?")) return;
+    if (!entry || !confirm("이 날짜의 기록을 삭제할까요?")) return;
     try {
       const storage = await getDiaryStorage();
       await storage.delete(entry.id);
       setEntry(null);
       setContent("");
-      setScoreState(createManualScoreState());
-      setInputMode(inputModeRef.current);
+      setWellbeing(DEFAULT_WELLBEING);
+      setMood(null);
       setMessage("삭제되었습니다.");
+      await refreshAllEntries();
     } catch (err) {
       setMessage(err instanceof Error ? err.message : "삭제에 실패했습니다.");
     }
-  };
-
-  const handleModeChange = (mode: DiaryInputMode) => {
-    setInputMode(mode);
-    inputModeRef.current = mode;
-    setMessage("");
-    markDiaryModeSelected();
-    setShowModeSelect(false);
   };
 
   const handleBirthDateChange = useCallback((birthDate: string) => {
@@ -359,35 +325,13 @@ export default function DiaryEditor({ initialDate, initialInputMode = "text", on
   }, []);
 
   const isBusy = status === "loading" || status === "saving" || status === "analyzing";
-  const displayAnalysis = inputMode === "text" ? entry?.analysis ?? null : null;
-
-  if (showValueIntro) {
-    return (
-      <DiaryValueIntro
-        onStart={() => {
-          markDiaryValuePropSeen();
-          setShowValueIntro(false);
-          setShowModeSelect(!hasSelectedDiaryMode());
-        }}
-      />
-    );
-  }
-
-  if (showModeSelect) {
-    return (
-      <DiaryModeSelect
-        onSelect={(mode) => {
-          handleModeChange(mode);
-        }}
-      />
-    );
-  }
-
   const collectionSummary = getCollectionSummary(allEntries);
   const dayPillarIndex = dayPillar?.ganjiIndex ?? 0;
-  const nextSame = dayPillar
-    ? getNextSameGanjiDate(date, dayPillarIndex)
-    : null;
+  const nextSame = dayPillar ? getNextSameGanjiDate(date, dayPillarIndex) : null;
+  const nextUncollected = useMemo(() => {
+    const collected = getCollectedGanjiIndices(allEntries);
+    return getNextUncollectedGanjiDate(date, collected);
+  }, [date, allEntries]);
 
   const yesterdayStr = (() => {
     const [y, m, d] = date.split("-").map(Number);
@@ -398,8 +342,30 @@ export default function DiaryEditor({ initialDate, initialInputMode = "text", on
   const yesterdayEntry = allEntries.find((e) => e.date === yesterdayStr);
   const yesterdayWellbeing = yesterdayEntry?.analysis?.daily_wellbeing_score ?? null;
 
+  if (showValueIntro) {
+    return (
+      <DiaryValueIntro
+        onStart={() => {
+          markDiaryValuePropSeen();
+          markDiaryModeSelected();
+          setShowValueIntro(false);
+        }}
+      />
+    );
+  }
+
   return (
     <div className="space-y-4">
+      <DiaryWriteSheet
+        open={showWriteSheet}
+        value={content}
+        onChange={setContent}
+        onClose={() => setShowWriteSheet(false)}
+        disabled={isBusy}
+        onAnalyze={handleAnalyze}
+        analyzing={status === "analyzing"}
+      />
+
       {saveCelebration && dayPillar && (
         <SaveCelebrationModal
           celebration={saveCelebration}
@@ -414,6 +380,7 @@ export default function DiaryEditor({ initialDate, initialInputMode = "text", on
           onClose={() => setShowDay7Modal(false)}
         />
       )}
+
       {totalEntryDays >= STATS_INSIGHT_MIN_ENTRIES && (
         <Link
           href="/diary/stats"
@@ -428,7 +395,7 @@ export default function DiaryEditor({ initialDate, initialInputMode = "text", on
           {totalEntryDays}일 기록됨 · 간지별 행복도 패턴 보기 →
         </Link>
       )}
-      {/* ① 만세력 + 일기 날짜 */}
+
       <SajuDepthPicker
         diaryDate={date}
         onDiaryDateChange={handleDiaryDateChange}
@@ -442,81 +409,72 @@ export default function DiaryEditor({ initialDate, initialInputMode = "text", on
         entries={allEntries}
       />
 
-      {/* ② 기록 방식 */}
-      <div className="flex gap-2">
-        <button
-          type="button"
-          onClick={() => handleModeChange("scores")}
-          disabled={isBusy}
-          className={`ui-mode-btn${inputMode === "scores" ? " ui-mode-btn-selected" : ""}`}
-        >
-          점수로 기록
-        </button>
-        <button
-          type="button"
-          onClick={() => handleModeChange("text")}
-          disabled={isBusy}
-          className={`ui-mode-btn${inputMode === "text" ? " ui-mode-btn-selected" : ""}`}
-        >
-          글로 기록
-        </button>
-      </div>
-
-      {inputMode === "scores" ? (
-        <ManualScoreInput state={scoreState} onChange={setScoreState} disabled={isBusy} />
-      ) : (
-        <textarea
-          value={content}
-          onChange={(e) => setContent(e.target.value)}
-          placeholder="오늘 하루는 어땠나요? 자유롭게 적어주세요."
-          rows={10}
-          disabled={isBusy}
-          className="w-full px-3 py-2 text-sm border-2 resize-y"
-          style={{
-            background: "var(--px-bg2)",
-            borderColor: "var(--px-border)",
-            color: "var(--px-text)",
+      <div
+        className="p-3 border-2 space-y-3"
+        style={{ background: "var(--px-bg2)", borderColor: "var(--px-border)" }}
+      >
+        <p className="ui-section-title">■ 오늘 기록</p>
+        <MoodChips value={mood} onChange={setMood} disabled={isBusy} />
+        <ScoreSlider
+          label="행복도"
+          value={wellbeing}
+          onChange={(v) => {
+            setWellbeing(v);
+            if (!mood) setMood(wellbeingToEmotionLabel(v));
           }}
+          color="var(--px-accent)"
+          disabled={isBusy}
         />
-      )}
 
-      {/* 액션 버튼 */}
-      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={() => setShowWriteSheet(true)}
+          disabled={isBusy}
+          className="w-full py-3 border-2 text-sm font-bold text-left px-3"
+          style={{
+            borderColor: "var(--px-border2)",
+            background: "var(--px-bg3)",
+            color: "var(--px-text-on-panel)",
+            boxShadow: "2px 2px 0 #000",
+          }}
+        >
+          {content.trim() ? (
+            <span className="line-clamp-2">{content}</span>
+          ) : (
+            <span style={{ color: "var(--px-text2)" }}>✎ 일기 쓰기 (선택)</span>
+          )}
+        </button>
+
         <button
           type="button"
           onClick={handleSave}
           disabled={isBusy}
-          className="ui-primary-btn"
+          className="ui-primary-btn w-full py-3 text-sm"
         >
-          {status === "saving" ? "저장 중..." : "저장"}
+          {status === "saving" ? "저장 중..." : "오늘 기록 저장"}
         </button>
-        {inputMode === "text" && (
-          <button
-            type="button"
-            onClick={handleAnalyze}
-            disabled={isBusy}
-            className="ui-action-btn"
-            style={{ opacity: isBusy ? 0.6 : 1 }}
-          >
-            {status === "analyzing" ? "분석 중..." : "마음 AI 분석"}
-          </button>
-        )}
+
         {entry && (
           <button
             type="button"
             onClick={handleDelete}
             disabled={isBusy}
-            className="px-4 py-2 text-xs font-bold border-2"
-            style={{
-              background: "var(--px-bg2)",
-              borderColor: "#f87171",
-              color: "#f87171",
-            }}
+            className="text-xs font-bold underline"
+            style={{ color: "#f87171" }}
           >
             삭제
           </button>
         )}
       </div>
+
+      <CollectionPreviewCard
+        summary={collectionSummary}
+        nextUncollected={
+          nextUncollected
+            ? { ganjiKo: nextUncollected.ganjiKo, daysUntil: nextUncollected.daysUntil }
+            : null
+        }
+      />
 
       {lastMiniReport && (
         <TodayMiniReport
@@ -529,23 +487,11 @@ export default function DiaryEditor({ initialDate, initialInputMode = "text", on
         />
       )}
 
-      {message && (
-        <p className="ui-hint font-bold">
-          {message}
-        </p>
-      )}
+      {message && <p className="ui-hint font-bold">{message}</p>}
 
-      {displayAnalysis && (
-        <div
-          className="p-3 border-2 space-y-3"
-          style={{ background: "var(--px-bg3)", borderColor: "var(--px-border)" }}
-        >
-          <p className="text-xs font-bold" style={{ color: "var(--px-accent)" }}>
-            ■ 마음 AI 분석
-          </p>
-          <AnalysisResult analysis={displayAnalysis} />
-        </div>
-      )}
+      <Link href="/diary/history" className="ui-hint font-bold underline block">
+        과거 기록 보기
+      </Link>
     </div>
   );
 }

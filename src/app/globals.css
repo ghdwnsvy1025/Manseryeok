@@ -354,7 +354,7 @@ body {
   background: #050508;
 }
 .app-mobile-device {
-  width: min(calc(100vw - 8px), 440px);
+  width: min(calc(100vw - 8px), 390px);
   max-width: 100%;
   height: calc(100dvh - 8px);
   max-height: calc(100dvh - 8px);

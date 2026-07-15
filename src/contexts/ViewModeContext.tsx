@@ -5,21 +5,21 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from "
 export type ViewMode = "desktop" | "mobile";
 
 const COMPACT_BREAKPOINT = 640;
+/** 앱 UI 기준 폭 — 모바일 해상도 고정 */
+export const APP_MOBILE_WIDTH = 390;
 
 type ViewModeContextValue = {
   viewMode: ViewMode;
   setViewMode: (mode: ViewMode) => void;
-  /** 모바일 레이아웃·타이포 적용 여부 */
+  /** 항상 모바일 레이아웃 */
   isMobile: boolean;
   /** 실제 좁은 화면(폰) — 프레임 없이 전체 너비 */
   isCompactViewport: boolean;
-  /** 데스크톱에서 390×844 폰 미리보기 프레임 */
+  /** 데스크톱에서 390 폭 폰 프레임으로 고정 미리보기 */
   showPhoneFrame: boolean;
 };
 
 const ViewModeContext = createContext<ViewModeContextValue | null>(null);
-
-const STORAGE_KEY = "saju-view-mode";
 
 function readCompactViewport(): boolean {
   if (typeof window === "undefined") return false;
@@ -27,15 +27,12 @@ function readCompactViewport(): boolean {
 }
 
 export function ViewModeProvider({ children }: { children: ReactNode }) {
-  const [viewMode, setViewModeState] = useState<ViewMode>("mobile");
   const [isCompactViewport, setIsCompactViewport] = useState(false);
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved === "mobile" || saved === "desktop") {
-      setViewModeState(saved);
-    }
+    // 앱은 모바일 전용 — PC/모바일 전환값 무시하고 모바일로 고정
+    localStorage.setItem("saju-view-mode", "mobile");
     setIsCompactViewport(readCompactViewport());
     setReady(true);
 
@@ -45,18 +42,16 @@ export function ViewModeProvider({ children }: { children: ReactNode }) {
     return () => mq.removeEventListener("change", onChange);
   }, []);
 
-  const setViewMode = (mode: ViewMode) => {
-    setViewModeState(mode);
-    localStorage.setItem(STORAGE_KEY, mode);
+  const setViewMode = (_mode: ViewMode) => {
+    // 모바일 고정 — desktop 전환 비활성
   };
 
-  const isMobile = isCompactViewport || viewMode === "mobile";
-  const showPhoneFrame = ready && !isCompactViewport && viewMode === "mobile";
+  const showPhoneFrame = ready && !isCompactViewport;
 
   const value: ViewModeContextValue = {
-    viewMode: ready ? viewMode : "mobile",
+    viewMode: "mobile",
     setViewMode,
-    isMobile: ready ? isMobile : true,
+    isMobile: true,
     isCompactViewport: ready ? isCompactViewport : false,
     showPhoneFrame,
   };
