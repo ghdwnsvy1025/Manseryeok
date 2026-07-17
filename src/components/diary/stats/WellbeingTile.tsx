@@ -55,7 +55,7 @@ export default function WellbeingTile({
         {label}
       </span>
       {insufficient ? (
-        <span className="block mt-1 text-[10px] font-bold" style={{ color: "var(--px-text2)" }}>
+        <span className="block mt-1 text-xs font-bold" style={{ color: "var(--px-text2)" }}>
           패턴 부족
         </span>
       ) : (
@@ -68,7 +68,7 @@ export default function WellbeingTile({
           </span>
           {deltaFromOverall !== undefined && deltaFromOverall !== 0 && (
             <span
-              className="absolute top-1 right-1 text-[10px] font-bold px-1 border"
+              className="absolute top-1 right-1 text-[11px] font-bold px-1 border"
               style={{
                 borderColor: "var(--px-border)",
                 color: deltaFromOverall > 0 ? "#4ade80" : "#f87171",
@@ -81,7 +81,7 @@ export default function WellbeingTile({
         </>
       )}
       <span
-        className="absolute bottom-1 right-1 text-[10px] font-bold px-1"
+        className="absolute bottom-1 right-1 text-[11px] font-bold px-1"
         style={{ color: "var(--px-text2)" }}
       >
         {entryCount}회

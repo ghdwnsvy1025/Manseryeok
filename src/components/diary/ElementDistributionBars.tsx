@@ -6,8 +6,12 @@ import { ELEMENT_LABELS } from "@/lib/saju/constants";
 import {
   calculateElementDistribution,
   ELEMENT_EN_TO_KO,
+  type ElementDistributionViewMode,
 } from "@/lib/saju/elementDistribution";
 import type { PartialDiaryPillars } from "@/lib/diary/dayPillar";
+import type { CurrentDaeunPillar } from "@/lib/diary/currentDaeun";
+import type { PillarVisibility } from "@/lib/diary/sajuSettings";
+import type { UserBirthPillars } from "@/lib/diary/types";
 
 const ELEM: Record<Element, { text: string }> = {
   wood: { text: "#4ade80" },
@@ -27,24 +31,48 @@ const ELEM_KO: Record<Element, string> = {
 
 type Props = {
   diaryPillars: PartialDiaryPillars;
+  birthPillars: UserBirthPillars | null;
+  currentDaeun: CurrentDaeunPillar | null;
+  pillarVisibility: PillarVisibility;
+  viewMode: ElementDistributionViewMode;
 };
 
-/** 내 사주와 동일: 시→일→월→년 순 천간·지지로 오행 분포율 계산 */
-export default function ElementDistributionBars({ diaryPillars }: Props) {
+/** 상세=원국+선택 운, 간단=선택 운끼리의 오행 분포율 */
+export default function ElementDistributionBars({
+  diaryPillars,
+  birthPillars,
+  currentDaeun,
+  pillarVisibility,
+  viewMode,
+}: Props) {
   const elemPct = useMemo(() => {
-    // calculateElementDistribution 입력 순서: 시간 → 일 → 월 → 년 (시주 없으면 일부터)
     let stems = "";
     let branches = "";
-    const order = [
-      diaryPillars.dayPillar,
-      diaryPillars.monthPillar,
-      diaryPillars.yearPillar,
-    ] as const;
 
-    for (const pillar of order) {
-      if (!pillar) continue;
-      stems += pillar.stem.ko;
-      branches += pillar.branch.ko;
+    if (birthPillars) {
+      const nativeOrder = [
+        birthPillars.hour,
+        birthPillars.day,
+        birthPillars.month,
+        birthPillars.year,
+      ] as const;
+      for (const pillar of nativeOrder) {
+        if (!pillar) continue;
+        stems += pillar.stemKo;
+        branches += pillar.branchKo;
+      }
+    } else {
+      // luck_only도 기존 API의 원국 인자를 받지만 최종 분포에는 섞지 않는다.
+      const fallbackOrder = [
+        diaryPillars.dayPillar,
+        diaryPillars.monthPillar,
+        diaryPillars.yearPillar,
+      ] as const;
+      for (const pillar of fallbackOrder) {
+        if (!pillar) continue;
+        stems += pillar.stem.ko;
+        branches += pillar.branch.ko;
+      }
     }
 
     const empty: Record<Element, number> = {
@@ -54,14 +82,53 @@ export default function ElementDistributionBars({ diaryPillars }: Props) {
       metal: 0,
       water: 0,
     };
-    if (stems.length === 0) return empty;
+    if (stems.length === 0 || (viewMode === "diary_detail" && !birthPillars)) {
+      return empty;
+    }
 
-    const result = calculateElementDistribution(stems, branches);
+    const result = calculateElementDistribution({
+      stems,
+      branches,
+      viewMode,
+      daewoon:
+        pillarVisibility.daeun && currentDaeun
+          ? { stem: currentDaeun.stemHanja, branch: currentDaeun.branchHanja }
+          : null,
+      yearly:
+        pillarVisibility.diary.year && diaryPillars.yearPillar
+          ? {
+              stem: diaryPillars.yearPillar.stem.ko,
+              branch: diaryPillars.yearPillar.branch.ko,
+            }
+          : null,
+      monthly:
+        pillarVisibility.diary.month && diaryPillars.monthPillar
+          ? {
+              stem: diaryPillars.monthPillar.stem.ko,
+              branch: diaryPillars.monthPillar.branch.ko,
+            }
+          : null,
+      daily:
+        pillarVisibility.diary.day && diaryPillars.dayPillar
+          ? {
+              stem: diaryPillars.dayPillar.stem.ko,
+              branch: diaryPillars.dayPillar.branch.ko,
+            }
+          : null,
+    });
     for (const elem of Object.keys(empty) as Element[]) {
       empty[elem] = result.percentage[ELEMENT_EN_TO_KO[elem]];
     }
     return empty;
-  }, [diaryPillars.dayPillar, diaryPillars.monthPillar, diaryPillars.yearPillar]);
+  }, [
+    birthPillars,
+    currentDaeun,
+    diaryPillars.dayPillar,
+    diaryPillars.monthPillar,
+    diaryPillars.yearPillar,
+    pillarVisibility,
+    viewMode,
+  ]);
 
   if (!diaryPillars.dayPillar && !diaryPillars.monthPillar && !diaryPillars.yearPillar) {
     return null;
@@ -73,7 +140,22 @@ export default function ElementDistributionBars({ diaryPillars }: Props) {
       style={{ background: "var(--px-bg2)", borderColor: "var(--px-border)" }}
       aria-label="오행 분포율"
     >
-      <p className="ui-section-title mb-1">오행 분포</p>
+      <div className="flex items-center gap-2 mb-1">
+        <p className="ui-section-title">오행 분포</p>
+        <span
+          className="px-2 py-1 border text-xs font-black whitespace-nowrap"
+          style={{
+            color: viewMode === "simple" ? "#60a5fa" : "var(--px-accent)",
+            borderColor: viewMode === "simple" ? "#60a5fa" : "var(--px-accent)",
+            background:
+              viewMode === "simple"
+                ? "color-mix(in srgb, #60a5fa 12%, var(--px-bg2))"
+                : "color-mix(in srgb, var(--px-accent) 12%, var(--px-bg2))",
+          }}
+        >
+          {viewMode === "simple" ? "운 기준" : "운 + 원국 기준"}
+        </span>
+      </div>
       {(Object.entries(elemPct) as [Element, number][]).map(([elem, pct]) => {
         const c = ELEM[elem];
         return (

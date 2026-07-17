@@ -2,6 +2,7 @@ import { describe, expect, test } from "@jest/globals";
 import { computeDailyWellbeing } from "@/lib/diary/dimensions";
 import {
   createManualScoreState,
+  createManualScoreStateFromWellbeing,
   manualStateToAnalysis,
   wellbeingToAnalysis,
   wellbeingToEmotionLabel,
@@ -19,6 +20,11 @@ describe("manual scores wellbeing", () => {
     expect(analysis.daily_wellbeing_score).toBe(72);
     expect(analysis.emotion_label).toBe("positive");
     expect(analysis.summary).toContain("72");
+  });
+
+  test("현재 행복도로 세부 조절 상태를 만들면 종합 행복도를 유지", () => {
+    const state = createManualScoreStateFromWellbeing(67);
+    expect(manualStateToAnalysis(state).daily_wellbeing_score).toBe(67);
   });
 });
 

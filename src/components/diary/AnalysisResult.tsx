@@ -57,7 +57,7 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 
 function ConfidenceBadge({ value }: { value: number }) {
   return (
-    <span className="text-[9px] px-1 py-0.5 border" style={{ borderColor: "var(--px-border)", color: "var(--px-text2)" }}>
+    <span className="text-[11px] px-1.5 py-0.5 border font-medium" style={{ borderColor: "var(--px-border)", color: "var(--px-text2)" }}>
       신뢰도 {value}%
     </span>
   );
@@ -112,7 +112,7 @@ function TheoryScoreBar({
         <ConfidenceBadge value={item.confidence} />
       </div>
       {item.evidence && (
-        <p className="text-[10px] pl-28 leading-relaxed" style={{ color: "var(--px-text2)" }}>
+        <p className="ui-hint pl-28 leading-relaxed">
           ↳ {item.evidence}
         </p>
       )}
@@ -185,12 +185,12 @@ export default function AnalysisResult({ analysis, hideDetailScores = false }: P
           {analysis.summary}
         </p>
         {analysis.reason && (
-          <p className="text-xs" style={{ color: "var(--px-text2)" }}>
+          <p className="ui-hint">
             {analysis.reason}
           </p>
         )}
         {psych?.comprehensive_wellbeing_reason && (
-          <p className="text-xs mt-1" style={{ color: "var(--px-text2)" }}>
+          <p className="ui-hint mt-1">
             <span className="font-bold">점수 근거: </span>
             {psych.comprehensive_wellbeing_reason}
           </p>
@@ -202,7 +202,7 @@ export default function AnalysisResult({ analysis, hideDetailScores = false }: P
           {analysis.dominant_emotions.map((e) => (
             <span
               key={e}
-              className="text-[10px] px-2 py-0.5 border font-bold"
+              className="text-[11px] px-2 py-1 border font-bold"
               style={{ borderColor: "var(--px-border)", color: "var(--px-text2)" }}
             >
               {e}
@@ -310,7 +310,7 @@ export default function AnalysisResult({ analysis, hideDetailScores = false }: P
           {psych.recovery_suggestions.length > 0 && (
             <div className="space-y-1 pt-2 border-t" style={{ borderColor: "var(--px-border)" }}>
               <SectionTitle>9. 오늘 나에게 필요한 회복/행동 제안</SectionTitle>
-              <ul className="text-xs space-y-1" style={{ color: "var(--px-text2)" }}>
+              <ul className="ui-guide space-y-1">
                 {psych.recovery_suggestions.map((s) => (
                   <li key={s}>· {s}</li>
                 ))}
@@ -368,7 +368,7 @@ export default function AnalysisResult({ analysis, hideDetailScores = false }: P
                 </span>
               </div>
               {scoreReason && (
-                <p className="text-[10px] pl-14 leading-relaxed" style={{ color: "var(--px-text2)" }}>
+                <p className="ui-hint pl-14 leading-relaxed">
                   ↳ {scoreReason}
                 </p>
               )}

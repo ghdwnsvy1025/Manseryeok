@@ -118,6 +118,12 @@ describe("validateBirthDateTimeFields", () => {
 describe("resolvePillarVisibility", () => {
   it("returns defaults when settings are missing", () => {
     expect(resolvePillarVisibility()).toEqual(DEFAULT_PILLAR_VISIBILITY);
+    expect(DEFAULT_PILLAR_VISIBILITY.diary).toEqual({
+      year: false,
+      month: true,
+      day: true,
+    });
+    expect(DEFAULT_PILLAR_VISIBILITY.daeun).toBe(false);
   });
 
   it("merges partial visibility with defaults", () => {
@@ -126,11 +132,13 @@ describe("resolvePillarVisibility", () => {
         pillarVisibility: {
           birth: { hour: false, day: true, month: true, year: true },
           diary: { year: true, month: false, day: true },
+          daeun: false,
         },
       })
     ).toEqual({
       birth: { hour: false, day: true, month: true, year: true },
       diary: { year: true, month: false, day: true },
+      daeun: false,
     });
   });
 });

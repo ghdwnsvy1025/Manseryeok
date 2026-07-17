@@ -1,6 +1,13 @@
 import type { Metadata, Viewport } from "next";
+import { Noto_Sans_KR } from "next/font/google";
 import "./globals.css";
 import ClientShell from "@/components/ClientShell";
+
+const notoSansKr = Noto_Sans_KR({
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--font-noto-sans-kr",
+});
 
 export const metadata: Metadata = {
   title: "사주 만세력 — 일진 기록 × 간지 통계",
@@ -22,7 +29,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link rel="preconnect" href="https://cdn.jsdelivr.net" />
       </head>
-      <body className="min-h-dvh overflow-x-hidden app-body">
+      <body
+        className={`${notoSansKr.variable} min-h-dvh overflow-x-hidden app-body`}
+      >
         <ClientShell>{children}</ClientShell>
       </body>
     </html>

@@ -40,7 +40,7 @@ export default function FortuneTimeline({ groups, selectedKey, onSelect }: Props
               {g.label}
             </p>
             {insufficient ? (
-              <p className="text-[10px] font-bold mt-1" style={{ color: "var(--px-text2)" }}>
+              <p className="text-xs font-bold mt-1" style={{ color: "var(--px-text2)" }}>
                 패턴 부족 · {g.entryCount}회
               </p>
             ) : (
@@ -48,7 +48,7 @@ export default function FortuneTimeline({ groups, selectedKey, onSelect }: Props
                 <p className="text-xs font-black mt-1" style={{ color: "#4ade80" }}>
                   {g.avgDailyWellbeing}점
                 </p>
-                <p className="text-[10px] font-bold" style={{ color: "var(--px-text2)" }}>
+                <p className="text-xs font-bold" style={{ color: "var(--px-text2)" }}>
                   {g.entryCount}회
                   {g.deltaFromOverall !== undefined && g.deltaFromOverall !== 0 && (
                     <span

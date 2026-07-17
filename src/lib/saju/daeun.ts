@@ -1,6 +1,20 @@
-import { GANJI_60, MONTH_SOLAR_TERM_LONGITUDES } from "./constants";
+import {
+  BRANCHES,
+  BRANCH_META,
+  GANJI_60,
+  MONTH_SOLAR_TERM_LONGITUDES,
+  STEMS,
+  STEM_META,
+} from "./constants";
 import { mod } from "./jdn";
 import { getSolarTermKSTIso, SOLAR_TERM_INFO } from "./solarTerms";
+
+/** 대운 1주기(약 10년)에 대응하는 년운(세운) 한 해 */
+export type SewoonYear = {
+  year: number;
+  ganji: string;
+  ganjiKo: string;
+};
 
 export type Gender = "male" | "female";
 export type LuckDirection = "forward" | "backward";
@@ -301,6 +315,33 @@ export function buildDaeunCycles(params: {
       estimatedStartDate,
       estimatedEndDate,
     };
+  });
+}
+
+/** 그레고리력 연도에 대응하는 년주 간지 (입춘 보정 없이 연도 표기용) */
+export function getYearGanjiByGregorianYear(year: number): Pick<SewoonYear, "ganji" | "ganjiKo"> {
+  const stem = STEMS[mod(year - 4, 10)];
+  const branch = BRANCHES[mod(year - 4, 12)];
+  return {
+    ganji: stem + branch,
+    ganjiKo: STEM_META[stem].ko + BRANCH_META[branch].ko,
+  };
+}
+
+/**
+ * 대운 주기에 해당하는 년운 10해.
+ * 시작 연도부터 오름차순(오래된 해 → 최근 해).
+ * UI에서는 오른쪽→왼쪽으로 증가하도록 뒤집어 표시한다.
+ */
+export function getSewoonYearsForDaeunCycle(cycle: DaeunCycle): SewoonYear[] {
+  if (!cycle.estimatedStartDate) return [];
+  const startYear = Number(cycle.estimatedStartDate.slice(0, 4));
+  if (!Number.isFinite(startYear)) return [];
+
+  return Array.from({ length: 10 }, (_, i) => {
+    const year = startYear + i;
+    const { ganji, ganjiKo } = getYearGanjiByGregorianYear(year);
+    return { year, ganji, ganjiKo };
   });
 }
 

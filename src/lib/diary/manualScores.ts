@@ -1,9 +1,5 @@
 import {
   clampScore,
-  computeDailyWellbeing,
-  createEmptyScoreReasons,
-  DETAIL_SCORE_DIMENSIONS,
-  type DetailScoreDimensionId,
   type DiaryAnalysis,
   type EmotionLabel,
   type ScaleScore,
@@ -11,20 +7,23 @@ import {
 
 export type DiaryInputMode = "text" | "scores";
 
-export type ManualDetailScores = {
-  depression_score: ScaleScore;
-  anxiety_score: ScaleScore;
-  stress_score: ScaleScore;
-  achievement_score: ScaleScore;
-  meaning_score: ScaleScore;
-  energy_score: ScaleScore;
-  relationship_score: ScaleScore | null;
-  gratitude_score: ScaleScore;
-  self_acceptance_score: ScaleScore;
-};
+export const MANUAL_WELLBEING_DIMENSIONS = [
+  { id: "joy", label: "즐거움", color: "#fbbf24" },
+  { id: "calm", label: "편안함", color: "#34d399" },
+  { id: "energy", label: "에너지", color: "#60a5fa" },
+  { id: "engagement", label: "몰입", color: "#a78bfa" },
+  { id: "relationship", label: "관계", color: "#f472b6" },
+  { id: "autonomy", label: "자율성", color: "#818cf8" },
+  { id: "achievement", label: "성취", color: "#fb923c" },
+  { id: "meaning", label: "의미", color: "#c084fc" },
+] as const;
+
+export type ManualWellbeingId =
+  (typeof MANUAL_WELLBEING_DIMENSIONS)[number]["id"];
+export type ManualWellbeingScores = Record<ManualWellbeingId, ScaleScore>;
 
 export type ManualScoreState = {
-  details: ManualDetailScores;
+  dimensions: ManualWellbeingScores;
 };
 
 export const DEFAULT_WELLBEING = 50;
@@ -37,78 +36,83 @@ export function wellbeingToEmotionLabel(wellbeing: ScaleScore): EmotionLabel {
   return "very_negative";
 }
 
-function createDefaultDetails(): ManualDetailScores {
-  const w = DEFAULT_WELLBEING;
-  const negative = 100 - w;
+function createDimensions(value: number): ManualWellbeingScores {
+  const score = clampScore(value);
   return {
-    depression_score: negative,
-    anxiety_score: negative,
-    stress_score: negative,
-    achievement_score: w,
-    meaning_score: w,
-    energy_score: w,
-    relationship_score: w,
-    gratitude_score: w,
-    self_acceptance_score: w,
+    joy: score,
+    calm: score,
+    energy: score,
+    engagement: score,
+    relationship: score,
+    autonomy: score,
+    achievement: score,
+    meaning: score,
   };
 }
 
 export function createManualScoreState(): ManualScoreState {
-  return {
-    details: createDefaultDetails(),
-  };
+  return { dimensions: createDimensions(DEFAULT_WELLBEING) };
 }
 
-export function updateDetailScore(
+/** 현재 행복도를 모든 세부 항목의 조절 시작값으로 사용 */
+export function createManualScoreStateFromWellbeing(
+  wellbeing: number
+): ManualScoreState {
+  return { dimensions: createDimensions(wellbeing) };
+}
+
+export function updateManualWellbeingScore(
   state: ManualScoreState,
-  key: DetailScoreDimensionId,
-  value: ScaleScore | null
+  key: ManualWellbeingId,
+  value: ScaleScore
 ): ManualScoreState {
   return {
     ...state,
-    details: {
-      ...state.details,
-      [key]: key === "relationship_score" ? value : clampScore(value ?? 0),
+    dimensions: {
+      ...state.dimensions,
+      [key]: clampScore(value),
     },
   };
 }
 
-function computeHappinessFromDetails(details: ManualDetailScores): ScaleScore {
-  const positives = [
-    details.achievement_score,
-    details.meaning_score,
-    details.energy_score,
-    details.relationship_score ?? DEFAULT_WELLBEING,
-    details.gratitude_score,
-    details.self_acceptance_score,
-  ];
-  const avg =
-    positives.reduce((sum, v) => sum + v, 0) / (positives.length || 1);
-  return clampScore(avg);
+function averageWellbeing(dimensions: ManualWellbeingScores): ScaleScore {
+  const values = Object.values(dimensions);
+  return clampScore(
+    values.reduce((sum, value) => sum + value, 0) / values.length
+  );
 }
 
 export function manualStateToAnalysis(state: ManualScoreState): DiaryAnalysis {
-  const happiness_score = computeHappinessFromDetails(state.details);
-
+  const d = state.dimensions;
+  const inverseCalm = 100 - d.calm;
   const scores = {
-    happiness_score,
-    ...state.details,
+    happiness_score: d.joy,
+    depression_score: inverseCalm,
+    anxiety_score: inverseCalm,
+    stress_score: inverseCalm,
+    achievement_score: d.achievement,
+    meaning_score: d.meaning,
+    energy_score: d.energy,
+    relationship_score: d.relationship,
+    gratitude_score: d.engagement,
+    self_acceptance_score: d.autonomy,
   };
 
-  const daily_wellbeing_score = computeDailyWellbeing(scores);
+  const daily_wellbeing_score = averageWellbeing(d);
   const emotion_label = wellbeingToEmotionLabel(daily_wellbeing_score);
 
-  const score_reasons = createEmptyScoreReasons();
-  for (const dim of DETAIL_SCORE_DIMENSIONS) {
-    if (dim.id === "relationship_score") {
-      score_reasons.relationship_score =
-        state.details.relationship_score === null
-          ? null
-          : "직접 설정한 점수입니다.";
-    } else {
-      score_reasons[dim.id] = "직접 설정한 점수입니다.";
-    }
-  }
+  const directReason = "웰빙 항목에서 직접 설정한 점수입니다.";
+  const score_reasons = {
+    depression_score: directReason,
+    anxiety_score: directReason,
+    stress_score: directReason,
+    achievement_score: directReason,
+    meaning_score: directReason,
+    energy_score: directReason,
+    relationship_score: directReason,
+    gratitude_score: directReason,
+    self_acceptance_score: directReason,
+  };
 
   return {
     ...scores,
@@ -125,17 +129,36 @@ export function manualStateToAnalysis(state: ManualScoreState): DiaryAnalysis {
 }
 
 export function analysisToManualState(analysis: DiaryAnalysis): ManualScoreState {
+  const psych = analysis.psychological_analysis;
+  const calm = clampScore(
+    100 -
+      (analysis.depression_score +
+        analysis.anxiety_score +
+        analysis.stress_score) /
+        3
+  );
   return {
-    details: {
-      depression_score: analysis.depression_score,
-      anxiety_score: analysis.anxiety_score,
-      stress_score: analysis.stress_score,
-      achievement_score: analysis.achievement_score,
-      meaning_score: analysis.meaning_score,
-      energy_score: analysis.energy_score,
-      relationship_score: analysis.relationship_score,
-      gratitude_score: analysis.gratitude_score,
-      self_acceptance_score: analysis.self_acceptance_score,
+    dimensions: {
+      joy: psych
+        ? clampScore(psych.perma.positive_emotion.score * 10)
+        : analysis.happiness_score,
+      calm,
+      energy: analysis.energy_score,
+      engagement: psych
+        ? clampScore(psych.perma.engagement.score * 10)
+        : analysis.gratitude_score,
+      relationship: psych
+        ? clampScore(psych.perma.relationships.score * 10)
+        : analysis.relationship_score ?? analysis.daily_wellbeing_score,
+      autonomy: psych
+        ? clampScore(psych.sdt.autonomy.score * 10)
+        : analysis.self_acceptance_score,
+      achievement: psych
+        ? clampScore(psych.perma.accomplishment.score * 10)
+        : analysis.achievement_score,
+      meaning: psych
+        ? clampScore(psych.perma.meaning.score * 10)
+        : analysis.meaning_score,
     },
   };
 }
@@ -151,19 +174,8 @@ export function wellbeingToAnalysis(
   emotionLabel?: EmotionLabel
 ): DiaryAnalysis {
   const w = clampScore(wellbeing);
-  const negative = 100 - w;
   const analysis = manualStateToAnalysis({
-    details: {
-      depression_score: negative,
-      anxiety_score: negative,
-      stress_score: negative,
-      achievement_score: w,
-      meaning_score: w,
-      energy_score: w,
-      relationship_score: w,
-      gratitude_score: w,
-      self_acceptance_score: w,
-    },
+    dimensions: createDimensions(w),
   });
   return {
     ...analysis,

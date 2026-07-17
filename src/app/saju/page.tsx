@@ -39,9 +39,8 @@ export default function SajuPage() {
     <div className={`space-y-6 sm:space-y-8 ${isMobile ? "space-y-5" : ""}`}>
       <div className="text-center space-y-3 sm:space-y-4">
         <div
-          className="inline-block px-3 sm:px-4 py-2 border-2 text-sm font-bold pixel-font"
+          className="inline-block px-3 sm:px-4 py-2 border-2 text-[15px] font-bold display-font"
           style={{
-            fontSize: isMobile ? "8px" : "10px",
             color: "var(--px-accent)",
             borderColor: "var(--px-accent)",
             background: "var(--px-bg3)",

@@ -22,6 +22,7 @@ import {
   calculateElementDistributionFromPillars,
   ELEMENT_EN_TO_KO,
 } from "@/lib/saju/elementDistribution";
+import { getSewoonYearsForDaeunCycle } from "@/lib/saju/daeun";
 
 // ── 오행별 픽셀 게임 색상 ──
 const ELEM: Record<Element, { text: string; bg: string; border: string }> = {
@@ -148,7 +149,10 @@ const DISPLAY_ORDER: PillarKey[] = ["hour", "day", "month", "year"];
 export default function SajuResult({ result }: { result: SajuResult }) {
   const { isMobile } = useViewMode();
   const charSize = isMobile ? "28px" : "40px";
-  const labelSize = isMobile ? "9px" : "10px";
+  const labelSize = "12px";
+  /** 연구 모드 대운·년운 — 원국보다 작게 */
+  const luckCharSize = isMobile ? "20px" : "28px";
+  const luckLabelSize = isMobile ? "11px" : "12px";
   const pillarTitleSize = isMobile ? "13px" : "15px";
   const [showCalcDebug, setShowCalcDebug] = useState(false);
   const [daeunAgeMode, setDaeunAgeMode] = useState<AgeMode>("international");
@@ -157,6 +161,7 @@ export default function SajuResult({ result }: { result: SajuResult }) {
   const [highlightHint, setHighlightHint] = useState<HighlightHintState | null>(null);
   const [highlightSelection, setHighlightSelection] = useState<HighlightSelection>(null);
   const [selectedDaeunOrder, setSelectedDaeunOrder] = useState<number | null>(null);
+  const [selectedSewoonYear, setSelectedSewoonYear] = useState<number | null>(null);
   const [flyers, setFlyers] = useState<FlyerData[]>([]);
   const [arrivedSlots, setArrivedSlots] = useState<Set<string>>(new Set());
   const [pumpingSlots, setPumpingSlots] = useState<Set<string>>(new Set());
@@ -176,9 +181,15 @@ export default function SajuResult({ result }: { result: SajuResult }) {
   const exploreMode = viewMode === "explore";
   /** 대운 선택 — 기본/연구 모드 공통 */
   const selectedDaeun = daeun.cycles.find((c) => c.order === selectedDaeunOrder) ?? null;
+  const selectedSewoon = useMemo(() => {
+    if (!selectedDaeun || selectedSewoonYear == null) return null;
+    return getSewoonYearsForDaeunCycle(selectedDaeun).find((y) => y.year === selectedSewoonYear) ?? null;
+  }, [selectedDaeun, selectedSewoonYear]);
   /** 연구 모드: 각 기둥에 대운 겹침 / 기본 모드: 년주 오른쪽 별도 칸 */
   const overlayDaeun = exploreMode && !!selectedDaeun;
+  const overlayYearly = exploreMode && !!selectedSewoon;
   const sideDaeun = !exploreMode && !!selectedDaeun;
+  const sideYearly = !exploreMode && !!selectedSewoon;
 
   useEffect(() => {
     setViewMode(loadSajuViewMode());
@@ -188,6 +199,7 @@ export default function SajuResult({ result }: { result: SajuResult }) {
     setHighlightSelection(null);
     setHighlightHint(null);
     setSelectedDaeunOrder(null);
+    setSelectedSewoonYear(null);
     setFlyers([]);
     setArrivedSlots(new Set());
     setPumpingSlots(new Set());
@@ -245,8 +257,11 @@ export default function SajuResult({ result }: { result: SajuResult }) {
     const daewoonInput = selectedDaeun
       ? { stem: selectedDaeun.ganji[0], branch: selectedDaeun.ganji[1] }
       : null;
-    return calculateElementDistributionFromPillars(pillars, daewoonInput);
-  }, [pillars, selectedDaeun]);
+    const yearlyInput = selectedSewoon
+      ? { stem: selectedSewoon.ganji[0], branch: selectedSewoon.ganji[1] }
+      : null;
+    return calculateElementDistributionFromPillars(pillars, daewoonInput, yearlyInput);
+  }, [pillars, selectedDaeun, selectedSewoon]);
   const hiddenStemItemsByPillar = Object.fromEntries(
     hiddenStems.items.map((item) => [item.pillar, item])
   ) as Partial<Record<PillarKey, HiddenStemByPillar>>;
@@ -266,8 +281,12 @@ export default function SajuResult({ result }: { result: SajuResult }) {
       const el = STEM_META[selectedDaeun.ganji[0]]?.element;
       if (el) set.add(el);
     }
+    if (selectedSewoon) {
+      const el = STEM_META[selectedSewoon.ganji[0]]?.element;
+      if (el) set.add(el);
+    }
     return set;
-  }, [pillars, selectedDaeun]);
+  }, [pillars, selectedDaeun, selectedSewoon]);
 
   const highlightBranchHiddenStems = useMemo(() => {
     if (!highlightSelection || highlightSelection.kind !== "branch-stem-match") return undefined;
@@ -478,6 +497,7 @@ export default function SajuResult({ result }: { result: SajuResult }) {
 
     if (isSelected) {
       setSelectedDaeunOrder(null);
+      setSelectedSewoonYear(null);
       setFlyers([]);
       setArrivedSlots(new Set());
       setPumpingSlots(new Set());
@@ -496,6 +516,7 @@ export default function SajuResult({ result }: { result: SajuResult }) {
     }
 
     setSelectedDaeunOrder(cycleOrder);
+    setSelectedSewoonYear(null);
     setHighlightSelection((prev) => {
       if (!prev) return prev;
       if (prev.kind === "stem" && (prev.source === "daeun-slot" || prev.source === "daeun-table")) return null;
@@ -683,14 +704,59 @@ export default function SajuResult({ result }: { result: SajuResult }) {
               ? "related"
               : null;
 
-          const colClass = `grid ${sideDaeun ? "grid-cols-5" : "grid-cols-4"} ${isMobile ? "gap-1.5" : "gap-2"}`;
+          const yearlyStemEl = selectedSewoon ? STEM_META[selectedSewoon.ganji[0]]?.element : null;
+          const yearlyBranchEl = selectedSewoon ? BRANCH_META[selectedSewoon.ganji[1]]?.element : null;
+          const yearlySc = yearlyStemEl ? ELEM[yearlyStemEl] : null;
+          const yearlyBc = yearlyBranchEl ? ELEM[yearlyBranchEl] : null;
+
+          const yearlyBranchHiddenStems = selectedSewoon
+            ? getBranchHiddenStemsWithTenGod(selectedSewoon.ganji[1], dayStem)
+            : [];
+
+          let yearlyStemTenGod = "";
+          let yearlyBranchTenGod: string | null = null;
+          if (selectedSewoon) {
+            try {
+              yearlyStemTenGod = getTenGod(dayStem, selectedSewoon.ganji[0] as StemHanja);
+              yearlyBranchTenGod =
+                yearlyBranchHiddenStems.find((s) => s.role === "main")?.tenGod ??
+                yearlyBranchHiddenStems[yearlyBranchHiddenStems.length - 1]?.tenGod ??
+                null;
+            } catch {
+              /* ignore */
+            }
+          }
+
+          const chartColCount = sideYearly ? 6 : sideDaeun ? 5 : 4;
+          const pillarGapClass = overlayYearly
+            ? isMobile
+              ? "gap-3"
+              : "gap-4"
+            : isMobile
+              ? "gap-1.5"
+              : "gap-2";
+          const colClass = `grid ${
+            chartColCount === 6
+              ? "grid-cols-6"
+              : chartColCount === 5
+                ? "grid-cols-5"
+                : "grid-cols-4"
+          } ${pillarGapClass}`;
+
+          const luckOverlayGap = overlayYearly
+            ? isMobile
+              ? "gap-3"
+              : "gap-4"
+            : isMobile
+              ? "gap-1.5"
+              : "gap-2";
 
           return (
             <>
-            {/* 연구 모드: 대운 천간 — 4글자 한 박스 강조 */}
+            {/* 연구 모드: 각 주 위 — 대운·년운을 그 주 중앙에 바짝 묶음 */}
             {overlayDaeun && selectedDaeun && daeunSc && (
               <div
-                className={`${colClass} mb-1.5 px-0.5 py-0.5`}
+                className={`grid grid-cols-4 ${luckOverlayGap} mb-1.5 px-0.5 py-0.5`}
                 style={daeunGroupHighlightStyle(daeunStemGroupTone)}
               >
                 {DISPLAY_ORDER.map((key, i) => {
@@ -703,21 +769,27 @@ export default function SajuResult({ result }: { result: SajuResult }) {
                       ref={(el) => {
                         daeunStemSlotRefs.current[i] = el;
                       }}
-                      className="flex flex-col items-center justify-center min-w-0"
+                      className="flex items-start justify-center min-w-0 w-full"
                     >
                       <div
                         key={`stem-${pumpGeneration}`}
-                        style={{ visibility: stemArrived ? "visible" : "hidden" }}
+                        className="inline-flex items-start justify-center"
+                        style={{
+                          visibility: stemArrived ? "visible" : "hidden",
+                          gap: 0,
+                          columnGap: 0,
+                        }}
                       >
                         <DaeunCharBox
                           char={selectedDaeun.ganji[0]}
                           tenGod={daeunStemTenGod}
                           style={daeunSc}
                           showBorder={false}
-                          charSize={charSize}
-                          labelSize={labelSize}
+                          charSize={luckCharSize}
+                          labelSize={luckLabelSize}
                           tone={null}
                           pumping={stemPumping}
+                          compact
                           onClick={() => {
                             const meta = STEM_META[selectedDaeun.ganji[0]];
                             const el = meta?.element;
@@ -732,11 +804,36 @@ export default function SajuResult({ result }: { result: SajuResult }) {
                             }
                           }}
                         />
+                        {overlayYearly && selectedSewoon && yearlySc && (
+                          <DaeunCharBox
+                            char={selectedSewoon.ganji[0]}
+                            tenGod={yearlyStemTenGod}
+                            style={yearlySc}
+                            showBorder={false}
+                            charSize={luckCharSize}
+                            labelSize={luckLabelSize}
+                            tone={null}
+                            pumping={false}
+                            compact
+                            onClick={() => {
+                              const meta = STEM_META[selectedSewoon.ganji[0]];
+                              const el = meta?.element;
+                              if (el) {
+                                toggleHighlight({
+                                  kind: "stem",
+                                  source: "daeun-slot",
+                                  pillar: key,
+                                  element: el,
+                                  label: meta.ko,
+                                });
+                              }
+                            }}
+                          />
+                        )}
                       </div>
                     </div>
                   );
                 })}
-                {sideDaeun ? <div /> : null}
               </div>
             )}
 
@@ -759,7 +856,7 @@ export default function SajuResult({ result }: { result: SajuResult }) {
                     >
                       <p className="text-xs font-bold text-center" style={{ color: "var(--px-text2)" }}>
                         {meta.ko}<br />
-                        <span style={{ fontSize: "10px" }}>{meta.hanja}</span>
+                        <span style={{ fontSize: "12px" }}>{meta.hanja}</span>
                       </p>
                       <p className="text-xs mt-3 text-center leading-relaxed" style={{ color: "var(--px-border2)" }}>
                         시간<br />없음
@@ -810,7 +907,7 @@ export default function SajuResult({ result }: { result: SajuResult }) {
                     <div className="text-center pb-1 w-full" style={{ borderBottom: "1px solid var(--px-border)" }}>
                       <p className="font-black leading-tight" style={{ color: "var(--px-accent)", fontSize: pillarTitleSize }}>{meta.ko}</p>
                       {!isMobile && (
-                        <p style={{ color: "var(--px-text2)", fontSize: "10px" }}>{meta.hanja}</p>
+                        <p style={{ color: "var(--px-text2)", fontSize: "12px" }}>{meta.hanja}</p>
                       )}
                     </div>
 
@@ -915,7 +1012,7 @@ export default function SajuResult({ result }: { result: SajuResult }) {
                       대운
                     </p>
                     {!isMobile && (
-                      <p style={{ color: "var(--px-text2)", fontSize: "10px" }}>大運</p>
+                      <p style={{ color: "var(--px-text2)", fontSize: "12px" }}>大運</p>
                     )}
                   </div>
                   <div
@@ -978,12 +1075,91 @@ export default function SajuResult({ result }: { result: SajuResult }) {
                   )}
                 </div>
               )}
+
+              {/* 기본 모드: 선택한 년운을 대운 오른쪽에 표시 (만세력과 동일 글자 크기) */}
+              {sideYearly && selectedSewoon && yearlySc && yearlyBc && (
+                <div
+                  className={`flex flex-col items-center gap-0 w-full min-w-0 ${isMobile ? "p-1" : "p-2"}`}
+                  style={{
+                    background: "color-mix(in srgb, #7dd3fc 10%, var(--px-bg2))",
+                    border: "2px solid #7dd3fc",
+                    boxShadow: "3px 3px 0 #0a3a4a",
+                  }}
+                >
+                  <div className="text-center pb-1 w-full" style={{ borderBottom: "1px solid var(--px-border)" }}>
+                    <p className="font-black leading-tight whitespace-nowrap" style={{ color: "#7dd3fc", fontSize: labelSize }}>
+                      년운
+                    </p>
+                    {!isMobile && (
+                      <p style={{ color: "var(--px-text2)", fontSize: "12px" }}>年運</p>
+                    )}
+                  </div>
+                  <div
+                    className={`flex flex-col items-center w-full ${isMobile ? "py-1 gap-0.5" : "gap-0.5 py-1.5"}`}
+                    style={{ borderBottom: "1px dashed var(--px-border)" }}
+                  >
+                    <span
+                      className="font-black leading-none"
+                      style={{ color: yearlySc.text, fontSize: charSize, textShadow: `0 0 10px ${yearlySc.text}88` }}
+                    >
+                      {selectedSewoon.ganji[0]}
+                    </span>
+                    <div className="flex items-center gap-1 mt-0.5">
+                      <span
+                        className="font-bold border leading-none"
+                        style={{
+                          color: yearlySc.text,
+                          borderColor: yearlySc.border,
+                          background: yearlySc.bg,
+                          fontSize: labelSize,
+                          padding: isMobile ? "1px 3px" : undefined,
+                        }}
+                      >
+                        {yearlyStemTenGod}
+                      </span>
+                    </div>
+                  </div>
+                  <div className={`flex flex-col items-center w-full ${isMobile ? "py-1 gap-0.5" : "gap-0.5 py-1.5"}`}>
+                    <span
+                      className="font-black leading-none"
+                      style={{ color: yearlyBc.text, fontSize: charSize, textShadow: `0 0 10px ${yearlyBc.text}88` }}
+                    >
+                      {selectedSewoon.ganji[1]}
+                    </span>
+                    {yearlyBranchTenGod && (
+                      <div className="flex items-center gap-1 mt-0.5">
+                        <span
+                          className="font-bold border leading-none"
+                          style={{
+                            color: yearlyBc.text,
+                            borderColor: yearlyBc.border,
+                            background: yearlyBc.bg,
+                            fontSize: labelSize,
+                            padding: isMobile ? "1px 3px" : undefined,
+                          }}
+                        >
+                          {yearlyBranchTenGod}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                  {yearlyBranchHiddenStems.length > 0 && (
+                    <HiddenStemPanel
+                      pillarStems={yearlyBranchHiddenStems}
+                      highlightSelection={null}
+                      touchoElements={touchoElements}
+                      pillarKey="year"
+                      isMobile={isMobile}
+                    />
+                  )}
+                </div>
+              )}
             </div>
 
-            {/* 연구 모드: 대운 지지 — 4글자 한 박스 강조 */}
+            {/* 연구 모드: 각 주 아래 — 대운·년운을 그 주 중앙에 바짝 묶음 */}
             {overlayDaeun && selectedDaeun && daeunBc && (
               <div
-                className={`${colClass} mt-1.5 px-0.5 py-0.5`}
+                className={`grid grid-cols-4 ${luckOverlayGap} mt-1.5 px-0.5 py-0.5`}
                 style={daeunGroupHighlightStyle(daeunBranchGroupTone)}
               >
                 {DISPLAY_ORDER.map((key, i) => {
@@ -996,21 +1172,27 @@ export default function SajuResult({ result }: { result: SajuResult }) {
                       ref={(el) => {
                         daeunBranchSlotRefs.current[i] = el;
                       }}
-                      className="flex flex-col items-center justify-center min-w-0"
+                      className="flex items-start justify-center min-w-0 w-full"
                     >
                       <div
                         key={`branch-${pumpGeneration}`}
-                        style={{ visibility: branchArrived ? "visible" : "hidden" }}
+                        className="inline-flex items-start justify-center"
+                        style={{
+                          visibility: branchArrived ? "visible" : "hidden",
+                          gap: 0,
+                          columnGap: 0,
+                        }}
                       >
                         <DaeunCharBox
                           char={selectedDaeun.ganji[1]}
                           tenGod={daeunBranchTenGod ?? ""}
                           style={daeunBc}
                           showBorder={false}
-                          charSize={charSize}
-                          labelSize={labelSize}
+                          charSize={luckCharSize}
+                          labelSize={luckLabelSize}
                           tone={null}
                           pumping={branchPumping}
+                          compact
                           onClick={() =>
                             toggleHighlight({
                               kind: "branch-stem-match",
@@ -1021,17 +1203,43 @@ export default function SajuResult({ result }: { result: SajuResult }) {
                             })
                           }
                         />
+                        {overlayYearly && selectedSewoon && yearlyBc && (
+                          <DaeunCharBox
+                            char={selectedSewoon.ganji[1]}
+                            tenGod={yearlyBranchTenGod ?? ""}
+                            style={yearlyBc}
+                            showBorder={false}
+                            charSize={luckCharSize}
+                            labelSize={luckLabelSize}
+                            tone={null}
+                            pumping={false}
+                            compact
+                            onClick={() =>
+                              toggleHighlight({
+                                kind: "branch-stem-match",
+                                scope: "daeun",
+                                pillar: key,
+                                label:
+                                  BRANCH_META[selectedSewoon.ganji[1]]?.ko ??
+                                  selectedSewoon.ganji[1],
+                                element:
+                                  BRANCH_META[selectedSewoon.ganji[1]]?.element ?? "earth",
+                              })
+                            }
+                          />
+                        )}
                       </div>
                     </div>
                   );
                 })}
-                {sideDaeun ? <div /> : null}
               </div>
             )}
 
-            {/* 연구 모드: 대운 지장간 (가운데 한 칸) */}
+            {/* 연구 모드: 대운 지장간 (+ 년운 지장간은 오른쪽) */}
             {overlayDaeun && daeunBranchHiddenStems.length > 0 && (
-              <div className={`flex justify-center ${isMobile ? "mt-1" : "mt-1.5"}`}>
+              <div
+                className={`flex justify-center items-stretch ${isMobile ? "mt-1 gap-1.5" : "mt-1.5 gap-2"}`}
+              >
                 <div
                   className={`w-full ${isMobile ? "max-w-[46%]" : "max-w-[28%]"}`}
                   style={{
@@ -1052,6 +1260,28 @@ export default function SajuResult({ result }: { result: SajuResult }) {
                     largeChips
                   />
                 </div>
+                {overlayYearly && yearlyBranchHiddenStems.length > 0 && (
+                  <div
+                    className={`w-full ${isMobile ? "max-w-[46%]" : "max-w-[28%]"}`}
+                    style={{
+                      background: "color-mix(in srgb, #7dd3fc 10%, var(--px-bg2))",
+                      border: "2px solid #7dd3fc",
+                      boxShadow: "3px 3px 0 #0a3a4a",
+                      padding: isMobile ? "1px 2px" : "2px 3px",
+                    }}
+                  >
+                    <HiddenStemPanel
+                      pillarStems={yearlyBranchHiddenStems}
+                      highlightSelection={highlightSelection}
+                      touchoElements={touchoElements}
+                      pillarKey="year"
+                      context="daeun"
+                      isMobile={isMobile}
+                      showTitle={false}
+                      largeChips
+                    />
+                  </div>
+                )}
               </div>
             )}
           </>
@@ -1064,126 +1294,231 @@ export default function SajuResult({ result }: { result: SajuResult }) {
           id="saju-daeun-section"
           style={{ background: "var(--px-bg3)", border: "2px solid var(--px-border)", boxShadow: "3px 3px 0 #000", overflowAnchor: "none" }}
         >
-          <div className={`grid ${isMobile ? "grid-cols-5 gap-1 p-2" : "grid-cols-10 gap-1 p-2"}`}>
-              {daeun.cycles.map((cycle) => {
-                const isSelected = selectedDaeunOrder === cycle.order;
-                const daeunCharSize = isMobile ? "16px" : "22px";
-                const daeunLabelSize = isMobile ? "9px" : "11px";
-                const daeunAgeSize = isMobile ? "9px" : "10px";
-                const stemEl = STEM_META[cycle.ganji[0]]?.element;
-                const branchEl = BRANCH_META[cycle.ganji[1]]?.element;
-                const sc = stemEl ? ELEM[stemEl] : ELEM.water;
-                const bc = branchEl ? ELEM[branchEl] : ELEM.water;
-                let stemTenGod: string = "";
-                let branchTenGod: string = "";
-                try {
-                  stemTenGod = getTenGod(dayStem, cycle.ganji[0] as StemHanja);
-                  const branchHiddenStems = getBranchHiddenStemsWithTenGod(cycle.ganji[1], dayStem);
-                  branchTenGod =
-                    branchHiddenStems.find((s) => s.role === "main")?.tenGod ??
-                    branchHiddenStems[branchHiddenStems.length - 1]?.tenGod ??
-                    "";
-                } catch {
-                  stemTenGod = "";
-                  branchTenGod = "";
-                }
-                const startAge = formatCycleAge(cycle.estimatedStartDate, input.normalizedSolarDateTime, daeunAgeMode);
-                const endAge = formatCycleAge(cycle.estimatedEndDate, input.normalizedSolarDateTime, daeunAgeMode);
+          <div className={isMobile ? "p-2 space-y-1" : "p-2 space-y-1"}>
+            {(() => {
+              const colsPerRow = isMobile ? 5 : 10;
+              const rows: typeof daeun.cycles[] = [];
+              for (let i = 0; i < daeun.cycles.length; i += colsPerRow) {
+                rows.push(daeun.cycles.slice(i, i + colsPerRow));
+              }
+              const sewoonYears = selectedDaeun
+                ? getSewoonYearsForDaeunCycle(selectedDaeun)
+                : [];
+              // 오른쪽→왼쪽으로 년도 증가: 최근 해를 왼쪽, 시작 해를 오른쪽에
+              const sewoonDisplay = [...sewoonYears].reverse();
+
+              return rows.map((rowCycles, rowIndex) => {
+                const rowHasSelection =
+                  selectedDaeun != null &&
+                  rowCycles.some((c) => c.order === selectedDaeun.order);
+
                 return (
-                  <div
-                    key={cycle.order}
-                    role="button"
-                    tabIndex={0}
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={(e) => {
-                      handleDaeunClick(
-                        cycle.order,
-                        isSelected,
-                        isMobile ? null : e.currentTarget,
-                        cycle.ganji[0],
-                        sc.text,
-                        stemEl ?? "water",
-                        cycle.ganji[1],
-                        bc.text,
-                        branchEl ?? "water",
-                      );
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
-                        handleDaeunClick(
-                          cycle.order,
-                          isSelected,
-                          isMobile ? null : e.currentTarget,
-                          cycle.ganji[0],
-                          sc.text,
-                          stemEl ?? "water",
-                          cycle.ganji[1],
-                          bc.text,
-                          branchEl ?? "water",
-                        );
-                      }
-                    }}
-                    className={`daeun-card flex flex-col items-center w-full ${isSelected ? "daeun-card-selected" : ""} ${isMobile ? "gap-0.5 px-1 py-1" : "gap-0.5 px-1 py-1"}`}
-                    style={{
-                      background: "var(--px-bg2)",
-                      border: isSelected ? "2px solid #fbbf24" : "1px solid var(--px-border)",
-                      boxShadow: isSelected ? "2px 2px 0 #4a3a00, 0 0 10px #fbbf2444" : "1px 1px 0 #000",
-                      cursor: "pointer",
-                    }}
-                  >
-                    {stemTenGod ? (
-                      <span
-                        className="font-bold border leading-none"
-                        style={{
-                          fontSize: daeunLabelSize,
-                          padding: "1px 3px",
-                          color: sc.text,
-                          borderColor: sc.border,
-                          background: sc.bg,
-                        }}
-                      >
-                        {stemTenGod}
-                      </span>
-                    ) : (
-                      <span className="font-bold leading-none" style={{ color: "var(--px-text2)", fontSize: daeunLabelSize }}>
-                        {cycle.order}운
-                      </span>
-                    )}
-                    <ColoredGanji ganji={cycle.ganji} compact={isMobile} charSize={daeunCharSize} />
-                    {branchTenGod ? (
-                      <span
-                        className="font-bold border leading-none"
-                        style={{
-                          fontSize: daeunLabelSize,
-                          padding: "1px 3px",
-                          color: bc.text,
-                          borderColor: bc.border,
-                          background: bc.bg,
-                        }}
-                      >
-                        {branchTenGod}
-                      </span>
-                    ) : null}
-                    <p
-                      className="font-bold leading-tight text-center w-full"
-                      style={{ color: "var(--px-accent)", fontSize: daeunAgeSize }}
+                  <div key={`daeun-row-${rowIndex}`} className="space-y-1">
+                    <div
+                      className={`grid gap-1 ${
+                        isMobile ? "grid-cols-5" : "grid-cols-10"
+                      }`}
                     >
-                      {startAge}~{endAge}세
-                    </p>
-                    {!isMobile && (
-                      <div className="text-[9px] text-center leading-tight w-full">
-                        <p style={{ color: "var(--px-text2)" }}>
-                          {cycle.estimatedStartDate ? formatIsoDate(cycle.estimatedStartDate) : "-"}
-                        </p>
-                        <p style={{ color: "var(--px-border2)" }}>
-                          ~{cycle.estimatedEndDate ? formatIsoDate(cycle.estimatedEndDate) : "-"}
-                        </p>
+                      {rowCycles.map((cycle) => {
+                        const isSelected = selectedDaeunOrder === cycle.order;
+                        const daeunCharSize = isMobile ? "16px" : "22px";
+                        const daeunLabelSize = isMobile ? "11px" : "12px";
+                        const daeunAgeSize = isMobile ? "11px" : "12px";
+                        const stemEl = STEM_META[cycle.ganji[0]]?.element;
+                        const branchEl = BRANCH_META[cycle.ganji[1]]?.element;
+                        const sc = stemEl ? ELEM[stemEl] : ELEM.water;
+                        const bc = branchEl ? ELEM[branchEl] : ELEM.water;
+                        let stemTenGod: string = "";
+                        let branchTenGod: string = "";
+                        try {
+                          stemTenGod = getTenGod(dayStem, cycle.ganji[0] as StemHanja);
+                          const branchHiddenStems = getBranchHiddenStemsWithTenGod(
+                            cycle.ganji[1],
+                            dayStem
+                          );
+                          branchTenGod =
+                            branchHiddenStems.find((s) => s.role === "main")?.tenGod ??
+                            branchHiddenStems[branchHiddenStems.length - 1]?.tenGod ??
+                            "";
+                        } catch {
+                          stemTenGod = "";
+                          branchTenGod = "";
+                        }
+                        const startAge = formatCycleAge(
+                          cycle.estimatedStartDate,
+                          input.normalizedSolarDateTime,
+                          daeunAgeMode
+                        );
+                        const endAge = formatCycleAge(
+                          cycle.estimatedEndDate,
+                          input.normalizedSolarDateTime,
+                          daeunAgeMode
+                        );
+                        return (
+                          <div
+                            key={cycle.order}
+                            role="button"
+                            tabIndex={0}
+                            onMouseDown={(e) => e.preventDefault()}
+                            onClick={(e) => {
+                              handleDaeunClick(
+                                cycle.order,
+                                isSelected,
+                                isMobile ? null : e.currentTarget,
+                                cycle.ganji[0],
+                                sc.text,
+                                stemEl ?? "water",
+                                cycle.ganji[1],
+                                bc.text,
+                                branchEl ?? "water"
+                              );
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" || e.key === " ") {
+                                e.preventDefault();
+                                handleDaeunClick(
+                                  cycle.order,
+                                  isSelected,
+                                  isMobile ? null : e.currentTarget,
+                                  cycle.ganji[0],
+                                  sc.text,
+                                  stemEl ?? "water",
+                                  cycle.ganji[1],
+                                  bc.text,
+                                  branchEl ?? "water"
+                                );
+                              }
+                            }}
+                            className={`daeun-card flex flex-col items-center w-full ${
+                              isSelected ? "daeun-card-selected" : ""
+                            } ${isMobile ? "gap-0.5 px-1 py-1" : "gap-0.5 px-1 py-1"}`}
+                            style={{
+                              background: "var(--px-bg2)",
+                              border: isSelected
+                                ? "2px solid #fbbf24"
+                                : "1px solid var(--px-border)",
+                              boxShadow: isSelected
+                                ? "2px 2px 0 #4a3a00, 0 0 10px #fbbf2444"
+                                : "1px 1px 0 #000",
+                              cursor: "pointer",
+                            }}
+                          >
+                            {stemTenGod ? (
+                              <span
+                                className="font-bold border leading-none"
+                                style={{
+                                  fontSize: daeunLabelSize,
+                                  padding: "1px 3px",
+                                  color: sc.text,
+                                  borderColor: sc.border,
+                                  background: sc.bg,
+                                }}
+                              >
+                                {stemTenGod}
+                              </span>
+                            ) : (
+                              <span
+                                className="font-bold leading-none"
+                                style={{ color: "var(--px-text2)", fontSize: daeunLabelSize }}
+                              >
+                                {cycle.order}운
+                              </span>
+                            )}
+                            <ColoredGanji
+                              ganji={cycle.ganji}
+                              compact={isMobile}
+                              charSize={daeunCharSize}
+                            />
+                            {branchTenGod ? (
+                              <span
+                                className="font-bold border leading-none"
+                                style={{
+                                  fontSize: daeunLabelSize,
+                                  padding: "1px 3px",
+                                  color: bc.text,
+                                  borderColor: bc.border,
+                                  background: bc.bg,
+                                }}
+                              >
+                                {branchTenGod}
+                              </span>
+                            ) : null}
+                            <p
+                              className="font-bold leading-tight text-center w-full"
+                              style={{ color: "var(--px-accent)", fontSize: daeunAgeSize }}
+                            >
+                              {startAge}~{endAge}세
+                            </p>
+                            {!isMobile && (
+                              <div className="text-[11px] text-center leading-tight w-full">
+                                <p style={{ color: "var(--px-text2)" }}>
+                                  {cycle.estimatedStartDate
+                                    ? formatIsoDate(cycle.estimatedStartDate)
+                                    : "-"}
+                                </p>
+                                <p style={{ color: "var(--px-border2)" }}>
+                                  ~
+                                  {cycle.estimatedEndDate
+                                    ? formatIsoDate(cycle.estimatedEndDate)
+                                    : "-"}
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {rowHasSelection && sewoonDisplay.length > 0 && (
+                      <div
+                        className="grid grid-cols-10 gap-0.5 px-0.5 py-1"
+                        style={{
+                          background: "color-mix(in srgb, #fbbf24 8%, var(--px-bg2))",
+                          border: "1px solid #fbbf2466",
+                          boxShadow: "1px 1px 0 #4a3a00",
+                        }}
+                        aria-label="년운"
+                      >
+                        {sewoonDisplay.map((item) => {
+                          let stemTenGod = "";
+                          let branchTenGod = "";
+                          try {
+                            stemTenGod = getTenGod(dayStem, item.ganji[0] as StemHanja);
+                            const branchHidden = getBranchHiddenStemsWithTenGod(
+                              item.ganji[1],
+                              dayStem
+                            );
+                            branchTenGod =
+                              branchHidden.find((s) => s.role === "main")?.tenGod ??
+                              branchHidden[branchHidden.length - 1]?.tenGod ??
+                              "";
+                          } catch {
+                            stemTenGod = "";
+                            branchTenGod = "";
+                          }
+                          return (
+                            <SewoonYearCell
+                              key={item.year}
+                              ganji={item.ganji}
+                              year={item.year}
+                              isMobile={isMobile}
+                              isSelected={selectedSewoonYear === item.year}
+                              stemTenGod={stemTenGod}
+                              branchTenGod={branchTenGod}
+                              onClick={() => {
+                                setSelectedSewoonYear((prev) =>
+                                  prev === item.year ? null : item.year
+                                );
+                              }}
+                            />
+                          );
+                        })}
                       </div>
                     )}
                   </div>
                 );
-              })}
+              });
+            })()}
           </div>
 
           {/* ── 오행 분포 ── */}
@@ -1472,6 +1807,7 @@ function DaeunCharBox({
   labelSize,
   tone = null,
   pumping = false,
+  compact = false,
   onClick,
 }: {
   char: string;
@@ -1482,12 +1818,15 @@ function DaeunCharBox({
   labelSize: string;
   tone?: HighlightTone;
   pumping?: boolean;
+  compact?: boolean;
   onClick?: () => void;
 }) {
   return (
     <button
       type="button"
-      className={`inline-flex flex-col items-center ganji-clickable bg-transparent border-0 ${highlightToneClass(tone)} ${pumping ? "daeun-slot-pump" : ""} ${charSize === "28px" ? "px-1 py-0.5" : "px-1.5 py-0.5"}`}
+      className={`inline-flex flex-col items-center ganji-clickable bg-transparent border-0 ${highlightToneClass(tone)} ${pumping ? "daeun-slot-pump" : ""} ${
+        compact ? "px-0 py-0" : charSize === "28px" ? "px-1 py-0.5" : "px-1.5 py-0.5"
+      }`}
       onClick={onClick}
       style={{
         border: tone
@@ -1517,7 +1856,7 @@ function DaeunCharBox({
       </span>
       {tenGod && (
         <span
-          className="font-bold border px-1.5 py-0.5 mt-0.5"
+          className={`font-bold border mt-0.5 ${compact ? "px-0.5 py-0" : "px-1.5 py-0.5"}`}
           style={{
             color: style.text,
             borderColor: style.border,
@@ -1678,8 +2017,8 @@ function DaeunSummaryItem({ label, value, compact = false }: { label: string; va
       className={compact ? "p-1.5" : "p-2"}
       style={{ background: "var(--px-bg2)", border: "1px solid var(--px-border)" }}
     >
-      <p className={`font-bold mb-1 ${compact ? "text-[10px]" : "text-xs"}`} style={{ color: "var(--px-text2)" }}>{label}</p>
-      <p className={`font-bold leading-relaxed ${compact ? "text-[10px]" : "text-xs"}`} style={{ color: "var(--px-text)" }}>{value}</p>
+      <p className={`font-bold mb-1 ${compact ? "text-[11px]" : "text-xs"}`} style={{ color: "var(--px-text2)" }}>{label}</p>
+      <p className={`font-bold leading-relaxed ${compact ? "text-[11px]" : "text-xs"}`} style={{ color: "var(--px-text)" }}>{value}</p>
     </div>
   );
 }
@@ -1746,8 +2085,8 @@ function HiddenStemPanel({
       ? "14px"
       : "16px"
     : isMobile
-      ? "10px"
-      : "11px";
+      ? "11px"
+      : "12px";
 
   return (
     <div
@@ -1759,7 +2098,7 @@ function HiddenStemPanel({
       {showTitle && (
         <p
           className="text-center font-bold"
-          style={{ fontSize: isMobile ? "8px" : "9px", color: "var(--px-text2)" }}
+          style={{ fontSize: isMobile ? "11px" : "12px", color: "var(--px-text2)" }}
         >
           {title}
         </p>
@@ -1783,7 +2122,7 @@ function HiddenStemPanel({
 function HiddenStemChip({
   hiddenStem,
   highlighted,
-  fontSize = "10px",
+  fontSize = "11px",
 }: {
   hiddenStem: HiddenStemWithTenGod;
   highlighted: boolean;
@@ -1834,6 +2173,104 @@ function ColoredGanji({
       <span style={{ color: stemColor, textShadow: `0 0 8px ${stemColor}66` }}>{stem}</span>
       <span style={{ color: branchColor, textShadow: `0 0 8px ${branchColor}66` }}>{branch}</span>
     </span>
+  );
+}
+
+/** 년운 한 칸: 십신 + 세로 간지, 클릭 시 오행 분포에 반영 */
+function SewoonYearCell({
+  ganji,
+  year,
+  isMobile,
+  isSelected,
+  stemTenGod,
+  branchTenGod,
+  onClick,
+}: {
+  ganji: string;
+  year: number;
+  isMobile: boolean;
+  isSelected: boolean;
+  stemTenGod: string;
+  branchTenGod: string;
+  onClick: () => void;
+}) {
+  const stem = ganji[0];
+  const branch = ganji[1];
+  const stemElement = STEM_META[stem]?.element;
+  const branchElement = BRANCH_META[branch]?.element;
+  const stemColor = stemElement ? ELEM[stemElement].text : "var(--px-accent)";
+  const branchColor = branchElement ? ELEM[branchElement].text : "var(--px-accent)";
+  const sc = stemElement ? ELEM[stemElement] : ELEM.water;
+  const bc = branchElement ? ELEM[branchElement] : ELEM.water;
+  const charSize = isMobile ? "13px" : "14px";
+  const yearSize = isMobile ? "11px" : "12px";
+  const tenGodSize = isMobile ? "11px" : "12px";
+
+  return (
+    <button
+      type="button"
+      onMouseDown={(e) => e.preventDefault()}
+      onClick={onClick}
+      className="daeun-card flex flex-col items-center justify-center gap-0 py-0.5 min-w-0 w-full"
+      title={`${year} · ${ganji}`}
+      style={{
+        background: isSelected
+          ? "color-mix(in srgb, #fbbf24 18%, var(--px-bg2))"
+          : "transparent",
+        border: isSelected ? "1px solid #fbbf24" : "1px solid transparent",
+        boxShadow: isSelected ? "0 0 8px #fbbf2444" : "none",
+        cursor: "pointer",
+      }}
+    >
+      {stemTenGod ? (
+        <span
+          className="font-bold border leading-none mb-0.5"
+          style={{
+            fontSize: tenGodSize,
+            padding: "0 2px",
+            color: sc.text,
+            borderColor: sc.border,
+            background: sc.bg,
+          }}
+        >
+          {stemTenGod}
+        </span>
+      ) : (
+        <span style={{ fontSize: tenGodSize, lineHeight: 1, opacity: 0 }}>·</span>
+      )}
+      <span
+        className="font-black leading-none"
+        style={{ fontSize: charSize, color: stemColor, textShadow: `0 0 6px ${stemColor}55` }}
+      >
+        {stem}
+      </span>
+      <span
+        className="font-black leading-none"
+        style={{ fontSize: charSize, color: branchColor, textShadow: `0 0 6px ${branchColor}55` }}
+      >
+        {branch}
+      </span>
+      {branchTenGod ? (
+        <span
+          className="font-bold border leading-none mt-0.5"
+          style={{
+            fontSize: tenGodSize,
+            padding: "0 2px",
+            color: bc.text,
+            borderColor: bc.border,
+            background: bc.bg,
+          }}
+        >
+          {branchTenGod}
+        </span>
+      ) : null}
+      <span
+        className="font-bold leading-none mt-0.5"
+        style={{ color: "var(--px-text2)", fontSize: yearSize }}
+      >
+        {String(year).slice(-2)}
+      </span>
+    </button>
   );
 }
 
@@ -1890,7 +2327,7 @@ function calculateKoreanAge(birthIso: string, targetIso: string): number {
 function DebugTable({ rows, compact = false }: { rows: [string, string][]; compact?: boolean }) {
   return (
     <div className="overflow-x-auto">
-      <table className={`w-full ${compact ? "text-[10px]" : "text-xs"}`} style={{ borderCollapse: "collapse" }}>
+      <table className={`w-full ${compact ? "text-[11px]" : "text-xs"}`} style={{ borderCollapse: "collapse" }}>
         <tbody>
           {rows.map(([label, value], i) => (
             <tr

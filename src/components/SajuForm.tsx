@@ -11,8 +11,8 @@ interface SajuFormProps {
   isLoading: boolean;
 }
 
-const LABEL_STYLE = { color: "var(--px-text2)", fontSize: "11px", fontWeight: "700" as const };
-const SECTION_STYLE = { color: "var(--px-accent)", fontSize: "12px", fontWeight: "700" as const };
+const LABEL_STYLE = { color: "var(--px-text2)", fontSize: "14px", fontWeight: "700" as const };
+const SECTION_STYLE = { color: "var(--px-accent)", fontSize: "16px", fontWeight: "800" as const };
 
 const LOCATION_PRESETS = [
   { id: "seoul", name: "대한민국, 서울", longitude: 126.98, latitude: 37.57 },
@@ -35,6 +35,7 @@ function getCurrentDateTimeParts() {
     day: String(now.getDate()),
     hour: String(now.getHours()),
     minute: String(now.getMinutes()),
+    gender: undefined as Gender | undefined,
   };
 }
 
@@ -95,11 +96,13 @@ export default function SajuForm({ onCalculate, isLoading }: SajuFormProps) {
   const [minute, setMinute] = useState(initialDateTime.minute);
   const [noTime, setNoTime] = useState(() => !initialDateTime.hour);
   const [calendarType, setCalendarType] = useState<CalendarType>("solar");
-  const [gender, setGender] = useState<Gender>("male");
+  const [gender, setGender] = useState<Gender>(
+    () => initialDateTime.gender ?? "male"
+  );
   const [isLeapMonth, setIsLeapMonth] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [dayChangeRule, setDayChangeRule] = useState<DayChangeRule>("midnight");
-  const [timeCorrection, setTimeCorrection] = useState<TimeCorrection>("none");
+  const [timeCorrection, setTimeCorrection] = useState<TimeCorrection>("trueSolarTime");
   const [locationPresetId, setLocationPresetId] = useState<(typeof LOCATION_PRESETS)[number]["id"]>("seoul");
   const [locationName, setLocationName] = useState("대한민국, 서울");
   const [longitude, setLongitude] = useState(126.98);

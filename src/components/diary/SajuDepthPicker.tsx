@@ -24,6 +24,7 @@ import {
 } from "@/lib/diary/dayPillar";
 import {
   computeUserBirthPillars,
+  hasDiarySajuProfile,
   resolvePillarVisibility,
   splitBirthDate,
   validateBirthDateTimeFields,
@@ -32,6 +33,7 @@ import {
   type PillarVisibility,
   type SajuSettings,
 } from "@/lib/diary/sajuSettings";
+import { resolveDiarySajuFortune } from "@/lib/diary/currentDaeun";
 
 const INPUT_STYLE: React.CSSProperties = {
   textAlign: "center",
@@ -213,7 +215,7 @@ function BirthDateInput({
   return (
     <div className="space-y-2">
       <p className="ui-section-title">
-        {compact ? "내 생년월일·시간" : "■ 내 생년월일"}
+        {compact ? "내 생년월일·시간" : "■ 생년월일"}
       </p>
       {compact && (
         <p className="ui-hint text-center">
@@ -345,7 +347,7 @@ function DiaryDateInput({
     <div className="space-y-2">
       {!hideTitle && (
         <p className="ui-section-title">
-          ■ 일기 날짜
+          ■ 날짜 선택
         </p>
       )}
       <div className={`flex items-start gap-1.5 flex-wrap ${hideTitle ? "justify-center" : ""}`}>
@@ -398,6 +400,7 @@ type Props = {
   onBirthMinuteChange: (minute: number | undefined) => void;
   onToggleBirthPillar: (slot: BirthPillarSlot) => void;
   onToggleDiaryPillar: (slot: DiaryPillarSlot) => void;
+  onToggleDaeun: () => void;
   totalEntryDays?: number;
   entries?: DiaryEntry[];
 };
@@ -411,6 +414,7 @@ export default function SajuDepthPicker({
   onBirthMinuteChange,
   onToggleBirthPillar,
   onToggleDiaryPillar,
+  onToggleDaeun,
   totalEntryDays = 0,
   entries = [],
 }: Props) {
@@ -436,6 +440,17 @@ export default function SajuDepthPicker({
   const diaryPillars = useMemo(
     () => getPartialPillarsForFields(diaryFields),
     [diaryFields]
+  );
+
+  const sajuFortune = useMemo(
+    () =>
+      hasDiarySajuProfile(sajuSettings)
+        ? resolveDiarySajuFortune(
+            sajuSettings,
+            new Date(`${diaryDate}T12:00:00+09:00`)
+          )
+        : null,
+    [diaryDate, sajuSettings]
   );
 
   const pillarVisibility = resolvePillarVisibility(sajuSettings);
@@ -502,7 +517,7 @@ export default function SajuDepthPicker({
     <div className="space-y-3">
       {!boardExpanded && (
         <div className="text-center px-1">
-          <h2 className="ui-page-title text-base sm:text-lg">■ 날짜</h2>
+          <h2 className="ui-page-title text-base sm:text-lg">■ 날짜 선택</h2>
         </div>
       )}
       {boardExpanded && (
@@ -521,6 +536,40 @@ export default function SajuDepthPicker({
         />
       )}
       {!boardExpanded && (
+        <ElementDistributionBars
+          diaryPillars={diaryPillars}
+          birthPillars={birthPillars}
+          currentDaeun={sajuFortune?.daeun ?? null}
+          pillarVisibility={pillarVisibility}
+          viewMode="simple"
+        />
+      )}
+      {boardExpanded && (
+        <ElementDistributionBars
+          diaryPillars={diaryPillars}
+          birthPillars={birthPillars}
+          currentDaeun={sajuFortune?.daeun ?? null}
+          pillarVisibility={{
+            ...pillarVisibility,
+            diary: { day: true, month: true, year: true },
+            daeun: true,
+          }}
+          viewMode="diary_detail"
+        />
+      )}
+      <ManseryeokBoard
+        birthPillars={birthPillars}
+        diaryPillars={diaryPillars}
+        pillarVisibility={pillarVisibility}
+        compact={!boardExpanded}
+        currentDaeun={sajuFortune?.daeun ?? null}
+        dayStemHanja={
+          sajuFortune?.dayStemHanja ?? birthPillars?.day.stemHanja ?? null
+        }
+        onToggleDiaryPillar={!boardExpanded ? onToggleDiaryPillar : undefined}
+        onToggleDaeun={!boardExpanded ? onToggleDaeun : undefined}
+      />
+      {!boardExpanded && (
         <DiaryDateInput
           date={diaryDate}
           pillarVisibility={pillarVisibility}
@@ -531,13 +580,6 @@ export default function SajuDepthPicker({
           hideTitle
         />
       )}
-      <ManseryeokBoard
-        birthPillars={birthPillars}
-        diaryPillars={diaryPillars}
-        pillarVisibility={pillarVisibility}
-        compact={!boardExpanded}
-      />
-      {!boardExpanded && <ElementDistributionBars diaryPillars={diaryPillars} />}
       {!boardExpanded && diaryPillars.dayPillar && (
         <SameGanjiHint
           ganjiKo={diaryPillars.dayPillar.ganjiKo}
@@ -562,7 +604,7 @@ export default function SajuDepthPicker({
   ) : !boardExpanded ? (
     <div className="space-y-3">
       <div className="text-center px-1">
-        <h2 className="ui-page-title text-base sm:text-lg">■ 날짜</h2>
+        <h2 className="ui-page-title text-base sm:text-lg">■ 날짜 선택</h2>
       </div>
       <DiaryDateInput
         date={diaryDate}
@@ -593,6 +635,7 @@ export default function SajuDepthPicker({
     >
       {boardExpanded ? (
         <>
+          {boardSection}
           <BirthDateInput
             birthDate={sajuSettings.birthDate}
             birthHour={sajuSettings.birthHour}
@@ -602,30 +645,27 @@ export default function SajuDepthPicker({
             onBirthDateChange={onBirthDateChange}
             onBirthHourChange={onBirthHourChange}
             onBirthMinuteChange={onBirthMinuteChange}
-            showPillarToggles={boardExpanded}
+            showPillarToggles={false}
           />
-          {boardSection}
           <DiaryDateInput
             date={diaryDate}
-            pillarVisibility={pillarVisibility}
+            pillarVisibility={{
+              ...pillarVisibility,
+              diary: { year: true, month: true, day: true },
+            }}
             onToggleDiaryPillar={onToggleDiaryPillar}
             onDiaryDateChange={onDiaryDateChange}
             onFieldsChange={setDiaryFields}
-            showPillarToggles={boardExpanded}
+            showPillarToggles={false}
           />
-          <div className="space-y-2 pt-1">
-            <p className="ui-hint text-center">
-              눈 아이콘으로 간지 표시/숨김을 선택하세요.
-            </p>
-            <div className="flex justify-center">
-              <button
-                type="button"
-                onClick={toggleBoardExpanded}
-                className="ui-action-btn ui-action-btn-muted"
-              >
-                간단히
-              </button>
-            </div>
+          <div className="flex justify-center pt-1">
+            <button
+              type="button"
+              onClick={toggleBoardExpanded}
+              className="ui-action-btn ui-action-btn-muted"
+            >
+              간단히
+            </button>
           </div>
         </>
       ) : (

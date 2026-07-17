@@ -1,4 +1,4 @@
-import type { DiaryAnalysis } from "./dimensions";
+import type { DiaryAnalysis, EmotionLabel } from "./dimensions";
 import type { DiaryInputMode } from "./manualScores";
 
 export type DiaryDayPillar = {
@@ -57,6 +57,8 @@ export type DiaryEntry = {
   analysis: DiaryAnalysis | null;
   /** text: 글쓰기, scores: 슬라이더 점수 입력 */
   inputMode?: DiaryInputMode;
+  /** 기분 라벨의 출처: 직접 선택 / 행복도 자동 추론 / AI 분석 */
+  emotionSource?: "selected" | "inferred" | "ai";
   createdAt: string;
   updatedAt: string;
 };
@@ -71,6 +73,8 @@ export type GroupStats = {
   analyzedCount: number;
   avgDailyWellbeing: number;
   avgScores: Partial<Record<keyof DiaryAnalysis, number>>;
+  explicitMoodCount: number;
+  moodCounts: Partial<Record<EmotionLabel, number>>;
   dates: string[];
   deltaFromOverall?: number;
 };

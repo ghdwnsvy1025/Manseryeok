@@ -2,6 +2,7 @@ import { describe, expect, test } from "@jest/globals";
 import {
   calculateElementDistribution,
   computeBranchWeightedPosition,
+  getCalculationModeByViewMode,
   getBranchBaseDistribution,
   getBranchFireWaterElementMultipliers,
   getBranchPeerElementMultipliers,
@@ -10,6 +11,9 @@ import {
   getPeerInteractionMultipliers,
   getSamhapMatches,
   getSamhapElementMultiplierMap,
+  PILLAR_INFLUENCE_WEIGHTS,
+  PILLAR_WEIGHTS,
+  resolveCalculationMode,
   stemHelpValue,
 } from "@/lib/saju/elementDistribution";
 
@@ -40,6 +44,78 @@ const NO_BANGHAP = {
   groups: [],
   boostedBranches: [],
 };
+
+describe("화면 모드별 오행 분포 계산 모드", () => {
+  const fortuneInput = {
+    stems: "신기병을",
+    branches: "미축술해",
+    daewoon: { stem: "신", branch: "오" },
+    yearly: { stem: "갑", branch: "진" },
+    monthly: { stem: "병", branch: "술" },
+    daily: { stem: "임", branch: "자" },
+  } as const;
+
+  test("내 일기 상세모드는 원국과 선택된 운을 함께 계산한다", () => {
+    const result = calculateElementDistribution({
+      ...fortuneInput,
+      viewMode: "diary_detail",
+    });
+
+    expect(getCalculationModeByViewMode("diary_detail")).toBe("native_with_luck");
+    expect(result.detail.calculationMode).toBe("native_with_luck");
+    expect(result.detail.viewMode).toBe("diary_detail");
+    expect(result.detail.luckOnly.applied).toBe(false);
+    expect(result.detail.finalMix.original).toBeGreaterThan(0);
+  });
+
+  test("간단 모드는 원국을 제외하고 선택된 운끼리 계산한다", () => {
+    const result = calculateElementDistribution({
+      ...fortuneInput,
+      viewMode: "simple",
+    });
+    const differentNative = calculateElementDistribution({
+      ...fortuneInput,
+      stems: "갑갑갑갑",
+      branches: "인인인인",
+      viewMode: "simple",
+    });
+
+    expect(getCalculationModeByViewMode("simple")).toBe("luck_only");
+    expect(result.detail.calculationMode).toBe("luck_only");
+    expect(result.detail.viewMode).toBe("simple");
+    expect(result.detail.luckOnly.applied).toBe(true);
+    expect(result.detail.finalMix.original).toBe(0);
+    expect(result.percentage).toEqual(differentNative.percentage);
+  });
+
+  test("직접 전달한 calculationMode가 화면 모드보다 우선한다", () => {
+    const result = calculateElementDistribution({
+      ...fortuneInput,
+      viewMode: "simple",
+      calculationMode: "native_with_luck",
+    });
+
+    expect(
+      resolveCalculationMode({
+        viewMode: "simple",
+        calculationMode: "native_with_luck",
+      })
+    ).toBe("native_with_luck");
+    expect(result.detail.calculationMode).toBe("native_with_luck");
+    expect(result.detail.luckOnly.applied).toBe(false);
+  });
+
+  test("모드 입력이 없으면 native_with_luck으로 fallback한다", () => {
+    const result = calculateElementDistribution({
+      stems: fortuneInput.stems,
+      branches: fortuneInput.branches,
+      daily: fortuneInput.daily,
+    });
+
+    expect(resolveCalculationMode({})).toBe("native_with_luck");
+    expect(result.detail.calculationMode).toBe("native_with_luck");
+  });
+});
 
 describe("getBranchBaseDistribution — 토 지지 + 지장간 양/음 보정", () => {
   test("미 기본 오행 분포 (토 지지, 대표 지장간 모두 음 → 기존과 동일)", () => {
@@ -378,6 +454,8 @@ describe("calculateElementDistribution — peer·화수·분포 기준", () => {
     expectVecCloseTo(result.originalPercentage, originalPct, 2);
     expect(result.percentage).toEqual(result.originalPercentage);
     expect(result.detail.daewoon.applied).toBe(false);
+    expect(result.detail.yearly.applied).toBe(false);
+    expect(result.detail.finalMix).toEqual({ original: 1, daewoon: 0, yearly: 0 });
   });
 
   test('테스트 2: 대운 "신오"', () => {
@@ -389,6 +467,8 @@ describe("calculateElementDistribution — peer·화수·분포 기준", () => {
     expectVecCloseTo(result.originalPercentage, originalPct, 2);
 
     expect(result.detail.daewoon.applied).toBe(true);
+    expect(result.detail.yearly.applied).toBe(false);
+    expect(result.detail.finalMix).toEqual({ original: 0.5, daewoon: 0.5, yearly: 0 });
     expect(result.detail.daewoon.influenceRate).toBe(0.5);
     expect(result.detail.daewoon.selfRate).toBe(0.4);
     expect(result.detail.daewoon.pillarInteractionRate).toBe(0.6);
@@ -410,13 +490,27 @@ describe("calculateElementDistribution — peer·화수·분포 기준", () => {
     expect(result.detail.daewoon.branchPolarityMultiplier).toBe(1.03);
     expect(result.detail.daewoon.branchFireWaterElementMultiplier?.화).toBeLessThan(1);
 
+    expect(PILLAR_WEIGHTS).toEqual([0.25, 0.35, 0.25, 0.15]);
+    expect(PILLAR_WEIGHTS.reduce((a, b) => a + b, 0)).toBeCloseTo(1, 10);
+    expect(PILLAR_WEIGHTS).not.toEqual([0.25, 0.25, 0.25, 0.25]);
+    expect(
+      PILLAR_INFLUENCE_WEIGHTS.time +
+        PILLAR_INFLUENCE_WEIGHTS.day +
+        PILLAR_INFLUENCE_WEIGHTS.month +
+        PILLAR_INFLUENCE_WEIGHTS.year
+    ).toBeCloseTo(1, 10);
+
     expect(result.detail.daewoon.pillarInteraction?.byPillar).toHaveLength(4);
     expect(result.detail.daewoon.pillarInteraction?.pillarWeights).toEqual({
       time: 0.25,
-      day: 0.25,
+      day: 0.35,
       month: 0.25,
-      year: 0.25,
+      year: 0.15,
     });
+    expect(result.detail.daewoon.pillarInteraction?.pillarWeights.time).toBe(0.25);
+    expect(result.detail.daewoon.pillarInteraction?.pillarWeights.day).toBe(0.35);
+    expect(result.detail.daewoon.pillarInteraction?.pillarWeights.month).toBe(0.25);
+    expect(result.detail.daewoon.pillarInteraction?.pillarWeights.year).toBe(0.15);
     expect(result.detail.daewoon.pillarInteraction?.stemInteractionWeight).toBe(0.5);
     expect(result.detail.daewoon.pillarInteraction?.branchInteractionWeight).toBe(0.5);
     expect(result.detail.daewoon.pillarInteraction?.byPillar[0]).toMatchObject({
@@ -425,6 +519,18 @@ describe("calculateElementDistribution — peer·화수·분포 기준", () => {
       nativeStemElement: "금",
       stemRelation: "same_element",
       pillarWeight: 0.25,
+    });
+    expect(result.detail.daewoon.pillarInteraction?.byPillar[1]).toMatchObject({
+      pillar: "day",
+      pillarWeight: 0.35,
+    });
+    expect(result.detail.daewoon.pillarInteraction?.byPillar[2]).toMatchObject({
+      pillar: "month",
+      pillarWeight: 0.25,
+    });
+    expect(result.detail.daewoon.pillarInteraction?.byPillar[3]).toMatchObject({
+      pillar: "year",
+      pillarWeight: 0.15,
     });
     // 대운 지지 오는 지장간 분포로 element별 배수 적용 (대표오행 단일 처리 아님)
     const timeBranchMult =
@@ -452,7 +558,7 @@ describe("calculateElementDistribution — peer·화수·분포 기준", () => {
       ),
       2
     );
-    expect(result.percentage).toEqual(vec(14.22, 22.08, 31.89, 21.47, 10.36));
+    expect(result.percentage).toEqual(vec(14.28, 22.07, 31.85, 21.45, 10.36));
   });
 
   test("대운 한자 간지 입력도 처리한다", () => {
@@ -464,7 +570,16 @@ describe("calculateElementDistribution — peer·화수·분포 기준", () => {
     expect(result.detail.daewoon.applied).toBe(true);
     expect(result.detail.daewoon.stem).toBe("신");
     expect(result.detail.daewoon.branch).toBe("오");
-    expect(result.percentage).toEqual(vec(14.22, 22.08, 31.89, 21.47, 10.36));
+    expect(result.detail.daewoon.influenceRate).toBe(0.5);
+    expect(result.detail.daewoon.selfRate).toBe(0.4);
+    expect(result.detail.daewoon.pillarInteractionRate).toBe(0.6);
+    expect(result.detail.daewoon.pillarInteraction?.pillarWeights).toEqual({
+      time: 0.25,
+      day: 0.35,
+      month: 0.25,
+      year: 0.15,
+    });
+    expect(result.percentage).toEqual(vec(14.28, 22.07, 31.85, 21.45, 10.36));
   });
 
   test('테스트 3: 대운 "갑축"', () => {
@@ -477,6 +592,8 @@ describe("calculateElementDistribution — peer·화수·분포 기준", () => {
 
     expect(result.detail.daewoon.applied).toBe(true);
     expect(result.detail.daewoon.influenceRate).toBe(0.5);
+    expect(result.detail.daewoon.selfRate).toBe(0.4);
+    expect(result.detail.daewoon.pillarInteractionRate).toBe(0.6);
     expect(result.detail.daewoon.selfStemWeight).toBe(0.5);
     expect(result.detail.daewoon.selfBranchWeight).toBe(0.5);
     expect(result.detail.daewoon.relation).toBe("stem_controls_branch");
@@ -486,6 +603,12 @@ describe("calculateElementDistribution — peer·화수·분포 기준", () => {
     expect(result.detail.daewoon.branchFinalMultiplier).toBeCloseTo(0.84, 10);
     expect(result.detail.daewoon.stemPolarityMultiplier).toBe(1.04);
     expect(result.detail.daewoon.branchPolarityMultiplier).toBe(0.97);
+    expect(result.detail.daewoon.pillarInteraction?.pillarWeights).toEqual({
+      time: 0.25,
+      day: 0.35,
+      month: 0.25,
+      year: 0.15,
+    });
 
     expect(result.detail.daewoon.branchSamhapDetail?.applied).toBe(false);
     // 천간/지지 0.50, stem_controls_branch는 지지 0.70
@@ -495,7 +618,7 @@ describe("calculateElementDistribution — peer·화수·분포 기준", () => {
       5
     );
 
-    expect(result.percentage).toEqual(vec(25.78, 13.31, 31.72, 15.84, 13.36));
+    expect(result.percentage).toEqual(vec(25.77, 13.34, 31.67, 15.86, 13.36));
   });
 
   test('테스트 4: 대운 "계미" — 지지가 천간을 극할 때 수 과대반영 완화', () => {
@@ -505,10 +628,19 @@ describe("calculateElementDistribution — peer·화수·분포 기준", () => {
     });
 
     expect(result.detail.daewoon.applied).toBe(true);
+    expect(result.detail.daewoon.influenceRate).toBe(0.5);
+    expect(result.detail.daewoon.selfRate).toBe(0.4);
+    expect(result.detail.daewoon.pillarInteractionRate).toBe(0.6);
     expect(result.detail.daewoon.selfStemWeight).toBe(0.5);
     expect(result.detail.daewoon.selfBranchWeight).toBe(0.5);
     expect(result.detail.daewoon.pillarStemInteractionWeight).toBe(0.5);
     expect(result.detail.daewoon.pillarBranchInteractionWeight).toBe(0.5);
+    expect(result.detail.daewoon.pillarInteraction?.pillarWeights).toEqual({
+      time: 0.25,
+      day: 0.35,
+      month: 0.25,
+      year: 0.15,
+    });
     expect(result.detail.daewoon.controlledSideMultiplier).toBe(0.7);
     expect(result.detail.daewoon.controllingSideMultiplier).toBe(1);
     expect(result.detail.daewoon.relation).toBe("branch_controls_stem");
@@ -521,7 +653,90 @@ describe("calculateElementDistribution — peer·화수·분포 기준", () => {
     // 미 지장간(목·화) 반영
     expect(result.percentage.화).toBeGreaterThan(result.originalPercentage.화);
     expect(result.percentage.목).toBeGreaterThan(result.originalPercentage.목);
-    expect(result.percentage).toEqual(vec(18, 17.3, 33.66, 13.51, 17.55));
+    expect(result.percentage).toEqual(vec(17.94, 17.31, 33.7, 13.51, 17.55));
+  });
+
+  test('테스트 5: 년운만 "갑진"', () => {
+    const result = calculateElementDistribution(stems, branches, null, {
+      stem: "갑",
+      branch: "진",
+    });
+
+    expect(result.detail.daewoon.applied).toBe(false);
+    expect(result.detail.yearly.applied).toBe(true);
+    expect(result.detail.yearly.finalInfluenceRate).toBe(0.25);
+    expect(result.detail.yearly.selfRate).toBe(0.4);
+    expect(result.detail.yearly.toOriginalRate).toBe(0.6);
+    expect(result.detail.yearly.toDaewoonRate).toBe(0);
+    expect(result.detail.yearly.toDaewoon?.applied).toBe(false);
+    expect(result.detail.finalMix).toEqual({ original: 0.75, daewoon: 0, yearly: 0.25 });
+
+    const y = result.detail.yearly.yearlyPercentage!;
+    expectVecCloseTo(
+      result.percentage,
+      vec(
+        round2(result.originalPercentage.목 * 0.75 + y.목 * 0.25),
+        round2(result.originalPercentage.화 * 0.75 + y.화 * 0.25),
+        round2(result.originalPercentage.토 * 0.75 + y.토 * 0.25),
+        round2(result.originalPercentage.금 * 0.75 + y.금 * 0.25),
+        round2(result.originalPercentage.수 * 0.75 + y.수 * 0.25)
+      ),
+      2
+    );
+  });
+
+  test('테스트 6: 대운 "신오" + 년운 "갑진"', () => {
+    const result = calculateElementDistribution(
+      stems,
+      branches,
+      { stem: "신", branch: "오" },
+      { stem: "갑", branch: "진" }
+    );
+
+    expect(result.detail.daewoon.applied).toBe(true);
+    expect(result.detail.yearly.applied).toBe(true);
+    expect(result.detail.finalMix).toEqual({ original: 0.4, daewoon: 0.4, yearly: 0.2 });
+    expect(result.detail.yearly.selfRate).toBe(0.3);
+    expect(result.detail.yearly.toOriginalRate).toBe(0.45);
+    expect(result.detail.yearly.toDaewoonRate).toBe(0.25);
+    expect(result.detail.yearly.toOriginalPillars?.byPillar).toHaveLength(4);
+    expect(result.detail.yearly.toDaewoon?.applied).toBe(true);
+    expect(result.detail.yearly.toOriginalPillars?.pillarWeights).toEqual({
+      time: 0.25,
+      day: 0.35,
+      month: 0.25,
+      year: 0.15,
+    });
+
+    // 진 지장간 분포(목/토/수)가 년운 자체·원국 작용에 반영
+    const selfRaw = result.detail.yearly.yearlySelfRaw!;
+    expect(selfRaw.목).toBeGreaterThan(0);
+    expect(selfRaw.토).toBeGreaterThan(0);
+    expect(selfRaw.수).toBeGreaterThan(0);
+
+    const dae = result.detail.daewoon.daewoonPercentage!;
+    const y = result.detail.yearly.yearlyPercentage!;
+    expectVecCloseTo(
+      result.percentage,
+      vec(
+        round2(
+          result.originalPercentage.목 * 0.4 + dae.목 * 0.4 + y.목 * 0.2
+        ),
+        round2(
+          result.originalPercentage.화 * 0.4 + dae.화 * 0.4 + y.화 * 0.2
+        ),
+        round2(
+          result.originalPercentage.토 * 0.4 + dae.토 * 0.4 + y.토 * 0.2
+        ),
+        round2(
+          result.originalPercentage.금 * 0.4 + dae.금 * 0.4 + y.금 * 0.2
+        ),
+        round2(
+          result.originalPercentage.수 * 0.4 + dae.수 * 0.4 + y.수 * 0.2
+        )
+      ),
+      2
+    );
   });
 });
 

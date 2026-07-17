@@ -28,7 +28,7 @@ export default function StatsSummaryHeader({
         >
           <p className="ui-section-title">패턴 분석까지 {daysUntilInsight}일 남았어요</p>
           <p className="ui-guide mt-1">
-            지금 {uniqueDays}일 기록 · {STATS_INSIGHT_MIN_ENTRIES}일이면 {groupLabel}별 평균 기분이 더 선명해져요.
+            지금 {uniqueDays}일 기록 · {STATS_INSIGHT_MIN_ENTRIES}일이면 {groupLabel}별 평균 행복도가 더 선명해져요.
           </p>
         </div>
       )}

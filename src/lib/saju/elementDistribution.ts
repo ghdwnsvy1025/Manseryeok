@@ -90,14 +90,67 @@ export const ORIGINAL_INFLUENCE_RATE = 0.5;
 export const DAEWOON_SELF_RATE = 0.4;
 export const DAEWOON_PILLAR_INTERACTION_RATE = 0.6;
 
-/** 시→일→월→년 기둥별 대운 작용 가중치 (합=1, 균등) */
+/** 최종 블렌딩 (원국 / 대운 / 년운) */
+export const FINAL_MIX_ORIGINAL_ONLY = {
+  original: 1,
+  daewoon: 0,
+  yearly: 0,
+} as const;
+export const FINAL_MIX_WITH_DAEWOON_ONLY = {
+  original: 0.5,
+  daewoon: 0.5,
+  yearly: 0,
+} as const;
+export const FINAL_MIX_WITH_YEARLY_ONLY = {
+  original: 0.75,
+  daewoon: 0,
+  yearly: 0.25,
+} as const;
+export const FINAL_MIX_WITH_DAEWOON_AND_YEARLY = {
+  original: 0.4,
+  daewoon: 0.4,
+  yearly: 0.2,
+} as const;
+
+/** 년운 percentage 내부 (대운 있을 때) */
+export const YEARLY_SELF_RATE = 0.3;
+export const YEARLY_TO_ORIGINAL_RATE = 0.45;
+export const YEARLY_TO_DAEWOON_RATE = 0.25;
+/** 년운 percentage 내부 (대운 없을 때) */
+export const YEARLY_SELF_RATE_WITHOUT_DAEWOON = 0.4;
+export const YEARLY_TO_ORIGINAL_RATE_WITHOUT_DAEWOON = 0.6;
+
+/** 년운 간지 내부 생극 */
+export const YEARLY_SAME_ELEMENT_STEM_MULT = 1;
+export const YEARLY_SAME_ELEMENT_BRANCH_MULT = 1;
+export const YEARLY_STEM_GENERATES_BRANCH_STEM_MULT = 1;
+export const YEARLY_STEM_GENERATES_BRANCH_BRANCH_MULT = 1.25;
+export const YEARLY_BRANCH_GENERATES_STEM_STEM_MULT = 1.25;
+export const YEARLY_BRANCH_GENERATES_STEM_BRANCH_MULT = 1;
+export const YEARLY_STEM_CONTROLS_BRANCH_STEM_MULT = 1;
+export const YEARLY_STEM_CONTROLS_BRANCH_BRANCH_MULT = 0.75;
+export const YEARLY_BRANCH_CONTROLS_STEM_STEM_MULT = 0.75;
+export const YEARLY_BRANCH_CONTROLS_STEM_BRANCH_MULT = 1;
+
+export const YEARLY_SELF_STEM_WEIGHT = 0.5;
+export const YEARLY_SELF_BRANCH_WEIGHT = 0.5;
+
+export const YEARLY_SAME_STEM_WITH_ORIGINAL_MULTIPLIER = 1.2;
+export const YEARLY_SAME_BRANCH_WITH_ORIGINAL_MULTIPLIER = 1.2;
+export const YEARLY_SAME_STEM_WITH_DAEWOON_MULTIPLIER = 1.2;
+export const YEARLY_SAME_BRANCH_WITH_DAEWOON_MULTIPLIER = 1.2;
+export const YEARLY_BANGHAP_TWO_MULTIPLIER = 1.15;
+export const YEARLY_BANGHAP_THREE_MULTIPLIER = 1.3;
+export const YEARLY_SAMHAP_DISTANCE_FACTOR = 0.85;
+
+/** 시→일→월→년 기둥별 대운 작용 가중치 (합=1, 일>시=월>년) */
 export const PILLAR_INFLUENCE_WEIGHTS = {
   time: 0.25,
-  day: 0.25,
+  day: 0.35,
   month: 0.25,
-  year: 0.25,
+  year: 0.15,
 } as const;
-export const PILLAR_WEIGHTS = [0.25, 0.25, 0.25, 0.25] as const;
+export const PILLAR_WEIGHTS = [0.25, 0.35, 0.25, 0.15] as const;
 
 export type DaewoonPillarKey = keyof typeof PILLAR_INFLUENCE_WEIGHTS;
 
@@ -118,6 +171,22 @@ export const DAEWOON_BRANCH_CONTROL_PENALTY = 0.16;
 export const NATIVE_BRANCH_CONTROLS_DAEWOON_BONUS = 0.04;
 export const DAEWOON_PILLAR_BRANCH_MULTIPLIER_MIN = 0.88;
 export const DAEWOON_PILLAR_BRANCH_MULTIPLIER_MAX = 1.12;
+
+/** 년운/대운 공통 luck→원국 작용 상수 별칭 */
+export const LUCK_TO_PILLAR_STEM_SAME_BONUS = DAEWOON_TO_PILLAR_STEM_SAME_BONUS;
+export const LUCK_TO_PILLAR_STEM_GENERATE_BONUS = DAEWOON_TO_PILLAR_STEM_GENERATE_BONUS;
+export const PILLAR_STEM_DRAINS_TO_LUCK_PENALTY = PILLAR_STEM_DRAINS_TO_DAEWOON_PENALTY;
+export const LUCK_TO_PILLAR_STEM_CONTROL_PENALTY = DAEWOON_TO_PILLAR_STEM_CONTROL_PENALTY;
+export const PILLAR_STEM_CONTROLS_LUCK_BONUS = PILLAR_STEM_CONTROLS_DAEWOON_BONUS;
+export const LUCK_PILLAR_STEM_MULTIPLIER_MIN = DAEWOON_PILLAR_STEM_MULTIPLIER_MIN;
+export const LUCK_PILLAR_STEM_MULTIPLIER_MAX = DAEWOON_PILLAR_STEM_MULTIPLIER_MAX;
+export const LUCK_BRANCH_SAME_ELEMENT_BONUS = DAEWOON_BRANCH_SAME_ELEMENT_BONUS;
+export const LUCK_BRANCH_GENERATE_BONUS = DAEWOON_BRANCH_GENERATE_BONUS;
+export const NATIVE_BRANCH_DRAINS_TO_LUCK_PENALTY = NATIVE_BRANCH_DRAINS_TO_DAEWOON_PENALTY;
+export const LUCK_BRANCH_CONTROL_PENALTY = DAEWOON_BRANCH_CONTROL_PENALTY;
+export const NATIVE_BRANCH_CONTROLS_LUCK_BONUS = NATIVE_BRANCH_CONTROLS_DAEWOON_BONUS;
+export const LUCK_PILLAR_BRANCH_MULTIPLIER_MIN = DAEWOON_PILLAR_BRANCH_MULTIPLIER_MIN;
+export const LUCK_PILLAR_BRANCH_MULTIPLIER_MAX = DAEWOON_PILLAR_BRANCH_MULTIPLIER_MAX;
 
 /** 대운 간지 내부 생극 — 같은 오행 */
 export const DAEWOON_SAME_ELEMENT_MULTIPLIER = 1.05;
@@ -601,6 +670,9 @@ export type DaewoonDetail = {
 };
 
 export type ElementDistributionDetail = {
+  calculationMode: CalculationMode;
+  viewMode?: ElementDistributionViewMode;
+  luckOnly: LuckOnlyDetail;
   branchBase: ElementVector[];
   branchWeighted: ElementVector[];
   branchWeightedDetail: BranchWeightedPositionDetail[];
@@ -614,11 +686,119 @@ export type ElementDistributionDetail = {
   stemPeerInteraction: PeerInteractionDetail;
   fireWaterExtreme: FireWaterExtremeDetail;
   daewoon: DaewoonDetail;
+  yearly: YearlyDetail;
+  finalMix: FinalMixRates;
 };
 
 export type DaewoonInput = {
   stem: string;
   branch: string;
+};
+
+export type YearlyInput = {
+  stem: string;
+  branch: string;
+};
+
+export type MonthlyInput = YearlyInput;
+export type DailyInput = YearlyInput;
+
+export type CalculationMode = "native_with_luck" | "luck_only";
+export type ElementDistributionViewMode = "diary_detail" | "simple";
+
+export type LuckOnlyDetail = {
+  applied: boolean;
+  selectedLuckCount: number;
+  raw?: ElementVector;
+  percentage?: ElementVector;
+};
+
+export type CalculateElementDistributionInput = {
+  stems: string;
+  branches: string;
+  daewoon?: DaewoonInput | null;
+  yearly?: YearlyInput | null;
+  monthly?: MonthlyInput | null;
+  daily?: DailyInput | null;
+  calculationMode?: CalculationMode;
+  viewMode?: ElementDistributionViewMode;
+};
+
+export type FinalMixRates = {
+  original: number;
+  daewoon: number;
+  yearly: number;
+};
+
+export type LuckToNativeStemRelation =
+  | "same_element"
+  | "luck_generates_native"
+  | "native_generates_luck"
+  | "luck_controls_native"
+  | "native_controls_luck"
+  | "none";
+
+export type YearlyToOriginalByPillar = {
+  index: number;
+  pillar: DaewoonPillarKey;
+  pillarWeight: number;
+  nativeStem: string;
+  nativeStemElement: ElementKo;
+  nativeStemBaseScore: number;
+  stemRelation: LuckToNativeStemRelation;
+  stemMultiplier: number;
+  sameStemMultiplier: number;
+  adjustedStemScore: number;
+  nativeBranch: string;
+  nativeBranchBaseContribution: ElementVector;
+  branchElementMultipliers: ElementVector;
+  sameBranchMultiplier: number;
+  banghapMultiplier: number;
+  samhapElementMultiplier: ElementVector;
+  adjustedBranchContribution: ElementVector;
+};
+
+export type YearlyToOriginalDetail = {
+  applied: boolean;
+  pillarWeights?: typeof PILLAR_INFLUENCE_WEIGHTS;
+  byPillar?: YearlyToOriginalByPillar[];
+  raw?: ElementVector;
+  percentage?: ElementVector;
+};
+
+export type YearlyToDaewoonDetail = {
+  applied: boolean;
+  daewoonStem?: string;
+  daewoonBranch?: string;
+  stemInteraction?: {
+    relation: LuckToNativeStemRelation;
+    multiplier: number;
+    adjustedScore: number;
+  };
+  branchInteraction?: {
+    elementMultipliers: ElementVector;
+    sameBranchMultiplier: number;
+    banghapMultiplier: number;
+    samhapElementMultiplier: ElementVector;
+    adjustedContribution: ElementVector;
+  };
+  raw?: ElementVector;
+  percentage?: ElementVector;
+};
+
+export type YearlyDetail = {
+  applied: boolean;
+  finalInfluenceRate: number;
+  stem?: string;
+  branch?: string;
+  selfRate?: number;
+  toOriginalRate?: number;
+  toDaewoonRate?: number;
+  yearlySelfRaw?: ElementVector;
+  yearlySelfPercentage?: ElementVector;
+  toOriginalPillars?: YearlyToOriginalDetail;
+  toDaewoon?: YearlyToDaewoonDetail;
+  yearlyPercentage?: ElementVector;
 };
 
 export type ElementDistributionResult = {
@@ -676,6 +856,34 @@ function blendOriginalAndDaewoonPercentage(
     );
   }
   return blended;
+}
+
+function blendFinalPercentage(
+  originalPct: ElementVector,
+  daewoonPct: ElementVector | null,
+  yearlyPct: ElementVector | null,
+  mix: FinalMixRates
+): ElementVector {
+  const blended = emptyVector();
+  for (const el of ELEMENT_ORDER) {
+    blended[el] = round2(
+      originalPct[el] * mix.original +
+        (daewoonPct?.[el] ?? 0) * mix.daewoon +
+        (yearlyPct?.[el] ?? 0) * mix.yearly
+    );
+  }
+  return blended;
+}
+
+function resolveFinalMix(hasDaewoon: boolean, hasYearly: boolean): FinalMixRates {
+  if (hasDaewoon && hasYearly) return { ...FINAL_MIX_WITH_DAEWOON_AND_YEARLY };
+  if (hasDaewoon) return { ...FINAL_MIX_WITH_DAEWOON_ONLY };
+  if (hasYearly) return { ...FINAL_MIX_WITH_YEARLY_ONLY };
+  return { ...FINAL_MIX_ORIGINAL_ONLY };
+}
+
+function emptyYearlyDetail(): YearlyDetail {
+  return { applied: false, finalInfluenceRate: 0 };
 }
 
 function percentageToRaw(percentage: ElementVector, originalSum: number): ElementVector {
@@ -2202,7 +2410,10 @@ function computeOriginalDistribution(
 ): {
   originalRaw: ElementVector;
   originalPercentage: ElementVector;
-  detail: Omit<ElementDistributionDetail, "daewoon">;
+  detail: Omit<
+    ElementDistributionDetail,
+    "calculationMode" | "viewMode" | "luckOnly" | "daewoon" | "yearly" | "finalMix"
+  >;
 } {
   const branchBase = branchChars.map((b) => getBranchBaseDistribution(b));
 
@@ -2303,11 +2514,13 @@ function computeOriginalDistribution(
  * @param stems 시간→일→월→년 천간 (예: "신기병을")
  * @param branches 시간→일→월→년 지지 (예: "미축술해")
  * @param daewoon 선택된 대운 간지 (천간·지지)
+ * @param yearly 선택된 년운 간지 (천간·지지)
  */
-export function calculateElementDistribution(
+function calculateNativeElementDistribution(
   stems: string,
   branches: string,
-  daewoon?: DaewoonInput | null
+  daewoon?: DaewoonInput | null,
+  yearly?: YearlyInput | null
 ): ElementDistributionResult {
   if (stems.length !== branches.length) {
     throw new Error("천간과 지지 길이가 일치해야 합니다.");
@@ -2324,57 +2537,119 @@ export function calculateElementDistribution(
         branch: normalizeBranchKo(daewoon.branch),
       }
     : null;
+  const normalizedYearly = yearly
+    ? {
+        stem: normalizeStemKo(yearly.stem),
+        branch: normalizeBranchKo(yearly.branch),
+      }
+    : null;
 
   const original = computeOriginalDistribution(stemChars, branchChars);
+  const hasDaewoon = !!normalizedDaewoon;
+  const hasYearly = !!normalizedYearly;
+  const finalMix = resolveFinalMix(hasDaewoon, hasYearly);
 
-  if (!normalizedDaewoon) {
-    return {
-      originalRaw: original.originalRaw,
-      originalPercentage: original.originalPercentage,
-      raw: original.originalRaw,
-      percentage: original.originalPercentage,
-      detail: {
-        ...original.detail,
-        daewoon: {
-          applied: false,
-          influenceRate: 0,
-        },
-      },
+  let daewoonDetail: DaewoonDetail = { applied: false, influenceRate: 0 };
+  let daewoonPercentage: ElementVector | null = null;
+  let daewoonSelfContrib: {
+    stemElement: ElementKo;
+    stemBaseScore: number;
+    branchContribution: ElementVector;
+    branchBase: ElementVector;
+  } | null = null;
+
+  if (normalizedDaewoon) {
+    const daewoonSelfResult = computeDaewoonDistribution(
+      normalizedDaewoon,
+      stemChars,
+      branchChars,
+      original.detail.branchBase
+    );
+    const daewoonSelfPercentage = toPercentage(daewoonSelfResult.raw);
+    const pillarInteraction = computeDaewoonPillarInteraction(
+      normalizedDaewoon.stem,
+      normalizedDaewoon.branch,
+      stemChars,
+      branchChars,
+      original.detail.stemScores,
+      original.detail.branchWeighted,
+      original.originalPercentage
+    );
+
+    daewoonPercentage = emptyVector();
+    for (const el of ELEMENT_ORDER) {
+      daewoonPercentage[el] = round2(
+        daewoonSelfPercentage[el] * DAEWOON_SELF_RATE +
+          pillarInteraction.percentage[el] * DAEWOON_PILLAR_INTERACTION_RATE
+      );
+    }
+
+    daewoonDetail = {
+      ...daewoonSelfResult.detail,
+      daewoonSelfPercentage,
+      pillarInteraction,
+      daewoonPercentage,
+    };
+
+    const branchBase = daewoonSelfResult.detail.branchBaseDistribution ?? emptyVector();
+    daewoonSelfContrib = {
+      stemElement: daewoonSelfResult.detail.stemElement!,
+      stemBaseScore:
+        1 *
+        (daewoonSelfResult.detail.stemFinalMultiplier ?? 1) *
+        (daewoonSelfResult.detail.stemPolarityMultiplier ?? 1),
+      branchContribution: (() => {
+        const v = emptyVector();
+        const branchFinal = daewoonSelfResult.detail.branchFinalMultiplier ?? 1;
+        const branchPol = daewoonSelfResult.detail.branchPolarityMultiplier ?? 1;
+        const samhap =
+          daewoonSelfResult.detail.branchSamhapDetail?.elementMultiplier ??
+          emptyVectorOnes();
+        const fw =
+          daewoonSelfResult.detail.branchFireWaterElementMultiplier ?? emptyVectorOnes();
+        for (const el of ELEMENT_ORDER) {
+          v[el] = branchBase[el] * branchFinal * samhap[el] * branchPol * fw[el];
+        }
+        return v;
+      })(),
+      branchBase,
     };
   }
 
-  const daewoonSelfResult = computeDaewoonDistribution(
-    normalizedDaewoon,
-    stemChars,
-    branchChars,
-    original.detail.branchBase
-  );
-  const daewoonSelfPercentage = toPercentage(daewoonSelfResult.raw);
+  let yearlyDetail: YearlyDetail = emptyYearlyDetail();
+  let yearlyPercentage: ElementVector | null = null;
 
-  const pillarInteraction = computeDaewoonPillarInteraction(
-    normalizedDaewoon.stem,
-    normalizedDaewoon.branch,
-    stemChars,
-    branchChars,
-    original.detail.stemScores,
-    original.detail.branchWeighted,
-    original.originalPercentage
-  );
-
-  const daewoonPercentage = emptyVector();
-  for (const el of ELEMENT_ORDER) {
-    daewoonPercentage[el] = round2(
-      daewoonSelfPercentage[el] * DAEWOON_SELF_RATE +
-        pillarInteraction.percentage[el] * DAEWOON_PILLAR_INTERACTION_RATE
-    );
+  if (normalizedYearly) {
+    const yearlyComputed = computeYearlyDistribution({
+      yearly: normalizedYearly,
+      stemChars,
+      branchChars,
+      stemScores: original.detail.stemScores,
+      branchWeighted: original.detail.branchWeighted,
+      originalPercentage: original.originalPercentage,
+      daewoon: normalizedDaewoon,
+      daewoonPercentage,
+      daewoonSelfContrib,
+    });
+    yearlyDetail = yearlyComputed.detail;
+    yearlyPercentage = yearlyComputed.percentage;
   }
 
-  const finalPercentage = blendOriginalAndDaewoonPercentage(
-    original.originalPercentage,
-    daewoonPercentage
-  );
+  const finalPercentage =
+    !hasDaewoon && !hasYearly
+      ? original.originalPercentage
+      : blendFinalPercentage(
+          original.originalPercentage,
+          daewoonPercentage,
+          yearlyPercentage,
+          finalMix
+        );
+
   const originalSum = vectorSum(original.originalRaw);
-  const finalRaw = percentageToRaw(finalPercentage, originalSum);
+  const finalRaw =
+    !hasDaewoon && !hasYearly
+      ? original.originalRaw
+      : percentageToRaw(finalPercentage, originalSum);
 
   return {
     originalRaw: original.originalRaw,
@@ -2382,13 +2657,571 @@ export function calculateElementDistribution(
     raw: finalRaw,
     percentage: finalPercentage,
     detail: {
+      calculationMode: "native_with_luck",
+      luckOnly: { applied: false, selectedLuckCount: 0 },
       ...original.detail,
-      daewoon: {
-        ...daewoonSelfResult.detail,
-        daewoonSelfPercentage,
-        pillarInteraction,
-        daewoonPercentage,
+      daewoon: daewoonDetail,
+      yearly: yearlyDetail,
+      finalMix,
+    },
+  };
+}
+
+export function getCalculationModeByViewMode(
+  viewMode?: ElementDistributionViewMode
+): CalculationMode {
+  if (viewMode === "simple") return "luck_only";
+  return "native_with_luck";
+}
+
+export function resolveCalculationMode(input: {
+  calculationMode?: CalculationMode;
+  viewMode?: ElementDistributionViewMode;
+}): CalculationMode {
+  return input.calculationMode ?? getCalculationModeByViewMode(input.viewMode);
+}
+
+function normalizeLuckInput(input?: YearlyInput | null): YearlyInput | null {
+  if (!input) return null;
+  return {
+    stem: normalizeStemKo(input.stem),
+    branch: normalizeBranchKo(input.branch),
+  };
+}
+
+function computeLuckOnlyDistribution(
+  selectedLuck: YearlyInput[]
+): { raw: ElementVector; percentage: ElementVector } {
+  if (selectedLuck.length === 0) {
+    return { raw: emptyVector(), percentage: emptyVector() };
+  }
+
+  // 가까운 운부터 일→월→년→대운 순서로 동일한 오행 상호작용 엔진을 적용한다.
+  const luckDistribution = computeOriginalDistribution(
+    selectedLuck.map((luck) => luck.stem),
+    selectedLuck.map((luck) => luck.branch)
+  );
+  return {
+    raw: luckDistribution.originalRaw,
+    percentage: luckDistribution.originalPercentage,
+  };
+}
+
+export function calculateElementDistribution(
+  input: CalculateElementDistributionInput
+): ElementDistributionResult;
+export function calculateElementDistribution(
+  stems: string,
+  branches: string,
+  daewoon?: DaewoonInput | null,
+  yearly?: YearlyInput | null
+): ElementDistributionResult;
+export function calculateElementDistribution(
+  inputOrStems: CalculateElementDistributionInput | string,
+  legacyBranches?: string,
+  legacyDaewoon?: DaewoonInput | null,
+  legacyYearly?: YearlyInput | null
+): ElementDistributionResult {
+  const input: CalculateElementDistributionInput =
+    typeof inputOrStems === "string"
+      ? {
+          stems: inputOrStems,
+          branches: legacyBranches ?? "",
+          daewoon: legacyDaewoon,
+          yearly: legacyYearly,
+        }
+      : inputOrStems;
+
+  const calculationMode = resolveCalculationMode(input);
+  const daewoon = normalizeLuckInput(input.daewoon);
+  const yearly = normalizeLuckInput(input.yearly);
+  const monthly = normalizeLuckInput(input.monthly);
+  const daily = normalizeLuckInput(input.daily);
+  const selectedLuck = [daily, monthly, yearly, daewoon].filter(
+    (luck): luck is YearlyInput => luck !== null
+  );
+
+  const nativeResult = calculateNativeElementDistribution(
+    input.stems,
+    input.branches,
+    daewoon,
+    yearly
+  );
+
+  if (calculationMode === "luck_only") {
+    const luckOnly = computeLuckOnlyDistribution(selectedLuck);
+    return {
+      ...nativeResult,
+      raw: luckOnly.raw,
+      percentage: luckOnly.percentage,
+      detail: {
+        ...nativeResult.detail,
+        calculationMode,
+        viewMode: input.viewMode,
+        luckOnly: {
+          applied: true,
+          selectedLuckCount: selectedLuck.length,
+          raw: { ...luckOnly.raw },
+          percentage: { ...luckOnly.percentage },
+        },
+        finalMix: {
+          original: 0,
+          daewoon: selectedLuck.length > 0 ? 1 : 0,
+          yearly: 0,
+        },
       },
+    };
+  }
+
+  // 기존 원국+대운+년운 결과를 그대로 기반으로 삼는다. 월운/일운이 추가되면
+  // 그 결과와 선택된 전체 운 조합을 1:1로 섞어 원국이 반드시 포함되게 한다.
+  if (monthly || daily) {
+    const luckCombined = computeLuckOnlyDistribution(selectedLuck);
+    const percentage = emptyVector();
+    for (const element of ELEMENT_ORDER) {
+      percentage[element] = round2(
+        nativeResult.percentage[element] * 0.5 +
+          luckCombined.percentage[element] * 0.5
+      );
+    }
+    return {
+      ...nativeResult,
+      raw: percentageToRaw(percentage, vectorSum(nativeResult.originalRaw)),
+      percentage,
+      detail: {
+        ...nativeResult.detail,
+        calculationMode,
+        viewMode: input.viewMode,
+        luckOnly: {
+          applied: false,
+          selectedLuckCount: selectedLuck.length,
+          raw: { ...luckCombined.raw },
+          percentage: { ...luckCombined.percentage },
+        },
+        finalMix: { original: 0.5, daewoon: 0.5, yearly: 0 },
+      },
+    };
+  }
+
+  return {
+    ...nativeResult,
+    detail: {
+      ...nativeResult.detail,
+      calculationMode,
+      viewMode: input.viewMode,
+      luckOnly: { applied: false, selectedLuckCount: selectedLuck.length },
+    },
+  };
+}
+
+function mapDaewoonStemRelationToLuck(
+  relation: DaewoonToPillarStemRelation
+): LuckToNativeStemRelation {
+  switch (relation) {
+    case "same_element":
+      return "same_element";
+    case "daewoon_generates_native":
+      return "luck_generates_native";
+    case "native_generates_daewoon":
+      return "native_generates_luck";
+    case "daewoon_controls_native":
+      return "luck_controls_native";
+    case "native_controls_daewoon":
+      return "native_controls_luck";
+    default:
+      return "none";
+  }
+}
+
+function getYearlyGanjiRelation(
+  stemElement: ElementKo,
+  branchMainElement: ElementKo
+): {
+  relation: DaewoonGanjiRelation;
+  stemGanjiMultiplier: number;
+  branchGanjiMultiplier: number;
+} {
+  if (stemElement === branchMainElement) {
+    return {
+      relation: "same_element",
+      stemGanjiMultiplier: YEARLY_SAME_ELEMENT_STEM_MULT,
+      branchGanjiMultiplier: YEARLY_SAME_ELEMENT_BRANCH_MULT,
+    };
+  }
+  if (generates[stemElement] === branchMainElement) {
+    return {
+      relation: "stem_generates_branch",
+      stemGanjiMultiplier: YEARLY_STEM_GENERATES_BRANCH_STEM_MULT,
+      branchGanjiMultiplier: YEARLY_STEM_GENERATES_BRANCH_BRANCH_MULT,
+    };
+  }
+  if (generates[branchMainElement] === stemElement) {
+    return {
+      relation: "branch_generates_stem",
+      stemGanjiMultiplier: YEARLY_BRANCH_GENERATES_STEM_STEM_MULT,
+      branchGanjiMultiplier: YEARLY_BRANCH_GENERATES_STEM_BRANCH_MULT,
+    };
+  }
+  if (controls[stemElement] === branchMainElement) {
+    return {
+      relation: "stem_controls_branch",
+      stemGanjiMultiplier: YEARLY_STEM_CONTROLS_BRANCH_STEM_MULT,
+      branchGanjiMultiplier: YEARLY_STEM_CONTROLS_BRANCH_BRANCH_MULT,
+    };
+  }
+  if (controls[branchMainElement] === stemElement) {
+    return {
+      relation: "branch_controls_stem",
+      stemGanjiMultiplier: YEARLY_BRANCH_CONTROLS_STEM_STEM_MULT,
+      branchGanjiMultiplier: YEARLY_BRANCH_CONTROLS_STEM_BRANCH_MULT,
+    };
+  }
+  return {
+    relation: "same_element",
+    stemGanjiMultiplier: YEARLY_SAME_ELEMENT_STEM_MULT,
+    branchGanjiMultiplier: YEARLY_SAME_ELEMENT_BRANCH_MULT,
+  };
+}
+
+/** 순수 년운 간지 자체 분포 (원국/대운 관계 제외) */
+function computeYearlySelfRaw(yearly: YearlyInput): {
+  raw: ElementVector;
+  stem: string;
+  branch: string;
+  branchBase: ElementVector;
+} {
+  const stem = yearly.stem;
+  const branch = yearly.branch;
+  const stemElement = getStemElement(stem);
+  const branchMainElement = getBranchMainElement(branch);
+  const branchBase = getBranchBaseDistribution(branch);
+
+  const { stemGanjiMultiplier, branchGanjiMultiplier } = getYearlyGanjiRelation(
+    stemElement,
+    branchMainElement
+  );
+
+  let stemFireWaterExtraMultiplier = 1;
+  const branchGanjiFireWaterEl = emptyVectorOnes();
+  if (stemElement === "화" && branchBase.수 > 0) {
+    stemFireWaterExtraMultiplier = GANJI_FIRE_STEM_WATER_BRANCH_STEM_MULT;
+    branchGanjiFireWaterEl.수 = GANJI_FIRE_STEM_WATER_BRANCH_WATER_MULT;
+  } else if (stemElement === "수" && branchBase.화 > 0) {
+    stemFireWaterExtraMultiplier = GANJI_WATER_STEM_FIRE_BRANCH_STEM_MULT;
+  }
+
+  const stemFinalMultiplier = stemGanjiMultiplier * stemFireWaterExtraMultiplier;
+  const branchFinalMultiplier = branchGanjiMultiplier;
+  const stemPolarityMultiplier = getStemPolarityMultiplier(stem);
+  const branchPolarityMultiplier = getBranchPolarityMultiplier(branch);
+
+  const raw = emptyVector();
+  raw[stemElement] +=
+    1 * stemFinalMultiplier * stemPolarityMultiplier * YEARLY_SELF_STEM_WEIGHT;
+
+  for (const el of ELEMENT_ORDER) {
+    raw[el] +=
+      branchBase[el] *
+      branchFinalMultiplier *
+      branchPolarityMultiplier *
+      branchGanjiFireWaterEl[el] *
+      YEARLY_SELF_BRANCH_WEIGHT;
+  }
+
+  return { raw, stem, branch, branchBase };
+}
+
+function computeYearlyToOriginalPillars(
+  yearlyStem: string,
+  yearlyBranch: string,
+  stemChars: string[],
+  branchChars: string[],
+  stemScores: StemScoreDetail[],
+  branchWeighted: ElementVector[],
+  originalPercentage: ElementVector
+): YearlyToOriginalDetail {
+  const yearlyStemElement = getStemElement(yearlyStem);
+  const yearlyBranchBase = getBranchBaseDistribution(yearlyBranch);
+  const slots = resolvePillarSlots(stemChars.length);
+  const total = emptyVector();
+  const byPillar: YearlyToOriginalByPillar[] = [];
+
+  const { multiplier: globalBanghapMultiplier, detail: banghapDetail } =
+    getDaewoonBranchBanghap(yearlyBranch, branchChars);
+  const samhapGroups = getDaewoonSamhapMatches(branchChars, yearlyBranch);
+
+  for (let i = 0; i < stemChars.length; i++) {
+    const slot = slots[i] ?? { key: "day" as DaewoonPillarKey, weight: 0 };
+    const pillarWeight = slot.weight;
+
+    const nativeStem = stemChars[i];
+    const nativeStemElement = getStemElement(nativeStem);
+    const nativeStemBaseScore = stemScores[i]?.finalScore ?? 0;
+    const { relation: daeRelation, multiplier: stemMultiplier } =
+      computeDaewoonToPillarStemMultiplier(
+        yearlyStemElement,
+        nativeStemElement,
+        pillarWeight
+      );
+    const sameStemMultiplier =
+      yearlyStem === nativeStem ? YEARLY_SAME_STEM_WITH_ORIGINAL_MULTIPLIER : 1;
+    const adjustedStemScore = nativeStemBaseScore * stemMultiplier * sameStemMultiplier;
+    total[nativeStemElement] += adjustedStemScore;
+
+    const nativeBranch = branchChars[i];
+    const nativeBranchBaseContribution = { ...(branchWeighted[i] ?? emptyVector()) };
+    const branchElementMultipliers = emptyVectorOnes();
+    const adjustedBranchContribution = emptyVector();
+
+    for (const el of ELEMENT_ORDER) {
+      const { multiplier } = computeDaewoonToPillarBranchElementMultiplier(
+        yearlyBranchBase,
+        el,
+        pillarWeight
+      );
+      branchElementMultipliers[el] = multiplier;
+    }
+
+    const sameBranchMultiplier =
+      yearlyBranch === nativeBranch ? YEARLY_SAME_BRANCH_WITH_ORIGINAL_MULTIPLIER : 1;
+    const banghapMultiplier =
+      globalBanghapMultiplier > 1 &&
+      banghapDetail?.matchedBranches.includes(nativeBranch)
+        ? globalBanghapMultiplier
+        : 1;
+    const branchExternalMultiplier = Math.max(sameBranchMultiplier, banghapMultiplier);
+
+    const samhapElementMultiplier = emptyVectorOnes();
+    for (const match of samhapGroups) {
+      if (!(match.matchedBranches as readonly string[]).includes(nativeBranch)) continue;
+      samhapElementMultiplier[match.element] = Math.max(
+        samhapElementMultiplier[match.element],
+        match.multiplier
+      );
+    }
+
+    for (const el of ELEMENT_ORDER) {
+      adjustedBranchContribution[el] =
+        nativeBranchBaseContribution[el] *
+        branchElementMultipliers[el] *
+        branchExternalMultiplier *
+        samhapElementMultiplier[el];
+      total[el] += adjustedBranchContribution[el];
+    }
+
+    byPillar.push({
+      index: i,
+      pillar: slot.key,
+      pillarWeight,
+      nativeStem,
+      nativeStemElement,
+      nativeStemBaseScore,
+      stemRelation: mapDaewoonStemRelationToLuck(daeRelation),
+      stemMultiplier,
+      sameStemMultiplier,
+      adjustedStemScore,
+      nativeBranch,
+      nativeBranchBaseContribution,
+      branchElementMultipliers,
+      sameBranchMultiplier,
+      banghapMultiplier,
+      samhapElementMultiplier,
+      adjustedBranchContribution,
+    });
+  }
+
+  const sum = vectorSum(total);
+  const percentage = sum > 0 ? toPercentage(total) : { ...originalPercentage };
+
+  return {
+    applied: true,
+    pillarWeights: { ...PILLAR_INFLUENCE_WEIGHTS },
+    byPillar,
+    raw: { ...total },
+    percentage,
+  };
+}
+
+function computeYearlyToDaewoon(
+  yearlyStem: string,
+  yearlyBranch: string,
+  daewoonStem: string,
+  daewoonBranch: string,
+  daewoonSelfContrib: {
+    stemElement: ElementKo;
+    stemBaseScore: number;
+    branchContribution: ElementVector;
+    branchBase: ElementVector;
+  },
+  daewoonPercentage: ElementVector
+): YearlyToDaewoonDetail {
+  const yearlyStemElement = getStemElement(yearlyStem);
+  const daewoonStemElement = daewoonSelfContrib.stemElement;
+  const yearlyBranchBase = getBranchBaseDistribution(yearlyBranch);
+
+  const { relation: daeRelation, multiplier: stemRelMult } =
+    computeDaewoonToPillarStemMultiplier(yearlyStemElement, daewoonStemElement, 1);
+  let stemMultiplier = stemRelMult;
+  if (yearlyStem === daewoonStem) {
+    stemMultiplier *= YEARLY_SAME_STEM_WITH_DAEWOON_MULTIPLIER;
+  }
+  const adjustedStemScore = daewoonSelfContrib.stemBaseScore * stemMultiplier;
+
+  const total = emptyVector();
+  total[daewoonStemElement] += adjustedStemScore;
+
+  const elementMultipliers = emptyVectorOnes();
+  for (const el of ELEMENT_ORDER) {
+    const { multiplier } = computeDaewoonToPillarBranchElementMultiplier(
+      yearlyBranchBase,
+      el,
+      1
+    );
+    elementMultipliers[el] = multiplier;
+  }
+
+  const sameBranchMultiplier =
+    yearlyBranch === daewoonBranch ? YEARLY_SAME_BRANCH_WITH_DAEWOON_MULTIPLIER : 1;
+  const { multiplier: banghapMultiplier } = getDaewoonBranchBanghap(yearlyBranch, [
+    daewoonBranch,
+  ]);
+  const branchExternalMultiplier = Math.max(sameBranchMultiplier, banghapMultiplier);
+
+  const samhapGroups = getDaewoonSamhapMatches([daewoonBranch], yearlyBranch);
+  const samhapElementMultiplier = emptyVectorOnes();
+  for (const match of samhapGroups) {
+    samhapElementMultiplier[match.element] = Math.max(
+      samhapElementMultiplier[match.element],
+      match.multiplier
+    );
+  }
+
+  const fw = getDaewoonBranchFireWaterElementMultiplier(
+    [yearlyBranchBase],
+    daewoonSelfContrib.branchBase
+  );
+
+  const adjustedContribution = emptyVector();
+  for (const el of ELEMENT_ORDER) {
+    adjustedContribution[el] =
+      daewoonSelfContrib.branchContribution[el] *
+      elementMultipliers[el] *
+      branchExternalMultiplier *
+      samhapElementMultiplier[el] *
+      fw[el];
+    total[el] += adjustedContribution[el];
+  }
+
+  const sum = vectorSum(total);
+  const percentage = sum > 0 ? toPercentage(total) : { ...daewoonPercentage };
+
+  return {
+    applied: true,
+    daewoonStem,
+    daewoonBranch,
+    stemInteraction: {
+      relation: mapDaewoonStemRelationToLuck(daeRelation),
+      multiplier: stemMultiplier,
+      adjustedScore: adjustedStemScore,
+    },
+    branchInteraction: {
+      elementMultipliers,
+      sameBranchMultiplier,
+      banghapMultiplier,
+      samhapElementMultiplier,
+      adjustedContribution,
+    },
+    raw: { ...total },
+    percentage,
+  };
+}
+
+function computeYearlyDistribution(params: {
+  yearly: YearlyInput;
+  stemChars: string[];
+  branchChars: string[];
+  stemScores: StemScoreDetail[];
+  branchWeighted: ElementVector[];
+  originalPercentage: ElementVector;
+  daewoon: YearlyInput | null;
+  daewoonPercentage: ElementVector | null;
+  daewoonSelfContrib: {
+    stemElement: ElementKo;
+    stemBaseScore: number;
+    branchContribution: ElementVector;
+    branchBase: ElementVector;
+  } | null;
+}): { detail: YearlyDetail; percentage: ElementVector } {
+  const {
+    yearly,
+    stemChars,
+    branchChars,
+    stemScores,
+    branchWeighted,
+    originalPercentage,
+    daewoon,
+    daewoonPercentage,
+    daewoonSelfContrib,
+  } = params;
+
+  const hasDaewoon = !!daewoon && !!daewoonSelfContrib && !!daewoonPercentage;
+  const selfRate = hasDaewoon ? YEARLY_SELF_RATE : YEARLY_SELF_RATE_WITHOUT_DAEWOON;
+  const toOriginalRate = hasDaewoon
+    ? YEARLY_TO_ORIGINAL_RATE
+    : YEARLY_TO_ORIGINAL_RATE_WITHOUT_DAEWOON;
+  const toDaewoonRate = hasDaewoon ? YEARLY_TO_DAEWOON_RATE : 0;
+  const finalInfluenceRate = hasDaewoon
+    ? FINAL_MIX_WITH_DAEWOON_AND_YEARLY.yearly
+    : FINAL_MIX_WITH_YEARLY_ONLY.yearly;
+
+  const self = computeYearlySelfRaw(yearly);
+  const yearlySelfPercentage = toPercentage(self.raw);
+
+  const toOriginal = computeYearlyToOriginalPillars(
+    yearly.stem,
+    yearly.branch,
+    stemChars,
+    branchChars,
+    stemScores,
+    branchWeighted,
+    originalPercentage
+  );
+
+  const toDaewoon = hasDaewoon
+    ? computeYearlyToDaewoon(
+        yearly.stem,
+        yearly.branch,
+        daewoon!.stem,
+        daewoon!.branch,
+        daewoonSelfContrib!,
+        daewoonPercentage!
+      )
+    : ({ applied: false } as YearlyToDaewoonDetail);
+
+  const yearlyPercentage = emptyVector();
+  for (const el of ELEMENT_ORDER) {
+    yearlyPercentage[el] = round2(
+      yearlySelfPercentage[el] * selfRate +
+        (toOriginal.percentage?.[el] ?? 0) * toOriginalRate +
+        (toDaewoon.percentage?.[el] ?? 0) * toDaewoonRate
+    );
+  }
+
+  return {
+    percentage: yearlyPercentage,
+    detail: {
+      applied: true,
+      finalInfluenceRate,
+      stem: yearly.stem,
+      branch: yearly.branch,
+      selfRate,
+      toOriginalRate,
+      toDaewoonRate,
+      yearlySelfRaw: { ...self.raw },
+      yearlySelfPercentage,
+      toOriginalPillars: toOriginal,
+      toDaewoon,
+      yearlyPercentage,
     },
   };
 }
@@ -2396,7 +3229,8 @@ export function calculateElementDistribution(
 /** SajuResult 기둥에서 오행 분포 계산 (시간→일→월→년 순) */
 export function calculateElementDistributionFromPillars(
   pillars: SajuResult["pillars"],
-  daewoon?: DaewoonInput | null
+  daewoon?: DaewoonInput | null,
+  yearly?: YearlyInput | null
 ): ElementDistributionResult | null {
   const order = ["hour", "day", "month", "year"] as const;
   let stems = "";
@@ -2410,5 +3244,5 @@ export function calculateElementDistributionFromPillars(
   }
 
   if (stems.length === 0) return null;
-  return calculateElementDistribution(stems, branches, daewoon);
+  return calculateElementDistribution(stems, branches, daewoon, yearly);
 }

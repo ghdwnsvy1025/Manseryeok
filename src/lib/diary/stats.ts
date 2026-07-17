@@ -2,6 +2,7 @@ import {
   NEGATIVE_SCORE_KEYS,
   POSITIVE_SCORE_KEYS,
   type DiaryAnalysis,
+  type EmotionLabel,
 } from "./dimensions";
 import { getPillarsForDate } from "./dayPillar";
 import type { DayPillarStats, DiaryEntry, GroupStats, StatsGroupType } from "./types";
@@ -105,6 +106,18 @@ function buildGroupStats(
 ): GroupStats {
   const sorted = [...matched].sort((a, b) => a.date.localeCompare(b.date));
   const { avgDailyWellbeing, avgScores } = averageAnalysis(sorted);
+  const moodCounts: Partial<Record<EmotionLabel, number>> = {};
+  let explicitMoodCount = 0;
+
+  for (const entry of sorted) {
+    if (!entry.analysis) continue;
+    const isLegacySelectedMood =
+      entry.emotionSource === undefined && entry.inputMode === "scores";
+    if (entry.emotionSource !== "selected" && !isLegacySelectedMood) continue;
+    const mood = entry.analysis.emotion_label;
+    moodCounts[mood] = (moodCounts[mood] ?? 0) + 1;
+    explicitMoodCount += 1;
+  }
 
   return {
     groupType,
@@ -114,6 +127,8 @@ function buildGroupStats(
     analyzedCount: sorted.filter((e) => e.analysis !== null).length,
     avgDailyWellbeing,
     avgScores,
+    explicitMoodCount,
+    moodCounts,
     dates: sorted.map((e) => e.date),
     deltaFromOverall:
       avgDailyWellbeing > 0 ? avgDailyWellbeing - overallAvg : undefined,

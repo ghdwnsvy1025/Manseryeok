@@ -24,7 +24,7 @@ export default function ViewModeToggle() {
             key={id}
             type="button"
             onClick={() => setViewMode(id)}
-            className="px-2 py-1 text-[10px] font-bold border-r last:border-r-0"
+            className="px-2.5 py-1.5 text-xs font-bold border-r last:border-r-0"
             style={{
               color: active ? "var(--px-bg)" : "var(--px-text2)",
               background: active ? "var(--px-accent)" : "transparent",

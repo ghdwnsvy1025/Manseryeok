@@ -75,7 +75,7 @@ export default function MonthFortuneList({ groups, selectedKey, onSelect }: Prop
                 <p className="text-sm font-black" style={{ color: "var(--px-accent)" }}>
                   {g.label}
                 </p>
-                <p className="text-[10px] font-bold" style={{ color: "var(--px-text2)" }}>
+                <p className="text-xs font-bold" style={{ color: "var(--px-text2)" }}>
                   {insufficient ? `패턴 부족 · ${g.entryCount}회` : `${g.entryCount}회 기록`}
                 </p>
               </div>
@@ -86,7 +86,7 @@ export default function MonthFortuneList({ groups, selectedKey, onSelect }: Prop
                   </p>
                   {g.deltaFromOverall !== undefined && g.deltaFromOverall !== 0 && (
                     <p
-                      className="text-[10px] font-bold"
+                      className="text-xs font-bold"
                       style={{ color: g.deltaFromOverall > 0 ? "#4ade80" : "#f87171" }}
                     >
                       {g.deltaFromOverall > 0 ? `+${g.deltaFromOverall}` : g.deltaFromOverall}

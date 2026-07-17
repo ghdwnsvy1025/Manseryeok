@@ -56,7 +56,7 @@ export default function CollectionNavButton({ entries }: Props) {
             style={{ width: `${pct}%`, background: "var(--px-accent)" }}
           />
         </div>
-        <p className="text-[10px] font-bold" style={{ color: "var(--px-text2)" }}>
+        <p className="text-xs font-bold" style={{ color: "var(--px-text2)" }}>
           수집한 일진 도장 보기
         </p>
       </div>

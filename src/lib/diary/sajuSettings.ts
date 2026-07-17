@@ -15,6 +15,7 @@ import { getYearPillar } from "@/lib/saju/yearPillar";
 import { getMonthPillar } from "@/lib/saju/monthPillar";
 import { getHourPillar } from "@/lib/saju/hourPillar";
 import { kstToJDE, mod } from "@/lib/saju/jdn";
+import type { Gender } from "@/lib/saju/daeun";
 import type { SajuDepth, UserBirthPillarDetail, UserBirthPillars } from "./types";
 import type { SajuResult } from "@/lib/saju/types";
 
@@ -30,6 +31,8 @@ export type SajuSettings = {
   birthHour?: number;
   /** 사용자 출생 분 (0-59) */
   birthMinute?: number;
+  /** 대운 방향용 성별 */
+  gender?: Gender;
   /** 만세력 기둥 표시 여부 (true = 사용/표시) */
   pillarVisibility?: PillarVisibility;
 };
@@ -40,11 +43,14 @@ export type DiaryPillarSlot = "year" | "month" | "day";
 export type PillarVisibility = {
   birth: Record<BirthPillarSlot, boolean>;
   diary: Record<DiaryPillarSlot, boolean>;
+  /** 현재 대운 기둥 표시 */
+  daeun: boolean;
 };
 
 export const DEFAULT_PILLAR_VISIBILITY: PillarVisibility = {
   birth: { hour: true, day: true, month: true, year: true },
-  diary: { year: true, month: true, day: true },
+  diary: { year: false, month: true, day: true },
+  daeun: false,
 };
 
 const DEFAULT_SETTINGS: SajuSettings = {
@@ -207,6 +213,10 @@ function isSupportedBirthMinute(birthMinute: unknown): birthMinute is number {
   );
 }
 
+function isSupportedGender(value: unknown): value is Gender {
+  return value === "male" || value === "female";
+}
+
 function isSupportedPillarVisibility(value: unknown): value is PillarVisibility {
   if (!value || typeof value !== "object") return false;
   const v = value as Partial<PillarVisibility>;
@@ -229,7 +239,13 @@ export function resolvePillarVisibility(settings?: Pick<SajuSettings, "pillarVis
   return {
     birth: { ...DEFAULT_PILLAR_VISIBILITY.birth, ...raw.birth },
     diary: { ...DEFAULT_PILLAR_VISIBILITY.diary, ...raw.diary },
+    daeun: typeof raw.daeun === "boolean" ? raw.daeun : DEFAULT_PILLAR_VISIBILITY.daeun,
   };
+}
+
+/** 대운·십신 표시에 필요한 프로필(생년월일 + 성별)이 있는지 */
+export function hasDiarySajuProfile(settings: Pick<SajuSettings, "birthDate" | "gender">): boolean {
+  return Boolean(settings.birthDate && isSupportedGender(settings.gender));
 }
 
 export function loadSajuSettings(): SajuSettings {
@@ -243,8 +259,9 @@ export function loadSajuSettings(): SajuSettings {
       birthDate: isSupportedBirthDate(parsed.birthDate) ? parsed.birthDate : undefined,
       birthHour: isSupportedBirthHour(parsed.birthHour) ? parsed.birthHour : undefined,
       birthMinute: isSupportedBirthMinute(parsed.birthMinute) ? parsed.birthMinute : undefined,
+      gender: isSupportedGender(parsed.gender) ? parsed.gender : undefined,
       pillarVisibility: isSupportedPillarVisibility(parsed.pillarVisibility)
-        ? parsed.pillarVisibility
+        ? resolvePillarVisibility({ pillarVisibility: parsed.pillarVisibility })
         : DEFAULT_PILLAR_VISIBILITY,
     };
   } catch {
@@ -257,7 +274,7 @@ export function saveSajuSettings(settings: SajuSettings): void {
   localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...settings, depth: "full" }));
 }
 
-/** 만세력 계산 결과에서 생년월일시를 일기 설정과 공유 */
+/** 만세력 계산 결과에서 생년월일시·성별을 일기 설정과 공유 */
 export function saveBirthFromSajuResult(result: SajuResult): void {
   const current = loadSajuSettings();
   const date = result.input.normalizedSolarDate;
@@ -267,12 +284,14 @@ export function saveBirthFromSajuResult(result: SajuResult): void {
   const birthDate = date;
   const hour = result.input.original.hour;
   const minute = result.input.original.minute;
+  const gender = result.input.original.gender;
 
   saveSajuSettings({
     ...current,
     birthDate,
     birthHour: hour !== undefined ? hour : undefined,
     birthMinute: minute !== undefined && hour !== undefined ? minute : undefined,
+    gender: isSupportedGender(gender) ? gender : current.gender,
   });
 }
 
@@ -283,6 +302,7 @@ export function getBirthPrefillForForm(): {
   day: string;
   hour: string;
   minute: string;
+  gender?: Gender;
 } | null {
   const settings = loadSajuSettings();
   if (!settings.birthDate) return null;
@@ -291,6 +311,7 @@ export function getBirthPrefillForForm(): {
     ...parts,
     hour: settings.birthHour !== undefined ? String(settings.birthHour) : "",
     minute: settings.birthMinute !== undefined ? String(settings.birthMinute) : "",
+    gender: settings.gender,
   };
 }
 

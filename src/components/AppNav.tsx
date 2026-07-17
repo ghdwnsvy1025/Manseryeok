@@ -71,7 +71,11 @@ export default function AppNav() {
               >
                 {item.icon}
               </span>
-              <span className={`font-bold ${item.main ? "text-sm" : "text-xs"}`}>
+              <span
+                className={`font-bold leading-tight ${
+                  item.main ? "text-[15px]" : "text-[13px]"
+                }`}
+              >
                 {item.label}
               </span>
             </Link>

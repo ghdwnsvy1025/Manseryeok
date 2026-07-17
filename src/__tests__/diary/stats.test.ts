@@ -143,6 +143,24 @@ describe("aggregateByGroup", () => {
     const stats = getStatsForGroup("임오", "ganji", entries, overall);
     expect(stats.deltaFromOverall).toBe(stats.avgDailyWellbeing - overall);
   });
+
+  test("기분 분포에는 사용자가 직접 선택한 기분만 포함", () => {
+    const moodEntries = [
+      makeEntry("2026-01-01", "임오", makeAnalysis({ emotion_label: "positive" }), {
+        emotionSource: "selected",
+      }),
+      makeEntry("2026-03-02", "임오", makeAnalysis({ emotion_label: "negative" }), {
+        emotionSource: "inferred",
+      }),
+      makeEntry("2026-04-01", "임오", makeAnalysis({ emotion_label: "mixed" }), {
+        emotionSource: "ai",
+      }),
+    ];
+
+    const stats = getStatsForGroup("임오", "ganji", moodEntries);
+    expect(stats.explicitMoodCount).toBe(1);
+    expect(stats.moodCounts).toEqual({ positive: 1 });
+  });
 });
 
 describe("resolveYearPillarKo", () => {

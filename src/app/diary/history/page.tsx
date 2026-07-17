@@ -72,7 +72,7 @@ export default function DiaryHistoryPage() {
               {entry.content}
             </p>
             {entry.analysis && (
-              <p className="text-[10px] mt-1 truncate" style={{ color: "var(--px-text2)" }}>
+              <p className="text-xs mt-1 truncate" style={{ color: "var(--px-text2)" }}>
                 행복도 {entry.analysis.daily_wellbeing_score} · {entry.analysis.summary}
               </p>
             )}

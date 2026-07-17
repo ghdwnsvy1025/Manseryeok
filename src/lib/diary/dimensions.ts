@@ -56,15 +56,17 @@ export type EmotionLabel =
   | "neutral"
   | "mixed"
   | "negative"
-  | "very_negative";
+  | "very_negative"
+  | "unknown";
 
 export const EMOTION_LABEL_KO: Record<EmotionLabel, string> = {
-  very_positive: "매우 긍정",
-  positive: "긍정",
-  neutral: "중립",
-  mixed: "혼합",
-  negative: "부정",
-  very_negative: "매우 부정",
+  very_positive: "매우 좋음",
+  positive: "좋음",
+  neutral: "무덤덤",
+  mixed: "복잡함",
+  negative: "힘듦",
+  very_negative: "매우 힘듦",
+  unknown: "모르겠음",
 };
 
 export type DiaryAnalysis = {

@@ -33,11 +33,11 @@ function CollectionTile({ item }: { item: GanjiCollectionEntry }) {
       </p>
       {item.status !== "locked" && (
         <>
-          <p className="text-[10px] font-bold mt-1" style={{ color: "#4ade80" }}>
+          <p className="text-xs font-bold mt-1" style={{ color: "#4ade80" }}>
             {item.avgWellbeing > 0 ? `${item.avgWellbeing}점` : `${item.entryCount}회`}
           </p>
           {item.status === "pattern" && (
-            <p className="text-[10px] ui-hint">{item.entryCount}회</p>
+            <p className="ui-hint">{item.entryCount}회</p>
           )}
         </>
       )}

@@ -4,6 +4,8 @@ import {
   findTargetTermForDaeun,
   getDaeunDirection,
   getDaeunGanjiList,
+  getSewoonYearsForDaeunCycle,
+  getYearGanjiByGregorianYear,
   type SolarTerm,
 } from "@/lib/saju/daeun";
 
@@ -47,6 +49,44 @@ describe("getDaeunGanjiList", () => {
 
   test("월주 간지가 60갑자에 없으면 오류", () => {
     expect(() => getDaeunGanjiList("甲甲", "forward", 1)).toThrow("Invalid ganji");
+  });
+});
+
+describe("getSewoonYearsForDaeunCycle", () => {
+  test("시작일 기준 10개 년운을 오름차순으로 반환", () => {
+    const years = getSewoonYearsForDaeunCycle({
+      order: 1,
+      ganji: "丁卯",
+      startAgeDecimal: 5,
+      endAgeDecimal: 15,
+      startAgeText: "",
+      endAgeText: "",
+      displayStartAge: null,
+      estimatedStartDate: "2020-03-15T00:00:00.000Z",
+      estimatedEndDate: "2030-03-15T00:00:00.000Z",
+    });
+
+    expect(years).toHaveLength(10);
+    expect(years[0].year).toBe(2020);
+    expect(years[9].year).toBe(2029);
+    expect(years[0].ganji).toBe(getYearGanjiByGregorianYear(2020).ganji);
+    expect(years[0].ganji).toBe("庚子");
+  });
+
+  test("시작일이 없으면 빈 배열", () => {
+    expect(
+      getSewoonYearsForDaeunCycle({
+        order: 1,
+        ganji: "丁卯",
+        startAgeDecimal: 5,
+        endAgeDecimal: 15,
+        startAgeText: "",
+        endAgeText: "",
+        displayStartAge: null,
+        estimatedStartDate: null,
+        estimatedEndDate: null,
+      })
+    ).toEqual([]);
   });
 });
 

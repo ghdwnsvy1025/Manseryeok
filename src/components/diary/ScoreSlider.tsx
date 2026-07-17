@@ -31,7 +31,7 @@ export default function ScoreSlider({
 
   return (
     <div className={`space-y-1 ${disabled ? "opacity-50" : ""}`}>
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex items-center gap-1.5">
         <span className="ui-list-label" style={{ color }}>
           {label}
         </span>

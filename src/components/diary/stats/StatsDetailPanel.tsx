@@ -2,6 +2,10 @@
 
 import Link from "next/link";
 import ScoreBars from "@/components/diary/ScoreBars";
+import {
+  EMOTION_LABEL_KO,
+  type EmotionLabel,
+} from "@/lib/diary/dimensions";
 import type { DiaryEntry, GroupStats } from "@/lib/diary/types";
 
 type Props = {
@@ -49,6 +53,31 @@ export default function StatsDetailPanel({ stats, entries, overallAvg }: Props) 
         <ScoreBars avgScores={stats.avgScores} avgDailyWellbeing={stats.avgDailyWellbeing} />
       ) : (
         <p className="ui-guide">분석된 일기가 없어요. 점수로 기록하거나 AI 분석을 실행해주세요.</p>
+      )}
+
+      {stats.explicitMoodCount > 0 && (
+        <div className="space-y-1.5">
+          <p className="ui-list-label">
+            직접 선택한 기분 · {stats.explicitMoodCount}회
+          </p>
+          <div className="flex flex-wrap gap-1">
+            {(Object.entries(stats.moodCounts) as [EmotionLabel, number][]).map(
+              ([mood, count]) => (
+                <span
+                  key={mood}
+                  className="px-2 py-1 border text-xs font-bold"
+                  style={{
+                    borderColor: "var(--px-border)",
+                    background: "var(--px-bg2)",
+                    color: "var(--px-text2)",
+                  }}
+                >
+                  {EMOTION_LABEL_KO[mood]} {count}
+                </span>
+              )
+            )}
+          </div>
+        </div>
       )}
 
       <div className="space-y-2 pt-2 border-t" style={{ borderColor: "var(--px-border)" }}>
