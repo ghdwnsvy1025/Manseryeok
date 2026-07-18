@@ -1,5 +1,15 @@
 import type { DiaryAnalysis, EmotionLabel } from "./dimensions";
+import type { HappinessRating } from "./happiness";
 import type { DiaryInputMode } from "./manualScores";
+import type {
+  CalendarType,
+  DayChangeRule,
+  TimeCorrection,
+} from "@/lib/saju/types";
+import type { Gender } from "@/lib/saju/daeun";
+
+/** 현재 도메인 스키마 버전 */
+export const DIARY_SCHEMA_VERSION = 2;
 
 export type DiaryDayPillar = {
   ganji: string;
@@ -43,6 +53,57 @@ export type UserBirthPillars = {
   hour?: UserBirthPillarDetail;
 };
 
+export type UserProfile = {
+  id: string;
+  locale?: string;
+  timezone?: string;
+  activeSajuProfileId?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  schemaVersion: number;
+};
+
+export type SajuProfilePillars = {
+  year: UserBirthPillarDetail;
+  month: UserBirthPillarDetail;
+  day: UserBirthPillarDetail;
+  hour?: UserBirthPillarDetail | null;
+};
+
+export type SajuProfile = {
+  id: string;
+  userId?: string | null;
+  label?: string;
+  isPrimary: boolean;
+  birthDate: string;
+  birthHour?: number;
+  birthMinute?: number;
+  birthTimeUnknown: boolean;
+  calendarType: CalendarType;
+  isLeapMonth?: boolean;
+  gender?: Gender;
+  timezone: string;
+  locationName?: string;
+  longitude?: number;
+  latitude?: number;
+  dayChangeRule: DayChangeRule;
+  timeCorrection: TimeCorrection;
+  pillars: SajuProfilePillars;
+  calculationVersion: string;
+  inputHash?: string;
+  solarTermBoundary?: {
+    lichun?: string;
+    monthStart?: string;
+    monthEnd?: string;
+    monthName?: string;
+  };
+  calculationMetadata?: Record<string, unknown>;
+  reconstructed?: boolean;
+  createdAt: string;
+  updatedAt: string;
+  schemaVersion: number;
+};
+
 export type DiaryEntry = {
   id: string;
   date: string;
@@ -52,13 +113,31 @@ export type DiaryEntry = {
   yearPillarKo?: string;
   /** 이 항목에 저장된 사주 기록 범위 */
   sajuDepth?: SajuDepth;
-  /** 사용자의 사주팔자 (sajuDepth === "full" 일 때) */
+  /** 사용자의 사주팔자 (sajuDepth === "full" 일 때, legacy) */
   userBirthPillars?: UserBirthPillars;
+  /** 연결된 사주 프로필 */
+  sajuProfileId?: string | null;
   analysis: DiaryAnalysis | null;
+  /** 사용자 입력 행복도 1–5 */
+  happinessRating?: HappinessRating;
+  /** 다중 감정 태그 */
+  emotions?: string[];
+  /** 사건·사용자 정의 태그 */
+  tags?: string[];
+  heavenlyStem?: string;
+  earthlyBranch?: string;
+  weekday?: number;
+  isWeekend?: boolean;
+  sleepScore?: number | null;
+  exerciseStatus?: string | null;
+  socialActivity?: string | null;
+  weatherMetadata?: Record<string, unknown> | null;
   /** text: 글쓰기, scores: 슬라이더 점수 입력 */
   inputMode?: DiaryInputMode;
   /** 기분 라벨의 출처: 직접 선택 / 행복도 자동 추론 / AI 분석 */
   emotionSource?: "selected" | "inferred" | "ai";
+  userId?: string | null;
+  schemaVersion?: number;
   createdAt: string;
   updatedAt: string;
 };
@@ -92,4 +171,9 @@ export type DayPillarStats = {
 export type DiaryListOptions = {
   limit?: number;
   offset?: number;
+};
+
+export type DiaryMonthRange = {
+  year: number;
+  month: number;
 };

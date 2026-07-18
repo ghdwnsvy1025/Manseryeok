@@ -1,7 +1,8 @@
 import type { DiaryStorage } from "./storage";
-import type { DiaryEntry } from "./types";
+import type { DiaryEntry, DiaryMonthRange } from "./types";
 import type { DiaryAnalysis } from "./dimensions";
 import { normalizeDiaryEntry } from "./migrate";
+import { DIARY_SCHEMA_VERSION } from "./types";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 
 type DbRow = {
@@ -14,6 +15,23 @@ type DbRow = {
   year_pillar_ko: string | null;
   scores: DiaryAnalysis | null;
   ai_summary: string | null;
+  happiness_rating: number | null;
+  emotions: string[] | null;
+  tags: string[] | null;
+  heavenly_stem: string | null;
+  earthly_branch: string | null;
+  weekday: number | null;
+  is_weekend: boolean | null;
+  sleep_score: number | null;
+  exercise_status: string | null;
+  social_activity: string | null;
+  weather_metadata: Record<string, unknown> | null;
+  input_mode: string | null;
+  emotion_source: string | null;
+  saju_depth: string | null;
+  user_birth_pillars: DiaryEntry["userBirthPillars"] | null;
+  saju_profile_id: string | null;
+  schema_version: number | null;
   created_at: string;
   updated_at: string;
 };
@@ -27,25 +45,71 @@ function rowToEntry(row: DbRow): DiaryEntry {
     monthPillarKo: row.month_pillar_ko ?? undefined,
     yearPillarKo: row.year_pillar_ko ?? undefined,
     analysis: row.scores,
+    happinessRating: row.happiness_rating ?? undefined,
+    emotions: row.emotions ?? [],
+    tags: row.tags ?? [],
+    heavenlyStem: row.heavenly_stem ?? undefined,
+    earthlyBranch: row.earthly_branch ?? undefined,
+    weekday: row.weekday ?? undefined,
+    isWeekend: row.is_weekend ?? undefined,
+    sleepScore: row.sleep_score,
+    exerciseStatus: row.exercise_status,
+    socialActivity: row.social_activity,
+    weatherMetadata: row.weather_metadata,
+    inputMode: row.input_mode ?? undefined,
+    emotionSource: row.emotion_source ?? undefined,
+    sajuDepth: row.saju_depth ?? undefined,
+    userBirthPillars: row.user_birth_pillars ?? undefined,
+    sajuProfileId: row.saju_profile_id,
+    schemaVersion: row.schema_version ?? DIARY_SCHEMA_VERSION,
+    userId: row.user_id,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   });
 }
 
-function entryToRow(entry: DiaryEntry, userId: string): Omit<DbRow, "user_id"> & { user_id: string } {
+function entryToRow(
+  entry: DiaryEntry,
+  userId: string
+): Omit<DbRow, "user_id"> & { user_id: string } {
+  const normalized = normalizeDiaryEntry(entry as unknown as Record<string, unknown>);
   return {
-    id: entry.id,
+    id: normalized.id,
     user_id: userId,
-    date: entry.date,
-    content: entry.content,
-    day_pillar: entry.dayPillar,
-    month_pillar_ko: entry.monthPillarKo ?? null,
-    year_pillar_ko: entry.yearPillarKo ?? null,
-    scores: entry.analysis,
-    ai_summary: entry.analysis?.summary ?? null,
-    created_at: entry.createdAt,
-    updated_at: entry.updatedAt,
+    date: normalized.date,
+    content: normalized.content,
+    day_pillar: normalized.dayPillar,
+    month_pillar_ko: normalized.monthPillarKo ?? null,
+    year_pillar_ko: normalized.yearPillarKo ?? null,
+    scores: normalized.analysis,
+    ai_summary: normalized.analysis?.summary ?? null,
+    happiness_rating: normalized.happinessRating ?? null,
+    emotions: normalized.emotions ?? [],
+    tags: normalized.tags ?? [],
+    heavenly_stem: normalized.heavenlyStem ?? null,
+    earthly_branch: normalized.earthlyBranch ?? null,
+    weekday: normalized.weekday ?? null,
+    is_weekend: normalized.isWeekend ?? null,
+    sleep_score: normalized.sleepScore ?? null,
+    exercise_status: normalized.exerciseStatus ?? null,
+    social_activity: normalized.socialActivity ?? null,
+    weather_metadata: normalized.weatherMetadata ?? null,
+    input_mode: normalized.inputMode ?? null,
+    emotion_source: normalized.emotionSource ?? null,
+    saju_depth: normalized.sajuDepth ?? null,
+    user_birth_pillars: normalized.userBirthPillars ?? null,
+    saju_profile_id: normalized.sajuProfileId ?? null,
+    schema_version: normalized.schemaVersion ?? DIARY_SCHEMA_VERSION,
+    created_at: normalized.createdAt,
+    updated_at: normalized.updatedAt,
   };
+}
+
+function monthBounds({ year, month }: DiaryMonthRange): { start: string; end: string } {
+  const start = `${year}-${String(month).padStart(2, "0")}-01`;
+  const lastDay = new Date(year, month, 0).getDate();
+  const end = `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+  return { start, end };
 }
 
 export class SupabaseDiaryStorage implements DiaryStorage {
@@ -61,6 +125,15 @@ export class SupabaseDiaryStorage implements DiaryStorage {
     const { error } = await this.client
       .from("diary_entries")
       .upsert(entryToRow(entry, this.userId), { onConflict: "user_id,date" });
+    if (error) throw new Error(error.message);
+  }
+
+  async upsertMany(entries: DiaryEntry[]): Promise<void> {
+    if (entries.length === 0) return;
+    const rows = entries.map((entry) => entryToRow(entry, this.userId));
+    const { error } = await this.client
+      .from("diary_entries")
+      .upsert(rows, { onConflict: "user_id,date" });
     if (error) throw new Error(error.message);
   }
 
@@ -112,6 +185,19 @@ export class SupabaseDiaryStorage implements DiaryStorage {
     return (data as DbRow[]).map(rowToEntry);
   }
 
+  async listByMonth(range: DiaryMonthRange): Promise<DiaryEntry[]> {
+    const { start, end } = monthBounds(range);
+    const { data, error } = await this.client
+      .from("diary_entries")
+      .select("*")
+      .eq("user_id", this.userId)
+      .gte("date", start)
+      .lte("date", end)
+      .order("date", { ascending: true });
+    if (error) throw new Error(error.message);
+    return (data as DbRow[]).map(rowToEntry);
+  }
+
   async delete(id: string): Promise<void> {
     const { error } = await this.client
       .from("diary_entries")
@@ -126,7 +212,9 @@ export async function getSupabaseDiaryStorage(): Promise<SupabaseDiaryStorage | 
   const supabase = getSupabaseBrowserClient();
   if (!supabase) return null;
 
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   if (!user) return null;
 
   return new SupabaseDiaryStorage(user.id);

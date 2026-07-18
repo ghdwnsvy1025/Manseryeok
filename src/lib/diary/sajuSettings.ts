@@ -252,14 +252,46 @@ export function loadSajuSettings(): SajuSettings {
   if (typeof window === "undefined") return DEFAULT_SETTINGS;
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return DEFAULT_SETTINGS;
-    const parsed = JSON.parse(raw) as Partial<SajuSettings>;
+    const parsed = raw ? (JSON.parse(raw) as Partial<SajuSettings>) : {};
+
+    // 버전형 프로필이 있으면 출생 정보를 우선
+    let profileBirth: Partial<SajuSettings> = {};
+    try {
+      const profileRaw = localStorage.getItem("manseryeok_saju_profile_v2");
+      if (profileRaw) {
+        const profile = JSON.parse(profileRaw) as {
+          birthDate?: string;
+          birthHour?: number;
+          birthMinute?: number;
+          gender?: Gender;
+        };
+        profileBirth = {
+          birthDate: isSupportedBirthDate(profile.birthDate) ? profile.birthDate : undefined,
+          birthHour: isSupportedBirthHour(profile.birthHour) ? profile.birthHour : undefined,
+          birthMinute: isSupportedBirthMinute(profile.birthMinute)
+            ? profile.birthMinute
+            : undefined,
+          gender: isSupportedGender(profile.gender) ? profile.gender : undefined,
+        };
+      }
+    } catch {
+      /* ignore */
+    }
+
     return {
       depth: "full",
-      birthDate: isSupportedBirthDate(parsed.birthDate) ? parsed.birthDate : undefined,
-      birthHour: isSupportedBirthHour(parsed.birthHour) ? parsed.birthHour : undefined,
-      birthMinute: isSupportedBirthMinute(parsed.birthMinute) ? parsed.birthMinute : undefined,
-      gender: isSupportedGender(parsed.gender) ? parsed.gender : undefined,
+      birthDate:
+        profileBirth.birthDate ??
+        (isSupportedBirthDate(parsed.birthDate) ? parsed.birthDate : undefined),
+      birthHour:
+        profileBirth.birthHour ??
+        (isSupportedBirthHour(parsed.birthHour) ? parsed.birthHour : undefined),
+      birthMinute:
+        profileBirth.birthMinute ??
+        (isSupportedBirthMinute(parsed.birthMinute) ? parsed.birthMinute : undefined),
+      gender:
+        profileBirth.gender ??
+        (isSupportedGender(parsed.gender) ? parsed.gender : undefined),
       pillarVisibility: isSupportedPillarVisibility(parsed.pillarVisibility)
         ? resolvePillarVisibility({ pillarVisibility: parsed.pillarVisibility })
         : DEFAULT_PILLAR_VISIBILITY,
@@ -292,6 +324,15 @@ export function saveBirthFromSajuResult(result: SajuResult): void {
     birthHour: hour !== undefined ? hour : undefined,
     birthMinute: minute !== undefined && hour !== undefined ? minute : undefined,
     gender: isSupportedGender(gender) ? gender : current.gender,
+  });
+
+  // 화면 설정을 유지한 채 버전형 사주 프로필도 저장 (비동기, 실패해도 UI 차단 안 함)
+  void import("./profileStorage").then(async ({ buildSajuProfileFromResult, saveSajuProfile }) => {
+    try {
+      await saveSajuProfile(buildSajuProfileFromResult(result));
+    } catch {
+      /* ignore profile sync errors */
+    }
   });
 }
 

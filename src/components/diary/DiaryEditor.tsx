@@ -8,31 +8,34 @@ import SaveCelebrationModal from "@/components/diary/journey/SaveCelebrationModa
 import Day7MilestoneModal from "@/components/diary/journey/Day7MilestoneModal";
 import TodayMiniReport from "@/components/diary/journey/TodayMiniReport";
 import DiaryWriteSheet from "@/components/diary/DiaryWriteSheet";
-import DiaryModeSelect from "@/components/diary/DiaryModeSelect";
 import ManualScoreSheet from "@/components/diary/ManualScoreSheet";
-import MoodChips from "@/components/diary/MoodChips";
+import HappinessRatingPicker from "@/components/diary/HappinessRatingPicker";
+import {
+  EmotionMultiSelect,
+  EventTagPicker,
+} from "@/components/diary/EmotionTagPickers";
 import SajuDepthPicker from "@/components/diary/SajuDepthPicker";
-import ScoreSlider from "@/components/diary/ScoreSlider";
 import { createDiaryEntry } from "@/lib/diary/createEntry";
 import { getPillarsForDate, resolveDateString } from "@/lib/diary/dayPillar";
-import type { DiaryAnalysis, EmotionLabel } from "@/lib/diary/dimensions";
+import type { DiaryAnalysis } from "@/lib/diary/dimensions";
 import { getDiaryStorage } from "@/lib/diary/getStorage";
 import {
-  analysisToWellbeing,
+  DEFAULT_HAPPINESS_RATING,
+  happinessRatingToScore,
+  scoreToHappinessRating,
+  type HappinessRating,
+} from "@/lib/diary/happiness";
+import {
   analysisToManualState,
   createManualScoreState,
   createManualScoreStateFromWellbeing,
-  DEFAULT_WELLBEING,
   manualStateToAnalysis,
   wellbeingToAnalysis,
-  wellbeingToEmotionLabel,
-  type DiaryInputMode,
   type ManualScoreState,
 } from "@/lib/diary/manualScores";
 import {
   hasSeenDiaryValueProp,
   hasSeenDay7Milestone,
-  markDiaryModeSelected,
   markDiaryValuePropSeen,
   markDay7MilestoneSeen,
   STATS_INSIGHT_MIN_ENTRIES,
@@ -42,7 +45,6 @@ import { getNextSameGanjiDate, getNextUncollectedGanjiDate } from "@/lib/diary/n
 import { computeSaveCelebration, type SaveCelebration } from "@/lib/diary/saveCelebration";
 import { getUniqueEntryDays } from "@/lib/diary/stats";
 import {
-  computeUserBirthPillars,
   loadSajuSettings,
   resolvePillarVisibility,
   saveSajuSettings,
@@ -51,6 +53,7 @@ import {
   type DiaryPillarSlot,
   type SajuSettings,
 } from "@/lib/diary/sajuSettings";
+import { loadPrimarySajuProfile } from "@/lib/diary/profileStorage";
 import CreateSajuPromptModal from "@/components/diary/CreateSajuPromptModal";
 import type { DiaryEntry, DiaryPillar } from "@/lib/diary/types";
 
@@ -89,16 +92,18 @@ export default function DiaryEditor({ initialDate }: Props) {
   const [monthPillar, setMonthPillar] = useState<DiaryPillar>(EMPTY_PILLAR);
   const [yearPillar, setYearPillar] = useState<DiaryPillar>(EMPTY_PILLAR);
   const [content, setContent] = useState("");
-  const [inputMode, setInputMode] = useState<DiaryInputMode>("scores");
-  const [hasChosenInputMode, setHasChosenInputMode] = useState(false);
+  const [memo, setMemo] = useState("");
+  const [showAdvancedWrite, setShowAdvancedWrite] = useState(false);
   const [manualScores, setManualScores] = useState<ManualScoreState>(
     createManualScoreState
   );
   const [hasCustomScores, setHasCustomScores] = useState(false);
-  const [wellbeing, setWellbeing] = useState(DEFAULT_WELLBEING);
-  const [mood, setMood] = useState<EmotionLabel | null>(null);
-  const [emotionSource, setEmotionSource] =
-    useState<NonNullable<DiaryEntry["emotionSource"]>>("inferred");
+  const [happinessRating, setHappinessRating] = useState<HappinessRating>(
+    DEFAULT_HAPPINESS_RATING
+  );
+  const [emotions, setEmotions] = useState<string[]>([]);
+  const [tags, setTags] = useState<string[]>([]);
+  const [sajuProfileId, setSajuProfileId] = useState<string | null>(null);
   const [entry, setEntry] = useState<DiaryEntry | null>(null);
   const [dayPillar, setDayPillar] = useState<DiaryEntry["dayPillar"] | null>(null);
   const [dayPillarKo, setDayPillarKo] = useState("");
@@ -149,6 +154,12 @@ export default function DiaryEditor({ initialDate }: Props) {
     refreshAllEntries();
   }, [refreshAllEntries]);
 
+  useEffect(() => {
+    void loadPrimarySajuProfile().then((profile) => {
+      if (profile) setSajuProfileId(profile.id);
+    });
+  }, []);
+
   const loadEntry = useCallback(async (targetDate: string) => {
     setStatus("loading");
     setMessage("");
@@ -163,33 +174,34 @@ export default function DiaryEditor({ initialDate }: Props) {
       const existing = await storage.getByDate(targetDate);
       if (existing) {
         setEntry(existing);
-        setHasChosenInputMode(false);
-        setContent(isDiaryBody(existing.content) ? existing.content : "");
-        setInputMode(
-          isDiaryBody(existing.content)
-            ? "text"
-            : existing.inputMode ?? "scores"
+        const body = isDiaryBody(existing.content) ? existing.content : "";
+        setContent(body);
+        setMemo(body);
+        setShowAdvancedWrite(false);
+        setHappinessRating(
+          existing.happinessRating ??
+            scoreToHappinessRating(
+              existing.analysis?.daily_wellbeing_score ??
+                happinessRatingToScore(DEFAULT_HAPPINESS_RATING)
+            )
         );
-        setWellbeing(analysisToWellbeing(existing.analysis));
-        setMood(existing.analysis?.emotion_label ?? null);
-        setEmotionSource(
-          existing.emotionSource ??
-            (existing.inputMode === "text" ? "ai" : "selected")
-        );
+        setEmotions(existing.emotions ?? []);
+        setTags(existing.tags ?? []);
+        setSajuProfileId(existing.sajuProfileId ?? sajuProfileId);
         setManualScores(
           existing.analysis
             ? analysisToManualState(existing.analysis)
             : createManualScoreState()
         );
-        setHasCustomScores(existing.analysis !== null);
+        setHasCustomScores(existing.analysis !== null && existing.inputMode !== "scores");
       } else {
         setEntry(null);
-        setHasChosenInputMode(false);
         setContent("");
-        setInputMode("scores");
-        setWellbeing(DEFAULT_WELLBEING);
-        setMood(null);
-        setEmotionSource("inferred");
+        setMemo("");
+        setShowAdvancedWrite(false);
+        setHappinessRating(DEFAULT_HAPPINESS_RATING);
+        setEmotions([]);
+        setTags([]);
         setManualScores(createManualScoreState());
         setHasCustomScores(false);
       }
@@ -199,7 +211,7 @@ export default function DiaryEditor({ initialDate }: Props) {
       setMessage(err instanceof Error ? err.message : "일기를 불러오지 못했습니다.");
       setStatus("idle");
     }
-  }, []);
+  }, [sajuProfileId]);
 
   useEffect(() => {
     loadEntry(date);
@@ -212,24 +224,29 @@ export default function DiaryEditor({ initialDate }: Props) {
     entryContent: string,
     nextEmotionSource: NonNullable<DiaryEntry["emotionSource"]>
   ): DiaryEntry => {
-    const userBirthPillars = sajuSettings.birthDate
-      ? computeUserBirthPillars(
-          sajuSettings.birthDate,
-          sajuSettings.birthHour,
-          sajuSettings.birthMinute
-        ) ?? undefined
-      : undefined;
-
     return {
       ...base,
       content: entryContent,
       analysis,
-      inputMode,
+      happinessRating,
+      emotions,
+      tags,
+      heavenlyStem: dayPillar?.stem.ko ?? base.heavenlyStem,
+      earthlyBranch: dayPillar?.branch.ko ?? base.earthlyBranch,
+      weekday: dayPillar
+        ? new Date(`${date}T12:00:00`).getDay()
+        : base.weekday,
+      isWeekend: (() => {
+        const wd = new Date(`${date}T12:00:00`).getDay();
+        return wd === 0 || wd === 6;
+      })(),
+      inputMode: showAdvancedWrite ? "text" : "scores",
       emotionSource: nextEmotionSource,
-      sajuDepth: "full",
+      sajuDepth: "day",
+      sajuProfileId,
       monthPillarKo: monthPillar.ganjiKo,
       yearPillarKo: yearPillar.ganjiKo,
-      userBirthPillars,
+      schemaVersion: 2,
       updatedAt: now,
       createdAt: entry?.createdAt ?? now,
     };
@@ -243,24 +260,30 @@ export default function DiaryEditor({ initialDate }: Props) {
       const now = new Date().toISOString();
       const listBefore = await storage.list();
       const base = entry ?? createDiaryEntry(date, "");
-      const resolvedMood = mood ?? wellbeingToEmotionLabel(wellbeing);
+      const score = happinessRatingToScore(happinessRating);
       const analysis = hasCustomScores
         ? {
             ...manualStateToAnalysis(manualScores),
-            emotion_label: resolvedMood,
+            daily_wellbeing_score: score,
+            happiness_score: score,
           }
-        : wellbeingToAnalysis(wellbeing, resolvedMood);
-      const entryContent = content.trim() || `오늘의 행복도: ${analysis.daily_wellbeing_score}점`;
+        : wellbeingToAnalysis(score);
+      const entryContent =
+        memo.trim() ||
+        content.trim() ||
+        `오늘의 행복도: ${happinessRating}점`;
       const updated = buildPayload(
         base,
         analysis,
         now,
         entryContent,
-        emotionSource
+        emotions.length > 0 ? "selected" : "inferred"
       );
       await storage.save(updated);
-      setEntry(updated);
-      setMood(resolvedMood);
+      const reloaded = await storage.getByDate(date);
+      setEntry(reloaded ?? updated);
+      setContent(isDiaryBody(updated.content) ? updated.content : "");
+      setMemo(isDiaryBody(updated.content) ? updated.content : memo.trim());
 
       const celebration = computeSaveCelebration(listBefore, updated);
       if (celebration) setSaveCelebration(celebration);
@@ -285,7 +308,7 @@ export default function DiaryEditor({ initialDate }: Props) {
         wellbeing: analysis.daily_wellbeing_score,
         analysis,
       });
-      setMessage("저장되었습니다.");
+      setMessage("저장되었습니다. 기록이 쌓일수록 패턴을 비교할 수 있어요.");
       setStatus("idle");
     } catch (err) {
       setMessage(err instanceof Error ? err.message : "저장에 실패했습니다.");
@@ -294,7 +317,8 @@ export default function DiaryEditor({ initialDate }: Props) {
   };
 
   const handleAnalyze = async () => {
-    if (!content.trim()) {
+    const text = content.trim() || memo.trim();
+    if (!text) {
       setMessage("분석할 일기 내용을 입력해주세요.");
       return;
     }
@@ -304,7 +328,7 @@ export default function DiaryEditor({ initialDate }: Props) {
       const res = await fetch("/api/diary/classify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: content.trim(), date, dayPillarKo }),
+        body: JSON.stringify({ content: text, date, dayPillarKo }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "분석에 실패했습니다.");
@@ -312,12 +336,17 @@ export default function DiaryEditor({ initialDate }: Props) {
       const analysis = data.analysis as DiaryAnalysis;
       const storage = await getDiaryStorage();
       const now = new Date().toISOString();
-      const base = entry ?? createDiaryEntry(date, content.trim());
-      const updated = buildPayload(base, analysis, now, content.trim(), "ai");
+      const base = entry ?? createDiaryEntry(date, text);
+      setHappinessRating(scoreToHappinessRating(analysis.daily_wellbeing_score));
+      if (analysis.dominant_emotions?.length) {
+        setEmotions(analysis.dominant_emotions.slice(0, 5));
+      }
+      const updated = buildPayload(base, analysis, now, text, "ai");
       await storage.save(updated);
-      setEntry(updated);
-      setWellbeing(analysisToWellbeing(analysis));
-      setMood(analysis.emotion_label);
+      const reloaded = await storage.getByDate(date);
+      setEntry(reloaded ?? updated);
+      setContent(text);
+      setMemo(text);
       await refreshAllEntries();
       setMessage("AI 분석이 완료되어 저장되었습니다.");
       setStatus("idle");
@@ -334,12 +363,11 @@ export default function DiaryEditor({ initialDate }: Props) {
       const storage = await getDiaryStorage();
       await storage.delete(entry.id);
       setEntry(null);
-      setHasChosenInputMode(false);
       setContent("");
-      setInputMode("scores");
-      setWellbeing(DEFAULT_WELLBEING);
-      setMood(null);
-      setEmotionSource("inferred");
+      setMemo("");
+      setHappinessRating(DEFAULT_HAPPINESS_RATING);
+      setEmotions([]);
+      setTags([]);
       setManualScores(createManualScoreState());
       setHasCustomScores(false);
       setMessage("삭제되었습니다.");
@@ -422,16 +450,6 @@ export default function DiaryEditor({ initialDate }: Props) {
     });
   }, []);
 
-  const handleInputModeSelect = (mode: DiaryInputMode) => {
-    setInputMode(mode);
-    setHasChosenInputMode(true);
-    markDiaryModeSelected();
-    setMessage("");
-    if (mode === "text" && !content.trim()) {
-      setShowWriteSheet(true);
-    }
-  };
-
   const isBusy = status === "loading" || status === "saving" || status === "analyzing";
   const collectionSummary = getCollectionSummary(allEntries);
   const dayPillarIndex = dayPillar?.ganjiIndex ?? 0;
@@ -479,7 +497,7 @@ export default function DiaryEditor({ initialDate }: Props) {
           const analysis = manualStateToAnalysis(next);
           setManualScores(next);
           setHasCustomScores(true);
-          setWellbeing(analysis.daily_wellbeing_score);
+          setHappinessRating(scoreToHappinessRating(analysis.daily_wellbeing_score));
         }}
         onClose={() => setShowManualScoreSheet(false)}
         disabled={isBusy}
@@ -518,20 +536,6 @@ export default function DiaryEditor({ initialDate }: Props) {
         </Link>
       )}
 
-      <SajuDepthPicker
-        diaryDate={date}
-        onDiaryDateChange={handleDiaryDateChange}
-        sajuSettings={sajuSettings}
-        onBirthDateChange={handleBirthDateChange}
-        onBirthHourChange={handleBirthHourChange}
-        onBirthMinuteChange={handleBirthMinuteChange}
-        onToggleBirthPillar={handleToggleBirthPillar}
-        onToggleDiaryPillar={handleToggleDiaryPillar}
-        onToggleDaeun={handleToggleDaeun}
-        totalEntryDays={totalEntryDays}
-        entries={allEntries}
-      />
-
       <div
         className="p-3 border-2 space-y-3"
         style={{ background: "var(--px-bg2)", borderColor: "var(--px-border)" }}
@@ -555,128 +559,122 @@ export default function DiaryEditor({ initialDate }: Props) {
             {dayPillarKo && ` ${dayPillarKo}일`}
           </span>
         </div>
-        {!hasChosenInputMode ? (
-          <div className="space-y-2">
-            <div className="text-center">
-              <p className="text-sm font-black" style={{ color: "var(--px-text-on-panel)" }}>
-                오늘은 어떻게 기록할까요?
-              </p>
-            </div>
-            <DiaryModeSelect
-              value={null}
-              disabled={isBusy}
-              onSelect={handleInputModeSelect}
-            />
-          </div>
-        ) : (
-          <>
-            {inputMode === "scores" ? (
-              <>
-                <ScoreSlider
-              label="행복도"
-              value={wellbeing}
-              onChange={(v) => {
-                setWellbeing(v);
-                setHasCustomScores(false);
-              }}
-              color="var(--px-accent)"
-              disabled={isBusy}
-            />
-            <MoodChips
-              value={emotionSource === "selected" ? mood : null}
-              onChange={(nextMood) => {
-                setMood(nextMood);
-                setEmotionSource(nextMood ? "selected" : "inferred");
-              }}
-              disabled={isBusy}
-            />
-            <button
-              type="button"
-              onClick={() => {
-                if (!hasCustomScores) {
-                  setManualScores(createManualScoreStateFromWellbeing(wellbeing));
-                }
-                setShowManualScoreSheet(true);
-              }}
-              disabled={isBusy}
-              className="w-full py-2 border text-xs font-black"
-              style={{
-                borderColor: "#60a5fa",
-                color: "#60a5fa",
-                background:
-                  "color-mix(in srgb, #60a5fa 10%, var(--px-bg2))",
-              }}
-            >
-              세부 감정 조절 (선택)
-            </button>
-            <button
-              type="button"
-              onClick={handleSave}
-              disabled={isBusy}
-              className="ui-primary-btn w-full py-3 text-sm"
-            >
-              {status === "saving" ? "저장 중..." : "빠른 기록 저장"}
-            </button>
-              </>
-            ) : (
-              <>
-                <button
-              type="button"
-              onClick={() => setShowWriteSheet(true)}
-              disabled={isBusy}
-              className="w-full py-3 border-2 text-sm font-bold text-left px-3"
-              style={{
-                borderColor: "var(--px-border2)",
-                background: "var(--px-bg3)",
-                color: "var(--px-text-on-panel)",
-                boxShadow: "2px 2px 0 #000",
-              }}
-            >
-              {content.trim() ? (
-                <span className="line-clamp-2">{content}</span>
-              ) : (
-                <span style={{ color: "var(--px-text2)" }}>
-                  ✎ 오늘 이야기 쓰기
-                </span>
-              )}
-            </button>
-            <button
-              type="button"
-              onClick={handleAnalyze}
-              disabled={isBusy || !content.trim()}
-              className="ui-primary-btn w-full py-3 text-sm"
-            >
-              {status === "analyzing"
-                ? "AI 분석 중..."
-                : "AI 분석하고 일기 저장"}
-            </button>
-              </>
-            )}
 
+        <HappinessRatingPicker
+          value={happinessRating}
+          onChange={(rating) => {
+            setHappinessRating(rating);
+            setHasCustomScores(false);
+          }}
+          disabled={isBusy}
+        />
+        <EmotionMultiSelect
+          value={emotions}
+          onChange={setEmotions}
+          disabled={isBusy}
+        />
+        <div className="space-y-1.5">
+          <p className="ui-section-title">짧은 메모</p>
+          <textarea
+            value={memo}
+            onChange={(e) => {
+              setMemo(e.target.value);
+              setContent(e.target.value);
+            }}
+            disabled={isBusy}
+            rows={3}
+            placeholder="오늘을 한두 문장으로 남겨보세요."
+            className="w-full px-3 py-2 border-2 text-sm resize-none"
+            style={{
+              background: "var(--px-bg3)",
+              borderColor: "var(--px-border)",
+              color: "var(--px-text-on-panel)",
+            }}
+          />
+        </div>
+        <EventTagPicker value={tags} onChange={setTags} disabled={isBusy} />
+
+        <button
+          type="button"
+          onClick={handleSave}
+          disabled={isBusy}
+          className="ui-primary-btn w-full py-3 text-sm"
+        >
+          {status === "saving"
+            ? "저장 중..."
+            : entry
+              ? "기록 수정 저장"
+              : "오늘 기록 저장"}
+        </button>
+
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              if (!hasCustomScores) {
+                setManualScores(
+                  createManualScoreStateFromWellbeing(
+                    happinessRatingToScore(happinessRating)
+                  )
+                );
+              }
+              setShowManualScoreSheet(true);
+            }}
+            disabled={isBusy}
+            className="text-xs font-bold underline"
+            style={{ color: "#60a5fa" }}
+          >
+            세부 감정 조절
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setShowAdvancedWrite(true);
+              setShowWriteSheet(true);
+            }}
+            disabled={isBusy}
+            className="text-xs font-bold underline"
+            style={{ color: "var(--px-text2)" }}
+          >
+            긴 일기·AI 분석
+          </button>
+          {entry && (
             <button
               type="button"
-              onClick={() => setHasChosenInputMode(false)}
+              onClick={handleDelete}
               disabled={isBusy}
-              className="block mx-auto text-xs font-bold underline"
-              style={{ color: "var(--px-text2)" }}
+              className="text-xs font-bold underline"
+              style={{ color: "#f87171" }}
             >
-              방식 바꾸기
+              삭제
             </button>
-
-            {entry && (
-              <button
-                type="button"
-                onClick={handleDelete}
-                disabled={isBusy}
-                className="text-xs font-bold underline"
-                style={{ color: "#f87171" }}
-              >
-                삭제
-              </button>
-            )}
-          </>
-        )}
+          )}
+        </div>
       </div>
+
+      <details
+        className="border-2 p-2"
+        style={{ borderColor: "var(--px-border)", background: "var(--px-bg2)" }}
+      >
+        <summary className="cursor-pointer text-sm font-bold px-1 py-1" style={{ color: "var(--px-text2)" }}>
+          날짜·만세력 자세히 보기
+        </summary>
+        <div className="pt-2">
+          <SajuDepthPicker
+            diaryDate={date}
+            onDiaryDateChange={handleDiaryDateChange}
+            sajuSettings={sajuSettings}
+            onBirthDateChange={handleBirthDateChange}
+            onBirthHourChange={handleBirthHourChange}
+            onBirthMinuteChange={handleBirthMinuteChange}
+            onToggleBirthPillar={handleToggleBirthPillar}
+            onToggleDiaryPillar={handleToggleDiaryPillar}
+            onToggleDaeun={handleToggleDaeun}
+            totalEntryDays={totalEntryDays}
+            entries={allEntries}
+          />
+        </div>
+      </details>
 
       <CollectionPreviewCard
         summary={collectionSummary}

@@ -2,8 +2,21 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import LocalImportPanel from "@/components/diary/LocalImportPanel";
+import { getIndexedDbStorage } from "@/lib/diary/indexedDbStorage";
+import {
+  getDiaryStorage,
+  resetDiaryStorageCache,
+} from "@/lib/diary/getStorage";
+import type { DiaryEntry } from "@/lib/diary/types";
+import type { DiaryStorage } from "@/lib/diary/storage";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
-import { resetDiaryStorageCache } from "@/lib/diary/getStorage";
+
+type ImportReady = {
+  localEntries: DiaryEntry[];
+  remoteEntries: DiaryEntry[];
+  remoteStorage: DiaryStorage;
+};
 
 export default function DiaryLoginPage() {
   const [email, setEmail] = useState("");
@@ -11,6 +24,20 @@ export default function DiaryLoginPage() {
   const [mode, setMode] = useState<"login" | "signup">("login");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
+  const [importReady, setImportReady] = useState<ImportReady | null>(null);
+
+  const prepareImportPrompt = async (): Promise<boolean> => {
+    resetDiaryStorageCache();
+    const localStorage = getIndexedDbStorage();
+    const localEntries = await localStorage.list();
+    if (localEntries.length === 0) {
+      return false;
+    }
+    const remoteStorage = await getDiaryStorage();
+    const remoteEntries = await remoteStorage.list();
+    setImportReady({ localEntries, remoteEntries, remoteStorage });
+    return true;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -31,8 +58,12 @@ export default function DiaryLoginPage() {
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
-        resetDiaryStorageCache();
-        window.location.href = "/diary";
+        const needsImport = await prepareImportPrompt();
+        if (!needsImport) {
+          window.location.href = "/diary";
+          return;
+        }
+        setMessage("로그인되었습니다. 로컬 기록을 가져올지 선택해주세요.");
       }
     } catch (err) {
       setMessage(err instanceof Error ? err.message : "인증에 실패했습니다.");
@@ -46,6 +77,7 @@ export default function DiaryLoginPage() {
     if (!supabase) return;
     await supabase.auth.signOut();
     resetDiaryStorageCache();
+    setImportReady(null);
     setMessage("로그아웃되었습니다.");
   };
 
@@ -59,45 +91,73 @@ export default function DiaryLoginPage() {
         설정하지 않으면 브라우저 로컬(IndexedDB)에만 저장됩니다.
       </p>
 
-      <form onSubmit={handleSubmit} className="space-y-3 p-4 border-2" style={{ background: "var(--px-bg3)", borderColor: "var(--px-border)" }}>
-        <input
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="이메일"
-          required
-          className="w-full px-3 py-2 text-sm border-2"
-          style={{ background: "var(--px-bg2)", borderColor: "var(--px-border)", color: "var(--px-text)" }}
+      {!importReady && (
+        <form
+          onSubmit={handleSubmit}
+          className="space-y-3 p-4 border-2"
+          style={{ background: "var(--px-bg3)", borderColor: "var(--px-border)" }}
+        >
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="이메일"
+            required
+            className="w-full px-3 py-2 text-sm border-2"
+            style={{
+              background: "var(--px-bg2)",
+              borderColor: "var(--px-border)",
+              color: "var(--px-text)",
+            }}
+          />
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="비밀번호"
+            required
+            minLength={6}
+            className="w-full px-3 py-2 text-sm border-2"
+            style={{
+              background: "var(--px-bg2)",
+              borderColor: "var(--px-border)",
+              color: "var(--px-text)",
+            }}
+          />
+          <div className="flex gap-2">
+            <button
+              type="submit"
+              disabled={loading}
+              className="flex-1 px-4 py-2 text-xs font-bold border-2"
+              style={{ background: "var(--px-accent)", borderColor: "#000", color: "#000" }}
+            >
+              {loading ? "처리 중..." : mode === "login" ? "로그인" : "가입"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode(mode === "login" ? "signup" : "login")}
+              className="px-3 py-2 text-xs font-bold border"
+              style={{ borderColor: "var(--px-border)", color: "var(--px-text2)" }}
+            >
+              {mode === "login" ? "가입" : "로그인"}
+            </button>
+          </div>
+        </form>
+      )}
+
+      {importReady && (
+        <LocalImportPanel
+          localEntries={importReady.localEntries}
+          remoteEntries={importReady.remoteEntries}
+          remoteStorage={importReady.remoteStorage}
+          onSkip={() => {
+            window.location.href = "/diary";
+          }}
+          onComplete={() => {
+            window.location.href = "/diary";
+          }}
         />
-        <input
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          placeholder="비밀번호"
-          required
-          minLength={6}
-          className="w-full px-3 py-2 text-sm border-2"
-          style={{ background: "var(--px-bg2)", borderColor: "var(--px-border)", color: "var(--px-text)" }}
-        />
-        <div className="flex gap-2">
-          <button
-            type="submit"
-            disabled={loading}
-            className="flex-1 px-4 py-2 text-xs font-bold border-2"
-            style={{ background: "var(--px-accent)", borderColor: "#000", color: "#000" }}
-          >
-            {loading ? "처리 중..." : mode === "login" ? "로그인" : "가입"}
-          </button>
-          <button
-            type="button"
-            onClick={() => setMode(mode === "login" ? "signup" : "login")}
-            className="px-3 py-2 text-xs font-bold border"
-            style={{ borderColor: "var(--px-border)", color: "var(--px-text2)" }}
-          >
-            {mode === "login" ? "가입" : "로그인"}
-          </button>
-        </div>
-      </form>
+      )}
 
       <button
         type="button"

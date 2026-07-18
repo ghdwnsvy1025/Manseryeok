@@ -18,9 +18,11 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...
 
 ## 3. DB 마이그레이션
 
-Supabase Dashboard → **SQL Editor** → 아래 파일 내용 실행:
+Supabase Dashboard → **SQL Editor** → 아래 파일을 **순서대로** 실행:
 
-[`supabase/migrations/001_diary_entries.sql`](../supabase/migrations/001_diary_entries.sql)
+1. [`supabase/migrations/001_diary_entries.sql`](../supabase/migrations/001_diary_entries.sql)
+2. [`supabase/migrations/002_year_pillar_ko.sql`](../supabase/migrations/002_year_pillar_ko.sql)
+3. [`supabase/migrations/003_p0_profiles_and_diary_fields.sql`](../supabase/migrations/003_p0_profiles_and_diary_fields.sql)
 
 ## 4. Auth 설정
 
