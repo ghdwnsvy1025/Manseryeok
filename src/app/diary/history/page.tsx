@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { getDiaryStorage } from "@/lib/diary/getStorage";
+import { filterRealEntries } from "@/lib/diary/dataOrigin";
 import { HAPPINESS_RATING_LABELS } from "@/lib/diary/happiness";
 import type { DiaryEntry } from "@/lib/diary/types";
 
@@ -40,7 +41,7 @@ export default function DiaryHistoryPage() {
     setLoading(true);
     getDiaryStorage()
       .then((storage) => storage.listByMonth({ year, month }))
-      .then(setEntries)
+      .then((list) => setEntries(filterRealEntries(list)))
       .catch(() => setEntries([]))
       .finally(() => setLoading(false));
   }, [year, month]);

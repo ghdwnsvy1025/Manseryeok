@@ -17,11 +17,18 @@ export function createDiaryEntry(
     analysis?: DiaryAnalysis | null;
     id?: string;
     happinessRating?: DiaryEntry["happinessRating"];
+    happinessSource?: DiaryEntry["happinessSource"];
+    conditionRating?: DiaryEntry["conditionRating"];
     emotions?: string[];
     tags?: string[];
     inputMode?: DiaryEntry["inputMode"];
     emotionSource?: DiaryEntry["emotionSource"];
     sajuProfileId?: string | null;
+    dataOrigin?: DiaryEntry["dataOrigin"];
+    sleepSatisfaction?: DiaryEntry["sleepSatisfaction"];
+    activityLevel?: DiaryEntry["activityLevel"];
+    socialMet?: DiaryEntry["socialMet"];
+    workIntensity?: DiaryEntry["workIntensity"];
   }
 ): DiaryEntry {
   const { dayPillar, monthPillarKo, yearPillarKo } = getPillarsForDate(date);
@@ -38,14 +45,21 @@ export function createDiaryEntry(
     yearPillarKo,
     analysis: opts?.analysis ?? null,
     happinessRating: opts?.happinessRating ?? DEFAULT_HAPPINESS_RATING,
+    happinessSource: opts?.happinessSource ?? "selected",
+    conditionRating: opts?.conditionRating ?? null,
     emotions: opts?.emotions ?? [],
     tags: opts?.tags ?? [],
     heavenlyStem: dayPillar.stem.ko,
     earthlyBranch: dayPillar.branch.ko,
     weekday,
     isWeekend: weekday === 0 || weekday === 6,
+    sleepSatisfaction: opts?.sleepSatisfaction ?? null,
+    activityLevel: opts?.activityLevel ?? null,
+    socialMet: opts?.socialMet ?? null,
+    workIntensity: opts?.workIntensity ?? null,
     inputMode: opts?.inputMode,
     emotionSource: opts?.emotionSource,
+    dataOrigin: opts?.dataOrigin ?? "user",
     sajuProfileId: opts?.sajuProfileId ?? null,
     schemaVersion: DIARY_SCHEMA_VERSION,
     createdAt: now,

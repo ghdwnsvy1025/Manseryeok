@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useRef } from "react";
+import { getDiaryStorage } from "@/lib/diary/getStorage";
+import { buildTwoMonthDemoEntries } from "@/lib/diary/seedDemoEntries";
 
 type EmbedStatus = "idle" | "loading" | "success" | "error";
 
@@ -10,7 +12,26 @@ export default function AdminPage() {
   const [message, setMessage] = useState("");
   const [chunkCount, setChunkCount] = useState(0);
   const [charCount, setCharCount] = useState(0);
+  const [seedStatus, setSeedStatus] = useState<"idle" | "loading" | "done" | "error">("idle");
+  const [seedMessage, setSeedMessage] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleSeedDemoDiary = async () => {
+    setSeedStatus("loading");
+    setSeedMessage("2개월 데모 일기를 저장하는 중...");
+    try {
+      const entries = buildTwoMonthDemoEntries();
+      const storage = await getDiaryStorage();
+      await storage.upsertMany(entries);
+      setSeedStatus("done");
+      setSeedMessage(
+        `${entries.length}일분 데모 일기를 저장했습니다. 일반 통계에서는 제외되며, 관리자 미리보기용입니다.`
+      );
+    } catch (err) {
+      setSeedStatus("error");
+      setSeedMessage(err instanceof Error ? err.message : "데모 일기 저장에 실패했습니다.");
+    }
+  };
 
   // 파일 선택 시 내용 읽기
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -85,6 +106,57 @@ export default function AdminPage() {
         <p className="text-xs mt-1" style={{ color: "var(--px-text2)" }}>
           사주 해석 텍스트를 업로드하고 AI 학습을 시작합니다.
         </p>
+      </div>
+
+      {/* 데모 일기 시드 */}
+      <div
+        className="p-4 border-2 space-y-3"
+        style={{
+          background: "var(--px-bg2)",
+          borderColor: "var(--px-accent)",
+        }}
+      >
+        <p className="font-bold text-sm" style={{ color: "var(--px-accent)" }}>
+          ■ 통계용 데모 일기
+        </p>
+        <p className="text-xs" style={{ color: "var(--px-text2)" }}>
+          최근 약 2개월치 임의 일기를 현재 저장소(로컬 IndexedDB 또는 로그인 계정)에 넣습니다.
+          같은 날짜가 있으면 덮어씁니다.
+        </p>
+        <button
+          type="button"
+          onClick={handleSeedDemoDiary}
+          disabled={seedStatus === "loading"}
+          className="px-btn w-full py-2 text-sm"
+        >
+          {seedStatus === "loading"
+            ? "[ 저장 중... ]"
+            : "[ 2개월 데모 일기 넣기 ]"}
+        </button>
+        {seedMessage && (
+          <p
+            className="text-xs font-bold"
+            style={{
+              color:
+                seedStatus === "error"
+                  ? "#f87171"
+                  : seedStatus === "done"
+                    ? "#4ade80"
+                    : "var(--px-text2)",
+            }}
+          >
+            {seedMessage}
+          </p>
+        )}
+        {seedStatus === "done" && (
+          <a
+            href="/diary/stats"
+            className="text-xs font-bold underline"
+            style={{ color: "var(--px-accent)" }}
+          >
+            통계 페이지로 이동 →
+          </a>
+        )}
       </div>
 
       {/* 안내 */}

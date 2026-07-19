@@ -8,6 +8,7 @@ type Props = {
   disabled?: boolean;
   onAnalyze?: () => void;
   analyzing?: boolean;
+  analyzeLabel?: string;
 };
 
 export default function DiaryWriteSheet({
@@ -18,6 +19,7 @@ export default function DiaryWriteSheet({
   disabled,
   onAnalyze,
   analyzing,
+  analyzeLabel = "긴 일기 반영",
 }: Props) {
   if (!open) return null;
 
@@ -34,7 +36,7 @@ export default function DiaryWriteSheet({
         style={{ borderColor: "var(--px-border)", background: "var(--px-bg2)" }}
       >
         <p className="text-sm font-black" style={{ color: "var(--px-accent)" }}>
-          ■ 일기 쓰기
+          ■ 긴 일기
         </p>
         <button
           type="button"
@@ -42,10 +44,11 @@ export default function DiaryWriteSheet({
           className="ui-primary-btn px-3 py-1.5 text-xs"
           disabled={disabled}
         >
-          완료
+          닫기
         </button>
       </div>
       <div className="flex-1 min-h-0 flex flex-col p-3 gap-2">
+        <p className="ui-hint">원문은 외부로 전송되지 않고 사용자 저장소에만 남습니다.</p>
         <textarea
           value={value}
           onChange={(e) => onChange(e.target.value)}
@@ -66,7 +69,7 @@ export default function DiaryWriteSheet({
             disabled={disabled || !value.trim()}
             className="ui-action-btn self-start text-xs"
           >
-            {analyzing ? "분석 중..." : "마음 AI 분석 (선택)"}
+            {analyzing ? "처리 중..." : analyzeLabel}
           </button>
         )}
       </div>

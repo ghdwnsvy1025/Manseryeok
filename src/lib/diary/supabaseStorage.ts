@@ -16,6 +16,8 @@ type DbRow = {
   scores: DiaryAnalysis | null;
   ai_summary: string | null;
   happiness_rating: number | null;
+  happiness_source: string | null;
+  condition_rating: number | null;
   emotions: string[] | null;
   tags: string[] | null;
   heavenly_stem: string | null;
@@ -23,11 +25,16 @@ type DbRow = {
   weekday: number | null;
   is_weekend: boolean | null;
   sleep_score: number | null;
+  sleep_satisfaction: string | null;
   exercise_status: string | null;
+  activity_level: string | null;
   social_activity: string | null;
+  social_met: string | null;
+  work_intensity: string | null;
   weather_metadata: Record<string, unknown> | null;
   input_mode: string | null;
   emotion_source: string | null;
+  data_origin: string | null;
   saju_depth: string | null;
   user_birth_pillars: DiaryEntry["userBirthPillars"] | null;
   saju_profile_id: string | null;
@@ -46,6 +53,8 @@ function rowToEntry(row: DbRow): DiaryEntry {
     yearPillarKo: row.year_pillar_ko ?? undefined,
     analysis: row.scores,
     happinessRating: row.happiness_rating ?? undefined,
+    happinessSource: row.happiness_source ?? undefined,
+    conditionRating: row.condition_rating ?? null,
     emotions: row.emotions ?? [],
     tags: row.tags ?? [],
     heavenlyStem: row.heavenly_stem ?? undefined,
@@ -53,11 +62,16 @@ function rowToEntry(row: DbRow): DiaryEntry {
     weekday: row.weekday ?? undefined,
     isWeekend: row.is_weekend ?? undefined,
     sleepScore: row.sleep_score,
+    sleepSatisfaction: row.sleep_satisfaction ?? null,
     exerciseStatus: row.exercise_status,
+    activityLevel: row.activity_level ?? null,
     socialActivity: row.social_activity,
+    socialMet: row.social_met ?? null,
+    workIntensity: row.work_intensity ?? null,
     weatherMetadata: row.weather_metadata,
     inputMode: row.input_mode ?? undefined,
     emotionSource: row.emotion_source ?? undefined,
+    dataOrigin: row.data_origin ?? undefined,
     sajuDepth: row.saju_depth ?? undefined,
     userBirthPillars: row.user_birth_pillars ?? undefined,
     sajuProfileId: row.saju_profile_id,
@@ -84,6 +98,8 @@ function entryToRow(
     scores: normalized.analysis,
     ai_summary: normalized.analysis?.summary ?? null,
     happiness_rating: normalized.happinessRating ?? null,
+    happiness_source: normalized.happinessSource ?? null,
+    condition_rating: normalized.conditionRating ?? null,
     emotions: normalized.emotions ?? [],
     tags: normalized.tags ?? [],
     heavenly_stem: normalized.heavenlyStem ?? null,
@@ -91,11 +107,16 @@ function entryToRow(
     weekday: normalized.weekday ?? null,
     is_weekend: normalized.isWeekend ?? null,
     sleep_score: normalized.sleepScore ?? null,
+    sleep_satisfaction: normalized.sleepSatisfaction ?? null,
     exercise_status: normalized.exerciseStatus ?? null,
+    activity_level: normalized.activityLevel ?? null,
     social_activity: normalized.socialActivity ?? null,
+    social_met: normalized.socialMet ?? null,
+    work_intensity: normalized.workIntensity ?? null,
     weather_metadata: normalized.weatherMetadata ?? null,
     input_mode: normalized.inputMode ?? null,
     emotion_source: normalized.emotionSource ?? null,
+    data_origin: normalized.dataOrigin ?? "user",
     saju_depth: normalized.sajuDepth ?? null,
     user_birth_pillars: normalized.userBirthPillars ?? null,
     saju_profile_id: normalized.sajuProfileId ?? null,

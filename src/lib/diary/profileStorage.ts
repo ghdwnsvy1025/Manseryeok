@@ -146,6 +146,8 @@ export function ensureLocalUserProfile(
     locale: "ko-KR",
     timezone: "Asia/Seoul",
     activeSajuProfileId: activeSajuProfileId ?? null,
+    experienceMode: null,
+    onboardingCompletedAt: null,
     createdAt: now,
     updatedAt: now,
     schemaVersion: DIARY_SCHEMA_VERSION,
@@ -257,7 +259,20 @@ export async function saveSajuProfile(profile: SajuProfile): Promise<SajuProfile
   } = await supabase.auth.getUser();
   if (!user) return profile;
 
-  const withUser = { ...profile, userId: user.id, updatedAt: new Date().toISOString() };
+  const { data: existingPrimary } = await supabase
+    .from("saju_profiles")
+    .select("id, created_at")
+    .eq("user_id", user.id)
+    .eq("is_primary", true)
+    .maybeSingle();
+
+  const withUser = {
+    ...profile,
+    id: existingPrimary?.id ?? profile.id,
+    userId: user.id,
+    createdAt: existingPrimary?.created_at ?? profile.createdAt,
+    updatedAt: new Date().toISOString(),
+  };
   const { error } = await supabase
     .from("saju_profiles")
     .upsert(profileToRow(withUser, user.id), { onConflict: "id" });
@@ -274,6 +289,37 @@ export async function saveSajuProfile(profile: SajuProfile): Promise<SajuProfile
 
   saveLocalSajuProfile(withUser);
   return withUser;
+}
+
+/**
+ * 비로그인 상태에서 만든 로컬 사주 프로필을 첫 로그인 후 계정에 연결합니다.
+ * 이미 계정에 primary 프로필이 있으면 원격 프로필을 우선하며 덮어쓰지 않습니다.
+ */
+export async function syncLocalSajuProfileToAccount(): Promise<SajuProfile | null> {
+  const local = loadLocalSajuProfile();
+  const supabase = getSupabaseBrowserClient();
+  if (!local || !supabase) return local;
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return local;
+
+  const { data: existing, error } = await supabase
+    .from("saju_profiles")
+    .select("*")
+    .eq("user_id", user.id)
+    .eq("is_primary", true)
+    .maybeSingle();
+
+  if (!error && existing) {
+    const remote = rowToProfile(existing as SajuProfileRow);
+    saveLocalSajuProfile(remote);
+    ensureLocalUserProfile(remote.id);
+    return remote;
+  }
+
+  return saveSajuProfile({ ...local, userId: user.id });
 }
 
 export async function loadPrimarySajuProfile(): Promise<SajuProfile | null> {

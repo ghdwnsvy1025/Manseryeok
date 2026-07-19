@@ -5,11 +5,11 @@ import { usePathname } from "next/navigation";
 
 const NAV_ITEMS = [
   {
-    href: "/saju",
-    label: "내 사주",
-    icon: "命",
+    href: "/",
+    label: "오늘",
+    icon: "今",
     main: false,
-    isActive: (path: string) => path.startsWith("/saju"),
+    isActive: (path: string) => path === "/",
   },
   {
     href: "/diary",
@@ -26,6 +26,13 @@ const NAV_ITEMS = [
     main: false,
     isActive: (path: string) =>
       path.startsWith("/diary/stats") || path.startsWith("/diary/collection"),
+  },
+  {
+    href: "/saju",
+    label: "만세력",
+    icon: "命",
+    main: false,
+    isActive: (path: string) => path.startsWith("/saju"),
   },
 ] as const;
 

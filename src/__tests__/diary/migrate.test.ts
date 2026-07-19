@@ -39,7 +39,7 @@ describe("normalizeDiaryEntry", () => {
     const normalized = normalizeDiaryEntry(raw);
     expect(normalized.happinessRating).toBe(5);
     expect(normalized.analysis?.daily_wellbeing_score).toBe(100);
-    expect(normalized.schemaVersion).toBe(2);
+    expect(normalized.schemaVersion).toBe(3);
   });
 
   test("구버전 단일 감정 라벨을 emotions로 승격", () => {
@@ -90,7 +90,7 @@ describe("normalizeDiaryEntry", () => {
       emotions: ["기쁨"],
       tags: ["일"],
     });
-    expect(entry.schemaVersion).toBe(2);
+    expect(entry.schemaVersion).toBe(3);
     expect(entry.happinessRating).toBe(4);
     expect(entry.emotions).toEqual(["기쁨"]);
     expect(entry.tags).toEqual(["일"]);

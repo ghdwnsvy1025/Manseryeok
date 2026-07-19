@@ -8,8 +8,10 @@ import {
   scoreToHappinessRating,
   type HappinessRating,
 } from "./happiness";
+import { resolveDataOrigin, resolveHappinessSource } from "./dataOrigin";
 import {
   DIARY_SCHEMA_VERSION,
+  type ConditionRating,
   type DiaryEntry,
 } from "./types";
 
@@ -51,6 +53,17 @@ function resolveHappinessRating(entry: Partial<DiaryEntry>): HappinessRating {
   return DEFAULT_HAPPINESS_RATING;
 }
 
+function resolveConditionRating(
+  entry: Partial<DiaryEntry>
+): ConditionRating | null {
+  const value = entry.conditionRating;
+  if (value === 1 || value === 2 || value === 3 || value === 4 || value === 5) {
+    return value;
+  }
+  // 기존 기록의 컨디션은 행복도에서 추정하지 않음
+  return null;
+}
+
 function backfillPillars(entry: DiaryEntry): DiaryEntry {
   let monthPillarKo = entry.monthPillarKo;
   let yearPillarKo = entry.yearPillarKo;
@@ -83,6 +96,13 @@ function backfillPillars(entry: DiaryEntry): DiaryEntry {
 
 /** 구버전 필드를 현재 DiaryEntry로 정규화하고 스키마 버전을 올린다 */
 export function normalizeDiaryEntry(raw: Record<string, unknown>): DiaryEntry {
+  const hadExplicitRating =
+    raw.happinessRating === 1 ||
+    raw.happinessRating === 2 ||
+    raw.happinessRating === 3 ||
+    raw.happinessRating === 4 ||
+    raw.happinessRating === 5;
+
   const hasAnalysisObject =
     raw.analysis && typeof raw.analysis === "object";
 
@@ -110,6 +130,8 @@ export function normalizeDiaryEntry(raw: Record<string, unknown>): DiaryEntry {
       sajuProfileId: entry.sajuProfileId,
       analysis: null,
       happinessRating: entry.happinessRating,
+      happinessSource: entry.happinessSource,
+      conditionRating: entry.conditionRating,
       emotions: entry.emotions,
       tags: entry.tags,
       heavenlyStem: entry.heavenlyStem,
@@ -117,11 +139,16 @@ export function normalizeDiaryEntry(raw: Record<string, unknown>): DiaryEntry {
       weekday: entry.weekday,
       isWeekend: entry.isWeekend,
       sleepScore: entry.sleepScore,
+      sleepSatisfaction: entry.sleepSatisfaction,
       exerciseStatus: entry.exerciseStatus,
+      activityLevel: entry.activityLevel,
       socialActivity: entry.socialActivity,
+      socialMet: entry.socialMet,
+      workIntensity: entry.workIntensity,
       weatherMetadata: entry.weatherMetadata,
       inputMode: entry.inputMode,
       emotionSource: entry.emotionSource,
+      dataOrigin: entry.dataOrigin,
       userId: entry.userId,
       schemaVersion: entry.schemaVersion,
       createdAt: entry.createdAt,
@@ -131,10 +158,13 @@ export function normalizeDiaryEntry(raw: Record<string, unknown>): DiaryEntry {
 
   const withPillars = backfillPillars(base);
   const { weekday, isWeekend } = weekdayFromDate(withPillars.date);
+  const happinessRating = resolveHappinessRating(withPillars);
 
   return {
     ...withPillars,
-    happinessRating: resolveHappinessRating(withPillars),
+    happinessRating,
+    happinessSource: resolveHappinessSource(withPillars, hadExplicitRating),
+    conditionRating: resolveConditionRating(withPillars),
     emotions: inferEmotionsFromLegacy(withPillars),
     tags: normalizeTagList(withPillars.tags),
     weekday: typeof withPillars.weekday === "number" ? withPillars.weekday : weekday,
@@ -142,6 +172,7 @@ export function normalizeDiaryEntry(raw: Record<string, unknown>): DiaryEntry {
       typeof withPillars.isWeekend === "boolean"
         ? withPillars.isWeekend
         : isWeekend,
+    dataOrigin: resolveDataOrigin(withPillars),
     schemaVersion: DIARY_SCHEMA_VERSION,
   };
 }

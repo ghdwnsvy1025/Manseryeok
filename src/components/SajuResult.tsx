@@ -6,7 +6,7 @@ import type { SajuResult } from "@/lib/saju/types";
 import type { Element } from "@/lib/saju/constants";
 import { BRANCH_META, ELEMENT_LABELS, STEM_META } from "@/lib/saju/constants";
 import { getTenGod, getHiddenStemsByBranch, type HiddenStemByPillar, type HiddenStemWithTenGod, type StemHanja } from "@/lib/saju/hiddenStems";
-import AiAnalysis from "@/components/AiAnalysis";
+import ExpertInsightsForSaju from "@/components/saju/ExpertInsightsForSaju";
 import CoachmarkOverlay from "@/components/CoachmarkOverlay";
 import Link from "next/link";
 import {
@@ -1600,8 +1600,8 @@ export default function SajuResult({ result }: { result: SajuResult }) {
           이 사주로 오늘 기분 기록하기 →
         </Link>
 
-        {/* ── AI 분석 ── */}
-        <AiAnalysis result={result} />
+        {/* ── 기존 만세력 보존 + 별도 해석 레이어 ── */}
+        <ExpertInsightsForSaju result={result} />
 
         {/* ── 경고 ── */}
         {debug.warnings.length > 0 && (

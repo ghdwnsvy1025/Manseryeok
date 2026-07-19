@@ -9,7 +9,19 @@ import type {
 import type { Gender } from "@/lib/saju/daeun";
 
 /** 현재 도메인 스키마 버전 */
-export const DIARY_SCHEMA_VERSION = 2;
+export const DIARY_SCHEMA_VERSION = 3;
+
+export type ExperienceMode = "beginner" | "expert";
+
+export type DiaryDataOrigin = "user" | "import" | "demo";
+export type HappinessSource = "selected" | "backfilled" | "default";
+
+export type ConditionRating = 1 | 2 | 3 | 4 | 5;
+
+export type SleepSatisfaction = "poor" | "fair" | "good" | "great";
+export type ActivityLevel = "low" | "moderate" | "high";
+export type SocialMet = "alone" | "few" | "many";
+export type WorkIntensity = "light" | "normal" | "heavy";
 
 export type DiaryDayPillar = {
   ganji: string;
@@ -58,6 +70,8 @@ export type UserProfile = {
   locale?: string;
   timezone?: string;
   activeSajuProfileId?: string | null;
+  experienceMode?: ExperienceMode | null;
+  onboardingCompletedAt?: string | null;
   createdAt: string;
   updatedAt: string;
   schemaVersion: number;
@@ -120,6 +134,10 @@ export type DiaryEntry = {
   analysis: DiaryAnalysis | null;
   /** 사용자 입력 행복도 1–5 */
   happinessRating?: HappinessRating;
+  /** 행복도 출처 */
+  happinessSource?: HappinessSource;
+  /** 생활 컨디션 1–5 (의료적 건강이 아님) */
+  conditionRating?: ConditionRating | null;
   /** 다중 감정 태그 */
   emotions?: string[];
   /** 사건·사용자 정의 태그 */
@@ -129,13 +147,19 @@ export type DiaryEntry = {
   weekday?: number;
   isWeekend?: boolean;
   sleepScore?: number | null;
+  sleepSatisfaction?: SleepSatisfaction | null;
   exerciseStatus?: string | null;
+  activityLevel?: ActivityLevel | null;
   socialActivity?: string | null;
+  socialMet?: SocialMet | null;
+  workIntensity?: WorkIntensity | null;
   weatherMetadata?: Record<string, unknown> | null;
   /** text: 글쓰기, scores: 슬라이더 점수 입력 */
   inputMode?: DiaryInputMode;
   /** 기분 라벨의 출처: 직접 선택 / 행복도 자동 추론 / AI 분석 */
   emotionSource?: "selected" | "inferred" | "ai";
+  /** 데이터 출처 — 통계에서는 demo 제외 */
+  dataOrigin?: DiaryDataOrigin;
   userId?: string | null;
   schemaVersion?: number;
   createdAt: string;
@@ -176,4 +200,24 @@ export type DiaryListOptions = {
 export type DiaryMonthRange = {
   year: number;
   month: number;
+};
+
+export type SampleLevel =
+  | "insufficient"
+  | "early"
+  | "usable"
+  | "comparable";
+
+export function getSampleLevel(count: number): SampleLevel {
+  if (count <= 2) return "insufficient";
+  if (count <= 4) return "early";
+  if (count <= 9) return "usable";
+  return "comparable";
+}
+
+export const SAMPLE_LEVEL_LABELS: Record<SampleLevel, string> = {
+  insufficient: "참고하기 어려움 (1~2회)",
+  early: "초기 경향 (3~4회)",
+  usable: "참고 가능한 경향 (5~9회)",
+  comparable: "반복 비교 가능 (10회 이상)",
 };

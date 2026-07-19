@@ -14,12 +14,14 @@ import StatsFortuneTabs, {
 } from "@/components/diary/stats/StatsFortuneTabs";
 import StatsSummaryHeader, { StatsEmptyState } from "@/components/diary/stats/StatsSummaryHeader";
 import StemBranchHeatmap from "@/components/diary/stats/StemBranchHeatmap";
+import HappinessTrendChart from "@/components/diary/stats/HappinessTrendChart";
 import {
   hasSeenStatsGuide,
   markStatsGuideSeen,
   STATS_INSIGHT_MIN_ENTRIES,
 } from "@/lib/diary/onboarding";
 import { getDiaryStorage } from "@/lib/diary/getStorage";
+import { cleanupDemoEntriesOnce, filterRealEntries } from "@/lib/diary/dataOrigin";
 import {
   aggregateByGroup,
   getDaysUntilInsight,
@@ -30,7 +32,15 @@ import {
   getUniqueEntryDays,
   getWellbeingInsightCards,
 } from "@/lib/diary/stats";
+import {
+  buildRatingTrend,
+  monthAverage,
+  topEmotions,
+  weekendComparison,
+  weekdayAverages,
+} from "@/lib/diary/trendStats";
 import type { DiaryEntry, StatsGroupType } from "@/lib/diary/types";
+import { SAMPLE_LEVEL_LABELS, getSampleLevel } from "@/lib/diary/types";
 
 function fortuneTabToGroupType(fortuneTab: FortuneTab, daySubTab: DaySubTab): StatsGroupType {
   if (fortuneTab === "year") return "year";
@@ -45,6 +55,13 @@ function pickDefaultKey(groups: ReturnType<typeof aggregateByGroup>): string {
   return withPattern?.key ?? groups[0]?.key ?? "";
 }
 
+async function loadRealDiaryEntries(): Promise<DiaryEntry[]> {
+  const storage = await getDiaryStorage();
+  await cleanupDemoEntriesOnce(storage);
+  const list = await storage.list();
+  return filterRealEntries(list);
+}
+
 export default function DiaryStatsPage() {
   const [entries, setEntries] = useState<DiaryEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -56,13 +73,13 @@ export default function DiaryStatsPage() {
   const groupType = fortuneTabToGroupType(fortuneTab, daySubTab);
 
   useEffect(() => {
-    getDiaryStorage()
-      .then((storage) => storage.list())
+    loadRealDiaryEntries()
       .then((list) => {
         setEntries(list);
         const groups = aggregateByGroup(list, "ganji");
         setSelectedKey(pickDefaultKey(groups));
       })
+      .catch(() => setEntries([]))
       .finally(() => setLoading(false));
   }, []);
 
@@ -84,6 +101,16 @@ export default function DiaryStatsPage() {
   const daysUntilInsight = useMemo(() => getDaysUntilInsight(entries), [entries]);
   const recentWellbeing = useMemo(() => getRecentAvgWellbeing(entries, 30), [entries]);
   const overallAvg = useMemo(() => getOverallAvgWellbeing(entries), [entries]);
+  const trend7 = useMemo(() => buildRatingTrend(entries, 7, "happiness"), [entries]);
+  const trend30 = useMemo(() => buildRatingTrend(entries, 30, "happiness"), [entries]);
+  const condition7 = useMemo(() => buildRatingTrend(entries, 7, "condition"), [entries]);
+  const weekdayStats = useMemo(() => weekdayAverages(entries), [entries]);
+  const weekend = useMemo(() => weekendComparison(entries), [entries]);
+  const emotions = useMemo(() => topEmotions(entries, 5), [entries]);
+  const thisMonth = useMemo(() => {
+    const now = new Date();
+    return monthAverage(entries, now.getFullYear(), now.getMonth() + 1);
+  }, [entries]);
 
   const selectedStats = useMemo(
     () => (selectedKey ? getStatsForGroup(selectedKey, groupType, entries, overallAvg) : null),
@@ -187,6 +214,64 @@ export default function DiaryStatsPage() {
               recentWellbeing={recentWellbeing}
               groupLabel={groupLabel}
             />
+
+            <div className="space-y-3">
+              <HappinessTrendChart
+                trend={trend7}
+                title="최근 7일 행복도"
+                description="사용자가 직접 남긴 1~5점만 표시합니다. 빈 날은 보간하지 않습니다."
+              />
+              <HappinessTrendChart
+                trend={trend30}
+                title="최근 30일 행복도"
+                description={
+                  weekend.weekdayAvg != null && weekend.weekendAvg != null
+                    ? `평일 평균 ${weekend.weekdayAvg}점(n=${weekend.weekdaySample}), 주말 평균 ${weekend.weekendAvg}점(n=${weekend.weekendSample})`
+                    : "평일·주말 비교는 표본이 쌓이면 표시됩니다."
+                }
+              />
+              <HappinessTrendChart
+                trend={condition7}
+                title="최근 7일 생활 컨디션"
+                description="의료적 건강 예측이 아니라 내가 기록한 컨디션입니다."
+              />
+              {thisMonth.sampleSize > 0 && (
+                <p className="ui-hint">
+                  이번 달 평균 행복도 {thisMonth.avgHappiness ?? "-"} · 컨디션{" "}
+                  {thisMonth.avgCondition ?? "-"} (n={thisMonth.sampleSize})
+                </p>
+              )}
+              {emotions.length > 0 && (
+                <p className="ui-hint">
+                  자주 느낀 감정: {emotions.map((e) => `${e.emotion}(${e.count})`).join(", ")}
+                </p>
+              )}
+              <div className="grid grid-cols-7 gap-1">
+                {weekdayStats.map((w) => (
+                  <div
+                    key={w.weekday}
+                    className="p-1 border text-center"
+                    style={{ borderColor: "var(--px-border)", background: "var(--px-bg3)" }}
+                  >
+                    <p className="text-[10px] font-bold" style={{ color: "var(--px-text2)" }}>
+                      {w.label}
+                    </p>
+                    <p className="text-xs font-black" style={{ color: "var(--px-accent)" }}>
+                      {w.avgHappiness ?? "-"}
+                    </p>
+                    <p className="text-[10px]" style={{ color: "var(--px-text2)" }}>
+                      n={w.sampleSize}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <p className="ui-section-title mt-2">전문 모드 보완 통계</p>
+            <p className="ui-hint">
+              아래 간지·천간·지지 통계는 기존 만세력의 대체물이 아니라 보완 기능입니다. 표본 수준:{" "}
+              {SAMPLE_LEVEL_LABELS[getSampleLevel(uniqueDays)]}
+            </p>
 
             <StatsFortuneTabs
               fortuneTab={fortuneTab}
