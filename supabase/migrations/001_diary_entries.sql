@@ -22,18 +22,22 @@ create index if not exists diary_entries_user_updated_idx
 
 alter table public.diary_entries enable row level security;
 
+drop policy if exists "Users can read own diary entries" on public.diary_entries;
 create policy "Users can read own diary entries"
   on public.diary_entries for select
   using (auth.uid() = user_id);
 
+drop policy if exists "Users can insert own diary entries" on public.diary_entries;
 create policy "Users can insert own diary entries"
   on public.diary_entries for insert
   with check (auth.uid() = user_id);
 
+drop policy if exists "Users can update own diary entries" on public.diary_entries;
 create policy "Users can update own diary entries"
   on public.diary_entries for update
   using (auth.uid() = user_id);
 
+drop policy if exists "Users can delete own diary entries" on public.diary_entries;
 create policy "Users can delete own diary entries"
   on public.diary_entries for delete
   using (auth.uid() = user_id);

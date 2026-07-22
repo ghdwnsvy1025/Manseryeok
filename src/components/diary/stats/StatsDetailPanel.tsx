@@ -7,6 +7,8 @@ import {
   type EmotionLabel,
 } from "@/lib/diary/dimensions";
 import type { DiaryEntry, GroupStats } from "@/lib/diary/types";
+import { SAMPLE_LEVEL_LABELS, getSampleLevel } from "@/lib/diary/types";
+import { summarizeGanjiReactionLine, type AbReactionStats } from "@/lib/diary/abStats";
 
 type Props = {
   stats: GroupStats;
@@ -14,8 +16,52 @@ type Props = {
   overallAvg: number;
 };
 
+function buildAbFromEntries(stats: GroupStats, entries: DiaryEntry[]): AbReactionStats {
+  const happiness = entries
+    .map((e) => e.happinessRating)
+    .filter((v): v is NonNullable<typeof v> => typeof v === "number");
+  const energy = entries
+    .map((e) => e.energyRating)
+    .filter((v): v is NonNullable<typeof v> => typeof v === "number");
+  const focus = entries
+    .map((e) => e.focusRating)
+    .filter((v): v is NonNullable<typeof v> => typeof v === "number");
+  const condition = entries
+    .map((e) => e.conditionRating)
+    .filter((v): v is NonNullable<typeof v> => typeof v === "number");
+  const avg = (vals: number[]) =>
+    vals.length
+      ? Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 10) / 10
+      : null;
+  const countMap = (items: string[]) => {
+    const m = new Map<string, number>();
+    for (const i of items) m.set(i, (m.get(i) ?? 0) + 1);
+    return Array.from(m.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([k]) => k);
+  };
+  const days = new Set(entries.map((e) => e.date)).size;
+  return {
+    key: stats.key,
+    label: stats.label,
+    entryCount: entries.length,
+    uniqueDays: days,
+    avgHappiness: avg(happiness),
+    avgEnergy: avg(energy),
+    avgFocus: avg(focus),
+    avgCondition: avg(condition),
+    topEmotions: countMap(entries.flatMap((e) => e.emotions ?? [])),
+    topTags: countMap(entries.flatMap((e) => e.tags ?? [])),
+    insufficient: days < 2,
+  };
+}
+
 export default function StatsDetailPanel({ stats, entries, overallAvg }: Props) {
   const delta = stats.avgDailyWellbeing - overallAvg;
+  const sampleLevel = getSampleLevel(stats.entryCount);
+  const ab = buildAbFromEntries(stats, entries);
+  const reactionLine = summarizeGanjiReactionLine(ab);
 
   return (
     <div
@@ -31,6 +77,24 @@ export default function StatsDetailPanel({ stats, entries, overallAvg }: Props) 
             {stats.entryCount}회 기록
             {stats.analyzedCount > 0 && ` · 분석 ${stats.analyzedCount}건`}
           </p>
+          <p className="text-[11px] font-bold mt-1" style={{ color: "var(--px-text2)" }}>
+            표본 수준: {SAMPLE_LEVEL_LABELS[sampleLevel]}
+          </p>
+          <p className="text-[11px] mt-1" style={{ color: "var(--px-text2)" }}>
+            {reactionLine}
+          </p>
+          {(ab.avgHappiness != null || ab.avgEnergy != null || ab.avgFocus != null) && (
+            <p className="text-[11px] mt-0.5" style={{ color: "var(--px-text2)" }}>
+              {ab.avgHappiness != null ? `행복 ${ab.avgHappiness}` : ""}
+              {ab.avgHappiness != null && ab.avgEnergy != null ? " · " : ""}
+              {ab.avgEnergy != null ? `에너지 ${ab.avgEnergy}` : ""}
+              {(ab.avgHappiness != null || ab.avgEnergy != null) && ab.avgFocus != null
+                ? " · "
+                : ""}
+              {ab.avgFocus != null ? `집중 ${ab.avgFocus}` : ""}
+              {ab.avgCondition != null ? ` · 컨디션 ${ab.avgCondition}` : ""}
+            </p>
+          )}
         </div>
         {stats.avgDailyWellbeing > 0 && (
           <div className="text-right shrink-0">
@@ -52,7 +116,7 @@ export default function StatsDetailPanel({ stats, entries, overallAvg }: Props) 
       {stats.analyzedCount > 0 ? (
         <ScoreBars avgScores={stats.avgScores} avgDailyWellbeing={stats.avgDailyWellbeing} />
       ) : (
-        <p className="ui-guide">분석된 일기가 없어요. 점수로 기록하거나 AI 분석을 실행해주세요.</p>
+        <p className="ui-guide">점수·분석이 있는 기록이 아직 없어요. 기분을 남겨두면 비교할 수 있어요.</p>
       )}
 
       {stats.explicitMoodCount > 0 && (

@@ -1,0 +1,67 @@
+{
+  "schema": "saju-calculation-rules-v1",
+  "source": "docs/sajubase_final.md",
+  "sourcePart": "B",
+  "rules": [
+    {
+      "id": "B-0-principles",
+      "section": "0. 전체 원칙",
+      "summary": "오행 출력 목화토금수, 원국 입력 시일월년, 지장간 벡터, percentage만 normalize"
+    },
+    {
+      "id": "B-1-stem-element",
+      "section": "1. 기본 오행 매핑",
+      "summary": "천간 오행·생극·stemHelp 배수"
+    },
+    {
+      "id": "B-2-polarity",
+      "section": "2. 양간/음간, 양지/음지 보정",
+      "summary": "양간 1.04/음간 0.96, 양지 1.03/음지 0.97"
+    },
+    {
+      "id": "B-3-hidden-stems",
+      "section": "3. 지장간 기본 분포",
+      "summary": "여기 0.2 / 중기 0.3 / 정기 0.5 + 지장간 표"
+    },
+    {
+      "id": "B-4-earth-branch",
+      "section": "4. 토 지지 보정",
+      "summary": "축진미술 EARTH_BRANCH_ELEMENT_DISTRIBUTION"
+    },
+    {
+      "id": "B-5-branch-weighted",
+      "section": "5. 원국 지지 실제 가중합",
+      "summary": "자기 1 + 인접 0.2, 나누지 않음"
+    },
+    {
+      "id": "B-6-banghap",
+      "section": "6. 방합",
+      "summary": "원국 2개 1.2 / 3개 1.4, 외부 1.15/1.3"
+    },
+    {
+      "id": "B-7-samhap",
+      "section": "7. 삼합/반합",
+      "summary": "결과 오행만 강화, 거리 보정은 보너스만"
+    },
+    {
+      "id": "B-8-native-stems",
+      "section": "8. 원국 천간 계산",
+      "summary": "아래·양옆 지지 지지도 + peer + 화수"
+    },
+    {
+      "id": "B-13-native-with-luck",
+      "section": "13. native_with_luck",
+      "summary": "LUCK_BASE_WEIGHTS daewoon50 yearly25 monthly12 daily6, cap60"
+    },
+    {
+      "id": "B-14-luck-only",
+      "section": "14. luck_only",
+      "summary": "원국 제외, self 0.55 + interaction 0.45"
+    },
+    {
+      "id": "B-15-mode-map",
+      "section": "15. 화면 모드 매핑",
+      "summary": "diary_detail→native_with_luck, simple→luck_only"
+    }
+  ]
+}

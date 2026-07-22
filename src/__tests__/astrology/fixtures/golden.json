@@ -1,0 +1,70 @@
+[
+  {
+    "id": "GF-1-native-only",
+    "sourceRuleIds": ["B-13-native-with-luck", "B-17-tests"],
+    "description": "원국만 신기병을/미축술해 — final === original",
+    "input": {
+      "stems": "신기병을",
+      "branches": "미축술해",
+      "calculationMode": "native_with_luck"
+    },
+    "expect": {
+      "luckMixRates": {
+        "original": 1,
+        "daewoon": 0,
+        "yearly": 0,
+        "monthly": 0,
+        "daily": 0
+      },
+      "percentageEqualsOriginal": true,
+      "originalPercentage": { "목": 16.94, "화": 15.75, "토": 36.01, "금": 16.56, "수": 14.73 }
+    }
+  },
+  {
+    "id": "GF-2-native-all-luck-rates",
+    "sourceRuleIds": ["B-13-native-with-luck"],
+    "description": "대운+세운+월운+일운 반영률 (자료 B §13 예)",
+    "input": {
+      "stems": "신기병을",
+      "branches": "미축술해",
+      "calculationMode": "native_with_luck",
+      "daewoon": { "stem": "신", "branch": "오" },
+      "yearly": { "stem": "갑", "branch": "진" },
+      "monthly": { "stem": "병", "branch": "술" },
+      "daily": { "stem": "임", "branch": "자" }
+    },
+    "expect": {
+      "luckMixRates": {
+        "original": 0.4,
+        "daewoon": 0.3225806451612903,
+        "yearly": 0.16129032258064516,
+        "monthly": 0.07741935483870968,
+        "daily": 0.03870967741935484
+      }
+    }
+  },
+  {
+    "id": "GF-3-luck-only-rates",
+    "sourceRuleIds": ["B-14-luck-only"],
+    "description": "luck_only 대운+세운+월운+일운 정규화 반영률 (자료 B §14 예)",
+    "input": {
+      "stems": "신기병을",
+      "branches": "미축술해",
+      "calculationMode": "luck_only",
+      "daewoon": { "stem": "신", "branch": "오" },
+      "yearly": { "stem": "갑", "branch": "진" },
+      "monthly": { "stem": "병", "branch": "술" },
+      "daily": { "stem": "임", "branch": "자" }
+    },
+    "expect": {
+      "luckMixRates": {
+        "original": 0,
+        "daewoon": 0.5376344086021505,
+        "yearly": 0.26881720430107525,
+        "monthly": 0.12903225806451613,
+        "daily": 0.06451612903225806
+      },
+      "modesSeparated": true
+    }
+  }
+]

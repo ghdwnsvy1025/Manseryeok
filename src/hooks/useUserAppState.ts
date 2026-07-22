@@ -43,7 +43,16 @@ export function useUserAppState(): HookState {
         })
       );
     } catch (err) {
-      setError(err instanceof Error ? err.message : "상태를 불러오지 못했습니다.");
+      const raw =
+        err instanceof Error ? err.message : "상태를 불러오지 못했습니다.";
+      const missingTable =
+        /diary_entries/i.test(raw) &&
+        /schema cache|does not exist|Could not find the table/i.test(raw);
+      setError(
+        missingTable
+          ? "Supabase에 diary_entries 테이블이 없습니다. SQL Editor에서 supabase/migrations/001_diary_entries.sql 부터 006까지 순서대로 실행한 뒤 다시 시도하세요."
+          : raw
+      );
       setState(null);
     } finally {
       setLoading(false);

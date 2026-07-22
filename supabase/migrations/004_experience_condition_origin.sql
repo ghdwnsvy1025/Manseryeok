@@ -55,8 +55,7 @@ begin
 end $$;
 
 update public.diary_entries
-set data_origin = 'demo'
-where id like 'demo-%' and data_origin = 'user';
-
-update public.diary_entries
 set schema_version = greatest(coalesce(schema_version, 2), 3);
+
+-- Note: demo rows are marked via data_origin in the app (IndexedDB demo ids are not UUIDs).
+-- Do not use: where id like 'demo-%'  (id is uuid)

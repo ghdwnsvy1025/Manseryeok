@@ -1588,7 +1588,7 @@ export default function SajuResult({ result }: { result: SajuResult }) {
         </div>
 
         <Link
-          href="/diary"
+          href="/journal"
           className="block text-center px-4 py-3 text-xs font-bold border-2"
           style={{
             background: "var(--px-accent)",
@@ -1597,7 +1597,7 @@ export default function SajuResult({ result }: { result: SajuResult }) {
             boxShadow: "4px 4px 0 #000",
           }}
         >
-          이 사주로 오늘 기분 기록하기 →
+          오늘 기록하기 →
         </Link>
 
         {/* ── 기존 만세력 보존 + 별도 해석 레이어 ── */}

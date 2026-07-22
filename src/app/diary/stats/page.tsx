@@ -15,6 +15,7 @@ import StatsFortuneTabs, {
 import StatsSummaryHeader, { StatsEmptyState } from "@/components/diary/stats/StatsSummaryHeader";
 import StemBranchHeatmap from "@/components/diary/stats/StemBranchHeatmap";
 import HappinessTrendChart from "@/components/diary/stats/HappinessTrendChart";
+import PatternOverviewSection from "@/components/diary/stats/PatternOverviewSection";
 import {
   hasSeenStatsGuide,
   markStatsGuideSeen,
@@ -154,6 +155,8 @@ export default function DiaryStatsPage() {
 
   return (
     <div className="space-y-6">
+      {!loading && <PatternOverviewSection entries={entries} />}
+
       {!loading && <MissionSection entries={entries} />}
 
       {!loading && <CollectionNavButton entries={entries} />}

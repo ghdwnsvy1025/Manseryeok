@@ -1,6 +1,11 @@
 import type { ExperienceMode, UserProfile } from "@/lib/diary/types";
 import { DIARY_SCHEMA_VERSION } from "@/lib/diary/types";
 import {
+  DEFAULT_EXPERIENCE_MODE,
+  normalizeExperienceMode,
+  type UserExperienceMode,
+} from "@/lib/product/modes";
+import {
   ensureLocalUserProfile,
   loadLocalUserProfile,
   saveLocalUserProfile,
@@ -11,13 +16,17 @@ const EXPERIENCE_MODE_KEY = "manseryeok_experience_mode";
 const ONBOARDING_DONE_KEY = "manseryeok_onboarding_completed_at";
 
 export function isExperienceMode(value: unknown): value is ExperienceMode {
-  return value === "beginner" || value === "expert";
+  return normalizeExperienceMode(value) != null;
 }
 
 export function loadExperienceModeLocal(): ExperienceMode | null {
   if (typeof window === "undefined") return null;
   const raw = localStorage.getItem(EXPERIENCE_MODE_KEY);
-  return isExperienceMode(raw) ? raw : null;
+  const normalized = normalizeExperienceMode(raw);
+  if (normalized && raw !== normalized) {
+    localStorage.setItem(EXPERIENCE_MODE_KEY, normalized);
+  }
+  return normalized;
 }
 
 export function saveExperienceModeLocal(mode: ExperienceMode): void {
@@ -56,14 +65,13 @@ export async function loadUserExperienceSettings(): Promise<{
         .eq("id", user.id)
         .maybeSingle();
       if (data) {
+        const mode = normalizeExperienceMode(data.experience_mode);
         profile = {
           id: data.id,
           locale: data.locale ?? "ko-KR",
           timezone: data.timezone ?? "Asia/Seoul",
           activeSajuProfileId: data.active_saju_profile_id ?? null,
-          experienceMode: isExperienceMode(data.experience_mode)
-            ? data.experience_mode
-            : null,
+          experienceMode: mode,
           onboardingCompletedAt: data.onboarding_completed_at ?? null,
           createdAt: data.created_at,
           updatedAt: data.updated_at,
@@ -88,12 +96,13 @@ export async function loadUserExperienceSettings(): Promise<{
 }
 
 export async function saveExperienceMode(mode: ExperienceMode): Promise<void> {
-  saveExperienceModeLocal(mode);
+  const resolved = normalizeExperienceMode(mode) ?? DEFAULT_EXPERIENCE_MODE;
+  saveExperienceModeLocal(resolved);
   const now = new Date().toISOString();
   const local = ensureLocalUserProfile();
   const next: UserProfile = {
     ...local,
-    experienceMode: mode,
+    experienceMode: resolved,
     updatedAt: now,
     schemaVersion: DIARY_SCHEMA_VERSION,
   };
@@ -111,7 +120,7 @@ export async function saveExperienceMode(mode: ExperienceMode): Promise<void> {
     locale: next.locale ?? "ko-KR",
     timezone: next.timezone ?? "Asia/Seoul",
     active_saju_profile_id: next.activeSajuProfileId ?? null,
-    experience_mode: mode,
+    experience_mode: resolved,
     onboarding_completed_at: next.onboardingCompletedAt ?? null,
     schema_version: DIARY_SCHEMA_VERSION,
     updated_at: now,
@@ -119,16 +128,17 @@ export async function saveExperienceMode(mode: ExperienceMode): Promise<void> {
 }
 
 export async function completeOnboarding(
-  mode: ExperienceMode
+  mode: ExperienceMode | UserExperienceMode = DEFAULT_EXPERIENCE_MODE
 ): Promise<void> {
+  const resolved = normalizeExperienceMode(mode) ?? DEFAULT_EXPERIENCE_MODE;
   const at = new Date().toISOString();
   markOnboardingCompletedLocal(at);
-  saveExperienceModeLocal(mode);
+  saveExperienceModeLocal(resolved);
 
   const local = ensureLocalUserProfile();
   const next: UserProfile = {
     ...local,
-    experienceMode: mode,
+    experienceMode: resolved,
     onboardingCompletedAt: at,
     updatedAt: at,
     schemaVersion: DIARY_SCHEMA_VERSION,
@@ -147,7 +157,7 @@ export async function completeOnboarding(
     locale: next.locale ?? "ko-KR",
     timezone: next.timezone ?? "Asia/Seoul",
     active_saju_profile_id: next.activeSajuProfileId ?? null,
-    experience_mode: mode,
+    experience_mode: resolved,
     onboarding_completed_at: at,
     schema_version: DIARY_SCHEMA_VERSION,
     updated_at: at,

@@ -1,20 +1,56 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import BeginnerTodayFlowCards from "@/components/saju/BeginnerTodayFlowCards";
 import ExpertInsightPanel from "@/components/saju/ExpertInsightPanel";
-import HappinessTrendChart from "@/components/diary/stats/HappinessTrendChart";
+import TomorrowForecastCard from "@/components/forecast/TomorrowForecastCard";
+import ModeSwitcher from "@/components/product/ModeSwitcher";
+import PersonalizationLevelCard from "@/components/product/PersonalizationLevelCard";
+import EmptyState from "@/components/product/EmptyState";
+import ActionSuggestionCard from "@/components/product/ActionSuggestionCard";
+import ReflectionSentenceCard from "@/components/product/ReflectionSentenceCard";
 import { getPillarsForDate } from "@/lib/diary/dayPillar";
 import {
   buildBeginnerTodayFlow,
   buildExpertInsights,
   buildRecordPatternInsight,
 } from "@/lib/saju/interpretation";
-import { buildRatingTrend } from "@/lib/diary/trendStats";
+import { detectDayRelations } from "@/lib/saju/interpretation/relations";
+import { getTenGod } from "@/lib/saju/hiddenStems";
+import { STEMS } from "@/lib/saju/constants";
 import { saveExperienceMode } from "@/lib/app/experienceMode";
 import type { UserAppState } from "@/lib/app/userAppState";
-import type { ExperienceMode } from "@/lib/diary/types";
+import {
+  DEFAULT_EXPERIENCE_MODE,
+  prefersPlainLanguage,
+  prefersSajuTerms,
+  type UserExperienceMode,
+} from "@/lib/product/modes";
+import { resolvePersonalizationLevel } from "@/lib/product/personalization";
+import { getUniqueEntryDays } from "@/lib/diary/stats";
+import { filterRealEntries } from "@/lib/diary/dataOrigin";
+
+const ACTION_POOL = [
+  {
+    action: "내일 반드시 끝낼 일 한 가지를 미리 정해보세요.",
+    reason: "할 일이 명확할수록 집중이 이어지기 쉬운 흐름이에요.",
+  },
+  {
+    action: "저녁에 짧은 회복 시간을 미리 비워두세요.",
+    reason: "피로가 빠르게 쌓일 수 있어 여백이 도움이 될 수 있어요.",
+  },
+  {
+    action: "오늘 마음에 남은 장면을 한 문장으로만 적어보세요.",
+    reason: "감정을 짧게 정리하면 다음날 흐름을 보기 쉬워져요.",
+  },
+];
+
+const REFLECTION_POOL = [
+  "모든 것을 혼자 감당하는 것이 책임감의 증거는 아닙니다.",
+  "오늘의 컨디션은 내일의 계획을 조금 줄여도 된다는 신호일 수 있어요.",
+  "관계는 의도가 분명할 때 더 가볍게 흘러갈 수 있어요.",
+];
 
 type Props = {
   state: UserAppState;
@@ -22,11 +58,21 @@ type Props = {
 };
 
 export default function HomeDashboard({ state, onModeChanged }: Props) {
-  const mode: ExperienceMode = state.experienceMode ?? "beginner";
+  const mode: UserExperienceMode = state.experienceMode ?? DEFAULT_EXPERIENCE_MODE;
+  const [actionIdx, setActionIdx] = useState(0);
+  const [reflectionIdx, setReflectionIdx] = useState(0);
+  const [showEvidence, setShowEvidence] = useState(false);
+
   const dayPillar = useMemo(
     () => getPillarsForDate(state.todayDate).dayPillar,
     [state.todayDate]
   );
+  const recordCount = useMemo(
+    () => getUniqueEntryDays(filterRealEntries(state.entries)),
+    [state.entries]
+  );
+  const personalization = resolvePersonalizationLevel(recordCount);
+
   const beginnerFlow = useMemo(
     () =>
       buildBeginnerTodayFlow({
@@ -51,81 +97,158 @@ export default function HomeDashboard({ state, onModeChanged }: Props) {
     () => buildRecordPatternInsight(state.entries, dayPillar.ganjiKo, state.todayDate),
     [state.entries, dayPillar.ganjiKo, state.todayDate]
   );
-  const trend7 = useMemo(
-    () => buildRatingTrend(state.entries, 7, "happiness"),
-    [state.entries]
-  );
 
-  const switchMode = async (next: ExperienceMode) => {
+  const groundingFacts = useMemo(() => {
+    const natal = state.sajuProfile?.pillars.day;
+    let tenGod: string | null = null;
+    if (natal?.stemHanja && STEMS.includes(natal.stemHanja as (typeof STEMS)[number])) {
+      const todayStem = dayPillar.stem.hanja as (typeof STEMS)[number];
+      if (STEMS.includes(todayStem)) {
+        tenGod = getTenGod(natal.stemHanja as (typeof STEMS)[number], todayStem);
+      }
+    }
+    const relations = natal
+      ? detectDayRelations({
+          natalStemHanja: natal.stemHanja,
+          natalBranchHanja: natal.branchHanja,
+          todayStemHanja: dayPillar.stem.hanja,
+          todayBranchHanja: dayPillar.branch.hanja,
+        })
+      : [];
+    return {
+      ganjiKo: dayPillar.ganjiKo,
+      heavenlyStem: dayPillar.stem.ko,
+      earthlyBranch: dayPillar.branch.ko,
+      tenGod,
+      relationLabels: relations.map((r) => r.label),
+    };
+  }, [dayPillar, state.sajuProfile]);
+
+  const weekdayLabel = ["일", "월", "화", "수", "목", "금", "토"][
+    new Date(`${state.todayDate}T12:00:00+09:00`).getDay()
+  ];
+  const tenGodLabel = groundingFacts.tenGod;
+  const plainHeadline = prefersPlainLanguage(mode)
+    ? tenGodLabel
+      ? "사람과 외부 활동에 에너지가 움직이기 쉬운 날일 수 있어요."
+      : "오늘의 흐름을 가볍게 살펴보세요."
+    : null;
+
+  const switchMode = async (next: UserExperienceMode) => {
     await saveExperienceMode(next);
     onModeChanged?.();
   };
 
+  const action = ACTION_POOL[actionIdx % ACTION_POOL.length];
+  const reflection = REFLECTION_POOL[reflectionIdx % REFLECTION_POOL.length];
+
   return (
     <div className="space-y-4 pb-8">
-      <header className="flex flex-wrap items-start justify-between gap-2">
-        <div>
-          <p className="ui-section-title">■ 오늘의 흐름</p>
-          <p className="text-sm font-black" style={{ color: "var(--px-accent)" }}>
-            {state.todayDate} · {dayPillar.ganjiKo}일
-          </p>
+      <header className="space-y-2">
+        <p className="ui-section-title">■ 예보</p>
+        <p className="text-lg font-black" style={{ color: "var(--px-accent)" }}>
+          {state.todayDate.replaceAll("-", ".")} {weekdayLabel}요일
+        </p>
+        <p className="text-sm font-bold" style={{ color: "var(--px-text-on-panel)" }}>
+          {prefersPlainLanguage(mode) && plainHeadline
+            ? plainHeadline
+            : `${dayPillar.ganjiKo}일${tenGodLabel ? ` · 나에게는 ${tenGodLabel}의 날` : ""}`}
+        </p>
+        <div className="flex flex-wrap gap-2 text-[11px] font-bold" style={{ color: "var(--px-text2)" }}>
+          <span>
+            {state.hasTodayEntry ? "오늘 기록 완료" : "오늘 기록 없음"}
+          </span>
+          <span>·</span>
+          <span>
+            {state.hasTodayEntry
+              ? "내일 예보 생성됨/가능"
+              : "기록하면 내일 예보 생성"}
+          </span>
         </div>
-        <div className="flex gap-1">
-          <button
-            type="button"
-            className="px-2 py-1 text-[11px] font-bold border"
-            style={{
-              borderColor: mode === "beginner" ? "var(--px-accent)" : "var(--px-border)",
-              color: mode === "beginner" ? "var(--px-accent)" : "var(--px-text2)",
-            }}
-            onClick={() => void switchMode("beginner")}
+        <button
+          type="button"
+          className="text-xs font-bold underline"
+          style={{ color: "#60a5fa" }}
+          onClick={() => setShowEvidence((v) => !v)}
+          aria-expanded={showEvidence}
+        >
+          명리 근거 보기
+        </button>
+        {showEvidence && (
+          <div
+            className="p-2 border text-xs space-y-1"
+            style={{ borderColor: "var(--px-border)", background: "var(--px-bg3)" }}
           >
-            초보
-          </button>
-          <button
-            type="button"
-            className="px-2 py-1 text-[11px] font-bold border"
-            style={{
-              borderColor: mode === "expert" ? "var(--px-accent)" : "var(--px-border)",
-              color: mode === "expert" ? "var(--px-accent)" : "var(--px-text2)",
-            }}
-            onClick={() => void switchMode("expert")}
-          >
-            전문
-          </button>
-        </div>
+            <p>간지: {dayPillar.ganjiKo} ({dayPillar.ganji})</p>
+            <p>
+              천간 {dayPillar.stem.ko} · 지지 {dayPillar.branch.ko}
+              {tenGodLabel ? ` · 십신 ${tenGodLabel}` : ""}
+            </p>
+            {groundingFacts.relationLabels.length > 0 && (
+              <p>관계: {groundingFacts.relationLabels.join(", ")}</p>
+            )}
+          </div>
+        )}
       </header>
 
-      {state.kind === "profile_without_diary" && (
-        <div className="p-3 border-2" style={{ borderColor: "var(--px-accent)", background: "var(--px-bg2)" }}>
-          <p className="text-sm font-bold" style={{ color: "var(--px-text-on-panel)" }}>
-            오늘의 기본 흐름을 확인했어요.
-          </p>
-          <p className="ui-hint mt-1">
-            오늘 하루를 기록하면 다음부터 내 실제 경험이 반영된 결과를 확인할 수 있어요.
-          </p>
-        </div>
+      <PersonalizationLevelCard level={personalization} recordCount={recordCount} />
+
+      <ModeSwitcher value={mode} onChange={(m) => void switchMode(m)} compact />
+
+      {!state.hasSajuProfile && (
+        <EmptyState
+          title="사주 정보를 연결하면 더 깊이 볼 수 있어요"
+          description="기록을 천간·지지·십신 기준으로도 볼 수 있어요."
+          actionLabel="사주 연결하기"
+          actionHref="/saju"
+        />
       )}
 
-      {mode === "beginner" ? (
-        <BeginnerTodayFlowCards flow={beginnerFlow} compact={state.kind !== "logged_today"} />
-      ) : (
+      {state.kind === "profile_without_diary" && state.hasSajuProfile && (
+        <EmptyState
+          title="아직 오늘 기록이 없어요"
+          description="기분만 남겨도 내일 예보를 만들 수 있어요."
+          actionLabel="첫 기록 남기기"
+          actionHref={`/diary?date=${state.todayDate}`}
+        />
+      )}
+
+      {prefersSajuTerms(mode) ? (
         <div className="space-y-3">
-          <div className="p-3 border-2" style={{ borderColor: "var(--px-border)", background: "var(--px-bg3)" }}>
-            <p className="ui-section-title">기본 사주 분석</p>
+          <div
+            className="p-3 border-2"
+            style={{ borderColor: "var(--px-border)", background: "var(--px-bg3)" }}
+          >
+            <p className="ui-section-title">오늘의 사주 흐름</p>
             <p className="text-sm mt-1" style={{ color: "var(--px-text)" }}>
               오늘 일진 {dayPillar.ganjiKo} ({dayPillar.ganji})
             </p>
-            <Link href="/saju" className="inline-block mt-2 text-xs font-bold underline" style={{ color: "var(--px-accent)" }}>
-              전문 만세력 상세 보기 →
+            <Link
+              href="/saju"
+              className="inline-block mt-2 text-xs font-bold underline"
+              style={{ color: "var(--px-accent)" }}
+            >
+              만세력 상세 보기 →
             </Link>
           </div>
-          <ExpertInsightPanel sections={expertSections} />
+          <ExpertInsightPanel
+            sections={expertSections}
+            groundingFacts={{ ...groundingFacts, surface: "today_expert" }}
+          />
         </div>
+      ) : (
+        <BeginnerTodayFlowCards
+          flow={beginnerFlow}
+          compact={state.kind !== "logged_today"}
+          groundingFacts={groundingFacts}
+        />
       )}
 
       {similar && state.hasAnyDiary && (
-        <div className="p-3 border-2" style={{ background: "var(--px-bg2)", borderColor: "var(--px-border)" }}>
+        <div
+          className="p-3 border-2"
+          style={{ background: "var(--px-bg2)", borderColor: "var(--px-border)" }}
+        >
           <p className="ui-section-title">{similar.title}</p>
           <p className="text-xs mt-1" style={{ color: "var(--px-text)" }}>
             {similar.summary}
@@ -133,8 +256,34 @@ export default function HomeDashboard({ state, onModeChanged }: Props) {
         </div>
       )}
 
+      <TomorrowForecastCard
+        todayDate={state.todayDate}
+        sajuProfile={state.sajuProfile}
+        entries={state.entries}
+        todayEntry={state.todayEntry ?? null}
+      />
+
+      <ActionSuggestionCard
+        action={action.action}
+        reason={action.reason}
+        onAccept={() => undefined}
+        onNext={() => setActionIdx((i) => i + 1)}
+        onReject={() => setActionIdx((i) => i + 1)}
+      />
+
+      <ReflectionSentenceCard
+        text={reflection}
+        source="generated"
+        onSave={() => undefined}
+        onNext={() => setReflectionIdx((i) => i + 1)}
+        onReject={() => setReflectionIdx((i) => i + 1)}
+      />
+
       {state.kind === "logged_today" && state.todayEntry && (
-        <div className="p-3 border-2 space-y-2" style={{ background: "var(--px-bg3)", borderColor: "var(--px-accent)" }}>
+        <div
+          className="p-3 border-2 space-y-2"
+          style={{ background: "var(--px-bg3)", borderColor: "var(--px-accent)" }}
+        >
           <p className="text-sm font-black" style={{ color: "var(--px-accent)" }}>
             오늘 기록 완료
           </p>
@@ -144,11 +293,11 @@ export default function HomeDashboard({ state, onModeChanged }: Props) {
               ? ` · 컨디션 ${state.todayEntry.conditionRating}점`
               : ""}
           </p>
-          {trend7.points.some((p) => p.value != null) && (
-            <HappinessTrendChart trend={trend7} title="최근 7일 행복도" />
-          )}
           <div className="flex flex-wrap gap-2">
-            <Link href={`/diary?date=${state.todayDate}`} className="ui-primary-btn px-3 py-2 text-xs">
+            <Link
+              href={`/diary?date=${state.todayDate}`}
+              className="ui-primary-btn px-3 py-2 text-xs"
+            >
               기록 수정
             </Link>
             <Link
@@ -156,7 +305,7 @@ export default function HomeDashboard({ state, onModeChanged }: Props) {
               className="px-3 py-2 text-xs font-bold border"
               style={{ borderColor: "var(--px-border)", color: "var(--px-text2)" }}
             >
-              오늘 결과 비교하기
+              내 패턴 보기
             </Link>
           </div>
         </div>
@@ -169,8 +318,10 @@ export default function HomeDashboard({ state, onModeChanged }: Props) {
             className="ui-primary-btn block w-full py-4 text-center text-base"
             style={{ boxShadow: "4px 4px 0 #000" }}
           >
-            {state.kind === "profile_without_diary" ? "오늘의 기분 기록하기" : "오늘 기록하기"}
-            <span className="block text-[11px] font-bold mt-1 opacity-90">30초면 기록할 수 있어요</span>
+            오늘을 기록하고 내일 보기
+            <span className="block text-[11px] font-bold mt-1 opacity-90">
+              내일의 운세, 내 기록으로 예보합니다
+            </span>
           </Link>
         </div>
       )}

@@ -1,0 +1,17 @@
+{
+  "schema": "saju-interpretation-index-v1",
+  "source": "docs/sajubase_final.md",
+  "sourcePart": "A",
+  "sections": [
+    { "id": "A-intro-1", "title": "입문 1강: 오리엔테이션", "approxLine": 387 },
+    { "id": "A-intro-3", "title": "입문 3강: 음양오행", "approxLine": 805 },
+    { "id": "A-intro-5", "title": "입문 5강: 천간", "approxLine": 1531 },
+    { "id": "A-intro-6", "title": "입문 6강: 지지 개관", "approxLine": 2179 },
+    { "id": "A-intro-7", "title": "입문 7강: 지지(자수~해수)", "approxLine": 2658 },
+    { "id": "A-intro-9", "title": "입문 9강: 일간과 십신", "approxLine": 3911 },
+    { "id": "A-tzone", "title": "T존·자리·원국 구조", "note": "자료 A 본문 내 T존/자리 서술" },
+    { "id": "A-luck-roles", "title": "대운·세운·월운·일운 역할", "note": "통합 프롬프트 §4 5단계와 자료 A 운 해석" },
+    { "id": "A-counsel-tone", "title": "강점·주의점·활용 방향", "note": "통합 프롬프트 §6 답변 템플릿" }
+  ],
+  "usage": "Phase 3에서는 인덱싱만 수행. 최종 상담 문장 생성은 Phase 4+."
+}

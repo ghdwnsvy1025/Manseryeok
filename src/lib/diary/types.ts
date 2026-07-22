@@ -1,6 +1,7 @@
 import type { DiaryAnalysis, EmotionLabel } from "./dimensions";
 import type { HappinessRating } from "./happiness";
 import type { DiaryInputMode } from "./manualScores";
+import type { FocusRating } from "@/lib/product/lifeAreas";
 import type {
   CalendarType,
   DayChangeRule,
@@ -8,10 +9,55 @@ import type {
 } from "@/lib/saju/types";
 import type { Gender } from "@/lib/saju/daeun";
 
-/** 현재 도메인 스키마 버전 */
-export const DIARY_SCHEMA_VERSION = 3;
+export type { FocusRating };
 
-export type ExperienceMode = "beginner" | "expert";
+/** 현재 도메인 스키마 버전 */
+export const DIARY_SCHEMA_VERSION = 5;
+
+/** 에너지 1–4: 충전됨 / 괜찮음 / 지침 / 소진 */
+export type EnergyRating = 1 | 2 | 3 | 4;
+
+export const ENERGY_RATING_LABELS: Record<EnergyRating, string> = {
+  1: "소진됨",
+  2: "지침",
+  3: "괜찮음",
+  4: "충전됨",
+};
+
+export const PRIMARY_AREA_OPTIONS = [
+  "일",
+  "공부",
+  "관계",
+  "연애",
+  "가족",
+  "돈",
+  "건강·컨디션",
+  "나 자신",
+  "특별한 일 없음",
+] as const;
+
+export type PrimaryArea = (typeof PRIMARY_AREA_OPTIONS)[number];
+
+/** LifeArea id → 한글 PrimaryArea (저장은 한글 라벨 유지) */
+export const LIFE_AREA_TO_PRIMARY: Record<
+  import("@/lib/product/lifeAreas").LifeArea,
+  PrimaryArea
+> = {
+  work: "일",
+  study: "공부",
+  relationship: "관계",
+  romance: "연애",
+  family: "가족",
+  money: "돈",
+  condition: "건강·컨디션",
+  self: "나 자신",
+  none: "특별한 일 없음",
+};
+
+export type ExperienceMode = "diary" | "balanced" | "saju" | "study";
+
+/** @deprecated 구버전 호환 — ExperienceMode 사용 */
+export type LegacyExperienceMode = "beginner" | "expert";
 
 export type DiaryDataOrigin = "user" | "import" | "demo";
 export type HappinessSource = "selected" | "backfilled" | "default";
@@ -138,6 +184,14 @@ export type DiaryEntry = {
   happinessSource?: HappinessSource;
   /** 생활 컨디션 1–5 (의료적 건강이 아님) */
   conditionRating?: ConditionRating | null;
+  /** 에너지 1–4 (충전됨~소진) */
+  energyRating?: EnergyRating | null;
+  /** 집중 1–5 */
+  focusRating?: FocusRating | null;
+  /** 일간 기준 십신 (사주 프로필 있을 때) */
+  tenGod?: string | null;
+  /** 오늘 가장 영향을 받은 생활 영역 */
+  primaryArea?: PrimaryArea | string | null;
   /** 다중 감정 태그 */
   emotions?: string[];
   /** 사건·사용자 정의 태그 */

@@ -46,11 +46,11 @@ export function computeUserAppState(input: UserAppStateInput): UserAppState {
   const onboardingCompleted = Boolean(input.onboardingCompletedAt);
 
   let kind: UserAppStateKind;
-  if (!onboardingCompleted || (!hasSajuProfile && !hasAnyDiary)) {
+  if (!onboardingCompleted) {
     kind = "new_user";
-  } else if (hasSajuProfile && !hasAnyDiary) {
+  } else if (!hasAnyDiary) {
     kind = "profile_without_diary";
-  } else if (hasAnyDiary && !hasTodayEntry) {
+  } else if (!hasTodayEntry) {
     kind = "returning_not_logged_today";
   } else {
     kind = "logged_today";

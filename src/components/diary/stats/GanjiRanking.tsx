@@ -1,6 +1,7 @@
 "use client";
 
 import type { GroupStats } from "@/lib/diary/types";
+import { SAMPLE_LEVEL_LABELS, getSampleLevel } from "@/lib/diary/types";
 import { STATS_INSIGHT_MIN_ENTRIES } from "@/lib/diary/onboarding";
 
 type Props = {
@@ -40,7 +41,9 @@ export default function GanjiRanking({
                   background: "var(--px-bg3)",
                 }}
               >
-                <p className="ui-hint">#{i + 1} · {card.entryCount}회 기록</p>
+                <p className="ui-hint">
+                  #{i + 1} · {card.entryCount}회 · {SAMPLE_LEVEL_LABELS[getSampleLevel(card.entryCount)]}
+                </p>
                 <p className="text-sm font-black" style={{ color: "var(--px-accent)" }}>
                   {card.label}
                 </p>

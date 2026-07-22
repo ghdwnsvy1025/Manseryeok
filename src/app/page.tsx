@@ -1,14 +1,53 @@
 "use client";
 
-import OnboardingFlow from "@/components/home/OnboardingFlow";
+import { useEffect, useState } from "react";
+import WelcomeAuthGate from "@/components/auth/WelcomeAuthGate";
+import SajuProfileSetup from "@/components/home/SajuProfileSetup";
 import HomeDashboard from "@/components/home/HomeDashboard";
 import { useUserAppState } from "@/hooks/useUserAppState";
+import {
+  disableGuestMode,
+  isGuestMode,
+} from "@/lib/auth/guestMode";
+import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 
 export default function HomePage() {
   const { state, loading, error, refresh } = useUserAppState();
+  const [authReady, setAuthReady] = useState(false);
+  const [entryAllowed, setEntryAllowed] = useState(false);
 
-  if (loading) {
+  useEffect(() => {
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) {
+      setEntryAllowed(isGuestMode());
+      setAuthReady(true);
+      return;
+    }
+
+    void supabase.auth.getUser().then(({ data }) => {
+      const signedIn = Boolean(data.user);
+      if (signedIn) disableGuestMode();
+      setEntryAllowed(signedIn || isGuestMode());
+      setAuthReady(true);
+    });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        disableGuestMode();
+        setEntryAllowed(true);
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  if (!authReady || loading) {
     return <p className="ui-hint p-4">불러오는 중...</p>;
+  }
+
+  if (!entryAllowed) {
+    return <WelcomeAuthGate onGuest={() => setEntryAllowed(true)} />;
   }
 
   if (error) {
@@ -25,7 +64,7 @@ export default function HomePage() {
   }
 
   if (!state || state.kind === "new_user") {
-    return <OnboardingFlow onCompleted={() => void refresh()} />;
+    return <SajuProfileSetup onCompleted={() => void refresh()} />;
   }
 
   return <HomeDashboard state={state} onModeChanged={() => void refresh()} />;

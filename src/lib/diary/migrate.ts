@@ -64,6 +64,54 @@ function resolveConditionRating(
   return null;
 }
 
+function resolveEnergyRating(
+  entry: Partial<DiaryEntry>
+): import("./types").EnergyRating | null {
+  const value = entry.energyRating;
+  if (value === 1 || value === 2 || value === 3 || value === 4) {
+    return value;
+  }
+  return null;
+}
+
+function resolveFocusRating(
+  entry: Partial<DiaryEntry>
+): import("./types").FocusRating | null {
+  const fromField = entry.focusRating;
+  if (
+    fromField === 1 ||
+    fromField === 2 ||
+    fromField === 3 ||
+    fromField === 4 ||
+    fromField === 5
+  ) {
+    return fromField;
+  }
+  const meta = entry.weatherMetadata?.focusRating;
+  if (meta === 1 || meta === 2 || meta === 3 || meta === 4 || meta === 5) {
+    return meta;
+  }
+  return null;
+}
+
+function resolveTenGod(entry: Partial<DiaryEntry>): string | null {
+  if (typeof entry.tenGod === "string" && entry.tenGod.trim()) {
+    return entry.tenGod.trim();
+  }
+  const meta = entry.weatherMetadata?.tenGod;
+  if (typeof meta === "string" && meta.trim()) return meta.trim();
+  return null;
+}
+
+function resolvePrimaryArea(
+  entry: Partial<DiaryEntry>
+): string | null {
+  if (typeof entry.primaryArea === "string" && entry.primaryArea.trim()) {
+    return entry.primaryArea.trim().slice(0, 40);
+  }
+  return null;
+}
+
 function backfillPillars(entry: DiaryEntry): DiaryEntry {
   let monthPillarKo = entry.monthPillarKo;
   let yearPillarKo = entry.yearPillarKo;
@@ -132,6 +180,10 @@ export function normalizeDiaryEntry(raw: Record<string, unknown>): DiaryEntry {
       happinessRating: entry.happinessRating,
       happinessSource: entry.happinessSource,
       conditionRating: entry.conditionRating,
+      energyRating: entry.energyRating,
+      focusRating: entry.focusRating,
+      tenGod: entry.tenGod,
+      primaryArea: entry.primaryArea,
       emotions: entry.emotions,
       tags: entry.tags,
       heavenlyStem: entry.heavenlyStem,
@@ -165,6 +217,10 @@ export function normalizeDiaryEntry(raw: Record<string, unknown>): DiaryEntry {
     happinessRating,
     happinessSource: resolveHappinessSource(withPillars, hadExplicitRating),
     conditionRating: resolveConditionRating(withPillars),
+    energyRating: resolveEnergyRating(withPillars),
+    focusRating: resolveFocusRating(withPillars),
+    tenGod: resolveTenGod(withPillars),
+    primaryArea: resolvePrimaryArea(withPillars),
     emotions: inferEmotionsFromLegacy(withPillars),
     tags: normalizeTagList(withPillars.tags),
     weekday: typeof withPillars.weekday === "number" ? withPillars.weekday : weekday,

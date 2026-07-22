@@ -7,8 +7,12 @@ import { getBirthPrefillForForm } from "@/lib/diary/sajuSettings";
 import { useViewMode } from "@/contexts/ViewModeContext";
 
 interface SajuFormProps {
-  onCalculate: (input: SajuInput) => void;
+  onCalculate: (input: SajuInput, meta: { label?: string }) => void;
   isLoading: boolean;
+  /** false면 저장된 생년월일로 채우지 않음 (다른 프로필 조회용) */
+  prefillBirth?: boolean;
+  /** 이름 입력란 표시 (기본 true, 조회 전용이면 false) */
+  showNameField?: boolean;
 }
 
 const LABEL_STYLE = { color: "var(--px-text2)", fontSize: "14px", fontWeight: "700" as const };
@@ -80,15 +84,23 @@ function clampDayForMonth(dayStr: string, yearStr: string, monthStr: string): { 
   return { value: dayStr, hint: null };
 }
 
-function getInitialDateTimeParts() {
-  const prefill = getBirthPrefillForForm();
-  if (prefill) return prefill;
+function getInitialDateTimeParts(prefillBirth: boolean) {
+  if (prefillBirth) {
+    const prefill = getBirthPrefillForForm();
+    if (prefill) return prefill;
+  }
   return getCurrentDateTimeParts();
 }
 
-export default function SajuForm({ onCalculate, isLoading }: SajuFormProps) {
+export default function SajuForm({
+  onCalculate,
+  isLoading,
+  prefillBirth = true,
+  showNameField = true,
+}: SajuFormProps) {
   const { isMobile } = useViewMode();
-  const [initialDateTime] = useState(getInitialDateTimeParts);
+  const [initialDateTime] = useState(() => getInitialDateTimeParts(prefillBirth));
+  const [displayName, setDisplayName] = useState("");
   const [year, setYear] = useState(initialDateTime.year);
   const [month, setMonth] = useState(initialDateTime.month);
   const [day, setDay] = useState(initialDateTime.day);
@@ -245,6 +257,10 @@ export default function SajuForm({ onCalculate, isLoading }: SajuFormProps) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (showNameField && !displayName.trim()) {
+      setFieldHint("이름을 입력해 주세요.");
+      return;
+    }
     const options: SajuOptions = {
       calendarType,
       isLeapMonth,
@@ -262,7 +278,9 @@ export default function SajuForm({ onCalculate, isLoading }: SajuFormProps) {
       gender,
       options,
     };
-    onCalculate(input);
+    onCalculate(input, {
+      label: showNameField ? displayName.trim() : undefined,
+    });
   };
 
   return (
@@ -271,6 +289,30 @@ export default function SajuForm({ onCalculate, isLoading }: SajuFormProps) {
       className={`px-card space-y-5 ${isMobile ? "p-3.5 space-y-5" : "p-5"}`}
       style={{ borderColor: "var(--px-border2)" }}
     >
+      {showNameField && (
+        <div>
+          <p className="mb-2" style={SECTION_STYLE}>
+            ■ 이름
+          </p>
+          <label className="flex flex-col gap-1">
+            <span style={LABEL_STYLE}>프로필에 보일 이름</span>
+            <input
+              type="text"
+              required
+              maxLength={20}
+              placeholder="예: 홍길동"
+              value={displayName}
+              onChange={(e) => {
+                setDisplayName(e.target.value);
+                if (fieldHint) setFieldHint(null);
+              }}
+              className="px-input px-3 py-2.5 text-sm w-full max-w-xs"
+              autoComplete="nickname"
+            />
+          </label>
+        </div>
+      )}
+
       {/* ── 생년월일 ── */}
       <div>
         <p className="mb-2" style={SECTION_STYLE}>■ 생년월일</p>
@@ -559,7 +601,7 @@ export default function SajuForm({ onCalculate, isLoading }: SajuFormProps) {
         disabled={isLoading}
         className="px-btn w-full py-3 text-base"
       >
-        {isLoading ? "[ 계산 중... ]" : "[ 사주 계산하기 ]"}
+        {isLoading ? "[ 등록 중... ]" : "[ 사주 등록하기 ]"}
       </button>
     </form>
   );

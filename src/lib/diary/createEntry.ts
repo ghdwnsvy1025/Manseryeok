@@ -1,6 +1,5 @@
 import type { DiaryAnalysis } from "./dimensions";
 import { getPillarsForDate } from "./dayPillar";
-import { DEFAULT_HAPPINESS_RATING } from "./happiness";
 import { DIARY_SCHEMA_VERSION, type DiaryEntry } from "./types";
 
 function generateId(): string {
@@ -19,6 +18,10 @@ export function createDiaryEntry(
     happinessRating?: DiaryEntry["happinessRating"];
     happinessSource?: DiaryEntry["happinessSource"];
     conditionRating?: DiaryEntry["conditionRating"];
+    energyRating?: DiaryEntry["energyRating"];
+    focusRating?: DiaryEntry["focusRating"];
+    tenGod?: DiaryEntry["tenGod"];
+    primaryArea?: DiaryEntry["primaryArea"];
     emotions?: string[];
     tags?: string[];
     inputMode?: DiaryEntry["inputMode"];
@@ -44,9 +47,13 @@ export function createDiaryEntry(
     monthPillarKo,
     yearPillarKo,
     analysis: opts?.analysis ?? null,
-    happinessRating: opts?.happinessRating ?? DEFAULT_HAPPINESS_RATING,
-    happinessSource: opts?.happinessSource ?? "selected",
+    happinessRating: opts?.happinessRating,
+    happinessSource: opts?.happinessSource ?? (opts?.happinessRating != null ? "selected" : undefined),
     conditionRating: opts?.conditionRating ?? null,
+    energyRating: opts?.energyRating ?? null,
+    focusRating: opts?.focusRating ?? null,
+    tenGod: opts?.tenGod ?? null,
+    primaryArea: opts?.primaryArea ?? null,
     emotions: opts?.emotions ?? [],
     tags: opts?.tags ?? [],
     heavenlyStem: dayPillar.stem.ko,

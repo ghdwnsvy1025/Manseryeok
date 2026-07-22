@@ -18,10 +18,14 @@ type DbRow = {
   happiness_rating: number | null;
   happiness_source: string | null;
   condition_rating: number | null;
+  energy_rating: number | null;
+  focus_rating: number | null;
+  primary_area: string | null;
   emotions: string[] | null;
   tags: string[] | null;
   heavenly_stem: string | null;
   earthly_branch: string | null;
+  ten_god: string | null;
   weekday: number | null;
   is_weekend: boolean | null;
   sleep_score: number | null;
@@ -55,10 +59,14 @@ function rowToEntry(row: DbRow): DiaryEntry {
     happinessRating: row.happiness_rating ?? undefined,
     happinessSource: row.happiness_source ?? undefined,
     conditionRating: row.condition_rating ?? null,
+    energyRating: row.energy_rating ?? null,
+    focusRating: row.focus_rating ?? null,
+    primaryArea: row.primary_area ?? null,
     emotions: row.emotions ?? [],
     tags: row.tags ?? [],
     heavenlyStem: row.heavenly_stem ?? undefined,
     earthlyBranch: row.earthly_branch ?? undefined,
+    tenGod: row.ten_god ?? null,
     weekday: row.weekday ?? undefined,
     isWeekend: row.is_weekend ?? undefined,
     sleepScore: row.sleep_score,
@@ -100,10 +108,14 @@ function entryToRow(
     happiness_rating: normalized.happinessRating ?? null,
     happiness_source: normalized.happinessSource ?? null,
     condition_rating: normalized.conditionRating ?? null,
+    energy_rating: normalized.energyRating ?? null,
+    focus_rating: normalized.focusRating ?? null,
+    primary_area: normalized.primaryArea ?? null,
     emotions: normalized.emotions ?? [],
     tags: normalized.tags ?? [],
     heavenly_stem: normalized.heavenlyStem ?? null,
     earthly_branch: normalized.earthlyBranch ?? null,
+    ten_god: normalized.tenGod ?? null,
     weekday: normalized.weekday ?? null,
     is_weekend: normalized.isWeekend ?? null,
     sleep_score: normalized.sleepScore ?? null,

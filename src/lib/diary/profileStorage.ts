@@ -1,4 +1,4 @@
-import type { SajuResult } from "@/lib/saju/types";
+import type { SajuInput, SajuResult } from "@/lib/saju/types";
 import type { Gender } from "@/lib/saju/daeun";
 import {
   DIARY_SCHEMA_VERSION,
@@ -9,9 +9,58 @@ import {
 } from "./types";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 
+/**
+ * 저장된 프로필 → 재계산용 입력.
+ * birthDate는 항상 양력(normalized solar)이므로 calendarType은 solar로 고정한다.
+ */
+export function sajuInputFromProfile(profile: SajuProfile): SajuInput {
+  const [year, month, day] = profile.birthDate.split("-").map(Number);
+  const hasTime =
+    !profile.birthTimeUnknown &&
+    profile.birthHour !== undefined &&
+    profile.birthMinute !== undefined;
+
+  return {
+    year,
+    month,
+    day,
+    hour: hasTime ? profile.birthHour : undefined,
+    minute: hasTime ? profile.birthMinute : undefined,
+    gender: profile.gender,
+    options: {
+      calendarType: "solar",
+      isLeapMonth: false,
+      timezone: profile.timezone || "Asia/Seoul",
+      dayChangeRule: profile.dayChangeRule,
+      timeCorrection: profile.timeCorrection,
+      location:
+        profile.locationName || profile.longitude !== undefined
+          ? {
+              name: profile.locationName,
+              longitude: profile.longitude,
+              latitude: profile.latitude,
+            }
+          : {
+              name: "대한민국, 서울",
+              longitude: 126.98,
+              latitude: 37.57,
+            },
+    },
+  };
+}
+
+/** 활성(적용 중) 프로필 캐시 — 하위 호환 */
 const LOCAL_SAJU_PROFILE_KEY = "manseryeok_saju_profile_v2";
+/** 전체 프로필 목록 */
+const LOCAL_SAJU_PROFILES_KEY = "manseryeok_saju_profiles_v2";
 const LOCAL_USER_PROFILE_KEY = "manseryeok_user_profile_v2";
 const CALCULATOR_VERSION = "0.1.0";
+export const SAJU_PROFILE_CHANGED_EVENT = "manseryeok:saju-profile-changed";
+
+export function notifySajuProfileChanged(): void {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new Event(SAJU_PROFILE_CHANGED_EVENT));
+}
 
 function generateId(): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
@@ -43,9 +92,14 @@ export function pillarsFromSajuResult(result: SajuResult): SajuProfilePillars {
   };
 }
 
+export function profileDisplayName(profile: SajuProfile): string {
+  const name = profile.label?.trim();
+  return name || "이름 없음";
+}
+
 export function buildSajuProfileFromResult(
   result: SajuResult,
-  opts?: { id?: string; userId?: string | null; label?: string }
+  opts?: { id?: string; userId?: string | null; label?: string; isPrimary?: boolean }
 ): SajuProfile {
   const now = new Date().toISOString();
   const original = result.input.original;
@@ -56,8 +110,8 @@ export function buildSajuProfileFromResult(
   return {
     id: opts?.id ?? generateId(),
     userId: opts?.userId ?? null,
-    label: opts?.label ?? "내 사주",
-    isPrimary: true,
+    label: opts?.label?.trim() || "이름 없음",
+    isPrimary: opts?.isPrimary ?? true,
     birthDate: result.input.normalizedSolarDate,
     birthHour: original.hour,
     birthMinute: original.minute,
@@ -107,6 +161,58 @@ export function loadLocalSajuProfile(): SajuProfile | null {
 export function saveLocalSajuProfile(profile: SajuProfile): void {
   if (typeof window === "undefined") return;
   localStorage.setItem(LOCAL_SAJU_PROFILE_KEY, JSON.stringify(profile));
+}
+
+/** 로컬에 저장된 전체 프로필 (단일 키 → 목록으로 마이그레이션 포함) */
+export function loadLocalSajuProfiles(): SajuProfile[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const rawList = localStorage.getItem(LOCAL_SAJU_PROFILES_KEY);
+    if (rawList) {
+      const parsed = JSON.parse(rawList) as SajuProfile[];
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch {
+    /* fall through */
+  }
+
+  const single = loadLocalSajuProfile();
+  if (!single) return [];
+  const migrated = [{ ...single, isPrimary: true }];
+  saveLocalSajuProfiles(migrated);
+  return migrated;
+}
+
+export function saveLocalSajuProfiles(profiles: SajuProfile[]): void {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(LOCAL_SAJU_PROFILES_KEY, JSON.stringify(profiles));
+  const primary =
+    profiles.find((p) => p.isPrimary) ?? (profiles.length > 0 ? profiles[0] : null);
+  if (primary) {
+    saveLocalSajuProfile(primary);
+  } else {
+    localStorage.removeItem(LOCAL_SAJU_PROFILE_KEY);
+  }
+}
+
+function upsertLocalProfileList(profile: SajuProfile): SajuProfile[] {
+  let list = loadLocalSajuProfiles();
+  if (profile.isPrimary) {
+    list = list.map((p) => ({ ...p, isPrimary: p.id === profile.id }));
+  }
+  const idx = list.findIndex((p) => p.id === profile.id);
+  if (idx >= 0) {
+    list[idx] = { ...profile };
+  } else {
+    list.push(profile);
+  }
+  if (list.length > 0 && !list.some((p) => p.isPrimary)) {
+    list[0] = { ...list[0], isPrimary: true };
+  }
+  saveLocalSajuProfiles(list);
+  const primary = list.find((p) => p.isPrimary) ?? list[0];
+  if (primary) ensureLocalUserProfile(primary.id);
+  return list;
 }
 
 export function loadLocalUserProfile(): UserProfile | null {
@@ -248,47 +354,55 @@ function profileToRow(profile: SajuProfile, userId: string) {
 }
 
 export async function saveSajuProfile(profile: SajuProfile): Promise<SajuProfile> {
-  saveLocalSajuProfile(profile);
-  ensureLocalUserProfile(profile.id);
+  const withMeta: SajuProfile = {
+    ...profile,
+    label: profile.label?.trim() || "이름 없음",
+    updatedAt: new Date().toISOString(),
+  };
+
+  upsertLocalProfileList(withMeta);
 
   const supabase = getSupabaseBrowserClient();
-  if (!supabase) return profile;
+  if (!supabase) return withMeta;
 
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return profile;
+  if (!user) return withMeta;
 
-  const { data: existingPrimary } = await supabase
-    .from("saju_profiles")
-    .select("id, created_at")
-    .eq("user_id", user.id)
-    .eq("is_primary", true)
-    .maybeSingle();
-
-  const withUser = {
-    ...profile,
-    id: existingPrimary?.id ?? profile.id,
+  const remote: SajuProfile = {
+    ...withMeta,
     userId: user.id,
-    createdAt: existingPrimary?.created_at ?? profile.createdAt,
-    updatedAt: new Date().toISOString(),
   };
+
+  if (remote.isPrimary) {
+    const { error: demoteError } = await supabase
+      .from("saju_profiles")
+      .update({ is_primary: false, updated_at: remote.updatedAt })
+      .eq("user_id", user.id)
+      .eq("is_primary", true)
+      .neq("id", remote.id);
+    if (demoteError) throw new Error(demoteError.message);
+  }
+
   const { error } = await supabase
     .from("saju_profiles")
-    .upsert(profileToRow(withUser, user.id), { onConflict: "id" });
+    .upsert(profileToRow(remote, user.id), { onConflict: "id" });
   if (error) throw new Error(error.message);
 
-  await supabase.from("user_profiles").upsert({
-    id: user.id,
-    locale: "ko-KR",
-    timezone: withUser.timezone,
-    active_saju_profile_id: withUser.id,
-    schema_version: DIARY_SCHEMA_VERSION,
-    updated_at: withUser.updatedAt,
-  });
+  if (remote.isPrimary) {
+    await supabase.from("user_profiles").upsert({
+      id: user.id,
+      locale: "ko-KR",
+      timezone: remote.timezone,
+      active_saju_profile_id: remote.id,
+      schema_version: DIARY_SCHEMA_VERSION,
+      updated_at: remote.updatedAt,
+    });
+  }
 
-  saveLocalSajuProfile(withUser);
-  return withUser;
+  upsertLocalProfileList(remote);
+  return remote;
 }
 
 /**
@@ -296,7 +410,8 @@ export async function saveSajuProfile(profile: SajuProfile): Promise<SajuProfile
  * 이미 계정에 primary 프로필이 있으면 원격 프로필을 우선하며 덮어쓰지 않습니다.
  */
 export async function syncLocalSajuProfileToAccount(): Promise<SajuProfile | null> {
-  const local = loadLocalSajuProfile();
+  const localProfiles = loadLocalSajuProfiles();
+  const local = localProfiles.find((p) => p.isPrimary) ?? localProfiles[0] ?? null;
   const supabase = getSupabaseBrowserClient();
   if (!local || !supabase) return local;
 
@@ -314,15 +429,24 @@ export async function syncLocalSajuProfileToAccount(): Promise<SajuProfile | nul
 
   if (!error && existing) {
     const remote = rowToProfile(existing as SajuProfileRow);
-    saveLocalSajuProfile(remote);
+    const { data: allRemote } = await supabase
+      .from("saju_profiles")
+      .select("*")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: true });
+    if (allRemote?.length) {
+      saveLocalSajuProfiles(allRemote.map((row) => rowToProfile(row as SajuProfileRow)));
+    } else {
+      upsertLocalProfileList(remote);
+    }
     ensureLocalUserProfile(remote.id);
     return remote;
   }
 
-  return saveSajuProfile({ ...local, userId: user.id });
+  return saveSajuProfile({ ...local, userId: user.id, isPrimary: true });
 }
 
-export async function loadPrimarySajuProfile(): Promise<SajuProfile | null> {
+export async function loadAllSajuProfiles(): Promise<SajuProfile[]> {
   const supabase = getSupabaseBrowserClient();
   if (supabase) {
     const {
@@ -333,14 +457,29 @@ export async function loadPrimarySajuProfile(): Promise<SajuProfile | null> {
         .from("saju_profiles")
         .select("*")
         .eq("user_id", user.id)
-        .eq("is_primary", true)
-        .maybeSingle();
+        .order("created_at", { ascending: true });
       if (!error && data) {
-        const profile = rowToProfile(data as SajuProfileRow);
-        saveLocalSajuProfile(profile);
-        return profile;
+        const profiles = data.map((row) => rowToProfile(row as SajuProfileRow));
+        saveLocalSajuProfiles(profiles);
+        return profiles;
       }
     }
   }
-  return loadLocalSajuProfile();
+  return loadLocalSajuProfiles();
+}
+
+export async function loadPrimarySajuProfile(): Promise<SajuProfile | null> {
+  const profiles = await loadAllSajuProfiles();
+  if (profiles.length === 0) return null;
+  return profiles.find((p) => p.isPrimary) ?? profiles[0] ?? null;
+}
+
+/** 적용 중 프로필 바꾸기 */
+export async function setActiveSajuProfile(
+  profileId: string
+): Promise<SajuProfile | null> {
+  const profiles = await loadAllSajuProfiles();
+  const target = profiles.find((p) => p.id === profileId);
+  if (!target) return null;
+  return saveSajuProfile({ ...target, isPrimary: true });
 }

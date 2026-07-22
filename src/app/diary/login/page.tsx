@@ -10,10 +10,10 @@ import {
   resetDiaryStorageCache,
 } from "@/lib/diary/getStorage";
 import { syncLocalSajuProfileToAccount } from "@/lib/diary/profileStorage";
+import { disableGuestMode, enableGuestMode } from "@/lib/auth/guestMode";
 import type { DiaryEntry } from "@/lib/diary/types";
 import type { DiaryStorage } from "@/lib/diary/storage";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
-import type { Provider } from "@supabase/supabase-js";
 
 type ImportReady = {
   localEntries: DiaryEntry[];
@@ -50,6 +50,7 @@ export default function DiaryLoginPage() {
     if (!supabase) return;
 
     void supabase.auth.getUser().then(({ data }) => {
+      if (data.user) disableGuestMode();
       setCurrentEmail(data.user ? data.user.email ?? "소셜 계정" : null);
     });
 
@@ -92,7 +93,7 @@ export default function DiaryLoginPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleSocialLogin = async (provider: Extract<Provider, "google" | "kakao">) => {
+  const handleGoogleLogin = async () => {
     const supabase = getSupabaseBrowserClient();
     if (!supabase) {
       setMessage("Supabase 환경 변수가 설정되지 않았습니다.");
@@ -101,19 +102,21 @@ export default function DiaryLoginPage() {
 
     setLoading(true);
     setMessage("");
+    disableGuestMode();
     const next = encodeURIComponent("/diary/login?oauth=success");
     const redirectTo = `${window.location.origin}/auth/callback?next=${next}`;
     const { error } = await supabase.auth.signInWithOAuth({
-      provider,
+      provider: "google",
       options: {
         redirectTo,
+        queryParams: { hl: "ko" },
       },
     });
 
     if (error) {
       setLoading(false);
       setMessage(
-        `${provider === "google" ? "Google" : "카카오"} 로그인을 시작하지 못했습니다. 관리자 설정을 확인해주세요.`
+        "Google 로그인을 시작하지 못했습니다. 관리자 설정을 확인해주세요."
       );
     }
   };
@@ -128,6 +131,7 @@ export default function DiaryLoginPage() {
 
     setLoading(true);
     setMessage("");
+    disableGuestMode();
 
     try {
       if (mode === "signup") {
@@ -185,12 +189,44 @@ export default function DiaryLoginPage() {
   return (
     <div className="max-w-md mx-auto space-y-4">
       <h2 className="text-lg font-black" style={{ color: "var(--px-accent)" }}>
-        ■ 일기 동기화 로그인
+        ■ 나
       </h2>
       <p className="text-xs" style={{ color: "var(--px-text2)" }}>
-        로그인하면 사주 프로필과 일기를 안전하게 백업하고 다른 기기에서도 이어서
+        로그인하면 사주 프로필과 기록을 안전하게 백업하고 다른 기기에서도 이어서
         사용할 수 있습니다. 로그인하지 않아도 이 기기에는 저장됩니다.
       </p>
+
+      <div
+        className="space-y-2 p-3 border-2"
+        style={{ background: "var(--px-bg2)", borderColor: "var(--px-border)" }}
+      >
+        <p className="text-xs font-bold" style={{ color: "var(--px-accent)" }}>
+          내 설정
+        </p>
+        <div className="flex flex-col gap-1.5">
+          <Link
+            href="/saju"
+            className="text-sm font-bold underline"
+            style={{ color: "var(--px-text)" }}
+          >
+            내 사주 (만세력) →
+          </Link>
+          <Link
+            href="/diary/stats"
+            className="text-sm font-bold underline"
+            style={{ color: "var(--px-text)" }}
+          >
+            내 패턴 →
+          </Link>
+          <Link
+            href="/"
+            className="text-sm font-bold underline"
+            style={{ color: "var(--px-text)" }}
+          >
+            오늘로 →
+          </Link>
+        </div>
+      </div>
 
       {!importReady && !currentEmail && (
         <div className="space-y-3">
@@ -206,7 +242,7 @@ export default function DiaryLoginPage() {
             </p>
             <button
               type="button"
-              onClick={() => void handleSocialLogin("google")}
+              onClick={() => void handleGoogleLogin()}
               disabled={loading}
               className="w-full px-4 py-3 text-sm font-bold border-2"
               style={{
@@ -216,19 +252,6 @@ export default function DiaryLoginPage() {
               }}
             >
               Google로 계속하기
-            </button>
-            <button
-              type="button"
-              onClick={() => void handleSocialLogin("kakao")}
-              disabled={loading}
-              className="w-full px-4 py-3 text-sm font-bold border-2"
-              style={{
-                background: "#FEE500",
-                borderColor: "#191919",
-                color: "#191919",
-              }}
-            >
-              카카오로 계속하기
             </button>
             <p className="ui-hint">
               소셜 로그인에서는 제공자가 전달하는 계정 식별 정보만 사용하며, 사주
@@ -262,6 +285,7 @@ export default function DiaryLoginPage() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="이메일"
+            aria-label="이메일"
             required
             className="w-full px-3 py-2 text-sm border-2"
             style={{
@@ -275,6 +299,7 @@ export default function DiaryLoginPage() {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="비밀번호"
+            aria-label="비밀번호"
             required
             minLength={8}
             autoComplete={mode === "signup" ? "new-password" : "current-password"}
@@ -341,8 +366,26 @@ export default function DiaryLoginPage() {
         </p>
       )}
 
+      {!currentEmail && !importReady && (
+        <button
+          type="button"
+          onClick={() => {
+            enableGuestMode();
+            window.location.href = "/";
+          }}
+          className="w-full px-3 py-3 text-xs font-bold border-2"
+          style={{
+            borderColor: "var(--px-border)",
+            color: "var(--px-text2)",
+            background: "var(--px-bg2)",
+          }}
+        >
+          비로그인으로 계속하기
+        </button>
+      )}
+
       <Link href="/diary" className="text-xs font-bold" style={{ color: "var(--px-accent)" }}>
-        ← 일기로 돌아가기
+        ← 기록으로 돌아가기
       </Link>
 
       <InstallAppButton />

@@ -1,71 +1,74 @@
 import { NextRequest } from "next/server";
-import OpenAI from "openai";
-import { chunkText, saveKnowledge, saveEmbeddings, loadKnowledge } from "@/lib/rag";
+import { requireAdmin } from "@/lib/auth/admin";
+import {
+  createKnowledgeDocument,
+  listKnowledgeDocuments,
+} from "@/lib/knowledge/store";
+import { isServiceRoleConfigured } from "@/lib/supabase/admin";
 
+/**
+ * 레거시 엔드포인트 — 관리자만 허용하며 documents API와 동일하게 동작합니다.
+ */
 export async function POST(req: NextRequest) {
+  const auth = await requireAdmin();
+  if (!auth.ok) {
+    return Response.json({ error: auth.error }, { status: auth.status });
+  }
+  if (!isServiceRoleConfigured()) {
+    return Response.json(
+      { error: "SUPABASE_SERVICE_ROLE_KEY가 설정되지 않았습니다." },
+      { status: 503 }
+    );
+  }
+
+  let body: { text?: string; title?: string };
   try {
-    const { text } = await req.json() as { text?: string };
+    body = await req.json();
+  } catch {
+    return Response.json({ error: "JSON 본문이 필요합니다." }, { status: 400 });
+  }
 
-    // 새 텍스트가 전달된 경우 저장, 없으면 기존 파일 사용
-    const knowledgeText = text?.trim() || loadKnowledge();
-    if (!knowledgeText) {
-      return Response.json(
-        { error: "텍스트가 없습니다. 사주 해석 텍스트를 입력해주세요." },
-        { status: 400 }
-      );
-    }
+  const content = (body.text ?? "").trim();
+  if (!content) {
+    return Response.json({ error: "텍스트가 없습니다." }, { status: 400 });
+  }
 
-    if (text?.trim()) {
-      saveKnowledge(text.trim());
-    }
-
-    const chunks = chunkText(knowledgeText);
-
-    const apiKey = process.env.OPENAI_API_KEY;
-    if (!apiKey || apiKey === "여기에_API_키를_입력하세요") {
-      return Response.json(
-        { error: ".env.local 파일에 OPENAI_API_KEY를 입력해주세요." },
-        { status: 400 }
-      );
-    }
-
-    const client = new OpenAI({ apiKey });
-
-    // 100개씩 배치 처리 (API 한도 초과 방지)
-    const BATCH_SIZE = 100;
-    const allVectors: number[][] = [];
-
-    for (let i = 0; i < chunks.length; i += BATCH_SIZE) {
-      const batch = chunks.slice(i, i + BATCH_SIZE);
-      const resp = await client.embeddings.create({
-        model: "text-embedding-3-small",
-        input: batch,
-      });
-      allVectors.push(...resp.data.map((d) => d.embedding));
-    }
-
-    const embeddings = chunks.map((chunk, i) => ({
-      chunk,
-      vector: allVectors[i],
-    }));
-
-    saveEmbeddings(embeddings);
-
+  try {
+    const doc = await createKnowledgeDocument({
+      title: body.title?.trim() || "레거시 업로드",
+      content,
+      createdBy: auth.user.id,
+    });
     return Response.json({
       success: true,
-      totalChars: knowledgeText.length,
-      chunks: chunks.length,
+      totalChars: doc.charCount,
+      chunks: doc.chunkCount,
+      documentId: doc.id,
     });
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
+    const message = err instanceof Error ? err.message : "학습 실패";
     return Response.json({ error: message }, { status: 500 });
   }
 }
 
 export async function GET() {
-  const knowledge = loadKnowledge();
-  return Response.json({
-    hasKnowledge: !!knowledge,
-    chars: knowledge?.length ?? 0,
-  });
+  const auth = await requireAdmin();
+  if (!auth.ok) {
+    return Response.json({ error: auth.error }, { status: auth.status });
+  }
+  if (!isServiceRoleConfigured()) {
+    return Response.json({ hasEmbeddings: false, documents: 0, totalChunks: 0 });
+  }
+  try {
+    const documents = await listKnowledgeDocuments();
+    const ready = documents.filter((d) => d.status === "ready");
+    return Response.json({
+      hasEmbeddings: ready.length > 0,
+      documents: ready.length,
+      totalChunks: ready.reduce((s, d) => s + d.chunkCount, 0),
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "조회 실패";
+    return Response.json({ error: message }, { status: 500 });
+  }
 }

@@ -85,9 +85,19 @@ describe("computeUserAppState", () => {
 
     expect(
       computeUserAppState({
-        experienceMode: "beginner",
+        experienceMode: "balanced",
         onboardingCompletedAt: "2024-01-01T00:00:00.000Z",
         sajuProfile: profile,
+        entries: [],
+        todayDate: "2024-06-01",
+      }).kind
+    ).toBe("profile_without_diary");
+
+    expect(
+      computeUserAppState({
+        experienceMode: "balanced",
+        onboardingCompletedAt: "2024-01-01T00:00:00.000Z",
+        sajuProfile: null,
         entries: [],
         todayDate: "2024-06-01",
       }).kind
@@ -99,7 +109,7 @@ describe("computeUserAppState", () => {
     });
     expect(
       computeUserAppState({
-        experienceMode: "beginner",
+        experienceMode: "balanced",
         onboardingCompletedAt: "2024-01-01T00:00:00.000Z",
         sajuProfile: profile,
         entries: [past],
@@ -113,7 +123,7 @@ describe("computeUserAppState", () => {
     });
     expect(
       computeUserAppState({
-        experienceMode: "expert",
+        experienceMode: "saju",
         onboardingCompletedAt: "2024-01-01T00:00:00.000Z",
         sajuProfile: profile,
         entries: [past, today],

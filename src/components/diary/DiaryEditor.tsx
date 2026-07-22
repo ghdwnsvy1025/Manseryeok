@@ -11,8 +11,12 @@ import DiaryWriteSheet from "@/components/diary/DiaryWriteSheet";
 import ManualScoreSheet from "@/components/diary/ManualScoreSheet";
 import HappinessRatingPicker from "@/components/diary/HappinessRatingPicker";
 import RatingPicker from "@/components/diary/RatingPicker";
+import EnergyRatingPicker from "@/components/diary/EnergyRatingPicker";
+import PrimaryAreaPicker from "@/components/diary/PrimaryAreaPicker";
 import LifestyleOptionalInputs from "@/components/diary/LifestyleOptionalInputs";
-import BeginnerTodayFlowCards from "@/components/saju/BeginnerTodayFlowCards";
+import NightTomorrowReport from "@/components/forecast/NightTomorrowReport";
+import DiaryWriteModePicker from "@/components/diary/DiaryWriteModePicker";
+import DiarySaveResultPanel from "@/components/diary/DiarySaveResultPanel";
 import {
   EmotionMultiSelect,
   EventTagPicker,
@@ -48,7 +52,6 @@ import { computeSaveCelebration, type SaveCelebration } from "@/lib/diary/saveCe
 import { getUniqueEntryDays } from "@/lib/diary/stats";
 import { happinessRankInRecentDays } from "@/lib/diary/trendStats";
 import { filterRealEntries } from "@/lib/diary/dataOrigin";
-import { buildBeginnerTodayFlow } from "@/lib/saju/interpretation";
 import {
   loadSajuSettings,
   resolvePillarVisibility,
@@ -65,10 +68,40 @@ import type {
   ConditionRating,
   DiaryEntry,
   DiaryPillar,
+  EnergyRating,
   SleepSatisfaction,
   SocialMet,
   WorkIntensity,
 } from "@/lib/diary/types";
+import {
+  applyAiWording,
+  getForecastStorage,
+  type DailyForecast,
+} from "@/lib/forecast";
+import {
+  buildForecastAiInput,
+  requestAiWording,
+} from "@/lib/forecast/requestAiWording";
+import { MATURITY_LABELS } from "@/lib/forecast/maturity";
+import { DIARY_SCHEMA_VERSION } from "@/lib/diary/types";
+import { getDiaryAnalysisService } from "@/services/analysis";
+import type { DiaryAnalysisResult } from "@/services/analysis";
+import {
+  DEFAULT_CHECKIN_TAGS,
+  FOCUS_RATING_LABELS,
+  type DiaryWriteMode,
+  type FocusRating,
+} from "@/lib/product/lifeAreas";
+import { loadExperienceModeLocal } from "@/lib/app/experienceMode";
+import {
+  DEFAULT_EXPERIENCE_MODE,
+  prefersPlainLanguage,
+} from "@/lib/product/modes";
+import {
+  buildDailySajuContext,
+  formatBLinkCopy,
+} from "@/lib/product/dailySajuContext";
+import { getForecastService } from "@/services/analysis";
 
 const CONDITION_LABELS: Record<ConditionRating, string> = {
   1: "매우 지침",
@@ -127,6 +160,8 @@ export default function DiaryEditor({ initialDate }: Props) {
   const [conditionRating, setConditionRating] = useState<ConditionRating>(
     DEFAULT_CONDITION
   );
+  const [energyRating, setEnergyRating] = useState<EnergyRating | null>(null);
+  const [primaryArea, setPrimaryArea] = useState<string | null>(null);
   const [emotions, setEmotions] = useState<string[]>([]);
   const [tags, setTags] = useState<string[]>([]);
   const [sleepSatisfaction, setSleepSatisfaction] = useState<SleepSatisfaction | null>(null);
@@ -151,6 +186,13 @@ export default function DiaryEditor({ initialDate }: Props) {
   const [saveCelebration, setSaveCelebration] = useState<SaveCelebration | null>(null);
   const [showDay7Modal, setShowDay7Modal] = useState(false);
   const [showCreateSajuPrompt, setShowCreateSajuPrompt] = useState(false);
+  const [nightReport, setNightReport] = useState<{
+    forecast: DailyForecast;
+    maturityLabel: string;
+  } | null>(null);
+  const [writeMode, setWriteMode] = useState<DiaryWriteMode>("oneline");
+  const [focusRating, setFocusRating] = useState<FocusRating | null>(null);
+  const [saveAnalysis, setSaveAnalysis] = useState<DiaryAnalysisResult | null>(null);
   const [lastMiniReport, setLastMiniReport] = useState<{
     ganjiKo: string;
     wellbeing: number | null;
@@ -216,6 +258,9 @@ export default function DiaryEditor({ initialDate }: Props) {
           existing.happinessRating ?? DEFAULT_HAPPINESS_RATING
         );
         setConditionRating(existing.conditionRating ?? DEFAULT_CONDITION);
+        setEnergyRating(existing.energyRating ?? null);
+        setFocusRating(existing.focusRating ?? null);
+        setPrimaryArea(existing.primaryArea ?? null);
         setEmotions(existing.emotions ?? []);
         setTags(existing.tags ?? []);
         setSleepSatisfaction(existing.sleepSatisfaction ?? null);
@@ -236,6 +281,9 @@ export default function DiaryEditor({ initialDate }: Props) {
         setShowAdvancedWrite(false);
         setHappinessRating(DEFAULT_HAPPINESS_RATING);
         setConditionRating(DEFAULT_CONDITION);
+        setEnergyRating(null);
+        setFocusRating(null);
+        setPrimaryArea(null);
         setEmotions([]);
         setTags([]);
         setSleepSatisfaction(null);
@@ -271,12 +319,33 @@ export default function DiaryEditor({ initialDate }: Props) {
       happinessRating,
       happinessSource: "selected",
       conditionRating,
+      energyRating,
+      focusRating,
+      tenGod: (() => {
+        try {
+          return buildDailySajuContext(date, sajuProfile).tenGod;
+        } catch {
+          return base.tenGod ?? null;
+        }
+      })(),
+      primaryArea,
       emotions,
       tags,
       sleepSatisfaction,
       activityLevel,
       socialMet,
       workIntensity,
+      weatherMetadata: {
+        ...(base.weatherMetadata ?? {}),
+        focusRating: focusRating ?? undefined,
+        tenGod: (() => {
+          try {
+            return buildDailySajuContext(date, sajuProfile).tenGod ?? undefined;
+          } catch {
+            return undefined;
+          }
+        })(),
+      },
       dataOrigin: "user",
       heavenlyStem: dayPillar?.stem.ko ?? base.heavenlyStem,
       earthlyBranch: dayPillar?.branch.ko ?? base.earthlyBranch,
@@ -293,7 +362,7 @@ export default function DiaryEditor({ initialDate }: Props) {
       sajuProfileId,
       monthPillarKo: monthPillar.ganjiKo,
       yearPillarKo: yearPillar.ganjiKo,
-      schemaVersion: 3,
+      schemaVersion: DIARY_SCHEMA_VERSION,
       updatedAt: now,
       createdAt: entry?.createdAt ?? now,
     };
@@ -370,6 +439,60 @@ export default function DiaryEditor({ initialDate }: Props) {
       } else {
         setMessage("오늘 기록이 분석에 반영됐어요. 기록이 쌓일수록 패턴을 비교할 수 있어요.");
       }
+
+      // 저장 성공 후 내일 준비 리포트 (AI 실패해도 로컬/목업 예보 유지)
+      try {
+        const forecastSvc = getForecastService();
+        const forecastResult = await forecastSvc.createForecast({
+          todayDate: date,
+          todayEntry: reloaded ?? updated,
+          entries: listAfter,
+          sajuProfile,
+          mode: loadExperienceModeLocal() ?? DEFAULT_EXPERIENCE_MODE,
+        });
+        if (forecastResult.forecast) {
+          let finalForecast = forecastResult.forecast;
+          try {
+            const aiInput = buildForecastAiInput({
+              forecast: finalForecast,
+              todayEntry: reloaded ?? updated,
+              entries: listAfter,
+            });
+            const wording = await requestAiWording(aiInput);
+            if (wording) {
+              finalForecast = applyAiWording(finalForecast, wording);
+            }
+          } catch {
+            /* AI 선택 — 실패해도 로컬 유지 */
+          }
+          const forecastStorage = await getForecastStorage();
+          await forecastStorage.saveForecast(finalForecast);
+          setNightReport({
+            forecast: finalForecast,
+            maturityLabel:
+              MATURITY_LABELS[finalForecast.maturity] ??
+              MATURITY_LABELS[finalForecast.maturity],
+          });
+        }
+      } catch {
+        setMessage(
+          "저장은 완료됐어요. 내일 예보는 잠시 후 홈에서 다시 확인할 수 있어요."
+        );
+      }
+
+      try {
+        const analysisSvc = getDiaryAnalysisService();
+        const result = await analysisSvc.analyzeDiary({
+          entry: reloaded ?? updated,
+          entries: listAfter,
+          sajuProfile,
+          mode: loadExperienceModeLocal() ?? DEFAULT_EXPERIENCE_MODE,
+        });
+        setSaveAnalysis(result);
+      } catch {
+        /* 분석 실패해도 저장은 유지 */
+      }
+
       setStatus("idle");
     } catch (err) {
       setMessage(err instanceof Error ? err.message : "저장에 실패했습니다.");
@@ -496,16 +619,6 @@ export default function DiaryEditor({ initialDate }: Props) {
     const collected = getCollectedGanjiIndices(allEntries);
     return getNextUncollectedGanjiDate(date, collected);
   }, [date, allEntries]);
-  const todayFlow = useMemo(() => {
-    if (!dayPillar) return null;
-    return buildBeginnerTodayFlow({
-      dayPillar,
-      sajuProfile,
-      entries: filterRealEntries(allEntries),
-      todayDate: date,
-    });
-  }, [dayPillar, sajuProfile, allEntries, date]);
-
   const yesterdayStr = (() => {
     const [y, m, d] = date.split("-").map(Number);
     const dt = new Date(y, m - 1, d);
@@ -549,7 +662,14 @@ export default function DiaryEditor({ initialDate }: Props) {
         disabled={isBusy}
       />
 
-      {saveCelebration && dayPillar && (
+      {nightReport && (
+        <NightTomorrowReport
+          forecast={nightReport.forecast}
+          maturityLabel={nightReport.maturityLabel}
+          onClose={() => setNightReport(null)}
+        />
+      )}
+      {!nightReport && saveCelebration && dayPillar && (
         <SaveCelebrationModal
           celebration={saveCelebration}
           ganjiIndex={dayPillar.ganjiIndex}
@@ -567,6 +687,25 @@ export default function DiaryEditor({ initialDate }: Props) {
         <CreateSajuPromptModal onClose={() => setShowCreateSajuPrompt(false)} />
       )}
 
+      {saveAnalysis && (
+        <DiarySaveResultPanel
+          result={saveAnalysis}
+          bLinkCopy={(() => {
+            try {
+              return formatBLinkCopy(
+                buildDailySajuContext(date, sajuProfile),
+                prefersPlainLanguage(
+                  loadExperienceModeLocal() ?? DEFAULT_EXPERIENCE_MODE
+                )
+              );
+            } catch {
+              return null;
+            }
+          })()}
+          onClose={() => setSaveAnalysis(null)}
+        />
+      )}
+
       {totalEntryDays >= STATS_INSIGHT_MIN_ENTRIES && (
         <Link
           href="/diary/stats"
@@ -580,10 +719,6 @@ export default function DiaryEditor({ initialDate }: Props) {
         >
           {totalEntryDays}일 기록됨 · 간지별 행복도 패턴 보기 →
         </Link>
-      )}
-
-      {todayFlow && (
-        <BeginnerTodayFlowCards flow={todayFlow} compact />
       )}
 
       <div
@@ -610,6 +745,36 @@ export default function DiaryEditor({ initialDate }: Props) {
           </span>
         </div>
 
+        <DiaryWriteModePicker
+          value={writeMode}
+          onChange={(mode) => {
+            setWriteMode(mode);
+            if (mode === "free") {
+              setShowAdvancedWrite(true);
+              setShowWriteSheet(true);
+            }
+          }}
+        />
+
+        <p className="ui-hint">
+          {(() => {
+            try {
+              const ctx = buildDailySajuContext(date, sajuProfile);
+              return formatBLinkCopy(
+                ctx,
+                prefersPlainLanguage(
+                  loadExperienceModeLocal() ?? DEFAULT_EXPERIENCE_MODE
+                )
+              );
+            } catch {
+              return dayPillarKo
+                ? `이 기록은 오늘의 ${dayPillarKo}일 흐름 정보와 자동으로 연결됩니다.`
+                : "이 기록은 오늘의 흐름 정보와 자동으로 연결됩니다.";
+            }
+          })()}
+        </p>
+        <p className="ui-hint">기분만 선택해도 저장할 수 있어요. 나머지는 모두 선택 사항입니다.</p>
+
         <HappinessRatingPicker
           value={happinessRating}
           onChange={(rating) => {
@@ -618,51 +783,95 @@ export default function DiaryEditor({ initialDate }: Props) {
           }}
           disabled={isBusy}
         />
-        <RatingPicker
-          title="생활 컨디션"
-          value={conditionRating}
-          onChange={setConditionRating}
-          labels={CONDITION_LABELS}
-          disabled={isBusy}
-        />
-        <EmotionMultiSelect
-          value={emotions}
-          onChange={setEmotions}
-          disabled={isBusy}
-        />
-        <div className="space-y-1.5">
-          <p className="ui-section-title">짧은 메모</p>
-          <textarea
-            value={memo}
-            onChange={(e) => {
-              setMemo(e.target.value);
-              setContent(e.target.value);
-            }}
+        {(writeMode === "quick" || writeMode === "oneline") && (
+          <>
+            <EnergyRatingPicker
+              value={energyRating}
+              onChange={setEnergyRating}
+              disabled={isBusy}
+            />
+            <RatingPicker
+              title="집중"
+              value={focusRating ?? 3}
+              onChange={(v) => setFocusRating(v as FocusRating)}
+              labels={FOCUS_RATING_LABELS}
+              disabled={isBusy}
+            />
+            <RatingPicker
+              title="생활 컨디션"
+              value={conditionRating}
+              onChange={setConditionRating}
+              labels={CONDITION_LABELS}
+              disabled={isBusy}
+            />
+          </>
+        )}
+        {writeMode !== "quick" && (
+          <PrimaryAreaPicker
+            value={primaryArea}
+            onChange={setPrimaryArea}
             disabled={isBusy}
-            rows={3}
-            placeholder="오늘을 한두 문장으로 남겨보세요."
-            className="w-full px-3 py-2 border-2 text-sm resize-none"
-            style={{
-              background: "var(--px-bg3)",
-              borderColor: "var(--px-border)",
-              color: "var(--px-text-on-panel)",
-            }}
           />
-        </div>
-        <EventTagPicker value={tags} onChange={setTags} disabled={isBusy} />
-        <LifestyleOptionalInputs
-          sleepSatisfaction={sleepSatisfaction}
-          activityLevel={activityLevel}
-          socialMet={socialMet}
-          workIntensity={workIntensity}
-          disabled={isBusy}
-          onChange={(next) => {
-            setSleepSatisfaction(next.sleepSatisfaction);
-            setActivityLevel(next.activityLevel);
-            setSocialMet(next.socialMet);
-            setWorkIntensity(next.workIntensity);
-          }}
-        />
+        )}
+        {writeMode === "quick" && (
+          <EventTagPicker
+            value={tags.length ? tags : []}
+            onChange={setTags}
+            disabled={isBusy}
+          />
+        )}
+        {writeMode !== "quick" && (
+          <>
+            <EmotionMultiSelect
+              value={emotions}
+              onChange={setEmotions}
+              disabled={isBusy}
+            />
+            <div className="space-y-1.5">
+              <p className="ui-section-title">짧은 메모</p>
+              <textarea
+                value={memo}
+                onChange={(e) => {
+                  setMemo(e.target.value);
+                  setContent(e.target.value);
+                }}
+                disabled={isBusy}
+                rows={3}
+                placeholder={
+                  writeMode === "oneline"
+                    ? "오늘 마음에 가장 오래 남은 장면은 무엇인가요?"
+                    : "오늘을 한두 문장으로 남겨보세요."
+                }
+                className="w-full px-3 py-2 border-2 text-sm resize-none"
+                style={{
+                  background: "var(--px-bg3)",
+                  borderColor: "var(--px-border)",
+                  color: "var(--px-text-on-panel)",
+                }}
+              />
+            </div>
+            <EventTagPicker value={tags} onChange={setTags} disabled={isBusy} />
+            <LifestyleOptionalInputs
+              sleepSatisfaction={sleepSatisfaction}
+              activityLevel={activityLevel}
+              socialMet={socialMet}
+              workIntensity={workIntensity}
+              disabled={isBusy}
+              onChange={(next) => {
+                setSleepSatisfaction(next.sleepSatisfaction);
+                setActivityLevel(next.activityLevel);
+                setSocialMet(next.socialMet);
+                setWorkIntensity(next.workIntensity);
+              }}
+            />
+          </>
+        )}
+
+        {writeMode === "quick" && tags.length === 0 && (
+          <p className="ui-hint">
+            추천 태그: {DEFAULT_CHECKIN_TAGS.slice(0, 4).join(" · ")}
+          </p>
+        )}
 
         <button
           type="button"
@@ -670,11 +879,7 @@ export default function DiaryEditor({ initialDate }: Props) {
           disabled={isBusy}
           className="ui-primary-btn w-full py-3 text-sm"
         >
-          {status === "saving"
-            ? "저장 중..."
-            : entry
-              ? "기록 수정 저장"
-              : "오늘 기록 저장"}
+          {status === "saving" ? "저장 중..." : "오늘을 기록하고 내일 보기"}
         </button>
 
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -768,8 +973,17 @@ export default function DiaryEditor({ initialDate }: Props) {
 
       {message && <p className="ui-hint font-bold">{message}</p>}
 
-      <Link href="/diary/history" className="ui-hint font-bold underline block">
-        과거 기록 보기
+      <Link
+        href="/diary/history"
+        className="block w-full px-3 py-3 text-center text-sm font-bold border-2"
+        style={{
+          borderColor: "var(--px-border)",
+          background: "var(--px-bg2)",
+          color: "var(--px-accent)",
+          boxShadow: "2px 2px 0 #000",
+        }}
+      >
+        과거 기록 보기 →
       </Link>
     </div>
   );

@@ -1,0 +1,95 @@
+{
+  "theoryId": "sajubase-final",
+  "theoryVersion": "sajubase-final-2026-07-19",
+  "calculationVersion": "saju-calc-1.0.0",
+  "featureSchemaVersion": "saju-feature-mvp-1.0.0",
+  "featureCatalogVersion": "saju-feature-catalog-1.0.0",
+  "calendarCalculationVersion": "0.1.0",
+  "structuredGeneratedAt": "2026-07-21T01:00:00.000Z",
+  "canonicalSource": {
+    "canonicalSourcePath": "docs/sajubase_final.md",
+    "generatedAt": "2026-07-19",
+    "sha256": "d12744da262aba1b50b020cbfabf3921b5f6b4a264c042682ec749efb4a44d02",
+    "byteLength": 869219,
+    "parts": {
+      "A": "사주명리 이론 통합 학습 데이터 정제본",
+      "B": "사주 오행 분포율 계산 총 공식 명세서",
+      "C": "상담·안전 규칙 (통합 프롬프트 §1, §7)"
+    }
+  },
+  "structured": {
+    "calculation": "knowledge/saju/structured/calculation_rules.json",
+    "interpretation": "knowledge/saju/structured/interpretation_index.json",
+    "safety": "knowledge/saju/structured/safety_rules.json"
+  },
+  "sourceNotes": {
+    "knowledge/saju/source": "포인터 README만 유지. 원문 복사본으로 덮어쓰지 않음."
+  },
+  "sections": {
+    "calculationImplemented": [
+      "B-0-principles",
+      "B-1-stem-element",
+      "B-2-polarity",
+      "B-3-hidden-stems",
+      "B-4-earth-branch",
+      "B-5-branch-weighted",
+      "B-6-banghap",
+      "B-7-samhap",
+      "B-8-native-stems",
+      "B-13-luck-base-weights-rates",
+      "B-14-luck-only-rates",
+      "B-15-mode-map"
+    ],
+    "calculationApproximate": [
+      "B-13-monthly-daily-toHigher",
+      "B-14-ordered-pair-interaction"
+    ],
+    "calculationUnimplemented": [
+      "B-13-full-monthly-daily-percentage-blend",
+      "B-14-full-luck-interaction-engine",
+      "yongshin-kishin-numeric"
+    ],
+    "interpretationIndexed": [
+      "A-intro-1",
+      "A-intro-3",
+      "A-intro-5",
+      "A-intro-6",
+      "A-intro-7",
+      "A-intro-9",
+      "A-tzone",
+      "A-luck-roles",
+      "A-counsel-tone"
+    ],
+    "safetyIndexed": [
+      "C-1-no-determinism",
+      "C-2-no-medical",
+      "C-3-no-catastrophe",
+      "C-4-no-absolute-wuxing",
+      "C-5-separate-data-vs-theory",
+      "C-6-calc-vs-interpret"
+    ]
+  },
+  "phase3Status": {
+    "implementation": "complete",
+    "localVerification": "complete",
+    "remoteMigration": "complete",
+    "existingDataPreservation": "complete",
+    "schemaVerification": "complete",
+    "remoteRlsVerification": "complete",
+    "phase3ProductionSecurityGate": "complete",
+    "phase3Overall": "complete",
+    "phase4Readiness": "ready",
+    "fullTheoryFormulaParity": "partial",
+    "appWideLaunchReadiness": "not_claimed",
+    "rlsRunId": "rls_1784630715103_54e56b",
+    "diaryEntriesBaseline": 2,
+    "diaryEntriesAfterRls": 2
+  },
+  "notes": [
+    "theoryVersion은 원문 생성일(2026-07-19) 기준.",
+    "sha256은 docs/sajubase_final.md 바이트 해시. 원문 변경 시 재계산 필요.",
+    "근사 section은 Phase 4 학습 allowlist에서 제외.",
+    "2026-07-21: 008/009·RLS 통과(runId rls_1784630715103_54e56b). Phase 3 overall complete. Phase 4 ready.",
+    "스크립트 productionReady=true 는 Phase 3 DB/RLS 게이트만 의미. 앱 전체 출시와 동일시하지 않음."
+  ]
+}

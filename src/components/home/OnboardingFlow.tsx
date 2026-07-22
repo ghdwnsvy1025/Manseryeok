@@ -13,7 +13,7 @@ const STEPS = ["value", "example", "mode", "saju"] as const;
 
 export default function OnboardingFlow({ onCompleted }: Props) {
   const [stepIndex, setStepIndex] = useState(0);
-  const [mode, setMode] = useState<ExperienceMode>("beginner");
+  const [mode, setMode] = useState<ExperienceMode>("balanced");
   const [saving, setSaving] = useState(false);
   const step = STEPS[stepIndex];
 
@@ -74,25 +74,25 @@ export default function OnboardingFlow({ onCompleted }: Props) {
             type="button"
             className="w-full p-3 border-2 text-left"
             style={{
-              borderColor: mode === "beginner" ? "var(--px-accent)" : "var(--px-border)",
+              borderColor: mode === "balanced" ? "var(--px-accent)" : "var(--px-border)",
               background: "var(--px-bg3)",
             }}
-            onClick={() => setMode("beginner")}
+            onClick={() => setMode("balanced")}
           >
-            <p className="font-black text-sm">초보 모드</p>
-            <p className="ui-hint mt-1">쉬운 문장으로 오늘의 흐름과 일기를 먼저 보여줘요.</p>
+            <p className="font-black text-sm">균형형</p>
+            <p className="ui-hint mt-1">기록과 사주 흐름을 함께 보여줘요.</p>
           </button>
           <button
             type="button"
             className="w-full p-3 border-2 text-left"
             style={{
-              borderColor: mode === "expert" ? "var(--px-accent)" : "var(--px-border)",
+              borderColor: mode === "saju" ? "var(--px-accent)" : "var(--px-border)",
               background: "var(--px-bg3)",
             }}
-            onClick={() => setMode("expert")}
+            onClick={() => setMode("saju")}
           >
-            <p className="font-black text-sm">전문 모드</p>
-            <p className="ui-hint mt-1">기존 만세력 원본 정보에 해석과 의견을 덧붙여요.</p>
+            <p className="font-black text-sm">사주 중심</p>
+            <p className="ui-hint mt-1">간지·십신 등 사주 정보를 중심에 둡니다.</p>
           </button>
           <button type="button" className="ui-primary-btn w-full py-3" onClick={() => setStepIndex(3)}>
             다음

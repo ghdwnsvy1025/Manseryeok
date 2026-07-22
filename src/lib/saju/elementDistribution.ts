@@ -2749,6 +2749,9 @@ export function calculateElementDistribution(
   );
 
   if (calculationMode === "luck_only") {
+    // APPROXIMATE (자료 B §14 대비): ordered-pair interaction 전량 미구현.
+    // computeLuckOnlyDistribution 은 운 기둥을 원국식 가중합으로 근사.
+    // luckMixRates (LUCK_BASE_WEIGHTS normalize) 만 verified.
     const luckOnly = computeLuckOnlyDistribution(selectedLuck);
     return {
       ...nativeResult,
@@ -2775,6 +2778,10 @@ export function calculateElementDistribution(
 
   // 기존 원국+대운+년운 결과를 그대로 기반으로 삼는다. 월운/일운이 추가되면
   // 그 결과와 선택된 전체 운 조합을 1:1로 섞어 원국이 반드시 포함되게 한다.
+  //
+  // APPROXIMATE (자료 B §13 대비): 월·일운 toHigher 전량 분배 미구현.
+  // Phase 3+ allowlist는 이 경로의 element % 를 eligibleForTraining=false 로 표시한다.
+  // 정확한 계산처럼 취급하지 말 것. 반영률 메타는 luckRates.ts (verified) 를 사용.
   if (monthly || daily) {
     const luckCombined = computeLuckOnlyDistribution(selectedLuck);
     const percentage = emptyVector();

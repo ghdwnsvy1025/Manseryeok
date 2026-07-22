@@ -33,6 +33,15 @@
   --earth: #fbbf24;
   --metal: #cbd5e1;
   --water: #60a5fa;
+
+  --signal-emotion: #f472b6;
+  --signal-energy: #60a5fa;
+  --signal-focus: #a78bfa;
+  --signal-condition: #34d399;
+  --signal-saju: #c8a700;
+  --signal-insufficient: #94a3b8;
+  --signal-positive: #4ade80;
+  --signal-caution: #fbbf24;
 }
 
 * {

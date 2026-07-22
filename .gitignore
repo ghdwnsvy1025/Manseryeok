@@ -14,3 +14,15 @@ data/embeddings.json
 # OS
 .DS_Store
 Thumbs.db
+
+# Phase 4 e2e bridge temp
+scripts/.tmp/
+
+# Playwright / Phase 6.1
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+e2e/.auth/
+e2e/results.json
+# E2E flag file written for next dev (also matched by .env*.local)
