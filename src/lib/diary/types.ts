@@ -12,7 +12,7 @@ import type { Gender } from "@/lib/saju/daeun";
 export type { FocusRating };
 
 /** 현재 도메인 스키마 버전 */
-export const DIARY_SCHEMA_VERSION = 5;
+export const DIARY_SCHEMA_VERSION = 6;
 
 /** 에너지 1–4: 충전됨 / 괜찮음 / 지침 / 소진 */
 export type EnergyRating = 1 | 2 | 3 | 4;
@@ -62,7 +62,8 @@ export type LegacyExperienceMode = "beginner" | "expert";
 export type DiaryDataOrigin = "user" | "import" | "demo";
 export type HappinessSource = "selected" | "backfilled" | "default";
 
-export type ConditionRating = 1 | 2 | 3 | 4 | 5;
+export type ConditionRating = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
+
 
 export type SleepSatisfaction = "poor" | "fair" | "good" | "great";
 export type ActivityLevel = "low" | "moderate" | "high";
@@ -178,15 +179,15 @@ export type DiaryEntry = {
   /** 연결된 사주 프로필 */
   sajuProfileId?: string | null;
   analysis: DiaryAnalysis | null;
-  /** 사용자 입력 행복도 1–5 */
+  /** 사용자 입력 행복도 1–10 */
   happinessRating?: HappinessRating;
   /** 행복도 출처 */
   happinessSource?: HappinessSource;
-  /** 생활 컨디션 1–5 (의료적 건강이 아님) */
+  /** 생활 컨디션 1–10 (의료적 건강이 아님) */
   conditionRating?: ConditionRating | null;
   /** 에너지 1–4 (충전됨~소진) */
   energyRating?: EnergyRating | null;
-  /** 집중 1–5 */
+  /** 집중 1–10 */
   focusRating?: FocusRating | null;
   /** 일간 기준 십신 (사주 프로필 있을 때) */
   tenGod?: string | null;

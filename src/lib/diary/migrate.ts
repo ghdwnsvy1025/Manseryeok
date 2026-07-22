@@ -5,6 +5,7 @@ import { normalizeTagList } from "./emotionTags";
 import {
   DEFAULT_HAPPINESS_RATING,
   normalizeHappinessRating,
+  scaleLegacyFivePointToTen,
   scoreToHappinessRating,
   type HappinessRating,
 } from "./happiness";
@@ -13,7 +14,26 @@ import {
   DIARY_SCHEMA_VERSION,
   type ConditionRating,
   type DiaryEntry,
+  type FocusRating,
 } from "./types";
+
+function needsFiveToTenScale(entry: Partial<DiaryEntry>): boolean {
+  const v = entry.schemaVersion;
+  return typeof v !== "number" || v < 6;
+}
+
+function toTenPointRating(
+  value: unknown,
+  entry: Partial<DiaryEntry>
+): number | null {
+  if (typeof value !== "number" || !Number.isFinite(value)) return null;
+  const rounded = Math.round(value);
+  if (rounded < 1 || rounded > 10) return null;
+  if (needsFiveToTenScale(entry) && rounded >= 1 && rounded <= 5) {
+    return scaleLegacyFivePointToTen(rounded);
+  }
+  return rounded;
+}
 
 function normalizeAnalysis(analysis: DiaryAnalysis): DiaryAnalysis {
   const withReasons = analysis.score_reasons
@@ -45,6 +65,8 @@ function inferEmotionsFromLegacy(entry: Partial<DiaryEntry>): string[] {
 
 function resolveHappinessRating(entry: Partial<DiaryEntry>): HappinessRating {
   if (entry.happinessRating != null) {
+    const scaled = toTenPointRating(entry.happinessRating, entry);
+    if (scaled != null) return scaled as HappinessRating;
     return normalizeHappinessRating(entry.happinessRating);
   }
   if (entry.analysis?.daily_wellbeing_score != null) {
@@ -56,12 +78,8 @@ function resolveHappinessRating(entry: Partial<DiaryEntry>): HappinessRating {
 function resolveConditionRating(
   entry: Partial<DiaryEntry>
 ): ConditionRating | null {
-  const value = entry.conditionRating;
-  if (value === 1 || value === 2 || value === 3 || value === 4 || value === 5) {
-    return value;
-  }
-  // 기존 기록의 컨디션은 행복도에서 추정하지 않음
-  return null;
+  const scaled = toTenPointRating(entry.conditionRating, entry);
+  return scaled != null ? (scaled as ConditionRating) : null;
 }
 
 function resolveEnergyRating(
@@ -74,24 +92,12 @@ function resolveEnergyRating(
   return null;
 }
 
-function resolveFocusRating(
-  entry: Partial<DiaryEntry>
-): import("./types").FocusRating | null {
-  const fromField = entry.focusRating;
-  if (
-    fromField === 1 ||
-    fromField === 2 ||
-    fromField === 3 ||
-    fromField === 4 ||
-    fromField === 5
-  ) {
-    return fromField;
-  }
+function resolveFocusRating(entry: Partial<DiaryEntry>): FocusRating | null {
+  const fromField = toTenPointRating(entry.focusRating, entry);
+  if (fromField != null) return fromField as FocusRating;
   const meta = entry.weatherMetadata?.focusRating;
-  if (meta === 1 || meta === 2 || meta === 3 || meta === 4 || meta === 5) {
-    return meta;
-  }
-  return null;
+  const fromMeta = toTenPointRating(meta, entry);
+  return fromMeta != null ? (fromMeta as FocusRating) : null;
 }
 
 function resolveTenGod(entry: Partial<DiaryEntry>): string | null {
@@ -144,12 +150,12 @@ function backfillPillars(entry: DiaryEntry): DiaryEntry {
 
 /** 구버전 필드를 현재 DiaryEntry로 정규화하고 스키마 버전을 올린다 */
 export function normalizeDiaryEntry(raw: Record<string, unknown>): DiaryEntry {
+  const hr = raw.happinessRating;
   const hadExplicitRating =
-    raw.happinessRating === 1 ||
-    raw.happinessRating === 2 ||
-    raw.happinessRating === 3 ||
-    raw.happinessRating === 4 ||
-    raw.happinessRating === 5;
+    typeof hr === "number" &&
+    Number.isInteger(hr) &&
+    hr >= 1 &&
+    hr <= 10;
 
   const hasAnalysisObject =
     raw.analysis && typeof raw.analysis === "object";
@@ -214,6 +220,8 @@ export function normalizeDiaryEntry(raw: Record<string, unknown>): DiaryEntry {
 
   return {
     ...withPillars,
+    content:
+      typeof withPillars.content === "string" ? withPillars.content : "",
     happinessRating,
     happinessSource: resolveHappinessSource(withPillars, hadExplicitRating),
     conditionRating: resolveConditionRating(withPillars),

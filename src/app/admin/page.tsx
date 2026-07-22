@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { getDiaryStorage } from "@/lib/diary/getStorage";
-import { buildTwoMonthDemoEntries } from "@/lib/diary/seedDemoEntries";
+import { buildRealTestSeedEntries, buildTwoMonthDemoEntries } from "@/lib/diary/seedDemoEntries";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 
 type DocRow = {
@@ -36,6 +36,10 @@ export default function AdminPage() {
     "idle"
   );
   const [seedMessage, setSeedMessage] = useState("");
+  const [realSeedStatus, setRealSeedStatus] = useState<
+    "idle" | "loading" | "done" | "error"
+  >("idle");
+  const [realSeedMessage, setRealSeedMessage] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -213,6 +217,25 @@ export default function AdminPage() {
       setSeedStatus("error");
       setSeedMessage(
         err instanceof Error ? err.message : "데모 일기 저장에 실패했습니다."
+      );
+    }
+  };
+
+  const handleSeedRealTestDiary = async () => {
+    setRealSeedStatus("loading");
+    setRealSeedMessage("실일기 테스트 시드 20일을 저장하는 중...");
+    try {
+      const entries = buildRealTestSeedEntries(20);
+      const storage = await getDiaryStorage();
+      await storage.upsertMany(entries);
+      setRealSeedStatus("done");
+      setRealSeedMessage(
+        `${entries.length}일분 실일기 시드를 저장했습니다. 예보 성숙도·통계에 포함됩니다.`
+      );
+    } catch (err) {
+      setRealSeedStatus("error");
+      setRealSeedMessage(
+        err instanceof Error ? err.message : "실일기 시드 저장에 실패했습니다."
       );
     }
   };
@@ -441,6 +464,44 @@ export default function AdminPage() {
               </li>
             ))}
           </ul>
+        )}
+      </div>
+
+      <div
+        className="p-4 border-2 space-y-3"
+        style={{ background: "var(--px-bg2)", borderColor: "var(--px-border)" }}
+      >
+        <p className="font-bold text-sm" style={{ color: "var(--px-accent)" }}>
+          실일기 테스트 시드 (관리자 전용)
+        </p>
+        <p className="text-xs" style={{ color: "var(--px-text2)" }}>
+          최근 20일 연속 일기를 <strong>user</strong> 출처로 넣습니다. 예보
+          성숙도·맞춤 패턴 테스트에 사용하세요.
+        </p>
+        <button
+          type="button"
+          onClick={() => void handleSeedRealTestDiary()}
+          disabled={realSeedStatus === "loading"}
+          className="px-btn w-full py-2 text-sm"
+        >
+          {realSeedStatus === "loading"
+            ? "[ 저장 중... ]"
+            : "[ 실일기 20일 시드 넣기 ]"}
+        </button>
+        {realSeedMessage && (
+          <p
+            className="text-xs font-bold"
+            style={{
+              color:
+                realSeedStatus === "error"
+                  ? "#f87171"
+                  : realSeedStatus === "done"
+                    ? "#4ade80"
+                    : "var(--px-text2)",
+            }}
+          >
+            {realSeedMessage}
+          </p>
         )}
       </div>
 

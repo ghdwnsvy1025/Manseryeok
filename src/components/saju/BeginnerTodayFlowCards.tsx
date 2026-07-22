@@ -19,17 +19,60 @@ type Props = {
   groundingFacts?: GroundingFacts;
 };
 
+type CardTone = {
+  accent: string;
+  soft: string;
+  mark: string;
+};
+
+const CARD_TONES: Record<string, CardTone> = {
+  emotion: {
+    accent: "var(--signal-emotion)",
+    soft: "color-mix(in srgb, var(--signal-emotion) 14%, var(--px-bg3))",
+    mark: "情",
+  },
+  energy: {
+    accent: "var(--signal-energy)",
+    soft: "color-mix(in srgb, var(--signal-energy) 14%, var(--px-bg3))",
+    mark: "動",
+  },
+  relation: {
+    accent: "#fb923c",
+    soft: "color-mix(in srgb, #fb923c 14%, var(--px-bg3))",
+    mark: "緣",
+  },
+  focus: {
+    accent: "var(--signal-focus)",
+    soft: "color-mix(in srgb, var(--signal-focus) 14%, var(--px-bg3))",
+    mark: "專",
+  },
+  condition: {
+    accent: "var(--signal-condition)",
+    soft: "color-mix(in srgb, var(--signal-condition) 14%, var(--px-bg3))",
+    mark: "體",
+  },
+  record: {
+    accent: "var(--signal-saju)",
+    soft: "color-mix(in srgb, var(--signal-saju) 14%, var(--px-bg3))",
+    mark: "記",
+  },
+};
+
+const FALLBACK_TONE: CardTone = {
+  accent: "var(--px-accent)",
+  soft: "var(--px-bg3)",
+  mark: "流",
+};
+
 export default function BeginnerTodayFlowCards({
   flow,
   compact,
   groundingFacts,
 }: Props) {
   const [display, setDisplay] = useState(flow);
-  const [ragNote, setRagNote] = useState<string | null>(null);
 
   useEffect(() => {
     setDisplay(flow);
-    setRagNote(null);
     if (!groundingFacts) return;
 
     let cancelled = false;
@@ -65,7 +108,6 @@ export default function BeginnerTodayFlowCards({
         },
       });
       if (cancelled || !result) return;
-      // stale guard
       void key;
       setDisplay({
         ...flow,
@@ -79,9 +121,6 @@ export default function BeginnerTodayFlowCards({
             ? "mixed"
             : flow.analysisKind,
       });
-      if (result.usedRag) {
-        setRagNote(`등록된 사주 이론 ${result.chunkCount}조각을 참고해 문장을 다듬었어요.`);
-      }
     })();
 
     return () => {
@@ -89,70 +128,128 @@ export default function BeginnerTodayFlowCards({
     };
   }, [flow, groundingFacts]);
 
-  const [openId, setOpenId] = useState<string | null>(null);
   const cards = compact ? display.cards.slice(0, 4) : display.cards;
+  const lead = cards[0];
+  const rest = cards.slice(1);
 
   return (
     <div className="space-y-3">
       <div
-        className="p-3 border-2"
-        style={{ background: "var(--px-bg2)", borderColor: "var(--px-accent)" }}
+        className="p-4 border-2 space-y-2"
+        style={{
+          background: "var(--px-bg2)",
+          borderColor: "var(--px-accent)",
+          boxShadow: "3px 3px 0 #000",
+        }}
       >
-        <p className="ui-section-title">오늘의 한 문장</p>
-        <p className="text-sm font-bold mt-1" style={{ color: "var(--px-text-on-panel)" }}>
+        <p
+          className="text-[11px] font-black tracking-wide"
+          style={{ color: "var(--px-accent)" }}
+        >
+          ■ 오늘의 한 문장
+        </p>
+        <p
+          className="text-base font-black leading-snug"
+          style={{ color: "var(--px-text-on-panel)" }}
+        >
           {display.headline}
         </p>
-        <p className="ui-hint mt-2">{display.disclaimer}</p>
-        <p className="ui-hint mt-1">
-          {display.analysisKind === "basic_saju"
-            ? "사주와 오늘의 간지를 바탕으로 본 기본 흐름입니다."
-            : display.analysisKind === "record_based"
-              ? "내 과거 기록에서는 비슷한 날에 이런 경향이 나타났어요."
-              : "기본 사주 분석과 내 기록 기반 분석을 함께 보여드려요."}
-        </p>
-        {ragNote && <p className="ui-hint mt-1">{ragNote}</p>}
+        {display.disclaimer && (
+          <p className="text-[11px] leading-relaxed" style={{ color: "var(--px-text2)" }}>
+            {display.disclaimer}
+          </p>
+        )}
       </div>
 
-      <div className="grid grid-cols-1 gap-2">
-        {cards.map((card) => {
-          const open = openId === card.id;
-          return (
-            <div
+      {lead && (
+        <FlowCard
+          id={lead.id}
+          title={lead.title}
+          status={lead.status}
+          observation={lead.observationQuestion}
+          featured
+        />
+      )}
+
+      {rest.length > 0 && (
+        <div className="grid grid-cols-2 gap-2">
+          {rest.map((card) => (
+            <FlowCard
               key={card.id}
-              className="p-3 border-2"
-              style={{ background: "var(--px-bg3)", borderColor: "var(--px-border)" }}
-            >
-              <p className="text-xs font-bold" style={{ color: "var(--px-text2)" }}>
-                {card.title}
-              </p>
-              <p className="text-sm font-black mt-1" style={{ color: "var(--px-accent)" }}>
-                {card.status}
-              </p>
-              {card.observationQuestion && (
-                <p className="ui-hint mt-1">관찰: {card.observationQuestion}</p>
-              )}
-              <button
-                type="button"
-                className="mt-2 text-xs font-bold underline"
-                style={{ color: "#60a5fa" }}
-                onClick={() => setOpenId(open ? null : card.id)}
-                aria-expanded={open}
-              >
-                왜 이런 결과가 나왔나요?
-              </button>
-              {open && (
-                <ul className="mt-2 space-y-1">
-                  {card.evidence.map((line) => (
-                    <li key={line} className="text-[11px]" style={{ color: "var(--px-text2)" }}>
-                      · {line}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          );
-        })}
-      </div>
+              id={card.id}
+              title={card.title}
+              status={card.status}
+              observation={card.observationQuestion}
+            />
+          ))}
+        </div>
+      )}
     </div>
+  );
+}
+
+function FlowCard({
+  id,
+  title,
+  status,
+  observation,
+  featured = false,
+}: {
+  id: string;
+  title: string;
+  status: string;
+  observation?: string;
+  featured?: boolean;
+}) {
+  const tone = CARD_TONES[id] ?? FALLBACK_TONE;
+
+  return (
+    <article
+      className={`border-2 flex flex-col ${featured ? "p-4 gap-2.5" : "p-3 gap-2 min-h-[7.5rem]"}`}
+      style={{
+        background: tone.soft,
+        borderColor: tone.accent,
+        boxShadow: featured ? `4px 4px 0 color-mix(in srgb, ${tone.accent} 55%, #000)` : "2px 2px 0 #000",
+      }}
+    >
+      <div className="flex items-center gap-2">
+        <span
+          className="shrink-0 flex items-center justify-center font-black pixel-font"
+          style={{
+            width: featured ? 28 : 22,
+            height: featured ? 28 : 22,
+            fontSize: featured ? 11 : 9,
+            color: "#0a0a12",
+            background: tone.accent,
+            border: "2px solid #000",
+          }}
+          aria-hidden
+        >
+          {tone.mark}
+        </span>
+        <p
+          className={`font-black leading-none ${featured ? "text-sm" : "text-[11px]"}`}
+          style={{ color: tone.accent }}
+        >
+          {title}
+        </p>
+      </div>
+
+      <p
+        className={`font-black leading-snug ${featured ? "text-lg" : "text-sm"}`}
+        style={{ color: "var(--px-text-on-panel)" }}
+      >
+        {status}
+      </p>
+
+      {observation && (
+        <p
+          className={`leading-relaxed ${featured ? "text-xs" : "text-[10px]"}`}
+          style={{ color: "var(--px-text2)" }}
+        >
+          {observation}
+        </p>
+      )}
+    </article>
   );
 }

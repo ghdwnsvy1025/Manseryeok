@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import SajuForm from "@/components/SajuForm";
 import { registerSajuProfileFromResult } from "@/lib/diary/registerSajuProfile";
 import {
@@ -54,6 +55,7 @@ function applyProfileToSettings(profile: SajuProfile): void {
 }
 
 export default function SajuProfilesPage() {
+  const router = useRouter();
   const { isMobile } = useViewMode();
   const [profiles, setProfiles] = useState<SajuProfile[]>([]);
   const [loading, setLoading] = useState(true);
@@ -202,14 +204,20 @@ export default function SajuProfilesPage() {
             <button
               key={profile.id}
               type="button"
-              disabled={busy || active}
-              onClick={() => void handleSelect(profile.id)}
+              disabled={busy}
+              onClick={() => {
+                if (active) {
+                  router.back();
+                  return;
+                }
+                void handleSelect(profile.id);
+              }}
               className="text-left p-4 border-2 space-y-1 transition-opacity disabled:opacity-100"
               style={{
                 borderColor: active ? "var(--px-accent)" : "var(--px-border)",
                 background: active ? "var(--px-bg3)" : "var(--px-bg2)",
                 boxShadow: active ? "4px 4px 0 #4a3a00" : "3px 3px 0 #000",
-                cursor: active ? "default" : "pointer",
+                cursor: "pointer",
               }}
             >
               <div className="flex items-center justify-between gap-2">

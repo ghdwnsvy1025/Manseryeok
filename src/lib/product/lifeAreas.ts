@@ -59,12 +59,17 @@ export const DEFAULT_CHECKIN_TAGS = [
   "외로움",
 ] as const;
 
-export type FocusRating = 1 | 2 | 3 | 4 | 5;
+export type FocusRating = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
 
 export const FOCUS_RATING_LABELS: Record<FocusRating, string> = {
-  1: "매우 어려움",
-  2: "산만함",
-  3: "보통",
-  4: "잘됨",
-  5: "매우 잘됨",
+  1: "최악",
+  2: "매우 산만",
+  3: "산만함",
+  4: "조금 산만",
+  5: "보통↓",
+  6: "보통",
+  7: "괜찮음",
+  8: "잘됨",
+  9: "매우 잘됨",
+  10: "최고",
 };

@@ -3,12 +3,9 @@
 import { useEffect, useState } from "react";
 import WelcomeAuthGate from "@/components/auth/WelcomeAuthGate";
 import SajuProfileSetup from "@/components/home/SajuProfileSetup";
-import HomeDashboard from "@/components/home/HomeDashboard";
+import HomeHub from "@/components/home/HomeHub";
 import { useUserAppState } from "@/hooks/useUserAppState";
-import {
-  disableGuestMode,
-  isGuestMode,
-} from "@/lib/auth/guestMode";
+import { disableGuestMode } from "@/lib/auth/guestMode";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 
 export default function HomePage() {
@@ -19,7 +16,7 @@ export default function HomePage() {
   useEffect(() => {
     const supabase = getSupabaseBrowserClient();
     if (!supabase) {
-      setEntryAllowed(isGuestMode());
+      setEntryAllowed(false);
       setAuthReady(true);
       return;
     }
@@ -27,7 +24,7 @@ export default function HomePage() {
     void supabase.auth.getUser().then(({ data }) => {
       const signedIn = Boolean(data.user);
       if (signedIn) disableGuestMode();
-      setEntryAllowed(signedIn || isGuestMode());
+      setEntryAllowed(signedIn);
       setAuthReady(true);
     });
 
@@ -42,12 +39,16 @@ export default function HomePage() {
     return () => subscription.unsubscribe();
   }, []);
 
-  if (!authReady || loading) {
+  if (!authReady) {
     return <p className="ui-hint p-4">불러오는 중...</p>;
   }
 
   if (!entryAllowed) {
     return <WelcomeAuthGate onGuest={() => setEntryAllowed(true)} />;
+  }
+
+  if (loading) {
+    return <p className="ui-hint p-4">불러오는 중...</p>;
   }
 
   if (error) {
@@ -56,7 +57,11 @@ export default function HomePage() {
         <p className="text-sm font-bold" style={{ color: "#f87171" }}>
           {error}
         </p>
-        <button type="button" className="ui-primary-btn px-3 py-2 text-xs" onClick={() => void refresh()}>
+        <button
+          type="button"
+          className="ui-primary-btn px-3 py-2 text-xs"
+          onClick={() => void refresh()}
+        >
           다시 시도
         </button>
       </div>
@@ -67,5 +72,5 @@ export default function HomePage() {
     return <SajuProfileSetup onCompleted={() => void refresh()} />;
   }
 
-  return <HomeDashboard state={state} onModeChanged={() => void refresh()} />;
+  return <HomeHub state={state} />;
 }

@@ -93,7 +93,7 @@ function block(
 function moodLabel(entry: DiaryEntry): string {
   const h = entry.happinessRating;
   if (h != null && h in HAPPINESS_RATING_LABELS) {
-    return HAPPINESS_RATING_LABELS[h as 1 | 2 | 3 | 4 | 5];
+    return HAPPINESS_RATING_LABELS[h];
   }
   return "기록된 기분";
 }
@@ -195,7 +195,7 @@ export function buildLocalNightReport(input: {
   const recentLowEnergy =
     recent.energyAvg != null && recent.energyAvg <= 2
       ? "최근 에너지가 낮은 편이어서 체감 피로는 더 클 수 있어요."
-      : recent.moodAvg != null && recent.moodAvg <= 2.5
+      : recent.moodAvg != null && recent.moodAvg <= 5
         ? "최근 기분이 낮은 편이어서 감정 기복이 더 크게 느껴질 수 있어요."
         : null;
 

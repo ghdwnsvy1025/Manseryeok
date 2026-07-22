@@ -1,6 +1,12 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useSyncExternalStore,
+  type ReactNode,
+} from "react";
 
 export type ViewMode = "desktop" | "mobile";
 
@@ -21,38 +27,44 @@ type ViewModeContextValue = {
 
 const ViewModeContext = createContext<ViewModeContextValue | null>(null);
 
-function readCompactViewport(): boolean {
-  if (typeof window === "undefined") return false;
+function subscribeCompact(cb: () => void) {
+  const mq = window.matchMedia(`(max-width: ${COMPACT_BREAKPOINT}px)`);
+  mq.addEventListener("change", cb);
+  return () => mq.removeEventListener("change", cb);
+}
+
+function getCompactSnapshot() {
   return window.matchMedia(`(max-width: ${COMPACT_BREAKPOINT}px)`).matches;
 }
 
+/** SSR·첫 페인트는 데스크톱 가정 → 폰 프레임과 맞춤 (넓은 화면 깜빡임 방지) */
+function getCompactServerSnapshot() {
+  return false;
+}
+
 export function ViewModeProvider({ children }: { children: ReactNode }) {
-  const [isCompactViewport, setIsCompactViewport] = useState(false);
-  const [ready, setReady] = useState(false);
+  const isCompactViewport = useSyncExternalStore(
+    subscribeCompact,
+    getCompactSnapshot,
+    getCompactServerSnapshot
+  );
 
   useEffect(() => {
     // 앱은 모바일 전용 — PC/모바일 전환값 무시하고 모바일로 고정
     localStorage.setItem("saju-view-mode", "mobile");
-    setIsCompactViewport(readCompactViewport());
-    setReady(true);
-
-    const mq = window.matchMedia(`(max-width: ${COMPACT_BREAKPOINT}px)`);
-    const onChange = () => setIsCompactViewport(mq.matches);
-    mq.addEventListener("change", onChange);
-    return () => mq.removeEventListener("change", onChange);
   }, []);
 
   const setViewMode = (_mode: ViewMode) => {
     // 모바일 고정 — desktop 전환 비활성
   };
 
-  const showPhoneFrame = ready && !isCompactViewport;
+  const showPhoneFrame = !isCompactViewport;
 
   const value: ViewModeContextValue = {
     viewMode: "mobile",
     setViewMode,
     isMobile: true,
-    isCompactViewport: ready ? isCompactViewport : false,
+    isCompactViewport,
     showPhoneFrame,
   };
 

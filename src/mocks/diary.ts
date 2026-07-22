@@ -27,9 +27,9 @@ export function buildMockDiaryEntries(
   const entries: DiaryEntry[] = [];
   for (let i = 0; i < count; i++) {
     const date = shiftDate(todayDate, i);
-    const happiness = ((i % 5) + 1) as 1 | 2 | 3 | 4 | 5;
+    const happiness = ((i % 10) + 1) as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
     const energy = (((i % 4) + 1) as 1 | 2 | 3 | 4);
-    const focus = (((i % 5) + 1) as 1 | 2 | 3 | 4 | 5);
+    const focus = (((i % 10) + 1) as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10);
     entries.push(
       createDiaryEntry(date, `목업 기록 ${i + 1}일째. 오늘의 장면 메모.`, {
         happinessRating: happiness,

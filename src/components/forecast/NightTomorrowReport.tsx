@@ -2,10 +2,8 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import EvidenceDisclosure from "@/components/forecast/EvidenceDisclosure";
 import ForecastMatchFeedback from "@/components/forecast/ForecastMatchFeedback";
 import type { DailyForecast, MatchFeedbackLevel } from "@/lib/forecast/types";
-import { MATURITY_LABELS } from "@/lib/forecast/maturity";
 import {
   createFeedbackId,
   getForecastStorage,
@@ -17,15 +15,6 @@ type Props = {
   onClose?: () => void;
 };
 
-function splitEvidence(forecast: DailyForecast["emotionForecast"]) {
-  return {
-    traditional: forecast.evidence.filter((e) => e.kind === "traditional"),
-    observed: forecast.evidence.filter((e) => e.kind === "observed"),
-    recent: forecast.evidence.filter((e) => e.kind === "recent"),
-    caution: forecast.evidence.filter((e) => e.kind === "caution"),
-  };
-}
-
 function DomainCard({
   title,
   block,
@@ -33,7 +22,6 @@ function DomainCard({
   title: string;
   block: DailyForecast["emotionForecast"];
 }) {
-  const ev = splitEvidence(block);
   return (
     <div
       className="p-3 border space-y-1"
@@ -45,14 +33,12 @@ function DomainCard({
       <p className="text-sm font-bold" style={{ color: "var(--px-text-on-panel)" }}>
         {block.forecast}
       </p>
-      <EvidenceDisclosure {...ev} />
     </div>
   );
 }
 
 export default function NightTomorrowReport({
   forecast,
-  maturityLabel,
   onClose,
 }: Props) {
   const [innerFeedback, setInnerFeedback] = useState<MatchFeedbackLevel | null>(
@@ -117,9 +103,6 @@ export default function NightTomorrowReport({
               ? ` · ${forecast.traditionalFacts.tenGod}`
               : ""}
           </p>
-          <p className="ui-hint">
-            {maturityLabel ?? MATURITY_LABELS[forecast.maturity]}
-          </p>
         </header>
 
         <section className="space-y-1">
@@ -131,9 +114,6 @@ export default function NightTomorrowReport({
 
         <section className="space-y-2">
           <p className="text-xs font-black">글 사이에 나타난 신호</p>
-          <p className="text-[11px] font-bold" style={{ color: "var(--px-text2)" }}>
-            가설이에요. 단정이 아닙니다.
-          </p>
           <p className="text-sm" style={{ color: "var(--px-text-on-panel)" }}>
             {forecast.innerSignal.text}
           </p>
@@ -151,13 +131,6 @@ export default function NightTomorrowReport({
           <p className="text-sm" style={{ color: "var(--px-text-on-panel)" }}>
             {forecast.neededCondition.text}
           </p>
-          {forecast.neededCondition.evidence.length > 0 && (
-            <ul className="list-disc pl-4 text-[11px]" style={{ color: "var(--px-text2)" }}>
-              {forecast.neededCondition.evidence.map((e, i) => (
-                <li key={i}>{e}</li>
-              ))}
-            </ul>
-          )}
         </section>
 
         <section className="space-y-2">
@@ -172,7 +145,6 @@ export default function NightTomorrowReport({
           <p className="text-sm font-bold" style={{ color: "var(--px-accent)" }}>
             {forecast.oneAction.action}
           </p>
-          <p className="ui-hint">{forecast.oneAction.reason}</p>
         </section>
 
         <section className="space-y-1">
@@ -185,24 +157,6 @@ export default function NightTomorrowReport({
           </p>
         </section>
 
-        <section
-          className="p-2 border text-[11px] space-y-1"
-          style={{ borderColor: "var(--px-border)", color: "var(--px-text2)" }}
-        >
-          <p className="font-black">분석 근거</p>
-          <p>
-            표본 — 간지 {forecast.sampleSizes.ganji} · 십신{" "}
-            {forecast.sampleSizes.tenGod} · 천간 {forecast.sampleSizes.stem} · 지지{" "}
-            {forecast.sampleSizes.branch}
-          </p>
-          <p>{forecast.recentStateSummary}</p>
-          <p>{forecast.disclaimer}</p>
-          <p>
-            생성: {forecast.generationMode === "ai_assisted" ? "로컬+AI 문구" : "로컬 규칙"}{" "}
-            · {forecast.ruleVersion}
-          </p>
-        </section>
-
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
@@ -212,12 +166,12 @@ export default function NightTomorrowReport({
             확인
           </button>
           <Link
-            href="/"
+            href="/forecast"
             className="flex-1 py-2.5 text-sm text-center font-bold border-2"
             style={{ borderColor: "var(--px-border)", color: "var(--px-text2)" }}
             onClick={onClose}
           >
-            홈에서 내일 보기
+            예보에서 내일 보기
           </Link>
         </div>
       </div>

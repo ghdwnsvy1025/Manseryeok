@@ -51,22 +51,21 @@ test.describe("Phase 6.1 — auth + legacy smoke", () => {
     ).toBeVisible({ timeout: 20_000 });
   });
 
-  test("conservative flags: journal+analysis nav ON, personalization OFF", async ({
-    page,
-  }) => {
+  test("bottom nav: 일기 · 홈 · 분석 only", async ({ page }) => {
     // Guest entry so home shell + AppNav render (not only WelcomeAuthGate content)
     await page.goto("/");
     const guest = page.getByRole("button", { name: /비로그인으로 시작/ });
     if (await guest.isVisible().catch(() => false)) {
       await guest.click();
     }
-    await expect(page.getByRole("navigation", { name: "메인 메뉴" })).toBeVisible({
-      timeout: 20_000,
-    });
-    await expect(page.getByRole("navigation", { name: "메인 메뉴" }).locator('a[href="/journal"]')).toBeVisible();
-    await expect(page.getByRole("navigation", { name: "메인 메뉴" }).locator('a[href="/analysis"]')).toBeVisible();
-    await expect(page.getByRole("navigation", { name: "메인 메뉴" }).locator('a[href="/journal/stats"]')).toHaveCount(0);
-    await expect(page.getByRole("navigation", { name: "메인 메뉴" }).locator('a[href="/diary"]')).toBeVisible();
-    await expect(page.getByRole("navigation", { name: "메인 메뉴" }).locator('a[href="/saju"]')).toBeVisible();
+    const nav = page.getByRole("navigation", { name: "메인 메뉴" });
+    await expect(nav).toBeVisible({ timeout: 20_000 });
+    await expect(nav.locator('a[href="/journal"]')).toBeVisible();
+    await expect(nav.locator('a[href="/"]')).toBeVisible();
+    await expect(nav.locator('a[href="/analysis"]')).toBeVisible();
+    await expect(nav.locator('a[href="/journal/stats"]')).toHaveCount(0);
+    await expect(nav.locator('a[href="/saju"]')).toHaveCount(0);
+    await expect(nav.locator('a[href="/diary"]')).toHaveCount(0);
+    await expect(nav.locator('a[href="/forecast"]')).toHaveCount(0);
   });
 });

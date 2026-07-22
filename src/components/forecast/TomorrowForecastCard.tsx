@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import ForecastMatchFeedback from "@/components/forecast/ForecastMatchFeedback";
 import ErrorState from "@/components/product/ErrorState";
 import {
@@ -11,7 +10,6 @@ import {
   getForecastStorage,
   type DailyForecast,
 } from "@/lib/forecast";
-import { MATURITY_LABELS } from "@/lib/forecast/maturity";
 import type { ActionHelpfulness, MatchFeedbackLevel } from "@/lib/forecast/types";
 import type { DiaryEntry, SajuProfile } from "@/lib/diary/types";
 import { getForecastService } from "@/services/analysis";
@@ -198,13 +196,6 @@ export default function TomorrowForecastCard({
 
         {tomorrowForecast ? (
           <>
-            {(forecastState === "insufficient_data" || forecastMessage) && (
-              <p className="ui-hint">
-                {forecastMessage ??
-                  "아직 비슷한 날 기록이 적어 기본 흐름을 중심으로 보여드려요."}
-              </p>
-            )}
-            <p className="ui-hint">{MATURITY_LABELS[tomorrowForecast.maturity]}</p>
             <div className="space-y-2 text-sm" style={{ color: "var(--px-text-on-panel)" }}>
               <p>
                 <span className="font-black" style={{ color: "var(--px-accent)" }}>
@@ -228,28 +219,14 @@ export default function TomorrowForecastCard({
             <p className="text-xs font-bold" style={{ color: "var(--px-text2)" }}>
               한 가지 준비: {tomorrowForecast.oneAction.action}
             </p>
-            <p className="ui-hint">
-              참고 표본 — 간지 {tomorrowForecast.sampleSizes.ganji} · 십신{" "}
-              {tomorrowForecast.sampleSizes.tenGod} · 천간{" "}
-              {tomorrowForecast.sampleSizes.stem} · 지지{" "}
-              {tomorrowForecast.sampleSizes.branch}
-            </p>
           </>
         ) : (
-          <>
-            <p className="text-sm" style={{ color: "var(--px-text-on-panel)" }}>
-              {forecastMessage ??
-                (previewFacts.tenGod
-                  ? `내일은 일간 기준 「${previewFacts.tenGod}」 흐름이 될 수 있어요. 오늘을 기록하면 내 패턴이 반영된 예보를 보여드려요.`
-                  : `내일은 ${previewFacts.ganjiKo}일이에요. 사주를 등록하고 오늘을 기록하면 더 개인화된 예보를 볼 수 있어요.`)}
-            </p>
-            <p className="ui-hint">
-              아직 개인 기록이 적어 전통 명리 해석을 중심으로 안내할 수 있어요.
-            </p>
-            <Link href="/diary" className="ui-primary-btn inline-block px-3 py-2 text-xs">
-              오늘 기록하고 내일 보기
-            </Link>
-          </>
+          <p className="text-sm" style={{ color: "var(--px-text-on-panel)" }}>
+            {forecastMessage ??
+              (previewFacts.tenGod
+                ? `내일은 일간 기준 「${previewFacts.tenGod}」 흐름이 될 수 있어요. 오늘을 기록하면 내 패턴이 반영된 예보를 보여드려요.`
+                : `내일은 ${previewFacts.ganjiKo}일이에요. 사주를 등록하고 오늘을 기록하면 더 개인화된 예보를 볼 수 있어요.`)}
+          </p>
         )}
       </div>
 

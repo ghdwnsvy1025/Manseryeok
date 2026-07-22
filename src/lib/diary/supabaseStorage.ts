@@ -95,11 +95,16 @@ function entryToRow(
   userId: string
 ): Omit<DbRow, "user_id"> & { user_id: string } {
   const normalized = normalizeDiaryEntry(entry as unknown as Record<string, unknown>);
+  const contentRaw = normalized.content ?? entry.content;
+  const content =
+    typeof contentRaw === "string" && contentRaw.trim().length > 0
+      ? contentRaw
+      : "(내용 없음)";
   return {
     id: normalized.id,
     user_id: userId,
     date: normalized.date,
-    content: normalized.content,
+    content,
     day_pillar: normalized.dayPillar,
     month_pillar_ko: normalized.monthPillarKo ?? null,
     year_pillar_ko: normalized.yearPillarKo ?? null,
@@ -154,16 +159,48 @@ export class SupabaseDiaryStorage implements DiaryStorage {
     return supabase;
   }
 
+  /** 같은 날짜 기존 행의 id를 유지 (daily_forecasts FK 보호) */
+  private async resolveIdsByDate(
+    dates: string[]
+  ): Promise<Map<string, string>> {
+    const unique = [...new Set(dates.filter(Boolean))];
+    const map = new Map<string, string>();
+    if (unique.length === 0) return map;
+
+    const { data, error } = await this.client
+      .from("diary_entries")
+      .select("id, date")
+      .eq("user_id", this.userId)
+      .in("date", unique);
+    if (error) throw new Error(error.message);
+
+    for (const row of data ?? []) {
+      if (row?.date && row?.id) map.set(String(row.date), String(row.id));
+    }
+    return map;
+  }
+
   async save(entry: DiaryEntry): Promise<void> {
+    const existingIds = await this.resolveIdsByDate([entry.date]);
+    const row = entryToRow(entry, this.userId);
+    const existingId = existingIds.get(entry.date);
+    if (existingId) row.id = existingId;
+
     const { error } = await this.client
       .from("diary_entries")
-      .upsert(entryToRow(entry, this.userId), { onConflict: "user_id,date" });
+      .upsert(row, { onConflict: "user_id,date" });
     if (error) throw new Error(error.message);
   }
 
   async upsertMany(entries: DiaryEntry[]): Promise<void> {
     if (entries.length === 0) return;
-    const rows = entries.map((entry) => entryToRow(entry, this.userId));
+    const existingIds = await this.resolveIdsByDate(entries.map((e) => e.date));
+    const rows = entries.map((entry) => {
+      const row = entryToRow(entry, this.userId);
+      const existingId = existingIds.get(entry.date);
+      if (existingId) row.id = existingId;
+      return row;
+    });
     const { error } = await this.client
       .from("diary_entries")
       .upsert(rows, { onConflict: "user_id,date" });

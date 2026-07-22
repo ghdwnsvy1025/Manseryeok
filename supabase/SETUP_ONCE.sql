@@ -135,20 +135,13 @@ begin
   ) then
     alter table public.diary_entries
       add constraint diary_entries_happiness_rating_check
-      check (happiness_rating is null or happiness_rating between 1 and 5);
+      check (happiness_rating is null or happiness_rating between 1 and 10);
   end if;
 end $$;
 
 -- Backfill happiness from scores.daily_wellbeing_score when possible
 update public.diary_entries
-set happiness_rating = case
-  when (scores->>'daily_wellbeing_score')::numeric <= 12 then 1
-  when (scores->>'daily_wellbeing_score')::numeric <= 37 then 2
-  when (scores->>'daily_wellbeing_score')::numeric <= 62 then 3
-  when (scores->>'daily_wellbeing_score')::numeric <= 87 then 4
-  when (scores->>'daily_wellbeing_score')::numeric is not null then 5
-  else coalesce(happiness_rating, 3)
-end
+set happiness_rating = greatest(1, least(10, round(1 + coalesce((scores->>'daily_wellbeing_score')::numeric, 50) / 100.0 * 9)))
 where happiness_rating is null;
 
 update public.diary_entries
@@ -284,7 +277,7 @@ begin
   ) then
     alter table public.diary_entries
       add constraint diary_entries_condition_rating_check
-      check (condition_rating is null or (condition_rating between 1 and 5));
+      check (condition_rating is null or (condition_rating between 1 and 10));
   end if;
 
   if not exists (

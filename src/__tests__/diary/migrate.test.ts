@@ -3,7 +3,7 @@ import { createDiaryEntry } from "@/lib/diary/createEntry";
 import { normalizeDiaryEntry } from "@/lib/diary/migrate";
 
 describe("normalizeDiaryEntry", () => {
-  test("0–100 행복도를 1–5로 역산하고 분석 점수는 유지", () => {
+  test("0–100 행복도를 1–10로 역산하고 분석 점수는 유지", () => {
     const raw = {
       id: "e1",
       date: "2024-06-15",
@@ -37,9 +37,9 @@ describe("normalizeDiaryEntry", () => {
     };
 
     const normalized = normalizeDiaryEntry(raw);
-    expect(normalized.happinessRating).toBe(5);
+    expect(normalized.happinessRating).toBe(10);
     expect(normalized.analysis?.daily_wellbeing_score).toBe(100);
-    expect(normalized.schemaVersion).toBe(5);
+    expect(normalized.schemaVersion).toBe(6);
   });
 
   test("구버전 단일 감정 라벨을 emotions로 승격", () => {
@@ -76,7 +76,7 @@ describe("normalizeDiaryEntry", () => {
     };
 
     const normalized = normalizeDiaryEntry(raw);
-    expect(normalized.happinessRating).toBe(2);
+    expect(normalized.happinessRating).toBe(4);
     expect(normalized.emotions?.length).toBeGreaterThan(0);
     expect(typeof normalized.weekday).toBe("number");
     expect(typeof normalized.isWeekend).toBe("boolean");
@@ -90,7 +90,7 @@ describe("normalizeDiaryEntry", () => {
       emotions: ["기쁨"],
       tags: ["일"],
     });
-    expect(entry.schemaVersion).toBe(5);
+    expect(entry.schemaVersion).toBe(6);
     expect(entry.happinessRating).toBe(4);
     expect(entry.emotions).toEqual(["기쁨"]);
     expect(entry.tags).toEqual(["일"]);

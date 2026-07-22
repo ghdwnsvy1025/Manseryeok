@@ -104,14 +104,19 @@ import {
 import { getForecastService } from "@/services/analysis";
 
 const CONDITION_LABELS: Record<ConditionRating, string> = {
-  1: "매우 지침",
-  2: "지침",
-  3: "보통",
-  4: "괜찮음",
-  5: "가뿐함",
+  1: "최악",
+  2: "매우 지침",
+  3: "지침",
+  4: "조금 지침",
+  5: "보통↓",
+  6: "보통",
+  7: "괜찮음",
+  8: "가뿐함",
+  9: "매우 가뿐",
+  10: "최고",
 };
 
-const DEFAULT_CONDITION: ConditionRating = 3;
+const DEFAULT_CONDITION: ConditionRating = 6;
 
 type Props = {
   initialDate?: string;
@@ -792,7 +797,7 @@ export default function DiaryEditor({ initialDate }: Props) {
             />
             <RatingPicker
               title="집중"
-              value={focusRating ?? 3}
+              value={focusRating ?? 6}
               onChange={(v) => setFocusRating(v as FocusRating)}
               labels={FOCUS_RATING_LABELS}
               disabled={isBusy}

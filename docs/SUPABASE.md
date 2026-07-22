@@ -36,8 +36,10 @@ Supabase Dashboard → **SQL Editor** → 아래 파일을 **순서대로** 실�
 4. [`supabase/migrations/004_experience_condition_origin.sql`](../supabase/migrations/004_experience_condition_origin.sql)
 5. [`supabase/migrations/005_forecast_mvp.sql`](../supabase/migrations/005_forecast_mvp.sql)
 6. [`supabase/migrations/006_rag_knowledge.sql`](../supabase/migrations/006_rag_knowledge.sql) — 사주 이론 RAG (pgvector)
-7. [`supabase/migrations/008_journal_category_system.sql`](../supabase/migrations/008_journal_category_system.sql) — 신규 journal (Phase 2)
-8. [`supabase/migrations/009_astrology_snapshots.sql`](../supabase/migrations/009_astrology_snapshots.sql) — 사주 스냅샷 (Phase 3)
+7. [`supabase/migrations/007_focus_tengod.sql`](../supabase/migrations/007_focus_tengod.sql) — `focus_rating` / `ten_god` (로컬기록)
+8. [`supabase/migrations/008_journal_category_system.sql`](../supabase/migrations/008_journal_category_system.sql) — 신규 journal (Phase 2)
+9. [`supabase/migrations/009_astrology_snapshots.sql`](../supabase/migrations/009_astrology_snapshots.sql) — 사주 스냅샷 (Phase 3)
+10. [`supabase/migrations/010_personalization_models.sql`](../supabase/migrations/010_personalization_models.sql) — 개인화 Ridge (Phase 4)
 
 > **점검 (2026-07-21):** 연결 프로젝트에 008이 아직 없을 수 있다.  
 > `node scripts/verify-journal-008.mjs` 로 확인. 상세는 `docs/MIGRATION_STRATEGY.md`.

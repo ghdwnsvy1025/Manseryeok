@@ -54,10 +54,10 @@ describe("Legacy 행복도·기분 저장/조회 회귀", () => {
     expect(reloaded.dayPillar.ganjiKo).toBe(created.dayPillar.ganjiKo);
   });
 
-  test("행복도 1–5 ↔ 점수 변환이 기존 통계 가정과 일치", () => {
+  test("행복도 1–10 ↔ 점수 변환", () => {
     expect(happinessRatingToScore(1)).toBe(0);
-    expect(happinessRatingToScore(5)).toBe(100);
-    expect(scoreToHappinessRating(75)).toBe(4);
+    expect(happinessRatingToScore(10)).toBe(100);
+    expect(scoreToHappinessRating(75)).toBe(8);
   });
 
   test("구버전: happiness 없이 wellbeing 점수만 있어도 행복도 복원", () => {
@@ -98,7 +98,7 @@ describe("Legacy 행복도·기분 저장/조회 회귀", () => {
     };
 
     const normalized = normalizeDiaryEntry(raw as Record<string, unknown>);
-    expect(normalized.happinessRating).toBe(2);
+    expect(normalized.happinessRating).toBe(3);
     expect(normalized.emotions.length).toBeGreaterThan(0);
   });
 });

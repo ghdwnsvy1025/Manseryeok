@@ -23,7 +23,7 @@ export default function HappinessTrendChart({ trend, title, description }: Props
   }
 
   const xs = trend.points.map((_, i) => pad + (i * (width - pad * 2)) / Math.max(trend.points.length - 1, 1));
-  const yFor = (value: number) => height - pad - ((value - 1) / 4) * (height - pad * 2);
+  const yFor = (value: number) => height - pad - ((value - 1) / 9) * (height - pad * 2);
 
   const path = trend.points
     .map((p, i) => {
@@ -44,7 +44,7 @@ export default function HappinessTrendChart({ trend, title, description }: Props
         </p>
       </div>
       <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto" role="img" aria-label={title}>
-        {[1, 2, 3, 4, 5].map((v) => (
+        {[1, 4, 7, 10].map((v) => (
           <g key={v}>
             <line
               x1={pad}
@@ -68,7 +68,7 @@ export default function HappinessTrendChart({ trend, title, description }: Props
       </svg>
       <div className="flex justify-between text-[10px]" style={{ color: "var(--px-text2)" }}>
         <span>{trend.points[0]?.label}</span>
-        <span>기간 {trend.days}일 · 축: 1~5점</span>
+        <span>기간 {trend.days}일 · 축: 1~10점</span>
         <span>{trend.points[trend.points.length - 1]?.label}</span>
       </div>
       {description && <p className="ui-hint">{description}</p>}

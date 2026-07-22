@@ -2,11 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-  isNewDiaryEnabled,
-  isPersonalizationEnabled,
-  isNewAnalysisEnabled,
-} from "@/lib/app/featureFlags";
+import { isNewDiaryEnabled } from "@/lib/app/featureFlags";
 
 type NavItem = {
   href: string;
@@ -16,80 +12,38 @@ type NavItem = {
   isActive: (path: string) => boolean;
 };
 
-const BASE_NAV: NavItem[] = [
-  {
-    href: "/",
-    label: "예보",
-    icon: "預",
-    main: false,
-    isActive: (path) => path === "/",
-  },
-  {
-    href: "/diary",
-    label: "기록",
-    icon: "記",
-    main: true,
-    isActive: (path) => path === "/diary" || path === "/diary/history",
-  },
-  {
-    href: "/diary/stats",
-    label: "패턴",
-    icon: "見",
-    main: false,
-    isActive: (path) =>
-      path.startsWith("/diary/stats") || path.startsWith("/diary/collection"),
-  },
-  {
-    href: "/saju",
-    label: "내 사주",
-    icon: "命",
-    main: false,
-    isActive: (path) => path === "/saju",
-  },
-];
-
-const JOURNAL_NAV: NavItem = {
-  href: "/journal",
-  label: "새일기",
-  icon: "新",
-  main: false,
-  isActive: (path) =>
-    path.startsWith("/journal") && !path.startsWith("/journal/stats"),
-};
-
-/** Phase 4 — 개인화 Ridge MVP 표시 플래그 ON 시 */
-const PERSONALIZATION_STATS_NAV: NavItem = {
-  href: "/journal/stats",
-  label: "개인화",
-  icon: "統",
-  main: false,
-  isActive: (path) => path.startsWith("/journal/stats"),
-};
-
-/** Phase 5 — 분석 UI·서술 */
-const ANALYSIS_NAV: NavItem = {
-  href: "/analysis",
-  label: "분석",
-  icon: "析",
-  main: false,
-  isActive: (path) => path.startsWith("/analysis"),
-};
-
 export default function AppNav() {
   const pathname = usePathname();
-  const journalItems = isNewDiaryEnabled()
-    ? [
-        BASE_NAV[0],
-        ...(isNewAnalysisEnabled() ? [ANALYSIS_NAV] : []),
-        JOURNAL_NAV,
-        ...(isPersonalizationEnabled() ? [PERSONALIZATION_STATS_NAV] : []),
-        BASE_NAV[2],
-        BASE_NAV[3],
-      ]
-    : isNewAnalysisEnabled()
-      ? [BASE_NAV[0], ANALYSIS_NAV, ...BASE_NAV.slice(1)]
-      : BASE_NAV;
-  const items = journalItems;
+  const diaryHref = isNewDiaryEnabled() ? "/journal" : "/diary";
+
+  const items: NavItem[] = [
+    {
+      href: diaryHref,
+      label: "일기",
+      icon: "記",
+      main: false,
+      isActive: (path) =>
+        path === "/diary" ||
+        path.startsWith("/diary/history") ||
+        (path.startsWith("/journal") &&
+          !path.startsWith("/journal/stats") &&
+          !path.startsWith("/journal/categories")),
+    },
+    {
+      href: "/",
+      label: "홈",
+      icon: "家",
+      main: true,
+      isActive: (path) => path === "/",
+    },
+    {
+      href: "/analysis",
+      label: "분석",
+      icon: "析",
+      main: false,
+      isActive: (path) => path.startsWith("/analysis"),
+    },
+  ];
 
   return (
     <nav

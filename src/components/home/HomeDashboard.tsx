@@ -5,9 +5,6 @@ import Link from "next/link";
 import BeginnerTodayFlowCards from "@/components/saju/BeginnerTodayFlowCards";
 import ExpertInsightPanel from "@/components/saju/ExpertInsightPanel";
 import TomorrowForecastCard from "@/components/forecast/TomorrowForecastCard";
-import ModeSwitcher from "@/components/product/ModeSwitcher";
-import PersonalizationLevelCard from "@/components/product/PersonalizationLevelCard";
-import EmptyState from "@/components/product/EmptyState";
 import ActionSuggestionCard from "@/components/product/ActionSuggestionCard";
 import ReflectionSentenceCard from "@/components/product/ReflectionSentenceCard";
 import { getPillarsForDate } from "@/lib/diary/dayPillar";
@@ -19,17 +16,12 @@ import {
 import { detectDayRelations } from "@/lib/saju/interpretation/relations";
 import { getTenGod } from "@/lib/saju/hiddenStems";
 import { STEMS } from "@/lib/saju/constants";
-import { saveExperienceMode } from "@/lib/app/experienceMode";
 import type { UserAppState } from "@/lib/app/userAppState";
 import {
   DEFAULT_EXPERIENCE_MODE,
-  prefersPlainLanguage,
   prefersSajuTerms,
   type UserExperienceMode,
 } from "@/lib/product/modes";
-import { resolvePersonalizationLevel } from "@/lib/product/personalization";
-import { getUniqueEntryDays } from "@/lib/diary/stats";
-import { filterRealEntries } from "@/lib/diary/dataOrigin";
 
 const ACTION_POOL = [
   {
@@ -57,21 +49,15 @@ type Props = {
   onModeChanged?: () => void;
 };
 
-export default function HomeDashboard({ state, onModeChanged }: Props) {
+export default function HomeDashboard({ state }: Props) {
   const mode: UserExperienceMode = state.experienceMode ?? DEFAULT_EXPERIENCE_MODE;
   const [actionIdx, setActionIdx] = useState(0);
   const [reflectionIdx, setReflectionIdx] = useState(0);
-  const [showEvidence, setShowEvidence] = useState(false);
 
   const dayPillar = useMemo(
     () => getPillarsForDate(state.todayDate).dayPillar,
     [state.todayDate]
   );
-  const recordCount = useMemo(
-    () => getUniqueEntryDays(filterRealEntries(state.entries)),
-    [state.entries]
-  );
-  const personalization = resolvePersonalizationLevel(recordCount);
 
   const beginnerFlow = useMemo(
     () =>
@@ -127,17 +113,6 @@ export default function HomeDashboard({ state, onModeChanged }: Props) {
   const weekdayLabel = ["일", "월", "화", "수", "목", "금", "토"][
     new Date(`${state.todayDate}T12:00:00+09:00`).getDay()
   ];
-  const tenGodLabel = groundingFacts.tenGod;
-  const plainHeadline = prefersPlainLanguage(mode)
-    ? tenGodLabel
-      ? "사람과 외부 활동에 에너지가 움직이기 쉬운 날일 수 있어요."
-      : "오늘의 흐름을 가볍게 살펴보세요."
-    : null;
-
-  const switchMode = async (next: UserExperienceMode) => {
-    await saveExperienceMode(next);
-    onModeChanged?.();
-  };
 
   const action = ACTION_POOL[actionIdx % ACTION_POOL.length];
   const reflection = REFLECTION_POOL[reflectionIdx % REFLECTION_POOL.length];
@@ -149,69 +124,7 @@ export default function HomeDashboard({ state, onModeChanged }: Props) {
         <p className="text-lg font-black" style={{ color: "var(--px-accent)" }}>
           {state.todayDate.replaceAll("-", ".")} {weekdayLabel}요일
         </p>
-        <p className="text-sm font-bold" style={{ color: "var(--px-text-on-panel)" }}>
-          {prefersPlainLanguage(mode) && plainHeadline
-            ? plainHeadline
-            : `${dayPillar.ganjiKo}일${tenGodLabel ? ` · 나에게는 ${tenGodLabel}의 날` : ""}`}
-        </p>
-        <div className="flex flex-wrap gap-2 text-[11px] font-bold" style={{ color: "var(--px-text2)" }}>
-          <span>
-            {state.hasTodayEntry ? "오늘 기록 완료" : "오늘 기록 없음"}
-          </span>
-          <span>·</span>
-          <span>
-            {state.hasTodayEntry
-              ? "내일 예보 생성됨/가능"
-              : "기록하면 내일 예보 생성"}
-          </span>
-        </div>
-        <button
-          type="button"
-          className="text-xs font-bold underline"
-          style={{ color: "#60a5fa" }}
-          onClick={() => setShowEvidence((v) => !v)}
-          aria-expanded={showEvidence}
-        >
-          명리 근거 보기
-        </button>
-        {showEvidence && (
-          <div
-            className="p-2 border text-xs space-y-1"
-            style={{ borderColor: "var(--px-border)", background: "var(--px-bg3)" }}
-          >
-            <p>간지: {dayPillar.ganjiKo} ({dayPillar.ganji})</p>
-            <p>
-              천간 {dayPillar.stem.ko} · 지지 {dayPillar.branch.ko}
-              {tenGodLabel ? ` · 십신 ${tenGodLabel}` : ""}
-            </p>
-            {groundingFacts.relationLabels.length > 0 && (
-              <p>관계: {groundingFacts.relationLabels.join(", ")}</p>
-            )}
-          </div>
-        )}
       </header>
-
-      <PersonalizationLevelCard level={personalization} recordCount={recordCount} />
-
-      <ModeSwitcher value={mode} onChange={(m) => void switchMode(m)} compact />
-
-      {!state.hasSajuProfile && (
-        <EmptyState
-          title="사주 정보를 연결하면 더 깊이 볼 수 있어요"
-          description="기록을 천간·지지·십신 기준으로도 볼 수 있어요."
-          actionLabel="사주 연결하기"
-          actionHref="/saju"
-        />
-      )}
-
-      {state.kind === "profile_without_diary" && state.hasSajuProfile && (
-        <EmptyState
-          title="아직 오늘 기록이 없어요"
-          description="기분만 남겨도 내일 예보를 만들 수 있어요."
-          actionLabel="첫 기록 남기기"
-          actionHref={`/diary?date=${state.todayDate}`}
-        />
-      )}
 
       {prefersSajuTerms(mode) ? (
         <div className="space-y-3">
@@ -308,21 +221,6 @@ export default function HomeDashboard({ state, onModeChanged }: Props) {
               내 패턴 보기
             </Link>
           </div>
-        </div>
-      )}
-
-      {state.kind !== "logged_today" && (
-        <div className="sticky bottom-2 z-10 pt-2">
-          <Link
-            href={`/diary?date=${state.todayDate}`}
-            className="ui-primary-btn block w-full py-4 text-center text-base"
-            style={{ boxShadow: "4px 4px 0 #000" }}
-          >
-            오늘을 기록하고 내일 보기
-            <span className="block text-[11px] font-bold mt-1 opacity-90">
-              내일의 운세, 내 기록으로 예보합니다
-            </span>
-          </Link>
         </div>
       )}
     </div>

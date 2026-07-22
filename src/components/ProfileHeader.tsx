@@ -5,6 +5,10 @@ import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import ModeSwitcher from "@/components/product/ModeSwitcher";
 import {
+  isNewDiaryEnabled,
+  isPersonalizationEnabled,
+} from "@/lib/app/featureFlags";
+import {
   loadLocalSajuProfile,
   loadPrimarySajuProfile,
   profileDisplayName,
@@ -119,11 +123,11 @@ export default function ProfileHeader() {
 
   return (
     <header
-      className="relative z-[60] shrink-0 flex items-center gap-2 px-2 py-2 border-b-2"
+      className="relative z-[60] shrink-0 flex items-center gap-2 px-2.5 py-2.5 border-2 mx-0"
       style={{
         background: "var(--px-bg2)",
-        borderColor: "var(--px-border2)",
-        boxShadow: "0 3px 0 #000",
+        borderColor: "var(--px-accent)",
+        boxShadow: "0 4px 0 #4a3a00",
       }}
     >
       <div ref={menuRef} className="relative shrink-0">
@@ -145,11 +149,13 @@ export default function ProfileHeader() {
 
         {open && (
           <div
-            className="absolute left-0 top-[calc(100%+8px)] w-72 p-3 border-2 space-y-3"
+            className="absolute left-0 top-[calc(100%+8px)] w-72 p-3 border-2 space-y-3 overflow-y-auto overscroll-contain"
             style={{
               background: "var(--px-bg3)",
               borderColor: "var(--px-border2)",
               boxShadow: "4px 4px 0 #000",
+              maxHeight: "min(70vh, calc(100dvh - 5.5rem))",
+              zIndex: 60,
             }}
             role="menu"
           >
@@ -175,11 +181,11 @@ export default function ProfileHeader() {
                 />
               </div>
             ) : (
-              <div className="grid gap-2.5">
+              <div className="grid gap-2">
                 <Link
                   href="/saju/profiles"
                   onClick={closeMenu}
-                  className="ui-primary-btn block w-full px-3 py-3.5 text-center text-base font-black"
+                  className="ui-primary-btn block w-full px-3 py-3 text-center text-sm font-black"
                   role="menuitem"
                 >
                   프로필 관리
@@ -187,25 +193,92 @@ export default function ProfileHeader() {
                 <button
                   type="button"
                   onClick={() => setPanel("modes")}
-                  className="block w-full px-3 py-3 text-center text-sm font-bold border"
+                  className="block w-full px-3 py-2.5 text-center text-sm font-bold border"
                   style={menuLinkStyle}
                   role="menuitem"
                 >
                   모드 관리
                 </button>
+
+                <p
+                  className="pt-1 text-[10px] font-black tracking-wide"
+                  style={{ color: "var(--px-accent)" }}
+                >
+                  메뉴
+                </p>
                 <Link
-                  href="/diary"
+                  href="/forecast"
                   onClick={closeMenu}
-                  className="block px-3 py-3 text-center text-sm font-bold border"
+                  className="block px-3 py-2.5 text-center text-sm font-bold border"
                   style={menuLinkStyle}
                   role="menuitem"
                 >
-                  기록(구)
+                  예보
+                </Link>
+                <Link
+                  href="/saju"
+                  onClick={closeMenu}
+                  className="block px-3 py-2.5 text-center text-sm font-bold border"
+                  style={menuLinkStyle}
+                  role="menuitem"
+                >
+                  내 사주
+                </Link>
+                <Link
+                  href="/diary/stats"
+                  onClick={closeMenu}
+                  className="block px-3 py-2.5 text-center text-sm font-bold border"
+                  style={menuLinkStyle}
+                  role="menuitem"
+                >
+                  패턴 통계
+                </Link>
+                {isNewDiaryEnabled() && (
+                  <>
+                    <Link
+                      href="/journal/categories"
+                      onClick={closeMenu}
+                      className="block px-3 py-2.5 text-center text-sm font-bold border"
+                      style={menuLinkStyle}
+                      role="menuitem"
+                    >
+                      일기 카테고리
+                    </Link>
+                    {isPersonalizationEnabled() && (
+                      <Link
+                        href="/journal/stats"
+                        onClick={closeMenu}
+                        className="block px-3 py-2.5 text-center text-sm font-bold border"
+                        style={menuLinkStyle}
+                        role="menuitem"
+                      >
+                        개인화
+                      </Link>
+                    )}
+                    <Link
+                      href="/diary"
+                      onClick={closeMenu}
+                      className="block px-3 py-2.5 text-center text-sm font-bold border"
+                      style={menuLinkStyle}
+                      role="menuitem"
+                    >
+                      기록(구)
+                    </Link>
+                  </>
+                )}
+                <Link
+                  href="/diary/history"
+                  onClick={closeMenu}
+                  className="block px-3 py-2.5 text-center text-sm font-bold border"
+                  style={menuLinkStyle}
+                  role="menuitem"
+                >
+                  기록 목록
                 </Link>
                 <Link
                   href="/diary/login"
                   onClick={closeMenu}
-                  className="block px-3 py-3 text-center text-sm font-bold border"
+                  className="block px-3 py-2.5 text-center text-sm font-bold border"
                   style={menuLinkStyle}
                   role="menuitem"
                 >
@@ -219,7 +292,12 @@ export default function ProfileHeader() {
 
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-black" style={{ color: "var(--px-accent)" }}>
-          {profile ? `${name} · ${birthDateLabel(profile)}` : "사주 프로필 없음"}
+          {profile ? `${name}` : "사주 프로필 없음"}
+          {profile && (
+            <span className="font-bold ml-2" style={{ color: "var(--px-text2)" }}>
+              {birthDateLabel(profile)}
+            </span>
+          )}
         </p>
       </div>
 
