@@ -25,9 +25,12 @@ export default function InstallAppButton() {
   const [promptEvent, setPromptEvent] = useState<InstallPromptEvent | null>(null);
   const [showIosGuide, setShowIosGuide] = useState(false);
   const [installed, setInstalled] = useState(false);
+  /** SSR/첫 페인트는 false — isIos()를 렌더에서 호출하면 hydration 깨짐 */
+  const [ios, setIos] = useState(false);
 
   useEffect(() => {
     setInstalled(isStandalone());
+    setIos(isIos());
 
     const onPrompt = (event: Event) => {
       event.preventDefault();
@@ -55,7 +58,7 @@ export default function InstallAppButton() {
   }
 
   const canPrompt = Boolean(promptEvent);
-  if (!canPrompt && !isIos()) return null;
+  if (!canPrompt && !ios) return null;
 
   return (
     <div

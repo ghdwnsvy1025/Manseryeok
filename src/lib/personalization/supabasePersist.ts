@@ -5,6 +5,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { PersonalizationModelRecord } from "./types";
 import type { PersonalizationStorage } from "./storage";
+import { FALLBACK_CENTER, STD_FLOOR } from "./baseline";
 
 export function modelToRow(model: PersonalizationModelRecord) {
   return {
@@ -73,9 +74,9 @@ export function rowToModel(row: Record<string, unknown>): PersonalizationModelRe
     featureMeans: (row.feature_means as number[]) || [],
     featureStds: (row.feature_stds as number[]) || [],
     normalization: {
-      weightedMean: Number(norm.weightedMean ?? 3),
-      mean: Number(norm.mean ?? 3),
-      std: Number(norm.std ?? 0.5),
+      weightedMean: Number(norm.weightedMean ?? FALLBACK_CENTER),
+      mean: Number(norm.mean ?? FALLBACK_CENTER),
+      std: Number(norm.std ?? STD_FLOOR),
       validCount: Number(norm.validCount ?? row.valid_sample_count ?? 0),
       coverage30d: Number(norm.coverage30d ?? 0),
       lowVariance: Boolean(norm.lowVariance),
@@ -85,7 +86,7 @@ export function rowToModel(row: Record<string, unknown>): PersonalizationModelRe
     },
     baselineMetrics: (row.baseline_metrics as PersonalizationModelRecord["baselineMetrics"]) || {
       mae: 0,
-      prediction: 3,
+      prediction: FALLBACK_CENTER,
     },
     modelMetrics: (row.model_metrics as PersonalizationModelRecord["modelMetrics"]) || {
       baselineMae: 0,

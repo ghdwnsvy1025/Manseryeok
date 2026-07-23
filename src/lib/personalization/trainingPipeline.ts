@@ -35,7 +35,7 @@ export async function loadScoresForCategory(
 ): Promise<ScoreSample[]> {
   const { data: scoreRows, error } = await sb
     .from("category_scores")
-    .select("raw_score,is_not_applicable,entry_id")
+    .select("raw_score,user_score,ai_score,final_score,is_not_applicable,entry_id")
     .eq("user_id", userId)
     .eq("category_code", categoryKey);
   if (error) throw new Error(error.message);
@@ -56,10 +56,19 @@ export async function loadScoresForCategory(
   for (const row of scoreRows) {
     const localDate = dateById.get(row.entry_id as string);
     if (!localDate) continue;
+    const isNa = Boolean(row.is_not_applicable);
+    const final =
+      row.final_score != null
+        ? Number(row.final_score)
+        : row.user_score != null
+          ? Number(row.user_score)
+          : row.raw_score != null
+            ? Number(row.raw_score)
+            : null;
     samples.push({
       localDate,
-      rawScore: row.raw_score == null ? 0 : Number(row.raw_score),
-      isNotApplicable: Boolean(row.is_not_applicable) || row.raw_score == null,
+      rawScore: final == null ? 0 : final,
+      isNotApplicable: isNa || final == null,
     });
   }
   return samples.sort((a, b) => a.localDate.localeCompare(b.localDate));

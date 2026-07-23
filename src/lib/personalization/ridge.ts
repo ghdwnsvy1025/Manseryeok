@@ -237,4 +237,4 @@ export function spearmanRho(a: number[], b: number[]): number | null {
 }
 
 export const DEFAULT_LAMBDA = 10;
-export const LAMBDA_CANDIDATES = [1, 3, 10, 30] as const;
+export const LAMBDA_CANDIDATES = [0.01, 0.1, 1, 10, 100] as const;

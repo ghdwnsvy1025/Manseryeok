@@ -10,7 +10,8 @@ import {
 
 export type ViewMode = "desktop" | "mobile";
 
-const COMPACT_BREAKPOINT = 640;
+/** 실제 폰으로 볼 때만 프레임 없이 전체 폭. 그 이상은 390 폰 프레임 */
+const PHONE_FULLWIDTH_BREAKPOINT = 430;
 /** 앱 UI 기준 폭 — 모바일 해상도 고정 */
 export const APP_MOBILE_WIDTH = 390;
 
@@ -21,20 +22,24 @@ type ViewModeContextValue = {
   isMobile: boolean;
   /** 실제 좁은 화면(폰) — 프레임 없이 전체 너비 */
   isCompactViewport: boolean;
-  /** 데스크톱에서 390 폭 폰 프레임으로 고정 미리보기 */
+  /** 데스크톱/태블릿에서 390 폭 폰 프레임으로 고정 미리보기 */
   showPhoneFrame: boolean;
 };
 
 const ViewModeContext = createContext<ViewModeContextValue | null>(null);
 
 function subscribeCompact(cb: () => void) {
-  const mq = window.matchMedia(`(max-width: ${COMPACT_BREAKPOINT}px)`);
+  const mq = window.matchMedia(
+    `(max-width: ${PHONE_FULLWIDTH_BREAKPOINT}px)`
+  );
   mq.addEventListener("change", cb);
   return () => mq.removeEventListener("change", cb);
 }
 
 function getCompactSnapshot() {
-  return window.matchMedia(`(max-width: ${COMPACT_BREAKPOINT}px)`).matches;
+  return window.matchMedia(
+    `(max-width: ${PHONE_FULLWIDTH_BREAKPOINT}px)`
+  ).matches;
 }
 
 /** SSR·첫 페인트는 데스크톱 가정 → 폰 프레임과 맞춤 (넓은 화면 깜빡임 방지) */

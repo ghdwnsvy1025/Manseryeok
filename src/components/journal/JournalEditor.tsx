@@ -1,26 +1,39 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { getJournalStorage } from "@/lib/journal/getStorage";
 import { getCategoryByCode } from "@/lib/journal/categoryCatalog";
-import { EVENT_TAG_CATALOG, getTagName } from "@/lib/journal/eventTagCatalog";
+import { EVENT_TAG_CATALOG } from "@/lib/journal/eventTagCatalog";
 import {
   getEnabledCodesOrdered,
   loadCategoryPreferencesLocal,
 } from "@/lib/journal/preferences";
 import {
   MOOD_OPTIONS,
-  SCORE_LABELS,
   type CategoryCode,
   type JournalEntry,
+  type JournalScore,
 } from "@/lib/journal/types";
+import type { OpenAiCallStatus } from "@/lib/journal/openaiStatus";
 import { todayDateString } from "@/lib/diary/dayPillar";
+import {
+  loadLocalSajuProfile,
+  loadPrimarySajuProfile,
+} from "@/lib/diary/profileStorage";
+import type { SajuProfile } from "@/lib/diary/types";
 import { scheduleAstrologySnapshotAfterJournalSave } from "@/lib/astrology/scheduleAfterJournal";
 import { schedulePersonalizationTrainAfterJournalSave } from "@/lib/personalization/scheduleAfterJournal";
+import type { JournalSaveResult } from "@/lib/journal/storage";
+import TodayQuestionCard from "@/components/journal/TodayQuestionCard";
+import JournalSaveCompleteModal from "@/components/journal/JournalSaveCompleteModal";
+import ScoreSlider from "@/components/journal/ScoreSlider";
+
+const WEEKDAY_KO = ["일", "월", "화", "수", "목", "금", "토"] as const;
+const HAPPINESS_PINK = "#f472b6";
 
 type ScoreUi = {
-  rawScore: 1 | 2 | 3 | 4 | 5 | null;
+  rawScore: JournalScore | null;
   isNotApplicable: boolean;
 };
 
@@ -28,12 +41,26 @@ type Props = {
   initialDate?: string;
 };
 
+function parseDateParts(iso: string) {
+  const [y, m, d] = iso.split("-");
+  const weekday =
+    WEEKDAY_KO[new Date(`${iso}T12:00:00+09:00`).getDay()] ?? "";
+  return {
+    year: y ?? "----",
+    month: m ?? "--",
+    day: d ?? "--",
+    weekday,
+  };
+}
+
 export default function JournalEditor({ initialDate }: Props) {
   const [date, setDate] = useState(initialDate ?? todayDateString());
+  const dateInputRef = useRef<HTMLInputElement>(null);
+  const dateParts = useMemo(() => parseDateParts(date), [date]);
   const [enabledCodes, setEnabledCodes] = useState<CategoryCode[]>([]);
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
   const [content, setContent] = useState("");
-  const [overall, setOverall] = useState<1 | 2 | 3 | 4 | 5 | null>(null);
+  const [overall, setOverall] = useState<JournalScore | null>(null);
   const [mood, setMood] = useState<string | null>(null);
   const [mainEvent, setMainEvent] = useState("");
   const [scores, setScores] = useState<Record<string, ScoreUi>>({});
@@ -41,7 +68,17 @@ export default function JournalEditor({ initialDate }: Props) {
   const [existingId, setExistingId] = useState<string | undefined>();
   const [status, setStatus] = useState<"idle" | "loading" | "saving">("loading");
   const [message, setMessage] = useState("");
-  const [savedSummary, setSavedSummary] = useState<JournalEntry | null>(null);
+  const [allEntries, setAllEntries] = useState<JournalEntry[]>([]);
+  const [sajuProfile, setSajuProfile] = useState<SajuProfile | null>(null);
+  const [showComplete, setShowComplete] = useState(false);
+  const [savedEntry, setSavedEntry] = useState<JournalEntry | null>(null);
+  const [saveMeta, setSaveMeta] = useState<JournalSaveResult["xp"] | null>(null);
+  const [openAiStatus, setOpenAiStatus] = useState<OpenAiCallStatus | null>(null);
+  const [aiSummary, setAiSummary] = useState<string | null>(null);
+  const [quote, setQuote] = useState<string | null>(null);
+  const [quoteOpenAi, setQuoteOpenAi] = useState<OpenAiCallStatus | null>(null);
+  const [quoteLoading, setQuoteLoading] = useState(false);
+  const [savedUniqueDays, setSavedUniqueDays] = useState(0);
 
   const completedScoreCount = useMemo(() => {
     return enabledCodes.filter((code) => {
@@ -50,20 +87,46 @@ export default function JournalEditor({ initialDate }: Props) {
     }).length;
   }, [enabledCodes, scores]);
 
+  const uniqueDays = useMemo(
+    () => new Set(allEntries.map((e) => e.entryDate)).size,
+    [allEntries]
+  );
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
       setStatus("loading");
-      setSavedSummary(null);
+      setShowComplete(false);
+      setSavedEntry(null);
+      setSaveMeta(null);
+      setOpenAiStatus(null);
+      setAiSummary(null);
+      setQuote(null);
+      setQuoteOpenAi(null);
       setMessage("");
       try {
         const storage = await getJournalStorage();
         const prefs = await storage.getPreferences();
         const enabled = getEnabledCodesOrdered(prefs);
+        const list = await storage.list();
         if (cancelled) return;
+        setAllEntries(list);
+
+        setSajuProfile(loadLocalSajuProfile());
+        try {
+          const remote = await loadPrimarySajuProfile();
+          if (!cancelled && remote) setSajuProfile(remote);
+        } catch {
+          /* keep local */
+        }
+
         if (enabled.length < 4) {
           setNeedsOnboarding(true);
-          setEnabledCodes(loadCategoryPreferencesLocal().filter((p) => p.enabled).map((p) => p.categoryCode));
+          setEnabledCodes(
+            loadCategoryPreferencesLocal()
+              .filter((p) => p.enabled)
+              .map((p) => p.categoryCode)
+          );
         } else {
           setNeedsOnboarding(false);
           setEnabledCodes(enabled);
@@ -81,7 +144,7 @@ export default function JournalEditor({ initialDate }: Props) {
           const map: Record<string, ScoreUi> = {};
           for (const s of existing.scores) {
             map[s.categoryCode] = {
-              rawScore: s.rawScore,
+              rawScore: s.userScore ?? s.rawScore,
               isNotApplicable: s.isNotApplicable,
             };
           }
@@ -118,24 +181,119 @@ export default function JournalEditor({ initialDate }: Props) {
     );
   };
 
+  const fetchQuote = async (
+    entry: JournalEntry,
+    summary: string | null,
+    entries: JournalEntry[]
+  ) => {
+    setQuoteLoading(true);
+    setQuote(null);
+    setQuoteOpenAi(null);
+    try {
+      const res = await fetch("/api/journal/today-quote", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          entry,
+          allEntries: entries,
+          enabledCodes,
+          sajuProfile,
+          aiSummary: summary,
+        }),
+      });
+      const data = (await res.json()) as {
+        quote?: string;
+        openAi?: OpenAiCallStatus;
+      };
+      setQuote(data.quote ?? null);
+      setQuoteOpenAi(data.openAi ?? null);
+    } catch (err) {
+      setQuoteOpenAi({
+        kind: "failed",
+        reason: "network",
+        detail: err instanceof Error ? err.message : String(err),
+      });
+    } finally {
+      setQuoteLoading(false);
+    }
+  };
+
   const handleSave = async () => {
     setStatus("saving");
     setMessage("");
+    setOpenAiStatus(null);
+    setAiSummary(null);
     try {
+      let aiByCode: Record<string, number | null> = {};
+      let extractStatus: OpenAiCallStatus = {
+        kind: "skipped",
+        detail: "본문 없음",
+      };
+      let summary: string | null = null;
+
+      if (content.trim()) {
+        try {
+          const res = await fetch("/api/journal/extract-scores", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              content,
+              enabledCodes,
+              moodLabel: mood,
+              mainEventText: mainEvent.trim() || null,
+            }),
+          });
+          const data = (await res.json()) as {
+            scores?: Record<string, { score?: number | null }>;
+            summary?: string | null;
+            openAi?: OpenAiCallStatus;
+            error?: string;
+          };
+          if (!res.ok) {
+            extractStatus = {
+              kind: "failed",
+              reason: "request_failed",
+              detail: data.error ?? `HTTP ${res.status}`,
+            };
+          } else {
+            extractStatus = data.openAi ?? { kind: "used" };
+            summary = data.summary ?? null;
+            for (const code of enabledCodes) {
+              const sc = data.scores?.[code]?.score;
+              aiByCode[code] =
+                typeof sc === "number" && sc >= 1 && sc <= 10
+                  ? Math.round(sc)
+                  : null;
+            }
+          }
+        } catch (err) {
+          extractStatus = {
+            kind: "failed",
+            reason: "network",
+            detail: err instanceof Error ? err.message : String(err),
+          };
+        }
+      }
+
+      setOpenAiStatus(extractStatus);
+      setAiSummary(summary);
+
       const storage = await getJournalStorage();
       const scorePayload = enabledCodes.map((categoryCode) => {
         const s = scores[categoryCode];
-        if (!s) {
-          return { categoryCode, rawScore: null, isNotApplicable: false };
-        }
+        const userScore = s?.isNotApplicable ? null : s?.rawScore ?? null;
+        const isNotApplicable = Boolean(s?.isNotApplicable);
+        const aiScore = isNotApplicable ? null : aiByCode[categoryCode] ?? null;
         return {
           categoryCode,
-          rawScore: s.isNotApplicable ? null : s.rawScore,
-          isNotApplicable: s.isNotApplicable,
+          userScore,
+          rawScore: userScore,
+          aiScore,
+          isNotApplicable,
         };
       });
 
-      const saved = await storage.save({
+      const saveInput = {
         entryDate: date,
         content,
         overallSatisfaction: overall,
@@ -143,18 +301,48 @@ export default function JournalEditor({ initialDate }: Props) {
         mainEventText: mainEvent.trim() || null,
         scores: scorePayload,
         tagCodes: tags,
+        enabledCodes,
         existingId,
-      });
-      setExistingId(saved.id);
-      setSavedSummary(saved);
-      setMessage("저장됐어요.");
-      // 사주 스냅샷·개인화 학습은 일기 저장과 분리 — 실패해도 일기 유지
+      };
+
+      const result =
+        storage.saveWithMeta != null
+          ? await storage.saveWithMeta(saveInput)
+          : {
+              entry: await storage.save(saveInput),
+              xp: {
+                gainedXp: 0,
+                dayXp: 0,
+                wasFirstSaveOfDay: false,
+                totalXp: 0,
+                level: 0,
+                leveledUp: false,
+                previousLevel: 0,
+              },
+            };
+
+      setExistingId(result.entry.id);
+      setSavedEntry(result.entry);
+      setSaveMeta(result.xp);
+      setShowComplete(true);
+      setMessage(
+        result.xp.wasFirstSaveOfDay
+          ? "저장됐어요."
+          : "오늘의 기록이 최신 내용으로 반영되었어요."
+      );
+
+      const list = await storage.list();
+      setAllEntries(list);
+      setSavedUniqueDays(new Set(list.map((e) => e.entryDate)).size);
+
+      void fetchQuote(result.entry, summary, list);
+
       scheduleAstrologySnapshotAfterJournalSave({
-        localDate: saved.entryDate,
+        localDate: result.entry.entryDate,
       });
       schedulePersonalizationTrainAfterJournalSave({
-        localDate: saved.entryDate,
-        categoryKeys: Object.keys(scorePayload),
+        localDate: result.entry.entryDate,
+        categoryKeys: enabledCodes,
       });
     } catch (e) {
       setMessage(e instanceof Error ? e.message : "저장에 실패했어요.");
@@ -165,12 +353,18 @@ export default function JournalEditor({ initialDate }: Props) {
 
   if (needsOnboarding) {
     return (
-      <div className="p-4 border-2 space-y-3" style={{ borderColor: "var(--px-accent)", background: "var(--px-bg2)" }}>
+      <div
+        className="p-4 border-2 space-y-3"
+        style={{ borderColor: "var(--px-accent)", background: "var(--px-bg2)" }}
+      >
         <p className="text-sm font-black" style={{ color: "var(--px-accent)" }}>
           기록할 카테고리를 먼저 선택해주세요
         </p>
         <p className="ui-hint">최소 4개 · 권장 6개 · 최대 9개</p>
-        <Link href="/journal/categories" className="ui-primary-btn inline-block px-4 py-3 text-sm">
+        <Link
+          href="/journal/categories"
+          className="ui-primary-btn inline-block px-4 py-3 text-sm"
+        >
           카테고리 선택하기
         </Link>
       </div>
@@ -179,58 +373,126 @@ export default function JournalEditor({ initialDate }: Props) {
 
   return (
     <div className="space-y-4 pb-8">
-      <header className="space-y-1">
+      <header className="space-y-2">
         <p className="ui-section-title">■ 새 일기</p>
-        <label className="block text-xs font-bold" style={{ color: "var(--px-text2)" }}>
-          기록 날짜
+        <div
+          className="flex items-stretch gap-1.5"
+          aria-label={`기록 날짜 ${date}`}
+        >
+          <button
+            type="button"
+            onClick={() => {
+              const el = dateInputRef.current;
+              if (!el) return;
+              try {
+                el.showPicker?.();
+              } catch {
+                el.click();
+              }
+            }}
+            className="shrink-0 px-2.5 border-2 flex items-center justify-center text-sm font-black"
+            style={{
+              borderColor: "var(--px-border2)",
+              background: "var(--px-bg3)",
+              color: "var(--px-accent)",
+              boxShadow: "2px 2px 0 #000",
+            }}
+            aria-label="날짜 바꾸기"
+            title="날짜 바꾸기"
+          >
+            날짜
+          </button>
           <input
+            ref={dateInputRef}
             type="date"
             value={date}
             onChange={(e) => setDate(e.target.value)}
-            className="mt-1 block w-full px-3 py-2 border-2 text-sm"
-            style={{ background: "var(--px-bg3)", borderColor: "var(--px-border)", color: "var(--px-text)" }}
+            className="sr-only"
+            tabIndex={-1}
           />
-        </label>
-        <Link href="/journal/categories" className="text-xs font-bold underline" style={{ color: "#60a5fa" }}>
-          카테고리 설정
-        </Link>
-      </header>
-
-      <section className="space-y-2">
-        <p className="ui-section-title">하루 만족도</p>
-        <div className="flex flex-wrap gap-1">
-          {([1, 2, 3, 4, 5] as const).map((n) => (
-            <button
-              key={n}
-              type="button"
-              aria-pressed={overall === n}
-              onClick={() => setOverall(n)}
-              className="px-3 py-2 text-xs font-bold border-2"
+          {(
+            [
+              { key: "year", value: dateParts.year, hint: "년" },
+              { key: "month", value: dateParts.month, hint: "월" },
+              { key: "day", value: dateParts.day, hint: "일" },
+              { key: "weekday", value: dateParts.weekday, hint: "요일" },
+            ] as const
+          ).map((part) => (
+            <div
+              key={part.key}
+              className="flex-1 min-w-0 border-2 flex flex-col items-center justify-center py-2"
               style={{
-                borderColor: overall === n ? "var(--px-accent)" : "var(--px-border)",
-                color: overall === n ? "var(--px-accent)" : "var(--px-text2)",
-                background: "var(--px-bg3)",
+                borderColor: "var(--px-border)",
+                background: "var(--px-bg2)",
               }}
             >
-              {n}
-            </button>
+              <span
+                className="text-[9px] font-bold leading-none"
+                style={{ color: "var(--px-text2)" }}
+              >
+                {part.hint}
+              </span>
+              <span
+                className="text-lg font-black tabular-nums leading-none mt-1"
+                style={{ color: "var(--px-text-on-panel)" }}
+              >
+                {part.value}
+              </span>
+            </div>
           ))}
         </div>
+      </header>
+
+      {enabledCodes.length >= 4 && (
+        <TodayQuestionCard
+          todayDate={date}
+          enabledCodes={enabledCodes}
+          entries={allEntries}
+          sajuProfile={sajuProfile}
+        />
+      )}
+
+      <section
+        className="space-y-3 p-3 border-2"
+        style={{
+          borderColor: HAPPINESS_PINK,
+          background: `color-mix(in srgb, ${HAPPINESS_PINK} 10%, var(--px-bg2))`,
+          boxShadow: `3px 3px 0 color-mix(in srgb, ${HAPPINESS_PINK} 45%, #000)`,
+        }}
+      >
+        <p
+          className="text-base font-black tracking-wide"
+          style={{ color: HAPPINESS_PINK }}
+        >
+          ■ 행복도
+        </p>
+        <ScoreSlider
+          label="행복도"
+          value={overall}
+          onChange={setOverall}
+          tone="happiness"
+          size="lg"
+        />
       </section>
 
       <section className="space-y-2">
         <p className="ui-section-title">기분</p>
-        <div className="flex flex-wrap gap-1">
+        <div className="grid grid-cols-4 gap-2">
           {MOOD_OPTIONS.map((m) => (
             <button
               key={m}
               type="button"
               aria-pressed={mood === m}
               onClick={() => setMood(mood === m ? null : m)}
-              className="px-2 py-1.5 text-[11px] font-bold border"
+              className="min-h-[3.25rem] px-2 py-2.5 text-sm font-black border-2 leading-tight"
               style={{
                 borderColor: mood === m ? "var(--px-accent)" : "var(--px-border)",
-                color: mood === m ? "var(--px-accent)" : "var(--px-text2)",
+                color: mood === m ? "var(--px-accent)" : "var(--px-text)",
+                background:
+                  mood === m
+                    ? "color-mix(in srgb, var(--px-accent) 14%, var(--px-bg3))"
+                    : "var(--px-bg3)",
+                boxShadow: mood === m ? "2px 2px 0 #000" : "none",
               }}
             >
               {m}
@@ -240,11 +502,20 @@ export default function JournalEditor({ initialDate }: Props) {
       </section>
 
       <section className="space-y-3">
-        <div className="flex justify-between items-baseline">
+        <div className="flex justify-between items-baseline gap-2">
           <p className="ui-section-title">카테고리 점수</p>
-          <p className="ui-hint">
-            입력 {completedScoreCount}/{enabledCodes.length}
-          </p>
+          <div className="flex items-baseline gap-2 shrink-0">
+            <p className="ui-hint">
+              입력 {completedScoreCount}/{enabledCodes.length}
+            </p>
+            <Link
+              href="/journal/categories"
+              className="text-xs font-bold underline"
+              style={{ color: "#60a5fa" }}
+            >
+              카테고리 설정
+            </Link>
+          </div>
         </div>
         {enabledCodes.map((code) => {
           const cat = getCategoryByCode(code);
@@ -259,46 +530,32 @@ export default function JournalEditor({ initialDate }: Props) {
                 {cat?.name ?? code}
               </p>
               <p className="ui-hint">{cat?.question}</p>
-              <div className="flex flex-wrap gap-1">
-                {([1, 2, 3, 4, 5] as const).map((n) => (
-                  <button
-                    key={n}
-                    type="button"
-                    aria-label={`${cat?.name} ${SCORE_LABELS[n]}`}
-                    aria-pressed={!s.isNotApplicable && s.rawScore === n}
-                    onClick={() =>
-                      setScore(code, { rawScore: n, isNotApplicable: false })
-                    }
-                    className="px-2 py-1.5 text-[11px] font-bold border"
-                    style={{
-                      borderColor:
-                        !s.isNotApplicable && s.rawScore === n
-                          ? "var(--px-accent)"
-                          : "var(--px-border)",
-                      color:
-                        !s.isNotApplicable && s.rawScore === n
-                          ? "var(--px-accent)"
-                          : "var(--px-text2)",
-                    }}
-                  >
-                    {n}
-                  </button>
-                ))}
-                <button
-                  type="button"
-                  aria-pressed={s.isNotApplicable}
-                  onClick={() =>
-                    setScore(code, { rawScore: null, isNotApplicable: true })
-                  }
-                  className="px-2 py-1.5 text-[11px] font-bold border"
-                  style={{
-                    borderColor: s.isNotApplicable ? "var(--px-accent)" : "var(--px-border)",
-                    color: s.isNotApplicable ? "var(--px-accent)" : "var(--px-text2)",
-                  }}
-                >
-                  해당 없음
-                </button>
-              </div>
+              <ScoreSlider
+                label={cat?.name ?? code}
+                value={s.isNotApplicable ? null : s.rawScore}
+                disabled={s.isNotApplicable}
+                onChange={(n) =>
+                  setScore(code, { rawScore: n, isNotApplicable: false })
+                }
+              />
+              <button
+                type="button"
+                aria-pressed={s.isNotApplicable}
+                onClick={() =>
+                  setScore(code, { rawScore: null, isNotApplicable: true })
+                }
+                className="px-2 py-1.5 text-[11px] font-bold border"
+                style={{
+                  borderColor: s.isNotApplicable
+                    ? "var(--px-accent)"
+                    : "var(--px-border)",
+                  color: s.isNotApplicable
+                    ? "var(--px-accent)"
+                    : "var(--px-text2)",
+                }}
+              >
+                해당 없음
+              </button>
             </div>
           );
         })}
@@ -335,7 +592,7 @@ export default function JournalEditor({ initialDate }: Props) {
           value={content}
           onChange={(e) => setContent(e.target.value)}
           rows={5}
-          placeholder="오늘의 이야기를 남겨보세요."
+          placeholder="오늘의 이야기를 남겨보세요. (저장 시 AI가 점수를 보조 추출합니다)"
           className="w-full px-3 py-2 border-2 text-sm resize-none"
           style={{
             background: "var(--px-bg3)",
@@ -366,30 +623,27 @@ export default function JournalEditor({ initialDate }: Props) {
         disabled={status !== "idle"}
         onClick={() => void handleSave()}
       >
-        {status === "saving" ? "저장 중…" : existingId ? "수정 저장" : "저장"}
+        {status === "saving"
+          ? "AI 분석·저장 중…"
+          : existingId
+            ? "수정 저장"
+            : "저장"}
       </button>
 
       {message && <p className="ui-hint">{message}</p>}
 
-      {savedSummary && (
-        <div
-          className="p-3 border-2 space-y-1"
-          style={{ borderColor: "var(--px-accent)", background: "var(--px-bg2)" }}
-          role="status"
-        >
-          <p className="text-sm font-black" style={{ color: "var(--px-accent)" }}>
-            기록 요약
-          </p>
-          <p className="ui-hint">
-            {savedSummary.entryDate} · 만족도 {savedSummary.overallSatisfaction ?? "-"} · 기분{" "}
-            {savedSummary.moodLabel ?? "-"}
-          </p>
-          <p className="ui-hint">
-            점수 {savedSummary.scores.filter((s) => s.rawScore != null).length}개 · 해당 없음{" "}
-            {savedSummary.scores.filter((s) => s.isNotApplicable).length}개 · 태그{" "}
-            {savedSummary.tags.map((t) => getTagName(t.tagCode)).join(", ") || "없음"}
-          </p>
-        </div>
+      {showComplete && savedEntry && saveMeta && (
+        <JournalSaveCompleteModal
+          entry={savedEntry}
+          xp={saveMeta}
+          uniqueDays={savedUniqueDays || uniqueDays}
+          openAiExtract={openAiStatus}
+          aiSummary={aiSummary}
+          quote={quote}
+          quoteOpenAi={quoteOpenAi}
+          quoteLoading={quoteLoading}
+          onClose={() => setShowComplete(false)}
+        />
       )}
     </div>
   );

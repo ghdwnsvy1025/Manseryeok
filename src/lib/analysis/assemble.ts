@@ -24,7 +24,7 @@ function filterValidScores(scores: AssembleScorePoint[]): AssembleScorePoint[] {
       s.rawScore != null &&
       Number.isFinite(s.rawScore) &&
       s.rawScore >= 1 &&
-      s.rawScore <= 5
+      s.rawScore <= 10
   );
 }
 

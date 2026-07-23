@@ -1,5 +1,6 @@
-const CACHE_NAME = "saju-diary-shell-v1";
-const APP_SHELL = ["/", "/diary", "/manifest.webmanifest", "/icons/app-icon.svg"];
+/* PWA shell — v2: /_next/static JS는 절대 캐시하지 않음 (구 번들 hydration 사고 방지) */
+const CACHE_NAME = "saju-diary-shell-v2";
+const APP_SHELL = ["/manifest.webmanifest", "/icons/app-icon.svg"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -34,20 +35,17 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  if (request.mode === "navigate") {
-    event.respondWith(
-      fetch(request).catch(async () => {
-        const cached = await caches.match(request);
-        return cached || caches.match("/");
-      })
-    );
+  // Next 번들·페이지 HTML은 네트워크만 (캐시 금지)
+  if (
+    url.pathname.startsWith("/_next/") ||
+    request.mode === "navigate" ||
+    url.pathname.endsWith(".js") ||
+    url.pathname.endsWith(".css")
+  ) {
     return;
   }
 
-  if (
-    url.pathname.startsWith("/_next/static/") ||
-    url.pathname.startsWith("/icons/")
-  ) {
+  if (url.pathname.startsWith("/icons/")) {
     event.respondWith(
       caches.match(request).then(
         (cached) =>

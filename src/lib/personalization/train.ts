@@ -355,7 +355,10 @@ export function trainCategoryModel(input: TrainInput): TrainResult {
     if (!betterThanBaseline && baseline.validCount < 30) {
       modelStatus = "insufficient_signal";
     }
-    const predictionVisible = betterThanBaseline && modelStatus === "active";
+    const predictionVisible =
+      betterThanBaseline &&
+      modelStatus === "active" &&
+      !baseline.lowVariance;
 
     const lastDate = realigned.usedDates.at(-1)!;
     const daysSince = daysBetween(lastDate, asOf);

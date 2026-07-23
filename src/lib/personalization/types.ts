@@ -6,7 +6,7 @@ import { FEATURE_CATALOG_VERSION } from "@/lib/astrology/featureAllowlist";
 
 export const PERSONALIZATION_PHASE_LABEL = "Phase 4 — 개인화 Ridge MVP" as const;
 
-export const MODEL_CODE_VERSION = "ridge-mvp-1.0.0";
+export const MODEL_CODE_VERSION = "ridge-mvp-1.1.0";
 /** allowlist version = feature catalog version (단일 출처) */
 export const ALLOWLIST_VERSION = FEATURE_CATALOG_VERSION;
 export const MODEL_TYPE = "ridge" as const;

@@ -77,11 +77,18 @@ describe("category preference rules", () => {
 });
 
 describe("category scores", () => {
-  test("1~5만 허용", () => {
+  test("1~10만 허용", () => {
     expect(
       validateScorePayload({
         categoryCode: "energy",
         rawScore: 3,
+        isNotApplicable: false,
+      }).ok
+    ).toBe(true);
+    expect(
+      validateScorePayload({
+        categoryCode: "energy",
+        rawScore: 10,
         isNotApplicable: false,
       }).ok
     ).toBe(true);
@@ -95,7 +102,7 @@ describe("category scores", () => {
     expect(
       validateScorePayload({
         categoryCode: "energy",
-        rawScore: 6 as unknown as number,
+        rawScore: 11 as unknown as number,
         isNotApplicable: false,
       }).ok
     ).toBe(false);
@@ -124,6 +131,9 @@ describe("category scores", () => {
         entryId: "e",
         userId: "u",
         categoryCode: "energy",
+        userScore: 4,
+        aiScore: null,
+        finalScore: 4,
         rawScore: 4,
         isNotApplicable: false,
         normalizedZ: null,
@@ -136,6 +146,9 @@ describe("category scores", () => {
         entryId: "e",
         userId: "u",
         categoryCode: "work_study",
+        userScore: null,
+        aiScore: null,
+        finalScore: null,
         rawScore: null,
         isNotApplicable: true,
         normalizedZ: null,

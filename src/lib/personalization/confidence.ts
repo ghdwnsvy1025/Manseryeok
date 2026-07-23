@@ -27,7 +27,7 @@ export function computeConfidenceComponents(opts: {
   const coverage = Math.max(0, Math.min(1, opts.coverage30d));
   const variation = opts.lowVariance
     ? 0.15
-    : Math.min(1, Math.max(0, (opts.std - 0.5) / 1.5));
+    : Math.min(1, Math.max(0, (opts.std - 0.5) / 3));
   const recency = Math.max(0, 1 - opts.daysSinceLastSample / 60);
 
   let validationImprovement = 0;

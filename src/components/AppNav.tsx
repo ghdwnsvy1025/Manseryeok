@@ -12,6 +12,10 @@ type NavItem = {
   isActive: (path: string) => boolean;
 };
 
+/**
+ * 하단 탭: 홈(G) · 일기(H) · 통계(I)
+ * 분석은 상단 메뉴 백업으로 이동
+ */
 export default function AppNav() {
   const pathname = usePathname();
   const diaryHref = isNewDiaryEnabled() ? "/journal" : "/diary";
@@ -37,11 +41,16 @@ export default function AppNav() {
       isActive: (path) => path === "/",
     },
     {
-      href: "/analysis",
-      label: "분석",
-      icon: "析",
+      href: "/stats",
+      label: "통계",
+      icon: "統",
       main: false,
-      isActive: (path) => path.startsWith("/analysis"),
+      isActive: (path) =>
+        path === "/stats" ||
+        path.startsWith("/stats/") ||
+        path.startsWith("/journal/stats") ||
+        path.startsWith("/diary/collection") ||
+        path.startsWith("/diary/stats"),
     },
   ];
 

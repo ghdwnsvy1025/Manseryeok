@@ -14,11 +14,12 @@ describe("personalizationLevel", () => {
     expect(xpCostToNext(5)).toBeLessThan(xpCostToNext(9));
   });
 
-  test("Lv10 누적 XP는 장기 목표 수준", () => {
+  test("Lv10 누적 XP는 약 1년 목표 수준 (하루 ~18XP)", () => {
     const max = cumulativeXpForLevel(PERSONALIZATION_MAX_LEVEL);
     expect(PERSONALIZATION_MAX_LEVEL).toBe(10);
-    expect(max).toBeGreaterThan(15000);
-    expect(max).toBeLessThan(40000);
+    expect(xpCostToNext(0)).toBe(180); // ≈10일
+    expect(max).toBeGreaterThan(5000);
+    expect(max).toBeLessThan(20000);
   });
 
   test("구체 기록이 빈 기록보다 XP가 높다", () => {

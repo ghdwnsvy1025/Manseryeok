@@ -8,7 +8,7 @@ export const HALF_LIFE_DAYS = 30;
 export const MAX_LOOKBACK = 60;
 export const STD_FLOOR = 0.5;
 export const Z_CLAMP = 2.5;
-export const FALLBACK_CENTER = 3;
+export const FALLBACK_CENTER = 5.5;
 export const MIN_SAMPLES_FULL_NORM = 14;
 
 function daysBetween(a: string, b: string): number {
@@ -28,7 +28,7 @@ export function filterValidScores(scores: ScoreSample[]): ScoreSample[] {
       s.rawScore != null &&
       Number.isFinite(s.rawScore) &&
       s.rawScore >= 1 &&
-      s.rawScore <= 5
+      s.rawScore <= 10
   );
 }
 
@@ -49,7 +49,10 @@ export function detectLowVariance(scores: ScoreSample[]): boolean {
   const recent = [...scores]
     .sort((a, b) => b.localDate.localeCompare(a.localDate))
     .slice(0, 14);
-  const distinct = new Set(recent.map((s) => s.rawScore));
+  // final A 소수점 대응: 0.5 단위 반올림 후 고유값 수 판단
+  const distinct = new Set(
+    recent.map((s) => Math.round(s.rawScore * 2) / 2)
+  );
   return distinct.size <= 2;
 }
 
@@ -125,7 +128,7 @@ export function normalizeScores(
       return {
         localDate: s.localDate,
         rawScore: s.rawScore,
-        normalizedZ: clampZ(s.rawScore - FALLBACK_CENTER),
+        normalizedZ: clampZ((s.rawScore - FALLBACK_CENTER) / STD_FLOOR),
         usedFallbackCenter: true,
       };
     }
@@ -143,7 +146,7 @@ export function normalizeScores(
 /** baseline 예측 = 가중평균을 z 공간으로 (학습 타깃이 z일 때 0에 가깝게) */
 export function baselinePredictionZ(baseline: BaselineStats): number {
   if (baseline.validCount < MIN_SAMPLES_FULL_NORM) {
-    return clampZ(baseline.weightedMean - FALLBACK_CENTER);
+    return clampZ((baseline.weightedMean - FALLBACK_CENTER) / STD_FLOOR);
   }
   return 0; // 가중평균으로 정규화했으므로 기준선 z ≈ 0
 }

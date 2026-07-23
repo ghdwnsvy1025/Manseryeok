@@ -5,7 +5,6 @@ import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import ModeSwitcher from "@/components/product/ModeSwitcher";
 import {
-  isNewDiaryEnabled,
   isPersonalizationEnabled,
 } from "@/lib/app/featureFlags";
 import {
@@ -204,16 +203,16 @@ export default function ProfileHeader() {
                   className="pt-1 text-[10px] font-black tracking-wide"
                   style={{ color: "var(--px-accent)" }}
                 >
-                  메뉴
+                  바로가기
                 </p>
                 <Link
-                  href="/forecast"
+                  href="/journal/categories"
                   onClick={closeMenu}
                   className="block px-3 py-2.5 text-center text-sm font-bold border"
                   style={menuLinkStyle}
                   role="menuitem"
                 >
-                  예보
+                  일기 카테고리
                 </Link>
                 <Link
                   href="/saju"
@@ -225,57 +224,6 @@ export default function ProfileHeader() {
                   내 사주
                 </Link>
                 <Link
-                  href="/diary/stats"
-                  onClick={closeMenu}
-                  className="block px-3 py-2.5 text-center text-sm font-bold border"
-                  style={menuLinkStyle}
-                  role="menuitem"
-                >
-                  패턴 통계
-                </Link>
-                {isNewDiaryEnabled() && (
-                  <>
-                    <Link
-                      href="/journal/categories"
-                      onClick={closeMenu}
-                      className="block px-3 py-2.5 text-center text-sm font-bold border"
-                      style={menuLinkStyle}
-                      role="menuitem"
-                    >
-                      일기 카테고리
-                    </Link>
-                    {isPersonalizationEnabled() && (
-                      <Link
-                        href="/journal/stats"
-                        onClick={closeMenu}
-                        className="block px-3 py-2.5 text-center text-sm font-bold border"
-                        style={menuLinkStyle}
-                        role="menuitem"
-                      >
-                        개인화
-                      </Link>
-                    )}
-                    <Link
-                      href="/diary"
-                      onClick={closeMenu}
-                      className="block px-3 py-2.5 text-center text-sm font-bold border"
-                      style={menuLinkStyle}
-                      role="menuitem"
-                    >
-                      기록(구)
-                    </Link>
-                  </>
-                )}
-                <Link
-                  href="/diary/history"
-                  onClick={closeMenu}
-                  className="block px-3 py-2.5 text-center text-sm font-bold border"
-                  style={menuLinkStyle}
-                  role="menuitem"
-                >
-                  기록 목록
-                </Link>
-                <Link
                   href="/diary/login"
                   onClick={closeMenu}
                   className="block px-3 py-2.5 text-center text-sm font-bold border"
@@ -284,6 +232,78 @@ export default function ProfileHeader() {
                 >
                   계정 및 설정
                 </Link>
+
+                <p
+                  className="pt-2 text-[10px] font-black tracking-wide"
+                  style={{ color: "var(--px-text2)" }}
+                >
+                  기존 · 백업
+                </p>
+                <Link
+                  href="/analysis"
+                  onClick={closeMenu}
+                  className="block px-3 py-2.5 text-center text-sm font-bold border"
+                  style={menuLinkStyle}
+                  role="menuitem"
+                >
+                  분석 (구)
+                </Link>
+                <Link
+                  href="/forecast"
+                  onClick={closeMenu}
+                  className="block px-3 py-2.5 text-center text-sm font-bold border"
+                  style={menuLinkStyle}
+                  role="menuitem"
+                >
+                  예보 (구)
+                </Link>
+                <Link
+                  href="/diary"
+                  onClick={closeMenu}
+                  className="block px-3 py-2.5 text-center text-sm font-bold border"
+                  style={menuLinkStyle}
+                  role="menuitem"
+                >
+                  기록 (구)
+                </Link>
+                <Link
+                  href="/diary/history"
+                  onClick={closeMenu}
+                  className="block px-3 py-2.5 text-center text-sm font-bold border"
+                  style={menuLinkStyle}
+                  role="menuitem"
+                >
+                  기록 목록 (구)
+                </Link>
+                <Link
+                  href="/diary/stats"
+                  onClick={closeMenu}
+                  className="block px-3 py-2.5 text-center text-sm font-bold border"
+                  style={menuLinkStyle}
+                  role="menuitem"
+                >
+                  패턴 통계 (구)
+                </Link>
+                <Link
+                  href="/diary/collection"
+                  onClick={closeMenu}
+                  className="block px-3 py-2.5 text-center text-sm font-bold border"
+                  style={menuLinkStyle}
+                  role="menuitem"
+                >
+                  간지 도감 (구 경로)
+                </Link>
+                {isPersonalizationEnabled() && (
+                  <Link
+                    href="/journal/stats"
+                    onClick={closeMenu}
+                    className="block px-3 py-2.5 text-center text-sm font-bold border"
+                    style={menuLinkStyle}
+                    role="menuitem"
+                  >
+                    개인화 Ridge (구)
+                  </Link>
+                )}
               </div>
             )}
           </div>

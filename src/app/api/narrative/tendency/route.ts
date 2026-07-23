@@ -48,12 +48,11 @@ export async function POST(req: NextRequest) {
 
   const result = await generateTendencyThreeLines(readHints(body));
   if (!result.ok) {
+    // 이론 없음·생성 실패는 UI가 안내 문구로 처리 — 5xx로 보이지 않게 함
     const status =
       result.reason === "no_api_key" || result.reason === "no_service_role"
         ? 503
-        : result.reason === "no_chunks"
-          ? 404
-          : 502;
+        : 200;
     return Response.json(
       {
         ok: false,

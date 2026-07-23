@@ -4,7 +4,9 @@ import { useEffect, useState } from "react";
 import WelcomeAuthGate from "@/components/auth/WelcomeAuthGate";
 import SajuProfileSetup from "@/components/home/SajuProfileSetup";
 import HomeHub from "@/components/home/HomeHub";
+import HomeG from "@/components/home/HomeG";
 import { useUserAppState } from "@/hooks/useUserAppState";
+import { isNewDiaryEnabled } from "@/lib/app/featureFlags";
 import { disableGuestMode } from "@/lib/auth/guestMode";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 
@@ -12,6 +14,7 @@ export default function HomePage() {
   const { state, loading, error, refresh } = useUserAppState();
   const [authReady, setAuthReady] = useState(false);
   const [entryAllowed, setEntryAllowed] = useState(false);
+  const newDiary = isNewDiaryEnabled();
 
   useEffect(() => {
     const supabase = getSupabaseBrowserClient();
@@ -70,6 +73,11 @@ export default function HomePage() {
 
   if (!state || state.kind === "new_user") {
     return <SajuProfileSetup onCompleted={() => void refresh()} />;
+  }
+
+  // G — 새 홈 (journal 플래그 ON)
+  if (newDiary) {
+    return <HomeG />;
   }
 
   return <HomeHub state={state} />;
