@@ -236,6 +236,7 @@ export class IndexedDbJournalStorage implements JournalStorage {
       now,
       inputScores: input.scores,
       previous: base?.scores ?? [],
+      content: input.content,
     });
     const tags: JournalEntryTag[] = input.tagCodes.map((tagCode) => ({
       tagCode,
@@ -387,6 +388,7 @@ export class MemoryJournalStorage implements JournalStorage {
       now,
       inputScores: input.scores,
       previous: existing?.scores ?? [],
+      content: input.content,
     });
 
     const allEntries = await this.list();

@@ -6,6 +6,8 @@ export type JournalScoreSaveRow = {
   userScore?: JournalScore | null;
   rawScore?: JournalScore | null;
   aiScore?: number | null;
+  /** AI 텍스트 추정 신뢰도 0~1 — alpha 융합 가중치 */
+  aiConfidence?: number | null;
   finalScore?: number | null;
   isNotApplicable: boolean;
 };

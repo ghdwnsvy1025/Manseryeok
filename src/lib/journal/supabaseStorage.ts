@@ -20,6 +20,7 @@ import {
   validateTagCodes,
 } from "./validation";
 import { computeFinalScore } from "./finalScore";
+import { fuseTextAndUserScore } from "./textAlphaFusion";
 import { resolveUserScore } from "./buildScores";
 import { applyJournalXpOnSave } from "./xp";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
@@ -354,11 +355,13 @@ class SupabaseJournalStorage implements JournalStorage {
       const finalScore =
         s.finalScore !== undefined
           ? s.finalScore
-          : computeFinalScore({
+          : fuseTextAndUserScore({
               userScore,
               aiScore,
+              aiConfidence: s.aiConfidence ?? null,
+              content: input.content,
               isNotApplicable: s.isNotApplicable,
-            });
+            }).finalScore;
       return {
         id: generateId(),
         entry_id: id,

@@ -480,6 +480,7 @@ export default function CheckInEditor({ initialDate }: Props) {
 
     try {
       let aiByCode: Record<string, number | null> = {};
+      const aiConfidenceByCode: Record<string, number | null> = {};
       let extractStatus: OpenAiCallStatus = {
         kind: "skipped",
         detail: "본문 없음",
@@ -500,7 +501,10 @@ export default function CheckInEditor({ initialDate }: Props) {
             }),
           });
           const data = (await res.json()) as {
-            scores?: Record<string, { score?: number | null }>;
+            scores?: Record<
+              string,
+              { score?: number | null; confidence?: number | null }
+            >;
             summary?: string | null;
             openAi?: OpenAiCallStatus;
             error?: string;
@@ -519,6 +523,11 @@ export default function CheckInEditor({ initialDate }: Props) {
               aiByCode[code] =
                 typeof sc === "number" && sc >= 1 && sc <= 10
                   ? Math.round(sc)
+                  : null;
+              const cf = data.scores?.[code]?.confidence;
+              aiConfidenceByCode[code] =
+                typeof cf === "number" && Number.isFinite(cf)
+                  ? Math.max(0, Math.min(1, cf))
                   : null;
             }
           }
@@ -540,6 +549,9 @@ export default function CheckInEditor({ initialDate }: Props) {
           aiScore: row.isNotApplicable
             ? null
             : aiByCode[row.categoryCode] ?? null,
+          aiConfidence: row.isNotApplicable
+            ? null
+            : aiConfidenceByCode[row.categoryCode] ?? null,
         })
       );
 
