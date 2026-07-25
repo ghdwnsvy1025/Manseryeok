@@ -276,6 +276,7 @@ export class IndexedDbJournalStorage implements JournalStorage {
       xpGranted: xp.xpGranted,
       xpAwarded: xp.xpAwarded,
       schemaVersion: JOURNAL_SCHEMA_VERSION,
+      firstRecordedAt: base?.firstRecordedAt ?? base?.createdAt ?? now,
       createdAt: base?.createdAt ?? now,
       updatedAt: now,
     };
@@ -427,6 +428,7 @@ export class MemoryJournalStorage implements JournalStorage {
       xpGranted: xp.xpGranted,
       xpAwarded: xp.xpAwarded,
       schemaVersion: JOURNAL_SCHEMA_VERSION,
+      firstRecordedAt: existing?.firstRecordedAt ?? existing?.createdAt ?? now,
       createdAt: existing?.createdAt ?? now,
       updatedAt: now,
     };

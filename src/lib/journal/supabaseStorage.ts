@@ -204,6 +204,10 @@ class SupabaseJournalStorage implements JournalStorage {
       xpGranted: Boolean(row.xp_granted),
       xpAwarded: typeof row.xp_awarded === "number" ? row.xp_awarded : 0,
       schemaVersion: Math.max(schemaVersion, JOURNAL_SCHEMA_VERSION),
+      firstRecordedAt:
+        row.first_recorded_at == null
+          ? String(row.created_at)
+          : String(row.first_recorded_at),
       createdAt: String(row.created_at),
       updatedAt: String(row.updated_at),
     };
@@ -296,6 +300,8 @@ class SupabaseJournalStorage implements JournalStorage {
       xp_awarded: xp.xpAwarded,
       updated_at: now,
       created_at: existing?.createdAt ?? now,
+      // 최초 기록 시각은 한 번 정해지면 재저장으로 갱신하지 않는다
+      first_recorded_at: existing?.firstRecordedAt ?? existing?.createdAt ?? now,
       happiness_score:
         input.happinessScore !== undefined
           ? input.happinessScore

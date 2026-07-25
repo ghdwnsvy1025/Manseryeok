@@ -13,6 +13,7 @@
  *    λ_g = τ² / (τ² + σ²_within / n_g) — 표본이 적을수록 0에 가깝게 축소된다.
  */
 import { getPillarsForDate } from "@/lib/diary/dayPillar";
+import { assessRecall } from "@/lib/journal/recallConfidence";
 import type { CategoryCode, JournalEntry } from "@/lib/journal/types";
 
 export const DAY_PILLAR_STATS_VERSION = "day-pillar-hierarchy-v1.0.0";
@@ -58,6 +59,8 @@ export type DayPillarHierarchy = {
   /** 잔차 계산에 쓴 개인 기준선 */
   personalBaseline: number;
   totalObservations: number;
+  /** 회상 지연이 커서 통계에서 제외한 기록 수 */
+  excludedByRecall: number;
   /** 관측이 충분하지 않으면 false — 이때 모든 효과는 0 */
   sufficient: boolean;
   levels: LevelSummary[];
@@ -101,11 +104,14 @@ function pillarKeys(date: string): Record<PillarLevel, string> {
   };
 }
 
-/** 날짜별 최신 1건만 남기고 해당 카테고리 점수를 추출 */
+/**
+ * 날짜별 최신 1건만 남기고 해당 카테고리 점수를 추출.
+ * 회상 지연이 큰(몰아서 채워 넣은) 기록은 기억 왜곡이 섞이므로 제외한다.
+ */
 function collectObservations(
   entries: JournalEntry[],
   categoryCode: CategoryCode
-): Observation[] {
+): { observations: Observation[]; excludedByRecall: number } {
   const byDate = new Map<string, JournalEntry>();
   for (const e of entries) {
     const prev = byDate.get(e.entryDate);
@@ -113,12 +119,24 @@ function collectObservations(
   }
 
   const out: Observation[] = [];
+  let excludedByRecall = 0;
   for (const entry of Array.from(byDate.values())) {
     const s = entry.scores.find((x) => x.categoryCode === categoryCode);
     if (!s || s.isNotApplicable || s.finalScore == null) continue;
+    const recall = assessRecall(
+      entry.entryDate,
+      entry.firstRecordedAt ?? entry.createdAt
+    );
+    if (!recall.usableForStats) {
+      excludedByRecall += 1;
+      continue;
+    }
     out.push({ date: entry.entryDate, value: s.finalScore });
   }
-  return out.sort((a, b) => a.date.localeCompare(b.date));
+  return {
+    observations: out.sort((a, b) => a.date.localeCompare(b.date)),
+    excludedByRecall,
+  };
 }
 
 /** SSW / (N - G) — 그룹 내 풀링 분산. 자유도를 정확히 쓴다. */
@@ -200,7 +218,10 @@ export function buildDayPillarHierarchy(
   entries: JournalEntry[],
   categoryCode: CategoryCode
 ): DayPillarHierarchy {
-  const obs = collectObservations(entries, categoryCode);
+  const { observations: obs, excludedByRecall } = collectObservations(
+    entries,
+    categoryCode
+  );
   const personalBaseline = round4(mean(obs.map((o) => o.value)));
 
   const empty: DayPillarHierarchy = {
@@ -208,6 +229,7 @@ export function buildDayPillarHierarchy(
     categoryCode,
     personalBaseline,
     totalObservations: obs.length,
+    excludedByRecall,
     sufficient: false,
     levels: [],
     effects: [],
@@ -271,6 +293,7 @@ export function buildDayPillarHierarchy(
     categoryCode,
     personalBaseline,
     totalObservations: obs.length,
+    excludedByRecall,
     sufficient: true,
     levels,
     effects,

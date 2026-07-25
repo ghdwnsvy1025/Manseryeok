@@ -117,6 +117,11 @@ export type JournalEntry = {
   /** 최초 저장 시 지급된 XP (수정 시 유지) */
   xpAwarded: number;
   schemaVersion: number;
+  /**
+   * 이 날짜를 최초로 기록한 시각 — 회상 지연 계산용이라 재저장해도 갱신하지 않는다.
+   * 레거시 데이터는 없을 수 있어 optional. 없으면 createdAt으로 대체한다.
+   */
+  firstRecordedAt?: string | null;
   createdAt: string;
   updatedAt: string;
 };
