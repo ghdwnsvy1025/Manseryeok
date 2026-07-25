@@ -5,6 +5,11 @@ import { getActiveKeywordMapping } from "@/lib/journal/keywords/mapping";
 import { CANONICAL_KEYWORD_VERSION } from "@/lib/journal/keywords/canonical";
 import { INSIGHT_ENGINE_VERSION } from "@/lib/journal/insight/types";
 import { FORTUNE_SCORE_VERSION } from "@/lib/journal/fortune/score";
+import { SAJU_RULE_VERSION } from "@/lib/saju/rules";
+import {
+  getFeatureFlags,
+  isSajuRelationsScoringEnabled,
+} from "@/lib/app/featureFlags";
 
 export const runtime = "nodejs";
 
@@ -73,6 +78,12 @@ export async function GET(req: NextRequest) {
       fortuneScore: FORTUNE_SCORE_VERSION,
       canonicalKeywords: CANONICAL_KEYWORD_VERSION,
       keywordMapping: getActiveKeywordMapping().mappingVersion,
+      sajuRules: SAJU_RULE_VERSION,
+      sajuRelationsScoring: isSajuRelationsScoringEnabled(),
+    },
+    flags: {
+      sajuRelationsScoringEnabled:
+        getFeatureFlags().sajuRelationsScoringEnabled,
     },
     insight: insight.data ?? [],
     fortunes: fortune.data ?? [],

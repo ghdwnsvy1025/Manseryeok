@@ -199,3 +199,41 @@ export function detectDayRelations(input: {
       : [];
   return [...stem, ...branch];
 }
+
+/**
+ * 원국 내부 합·충·형·파·해·천간합.
+ * 모든 기둥 쌍을 검사하되 동일 쌍 중복은 제거한다.
+ */
+export function detectNatalRelations(input: {
+  stems: string[];
+  branches: string[];
+}): DetectedRelation[] {
+  const out: DetectedRelation[] = [];
+  const seen = new Set<string>();
+
+  const push = (rel: DetectedRelation) => {
+    const key = `${rel.kind}:${[rel.left, rel.right].sort().join("-")}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push(rel);
+  };
+
+  for (let i = 0; i < input.branches.length; i += 1) {
+    for (let j = i + 1; j < input.branches.length; j += 1) {
+      for (const r of detectBranchRelations(
+        input.branches[i]!,
+        input.branches[j]!
+      )) {
+        push(r);
+      }
+    }
+  }
+  for (let i = 0; i < input.stems.length; i += 1) {
+    for (let j = i + 1; j < input.stems.length; j += 1) {
+      for (const r of detectStemRelations(input.stems[i]!, input.stems[j]!)) {
+        push(r);
+      }
+    }
+  }
+  return out;
+}

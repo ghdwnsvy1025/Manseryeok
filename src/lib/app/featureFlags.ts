@@ -53,6 +53,11 @@ export type FeatureFlags = {
   contentFeedbackEnabled: boolean;
   /** 노출 보정 평가(실험) */
   exposureAdjustedEvaluationEnabled: boolean;
+  /**
+   * 합·충·형·파·해를 최종 점수에 반영할지.
+   * 기본 OFF — 특징은 저장하되 점수 반영은 실험 플래그로만.
+   */
+  sajuRelationsScoringEnabled: boolean;
 };
 
 const TRUE = new Set(["1", "true", "yes", "on"]);
@@ -82,6 +87,7 @@ export const DEFAULT_FEATURE_FLAGS: FeatureFlags = {
   originalDailySentenceEnabled: true,
   contentFeedbackEnabled: true,
   exposureAdjustedEvaluationEnabled: false,
+  sajuRelationsScoringEnabled: false,
 };
 
 /** Playwright Phase 6.1 — bake-safe conservative matrix */
@@ -111,6 +117,7 @@ function e2eConservativeOverride(): FeatureFlags | null {
     originalDailySentenceEnabled: true,
     contentFeedbackEnabled: false,
     exposureAdjustedEvaluationEnabled: false,
+    sajuRelationsScoringEnabled: false,
   };
 }
 
@@ -203,6 +210,10 @@ export function getFeatureFlags(): FeatureFlags {
       process.env.NEXT_PUBLIC_FF_EXPOSURE_ADJUSTED_EVAL,
       DEFAULT_FEATURE_FLAGS.exposureAdjustedEvaluationEnabled
     ),
+    sajuRelationsScoringEnabled: asBool(
+      process.env.NEXT_PUBLIC_FF_SAJU_RELATIONS_SCORING,
+      DEFAULT_FEATURE_FLAGS.sajuRelationsScoringEnabled
+    ),
   };
 }
 
@@ -277,4 +288,9 @@ export function isContentFeedbackEnabled(): boolean {
 
 export function isExposureAdjustedEvaluationEnabled(): boolean {
   return getFeatureFlags().exposureAdjustedEvaluationEnabled;
+}
+
+/** 합충을 최종 점수에 반영할지 (기본 false = 특징만 저장) */
+export function isSajuRelationsScoringEnabled(): boolean {
+  return getFeatureFlags().sajuRelationsScoringEnabled;
 }
