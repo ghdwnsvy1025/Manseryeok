@@ -1,20 +1,25 @@
 /**
  * 콘텐츠용 D 값 결정 (§14)
  * 1) 검증된 Ridge 예측
- * 2) D-1 천간·지지·간지 단순 평균 합성
- * 3) 없음 → null (0으로 채우지 않음)
+ * 2) 일주 계층 통계 (잔차 · 부분 풀링 · 축소) — 표본이 충분할 때
+ * 3) D-1 천간·지지·간지 단순 평균 합성
+ * 4) 없음 → null (0으로 채우지 않음)
  */
 import {
   recomputeD1Aggregates,
   resolveD1ForToday,
 } from "./d1Aggregates";
 import {
+  buildDayPillarHierarchy,
+  predictDayPillarEffect,
+} from "./stats/dayPillarHierarchy";
+import {
   computeRecentAByCategory,
   computeRecentAOverall,
 } from "./recentA";
 import type { CategoryCode, JournalEntry } from "./types";
 
-export type ContentDSource = "ridge" | "d1" | "none";
+export type ContentDSource = "ridge" | "pillar_hierarchy" | "d1" | "none";
 
 export type CategoryContentD = {
   categoryCode: CategoryCode;
@@ -53,6 +58,18 @@ export function resolveCategoryD(opts: {
       categoryCode: opts.categoryCode,
       value: Math.round(opts.ridgePrediction * 100) / 100,
       source: "ridge",
+    };
+  }
+
+  // 표본이 충분하면 축소된 계층 추정을 쓴다.
+  // 단순 평균(D-1)은 표본 2~3건인 간지도 60건인 간지와 동등하게 취급해 과대 주장한다.
+  const hierarchy = buildDayPillarHierarchy(opts.entries, opts.categoryCode);
+  if (hierarchy.sufficient) {
+    const p = predictDayPillarEffect(hierarchy, opts.todayDate);
+    return {
+      categoryCode: opts.categoryCode,
+      value: Math.round(p.predicted * 100) / 100,
+      source: "pillar_hierarchy",
     };
   }
 
