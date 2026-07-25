@@ -48,8 +48,15 @@ Supabase Dashboard → **SQL Editor** → 아래 파일을 **순서대로** 실�
 16. [`018_daily_questions_context_id.sql`](../supabase/migrations/018_daily_questions_context_id.sql) — daily_questions.context_id FK
 17. [`019_checkin_mood_labels_max3.sql`](../supabase/migrations/019_checkin_mood_labels_max3.sql) — mood_labels 최대 3개 DB 제약
 18. [`020_seed_cicero_quote.sql`](../supabase/migrations/020_seed_cicero_quote.sql) — 키케로 명언 시드 (public_domain)
+19. [`021_journal_onboarding.sql`](../supabase/migrations/021_journal_onboarding.sql) — 온보딩 6문항 프로필 (콜드스타트 prior)
+20. [`022_journal_first_recorded_at.sql`](../supabase/migrations/022_journal_first_recorded_at.sql) — `first_recorded_at` (회상 신뢰도)
+21. [`023_question_feedback_fit_neutral.sql`](../supabase/migrations/023_question_feedback_fit_neutral.sql) — 적합도 3단계(`fit_neutral`) 허용
 
-> **점검:** `node scripts/verify-journal-008.mjs` · `node scripts/verify-checkin-014.mjs` · `node scripts/verify-daily-insight-015.mjs` · `node scripts/verify-category-scores-scale.mjs` · `node scripts/seed-cicero-quote.mjs`  
+> **Gate B(021~023) 미적용 시 동작:** 저장은 없는 컬럼을 떼고 재시도하므로
+> 깨지지 않지만, 온보딩 저장·회상 신뢰도 필터·"그저 그래요" 피드백은
+> 조용히 무시됩니다. 적용 여부는 `node scripts/verify-gate-b-migrations.mjs`로 확인하세요.
+
+> **점검:** `node scripts/verify-journal-008.mjs` · `node scripts/verify-checkin-014.mjs` · `node scripts/verify-daily-insight-015.mjs` · `node scripts/verify-category-scores-scale.mjs` · `node scripts/seed-cicero-quote.mjs` · `node scripts/verify-gate-b-migrations.mjs`  
 > 상세는 `docs/MIGRATION_STRATEGY.md` · `docs/FORTUNE_QUOTE_SPEC.md`.
 
 

@@ -33,6 +33,30 @@ function generateId(): string {
 }
 
 /**
+ * 마이그레이션이 아직 원격에 적용되지 않았을 수 있는 컬럼들.
+ * 마이그레이션은 Supabase 대시보드에서 수동 실행하므로 배포가 먼저 나갈 수 있다.
+ * 그때 저장 전체가 실패하면 안 되므로, 없는 컬럼만 떼고 재시도한다.
+ *
+ *  - 014: happiness_score / mood_labels / core_states / domain_scores / checkin_version
+ *  - 022: first_recorded_at
+ */
+export const MIGRATION_GATED_ENTRY_COLUMNS = [
+  "happiness_score",
+  "mood_labels",
+  "core_states",
+  "domain_scores",
+  "checkin_version",
+  "first_recorded_at",
+] as const;
+
+/** 에러 메시지에 언급된, 아직 없는 게이트 컬럼들 */
+export function missingGatedColumns(message: string): string[] {
+  return MIGRATION_GATED_ENTRY_COLUMNS.filter((c) =>
+    new RegExp(`\\b${c}\\b`, "i").test(message)
+  );
+}
+
+/**
  * Supabase journal storage.
  * 테이블이 아직 없으면 null을 반환해 IndexedDB로 폴백.
  */
@@ -213,6 +237,35 @@ class SupabaseJournalStorage implements JournalStorage {
     };
   }
 
+  /**
+   * 없는 컬럼을 하나씩 떼어내며 재시도한다.
+   * PostgREST는 한 번에 한 컬럼만 알려주므로 게이트 컬럼 수만큼 시도한다.
+   */
+  private async upsertEntryRow(row: Record<string, unknown>): Promise<void> {
+    let attempt = { ...row };
+    const dropped: string[] = [];
+
+    for (let i = 0; i <= MIGRATION_GATED_ENTRY_COLUMNS.length; i += 1) {
+      const { error } = await this.client
+        .from("journal_entries")
+        .upsert(attempt, { onConflict: "user_id,entry_date" });
+      if (!error) return;
+
+      const missing = missingGatedColumns(error.message).filter(
+        (c) => c in attempt
+      );
+      if (missing.length === 0) throw new Error(error.message);
+
+      for (const c of missing) delete attempt[c];
+      dropped.push(...missing);
+      attempt = { ...attempt };
+    }
+
+    throw new Error(
+      `journal_entries 저장 실패: 미적용 마이그레이션 컬럼(${dropped.join(", ")})`
+    );
+  }
+
   async save(input: JournalSaveInput): Promise<JournalEntry> {
     const result = await this.saveWithMeta(input);
     return result.entry;
@@ -312,32 +365,7 @@ class SupabaseJournalStorage implements JournalStorage {
       checkin_version: input.checkinVersion ?? null,
     };
 
-    const { error: upErr } = await this.client
-      .from("journal_entries")
-      .upsert(upsertRow, { onConflict: "user_id,entry_date" });
-    if (upErr) {
-      // 014 미적용 시 신규 컬럼 제거 후 재시도
-      if (
-        /happiness_score|mood_labels|core_states|domain_scores|checkin_version/i.test(
-          upErr.message
-        )
-      ) {
-        const {
-          happiness_score: _h,
-          mood_labels: _m,
-          core_states: _c,
-          domain_scores: _d,
-          checkin_version: _v,
-          ...legacy
-        } = upsertRow;
-        const { error: e2 } = await this.client
-          .from("journal_entries")
-          .upsert(legacy, { onConflict: "user_id,entry_date" });
-        if (e2) throw new Error(e2.message);
-      } else {
-        throw new Error(upErr.message);
-      }
-    }
+    await this.upsertEntryRow(upsertRow);
 
     await this.client
       .from("category_scores")
