@@ -9,6 +9,11 @@ import type { BTheme } from "./bTheme";
 import type { OpenAiCallStatus } from "./openaiStatus";
 import type { CategoryCode, JournalEntry } from "./types";
 import { isLowJournalScore } from "./scoreScale";
+import {
+  loadTheoryContext,
+  theoryUsageRules,
+  type TheoryEvidence,
+} from "./theoryContext";
 
 export type TodayQuoteInput = {
   b: BTheme;
@@ -16,11 +21,14 @@ export type TodayQuoteInput = {
   recentAOverall: number | null;
   trend: { delta: number | null; direction: "up" | "down" | "flat" | "unknown" };
   aiSummary?: string | null;
+  ganjiKo?: string | null;
 };
 
 export type TodayQuoteResult = {
   quote: string;
   openAi: OpenAiCallStatus;
+  theoryUsed: boolean;
+  theoryEvidence: TheoryEvidence[];
 };
 
 function lowestFinal(entry: JournalEntry): {
@@ -70,11 +78,20 @@ export async function generateTodayQuote(
   input: TodayQuoteInput
 ): Promise<TodayQuoteResult> {
   const fallback = buildQuoteTemplate(input);
+  const theory = await loadTheoryContext({
+    b: input.b,
+    ganjiKo: input.ganjiKo,
+    purpose: "quote",
+    matchCount: 5,
+  });
+
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     return {
       quote: fallback,
       openAi: { kind: "skipped", detail: "no_api_key" },
+      theoryUsed: theory.used,
+      theoryEvidence: theory.evidence,
     };
   }
 
@@ -100,20 +117,21 @@ export async function generateTodayQuote(
 규칙:
 - 1~2문장, 감성적이되 구체적.
 - 유명인 명언 인용·출처 흉내 금지.
-- 미래 확정, 불행/사고 예고, 비난, 추상 자기계발 문구 금지.
-- 오늘의 감정 인정 + 편안해질 작은 방향.
+${theoryUsageRules("quote")}
 - JSON: { "quote": "..." }`,
         },
         {
           role: "user",
           content: JSON.stringify({
             bTheme: input.b,
+            ganjiKo: input.ganjiKo ?? null,
             mood: input.entry.moodLabel,
             tags: input.entry.tags.map((t) => getTagName(t.tagCode)),
             finals,
             recentAOverall: input.recentAOverall,
             trend: input.trend,
             diarySummary: input.aiSummary ?? input.entry.content.slice(0, 400),
+            theoryChunks: theory.chunks,
             templateHint: fallback,
           }),
         },
@@ -125,6 +143,8 @@ export async function generateTodayQuote(
       return {
         quote: fallback,
         openAi: { kind: "failed", reason: "missing_required" },
+        theoryUsed: theory.used,
+        theoryEvidence: theory.evidence,
       };
     }
     const parsed = JSON.parse(raw) as { quote?: string };
@@ -132,12 +152,19 @@ export async function generateTodayQuote(
       typeof parsed.quote === "string" && parsed.quote.trim()
         ? parsed.quote.trim().slice(0, 320)
         : fallback;
-    return { quote, openAi: { kind: "used" } };
+    return {
+      quote,
+      openAi: { kind: "used" },
+      theoryUsed: theory.used,
+      theoryEvidence: theory.evidence,
+    };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     return {
       quote: fallback,
       openAi: { kind: "failed", reason: "request_failed", detail: msg },
+      theoryUsed: theory.used,
+      theoryEvidence: theory.evidence,
     };
   }
 }

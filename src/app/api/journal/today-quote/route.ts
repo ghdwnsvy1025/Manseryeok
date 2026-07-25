@@ -62,6 +62,7 @@ export async function POST(req: NextRequest) {
     recentAOverall: bundle.recentAOverall,
     trend,
     aiSummary: b.aiSummary,
+    ganjiKo: ctx.ganjiKo,
   });
 
   return Response.json({

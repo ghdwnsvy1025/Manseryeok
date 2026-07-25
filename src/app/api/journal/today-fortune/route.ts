@@ -25,11 +25,11 @@ export async function POST(req: NextRequest) {
 
   const ctx = buildDailySajuContext(b.todayDate, b.sajuProfile ?? null);
   const theme = buildBTheme(ctx);
-  const result = await generateTodayFortune(theme);
+  const result = await generateTodayFortune(theme, { ganjiKo: ctx.ganjiKo });
 
   return Response.json({
     ...result,
     ganjiKo: ctx.ganjiKo,
     bTheme: theme,
   });
-}
+

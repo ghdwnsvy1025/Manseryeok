@@ -1,9 +1,14 @@
 /**
- * C-3 오늘의 운세 — B 기반 5영역 × 2줄
+ * C-3 오늘의 운세 — B + 학습 이론(RAG) 기반 5영역 × 2줄
  */
 import OpenAI from "openai";
 import type { BTheme } from "./bTheme";
 import type { OpenAiCallStatus } from "./openaiStatus";
+import {
+  loadTheoryContext,
+  theoryUsageRules,
+  type TheoryEvidence,
+} from "./theoryContext";
 
 export type FortuneSection = {
   id: "personality" | "work" | "love" | "health" | "social";
@@ -14,6 +19,8 @@ export type FortuneSection = {
 export type TodayFortuneResult = {
   sections: FortuneSection[];
   openAi: OpenAiCallStatus;
+  theoryUsed: boolean;
+  theoryEvidence: TheoryEvidence[];
 };
 
 const TITLES: Record<FortuneSection["id"], string> = {
@@ -94,13 +101,24 @@ function parseSections(raw: unknown, fallback: FortuneSection[]): FortuneSection
   return out.length === 5 ? out : fallback;
 }
 
-export async function generateTodayFortune(b: BTheme): Promise<TodayFortuneResult> {
+export async function generateTodayFortune(
+  b: BTheme,
+  opts?: { ganjiKo?: string | null }
+): Promise<TodayFortuneResult> {
   const fallback = buildFortuneTemplate(b);
+  const theory = await loadTheoryContext({
+    b,
+    ganjiKo: opts?.ganjiKo,
+    purpose: "fortune",
+  });
+
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     return {
       sections: fallback,
       openAi: { kind: "skipped", detail: "no_api_key" },
+      theoryUsed: theory.used,
+      theoryEvidence: theory.evidence,
     };
   }
 
@@ -108,7 +126,7 @@ export async function generateTodayFortune(b: BTheme): Promise<TodayFortuneResul
     const client = new OpenAI({ apiKey });
     const completion = await client.chat.completions.create({
       model: process.env.OPENAI_JOURNAL_SCORE_MODEL || "gpt-4o-mini",
-      temperature: 0.7,
+      temperature: 0.65,
       response_format: { type: "json_object" },
       messages: [
         {
@@ -117,14 +135,16 @@ export async function generateTodayFortune(b: BTheme): Promise<TodayFortuneResul
 규칙:
 - 영역 5개: personality, work, love, health, social
 - 각 영역 한국어 문장 정확히 2줄
-- 미래 확정·사고 예고·의료 진단·비난 금지
 - 건강은 에너지·피로·회복으로만
-- JSON: { "sections": [ { "id": "...", "lines": ["...", "..."] } ] }`,
+${theoryUsageRules("fortune")}
+JSON: { "sections": [ { "id": "...", "lines": ["...", "..."] } ] }`,
         },
         {
           role: "user",
           content: JSON.stringify({
             bTheme: b,
+            ganjiKo: opts?.ganjiKo ?? null,
+            theoryChunks: theory.chunks,
             requiredIds: Object.keys(TITLES),
           }),
         },
@@ -136,18 +156,24 @@ export async function generateTodayFortune(b: BTheme): Promise<TodayFortuneResul
       return {
         sections: fallback,
         openAi: { kind: "failed", reason: "missing_required" },
+        theoryUsed: theory.used,
+        theoryEvidence: theory.evidence,
       };
     }
     const parsed = JSON.parse(raw);
     return {
       sections: parseSections(parsed, fallback),
       openAi: { kind: "used" },
+      theoryUsed: theory.used,
+      theoryEvidence: theory.evidence,
     };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     return {
       sections: fallback,
       openAi: { kind: "failed", reason: "request_failed", detail: msg },
+      theoryUsed: theory.used,
+      theoryEvidence: theory.evidence,
     };
   }
 }

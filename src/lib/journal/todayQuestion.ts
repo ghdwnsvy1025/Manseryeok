@@ -13,12 +13,19 @@ import {
   isLowJournalScore,
   scoreBandLabel,
 } from "./scoreScale";
+import {
+  loadTheoryContext,
+  theoryUsageRules,
+  type TheoryEvidence,
+} from "./theoryContext";
 
 export type TodayQuestionResult = {
   question: string;
   focusCategory: CategoryCode | null;
   contentScore: number | null;
   openAi: OpenAiCallStatus;
+  theoryUsed: boolean;
+  theoryEvidence: TheoryEvidence[];
 };
 
 function pickFocusCategory(
@@ -67,6 +74,7 @@ export async function generateTodayQuestion(opts: {
   b: BTheme;
   bundle: ContentScoreBundle;
   enabledCodes: CategoryCode[];
+  ganjiKo?: string | null;
 }): Promise<TodayQuestionResult> {
   const focus = pickFocusCategory(
     opts.bundle,
@@ -83,6 +91,13 @@ export async function generateTodayQuestion(opts: {
     contentScore,
   });
 
+  const theory = await loadTheoryContext({
+    b: opts.b,
+    ganjiKo: opts.ganjiKo,
+    purpose: "question",
+    matchCount: 5,
+  });
+
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     return {
@@ -90,6 +105,8 @@ export async function generateTodayQuestion(opts: {
       focusCategory: focus,
       contentScore,
       openAi: { kind: "skipped", detail: "no_api_key" },
+      theoryUsed: theory.used,
+      theoryEvidence: theory.evidence,
     };
   }
 
@@ -104,24 +121,18 @@ export async function generateTodayQuestion(opts: {
           role: "system",
           content: `당신은 일기 앱의 '오늘의 질문' 작성자입니다.
 - 한 문장 질문만 만듭니다.
-- 사주로 미래를 단정하지 마세요.
-- 사용자를 비난하지 마세요.
-- 의학적 진단·사고 예고 금지.
+${theoryUsageRules("question")}
 - JSON: { "question": "..." }`,
         },
         {
           role: "user",
           content: JSON.stringify({
             bTheme: opts.b,
+            ganjiKo: opts.ganjiKo ?? null,
             focusCategory: focus,
             contentScore,
             recentA: opts.bundle.recentAByCategory,
-            d: Object.fromEntries(
-              Object.entries(opts.bundle.dByCategory).map(([k, v]) => [
-                k,
-                { value: v.value, source: v.source },
-              ])
-            ),
+            theoryChunks: theory.chunks,
             templateHint: fallback,
           }),
         },
@@ -135,6 +146,8 @@ export async function generateTodayQuestion(opts: {
         focusCategory: focus,
         contentScore,
         openAi: { kind: "failed", reason: "missing_required" },
+        theoryUsed: theory.used,
+        theoryEvidence: theory.evidence,
       };
     }
     const parsed = JSON.parse(raw) as { question?: string };
@@ -147,6 +160,8 @@ export async function generateTodayQuestion(opts: {
       focusCategory: focus,
       contentScore,
       openAi: { kind: "used" },
+      theoryUsed: theory.used,
+      theoryEvidence: theory.evidence,
     };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -155,6 +170,8 @@ export async function generateTodayQuestion(opts: {
       focusCategory: focus,
       contentScore,
       openAi: { kind: "failed", reason: "request_failed", detail: msg },
+      theoryUsed: theory.used,
+      theoryEvidence: theory.evidence,
     };
   }
 }

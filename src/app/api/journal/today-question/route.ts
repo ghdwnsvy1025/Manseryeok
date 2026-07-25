@@ -55,6 +55,7 @@ export async function POST(req: NextRequest) {
     b: theme,
     bundle,
     enabledCodes,
+    ganjiKo: ctx.ganjiKo,
   });
 
   return Response.json({
