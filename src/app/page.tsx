@@ -24,10 +24,26 @@ export default function HomePage() {
       return;
     }
 
+    let cancelled = false;
+    const timeout = window.setTimeout(() => {
+      if (!cancelled) {
+        // auth가 응답 없으면 게스트 진입 허용으로 풀림
+        setEntryAllowed(false);
+        setAuthReady(true);
+      }
+    }, 8000);
+
     void supabase.auth.getUser().then(({ data }) => {
+      if (cancelled) return;
+      window.clearTimeout(timeout);
       const signedIn = Boolean(data.user);
       if (signedIn) disableGuestMode();
       setEntryAllowed(signedIn);
+      setAuthReady(true);
+    }).catch(() => {
+      if (cancelled) return;
+      window.clearTimeout(timeout);
+      setEntryAllowed(false);
       setAuthReady(true);
     });
 
@@ -37,9 +53,14 @@ export default function HomePage() {
       if (session?.user) {
         disableGuestMode();
         setEntryAllowed(true);
+        setAuthReady(true);
       }
     });
-    return () => subscription.unsubscribe();
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timeout);
+      subscription.unsubscribe();
+    };
   }, []);
 
   if (!authReady) {

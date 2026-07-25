@@ -99,6 +99,6 @@ describe("Legacy 행복도·기분 저장/조회 회귀", () => {
 
     const normalized = normalizeDiaryEntry(raw as Record<string, unknown>);
     expect(normalized.happinessRating).toBe(3);
-    expect(normalized.emotions.length).toBeGreaterThan(0);
+    expect(normalized.emotions?.length ?? 0).toBeGreaterThan(0);
   });
 });

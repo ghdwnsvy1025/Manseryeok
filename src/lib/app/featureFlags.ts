@@ -21,6 +21,38 @@ export type FeatureFlags = {
   /** Phase 5 — 분석 캐시 (미사용 시에도 OFF) */
   analysisCacheEnabled: boolean;
   sajuFeatureSnapshotEnabled: boolean;
+  /**
+   * 체크인 v2 — 행복도 0~10 · 기분≤3 · 핵심4 · 조건부2
+   * OFF면 기존 JournalEditor 유지
+   */
+  checkinV2Enabled: boolean;
+  /**
+   * 질문 RAG — 문장 다듬기만 (키워드/포커스 결정에는 미사용)
+   * 기본 ON
+   */
+  ragQuestionWordingEnabled: boolean;
+  /**
+   * 질문 경로에서 Ridge를 live D로 쓸지.
+   * 기본 OFF — 섀도 비교만 (마스터: Ridge≠온라인 핵심)
+   */
+  ridgeQuestionLiveEnabled: boolean;
+  /**
+   * 운세 v2 — DailyInsightContext + 5영역(종합/일/관계/재물/건강)
+   * OFF면 레거시 운세 유지
+   */
+  dailyFortuneV2Enabled: boolean;
+  /** 운세 상세(영역 아코디언) */
+  fortuneDetailsEnabled: boolean;
+  /** 검증 명언 라이브러리 노출 */
+  verifiedQuoteEnabled: boolean;
+  /** 명언 내부 RAG/검색 */
+  quoteRagEnabled: boolean;
+  /** 앱 생성 오늘의 문장 */
+  originalDailySentenceEnabled: boolean;
+  /** 운세·문장 피드백 UI */
+  contentFeedbackEnabled: boolean;
+  /** 노출 보정 평가(실험) */
+  exposureAdjustedEvaluationEnabled: boolean;
 };
 
 const TRUE = new Set(["1", "true", "yes", "on"]);
@@ -40,6 +72,16 @@ export const DEFAULT_FEATURE_FLAGS: FeatureFlags = {
   analysisNarrativeLlmEnabled: false,
   analysisCacheEnabled: false,
   sajuFeatureSnapshotEnabled: false,
+  checkinV2Enabled: false,
+  ragQuestionWordingEnabled: true,
+  ridgeQuestionLiveEnabled: false,
+  dailyFortuneV2Enabled: false,
+  fortuneDetailsEnabled: true,
+  verifiedQuoteEnabled: true,
+  quoteRagEnabled: true,
+  originalDailySentenceEnabled: true,
+  contentFeedbackEnabled: true,
+  exposureAdjustedEvaluationEnabled: false,
 };
 
 /** Playwright Phase 6.1 — bake-safe conservative matrix */
@@ -59,6 +101,16 @@ function e2eConservativeOverride(): FeatureFlags | null {
     newAnalysisEnabled: true,
     analysisNarrativeLlmEnabled: false,
     analysisCacheEnabled: false,
+    checkinV2Enabled: false,
+    ragQuestionWordingEnabled: true,
+    ridgeQuestionLiveEnabled: false,
+    dailyFortuneV2Enabled: false,
+    fortuneDetailsEnabled: true,
+    verifiedQuoteEnabled: false,
+    quoteRagEnabled: false,
+    originalDailySentenceEnabled: true,
+    contentFeedbackEnabled: false,
+    exposureAdjustedEvaluationEnabled: false,
   };
 }
 
@@ -108,6 +160,49 @@ export function getFeatureFlags(): FeatureFlags {
       process.env.NEXT_PUBLIC_FF_SAJU_SNAPSHOT,
       DEFAULT_FEATURE_FLAGS.sajuFeatureSnapshotEnabled
     ),
+    checkinV2Enabled: asBool(
+      process.env.NEXT_PUBLIC_FF_CHECKIN_V2,
+      DEFAULT_FEATURE_FLAGS.checkinV2Enabled
+    ),
+    ragQuestionWordingEnabled: asBool(
+      process.env.NEXT_PUBLIC_FF_RAG_QUESTION_WORDING,
+      DEFAULT_FEATURE_FLAGS.ragQuestionWordingEnabled
+    ),
+    /** 서버 전용 키도 허용 (실수로 ON 되는 것 방지: 기본 false) */
+    ridgeQuestionLiveEnabled:
+      asBool(
+        process.env.NEXT_PUBLIC_FF_RIDGE_QUESTION_LIVE,
+        DEFAULT_FEATURE_FLAGS.ridgeQuestionLiveEnabled
+      ) ||
+      asBool(process.env.FF_RIDGE_QUESTION_LIVE, false),
+    dailyFortuneV2Enabled: asBool(
+      process.env.NEXT_PUBLIC_FF_DAILY_FORTUNE_V2,
+      DEFAULT_FEATURE_FLAGS.dailyFortuneV2Enabled
+    ),
+    fortuneDetailsEnabled: asBool(
+      process.env.NEXT_PUBLIC_FF_FORTUNE_DETAILS,
+      DEFAULT_FEATURE_FLAGS.fortuneDetailsEnabled
+    ),
+    verifiedQuoteEnabled: asBool(
+      process.env.NEXT_PUBLIC_FF_VERIFIED_QUOTE,
+      DEFAULT_FEATURE_FLAGS.verifiedQuoteEnabled
+    ),
+    quoteRagEnabled: asBool(
+      process.env.NEXT_PUBLIC_FF_QUOTE_RAG,
+      DEFAULT_FEATURE_FLAGS.quoteRagEnabled
+    ),
+    originalDailySentenceEnabled: asBool(
+      process.env.NEXT_PUBLIC_FF_ORIGINAL_DAILY_SENTENCE,
+      DEFAULT_FEATURE_FLAGS.originalDailySentenceEnabled
+    ),
+    contentFeedbackEnabled: asBool(
+      process.env.NEXT_PUBLIC_FF_CONTENT_FEEDBACK,
+      DEFAULT_FEATURE_FLAGS.contentFeedbackEnabled
+    ),
+    exposureAdjustedEvaluationEnabled: asBool(
+      process.env.NEXT_PUBLIC_FF_EXPOSURE_ADJUSTED_EVAL,
+      DEFAULT_FEATURE_FLAGS.exposureAdjustedEvaluationEnabled
+    ),
   };
 }
 
@@ -141,4 +236,45 @@ export function isAnalysisNarrativeLlmEnabled(): boolean {
 
 export function isAnalysisCacheEnabled(): boolean {
   return getFeatureFlags().analysisCacheEnabled;
+}
+
+export function isCheckinV2Enabled(): boolean {
+  return getFeatureFlags().checkinV2Enabled;
+}
+
+export function isRagQuestionWordingEnabled(): boolean {
+  return getFeatureFlags().ragQuestionWordingEnabled;
+}
+
+/** 질문 live 경로에 Ridge D를 넣을지 (기본 false = 섀도만) */
+export function isRidgeQuestionLiveEnabled(): boolean {
+  return getFeatureFlags().ridgeQuestionLiveEnabled;
+}
+
+export function isDailyFortuneV2Enabled(): boolean {
+  return getFeatureFlags().dailyFortuneV2Enabled;
+}
+
+export function isFortuneDetailsEnabled(): boolean {
+  return getFeatureFlags().fortuneDetailsEnabled;
+}
+
+export function isVerifiedQuoteEnabled(): boolean {
+  return getFeatureFlags().verifiedQuoteEnabled;
+}
+
+export function isQuoteRagEnabled(): boolean {
+  return getFeatureFlags().quoteRagEnabled;
+}
+
+export function isOriginalDailySentenceEnabled(): boolean {
+  return getFeatureFlags().originalDailySentenceEnabled;
+}
+
+export function isContentFeedbackEnabled(): boolean {
+  return getFeatureFlags().contentFeedbackEnabled;
+}
+
+export function isExposureAdjustedEvaluationEnabled(): boolean {
+  return getFeatureFlags().exposureAdjustedEvaluationEnabled;
 }

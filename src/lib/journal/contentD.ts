@@ -98,12 +98,22 @@ export function buildContentScoreBundle(opts: {
   todayDate: string;
   enabledCodes: CategoryCode[];
   ridgeByCategory?: RidgePredictionMap;
+  /**
+   * true: 오늘(asOf) 기록·점수를 최근 A / D 집계에서 제외
+   * — 상태 체크 전 「오늘의 질문」필수
+   */
+  excludeToday?: boolean;
 }): ContentScoreBundle {
+  const entries = opts.excludeToday
+    ? opts.entries.filter((e) => e.entryDate < opts.todayDate)
+    : opts.entries;
+
   const recentAByCategory = computeRecentAByCategory(
-    opts.entries,
+    entries,
     opts.todayDate,
     opts.enabledCodes,
-    7
+    7,
+    { includeAsOfDate: !opts.excludeToday }
   );
 
   const dByCategory = {} as Record<CategoryCode, CategoryContentD>;
@@ -113,7 +123,7 @@ export function buildContentScoreBundle(opts: {
     const d = resolveCategoryD({
       categoryCode: code,
       todayDate: opts.todayDate,
-      entries: opts.entries,
+      entries,
       ridgePrediction: opts.ridgeByCategory?.[code],
     });
     dByCategory[code] = d;

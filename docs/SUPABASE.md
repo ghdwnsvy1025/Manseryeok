@@ -40,9 +40,14 @@ Supabase Dashboard → **SQL Editor** → 아래 파일을 **순서대로** 실�
 8. [`supabase/migrations/008_journal_category_system.sql`](../supabase/migrations/008_journal_category_system.sql) — 신규 journal (Phase 2)
 9. [`supabase/migrations/009_astrology_snapshots.sql`](../supabase/migrations/009_astrology_snapshots.sql) — 사주 스냅샷 (Phase 3)
 10. [`supabase/migrations/010_personalization_models.sql`](../supabase/migrations/010_personalization_models.sql) — 개인화 Ridge (Phase 4)
+11. [`011`](../supabase/migrations/011_ratings_1_to_10.sql) ~ [`013`](../supabase/migrations/013_journal_scores_1_to_10.sql) — 점수 척도 1~10
+12. [`014_checkin_v2.sql`](../supabase/migrations/014_checkin_v2.sql) — 체크인 v2 (행복도 0~10, mood_labels, daily_questions)
+13. [`015_daily_insight_fortune_quotes.sql`](../supabase/migrations/015_daily_insight_fortune_quotes.sql) — 공통 인사이트·운세·오늘의 문장 전달/노출
+14. [`016_quote_library_embedding.sql`](../supabase/migrations/016_quote_library_embedding.sql) — 명언 embedding + match RPC
+15. [`017_fix_category_scores_1_to_10.sql`](../supabase/migrations/017_fix_category_scores_1_to_10.sql) — category_scores 1~10 제약 보정 (013 누락 시)
 
-> **점검 (2026-07-21):** 연결 프로젝트에 008이 아직 없을 수 있다.  
-> `node scripts/verify-journal-008.mjs` 로 확인. 상세는 `docs/MIGRATION_STRATEGY.md`.
+> **점검:** `node scripts/verify-journal-008.mjs` · `node scripts/verify-checkin-014.mjs` · `node scripts/verify-daily-insight-015.mjs` · `node scripts/verify-category-scores-scale.mjs`  
+> 상세는 `docs/MIGRATION_STRATEGY.md` · `docs/FORTUNE_QUOTE_SPEC.md`.
 
 
 로그인 후 `Could not find the table 'public.diary_entries'` 가 보이면

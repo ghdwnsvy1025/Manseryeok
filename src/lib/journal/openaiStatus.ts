@@ -16,6 +16,7 @@ export type OpenAiFailureReason =
   | "missing_required"
   | "format_mismatch"
   | "safety_filter"
+  | "quality_rejected"
   | "network"
   | "unknown";
 

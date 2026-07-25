@@ -8,6 +8,7 @@ import {
   computeBaselineStats,
   decayWeight,
   detectLowVariance,
+  FALLBACK_CENTER,
   filterValidScores,
   normalizeScores,
   STD_FLOOR,
@@ -159,7 +160,9 @@ describe("Phase 4 — 개인화 Ridge MVP · 정규화", () => {
     const scores = makeScores(10, { pattern: (i) => (i % 2 === 0 ? 5 : 1) });
     const { samples } = normalizeScores(scores, "2025-01-10");
     expect(samples.every((s) => s.usedFallbackCenter)).toBe(true);
-    expect(samples[0]!.normalizedZ).toBe(clampZ(5 - 3));
+    expect(samples[0]!.normalizedZ).toBe(
+      clampZ((5 - FALLBACK_CENTER) / STD_FLOOR)
+    );
   });
 
   test("6. N/A 제외", () => {

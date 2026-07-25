@@ -7,7 +7,7 @@ import { progressFromTotalXp } from "@/lib/product/personalizationLevel";
 
 export function scoreJournalSaveXp(input: {
   content: string;
-  overallSatisfaction: JournalScore | null;
+  overallSatisfaction: JournalScore | 0 | null;
   moodLabel: string | null;
   scores: Array<{ isNotApplicable: boolean; userScore: number | null }>;
   tagCodes: string[];

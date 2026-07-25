@@ -19,8 +19,18 @@
 | `analysisNarrativeLlmEnabled` | `NEXT_PUBLIC_FF_ANALYSIS_NARRATIVE_LLM` | false | Phase 5 힌트 |
 | (서버) | `FF_ANALYSIS_NARRATIVE_LLM` | false | Phase 5 LLM |
 | `analysisCacheEnabled` | `NEXT_PUBLIC_FF_ANALYSIS_CACHE` | false | 예약 |
+| `checkinV2Enabled` | `NEXT_PUBLIC_FF_CHECKIN_V2` | false | 체크인 v2 (행복도 0~10) |
+| `ragQuestionWordingEnabled` | `NEXT_PUBLIC_FF_RAG_QUESTION_WORDING` | **true** | 질문 문장화만 RAG |
+| `ridgeQuestionLiveEnabled` | `NEXT_PUBLIC_FF_RIDGE_QUESTION_LIVE` / `FF_RIDGE_QUESTION_LIVE` | false | 질문 live Ridge (기본 섀도) |
+| `dailyFortuneV2Enabled` | `NEXT_PUBLIC_FF_DAILY_FORTUNE_V2` | false | 운세 v2 |
+| `fortuneDetailsEnabled` | `NEXT_PUBLIC_FF_FORTUNE_DETAILS` | true | 운세 영역 상세 |
+| `verifiedQuoteEnabled` | `NEXT_PUBLIC_FF_VERIFIED_QUOTE` | true | 검증 명언 |
+| `quoteRagEnabled` | `NEXT_PUBLIC_FF_QUOTE_RAG` | true | 명언 내부 검색 |
+| `originalDailySentenceEnabled` | `NEXT_PUBLIC_FF_ORIGINAL_DAILY_SENTENCE` | true | 오늘의 문장 |
+| `contentFeedbackEnabled` | `NEXT_PUBLIC_FF_CONTENT_FEEDBACK` | true | 콘텐츠 피드백 |
+| `exposureAdjustedEvaluationEnabled` | `NEXT_PUBLIC_FF_EXPOSURE_ADJUSTED_EVAL` | false | 노출 보정 평가 |
 
-잘못된/없는 값 → false.
+잘못된/없는 값 → false (단, RAG wording만 기본 true).
 
 **Next.js 주의:** `NEXT_PUBLIC_*` 는 `process.env.NEXT_PUBLIC_FOO`처럼 **정적 참조**해야 클라 번들에 인라인된다.  
 (`process.env[name]` 동적 접근은 클라이언트에서 비어 있을 수 있음.)

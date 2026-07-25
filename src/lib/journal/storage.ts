@@ -14,13 +14,28 @@ export type JournalSaveInput = {
   entryDate: string;
   userTimezone?: string;
   content: string;
-  overallSatisfaction: JournalScore | null;
+  overallSatisfaction: JournalScore | 0 | null;
+  /** 체크인 v2 행복도 0~10 */
+  happinessScore?: number | null;
   moodLabel: string | null;
+  /** 체크인 v2 복수 기분 */
+  moodLabels?: string[];
   mainEventText: string | null;
   scores: JournalScoreSaveRow[];
   tagCodes: string[];
+  coreStates?: Record<string, { ordinal: number | null; isNotApplicable: boolean }> | null;
+  domainScores?: Array<{
+    code: string;
+    ordinal: number | null;
+    isNotApplicable: boolean;
+  }> | null;
+  checkinVersion?: number | null;
   /** 저장 시 활성 카테고리 — 검증용 (없으면 scores만으로 검증) */
   enabledCodes?: string[];
+  /**
+   * 체크인 v2: 활성 카테고리 4~9 규칙 완화 (핵심+조건부만 저장)
+   */
+  relaxEnabledCount?: boolean;
   existingId?: string;
   /** XP 덮어쓰기 (storage가 계산한 결과) */
   xpGranted?: boolean;

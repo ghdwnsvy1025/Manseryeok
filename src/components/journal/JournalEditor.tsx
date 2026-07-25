@@ -28,6 +28,7 @@ import type { JournalSaveResult } from "@/lib/journal/storage";
 import TodayQuestionCard from "@/components/journal/TodayQuestionCard";
 import JournalSaveCompleteModal from "@/components/journal/JournalSaveCompleteModal";
 import ScoreSlider from "@/components/journal/ScoreSlider";
+import { reportQuestionFeedback } from "@/lib/journal/reportQuestionFeedback";
 
 const WEEKDAY_KO = ["일", "월", "화", "수", "목", "금", "토"] as const;
 const HAPPINESS_PINK = "#f472b6";
@@ -78,6 +79,19 @@ export default function JournalEditor({ initialDate }: Props) {
   const [quote, setQuote] = useState<string | null>(null);
   const [quoteOpenAi, setQuoteOpenAi] = useState<OpenAiCallStatus | null>(null);
   const [quoteLoading, setQuoteLoading] = useState(false);
+  const [quoteMeta, setQuoteMeta] = useState<{
+    contentType: string | null;
+    sourceLabel: string | null;
+    authorName: string | null;
+    workTitle: string | null;
+    deliveryId: string | null;
+  }>({
+    contentType: null,
+    sourceLabel: null,
+    authorName: null,
+    workTitle: null,
+    deliveryId: null,
+  });
   const [savedUniqueDays, setSavedUniqueDays] = useState(0);
 
   const completedScoreCount = useMemo(() => {
@@ -137,7 +151,11 @@ export default function JournalEditor({ initialDate }: Props) {
         if (existing) {
           setExistingId(existing.id);
           setContent(existing.content);
-          setOverall(existing.overallSatisfaction);
+          setOverall(
+            existing.overallSatisfaction === 0
+              ? 1
+              : existing.overallSatisfaction
+          );
           setMood(existing.moodLabel);
           setMainEvent(existing.mainEventText ?? "");
           setTags(existing.tags.map((t) => t.tagCode));
@@ -189,6 +207,13 @@ export default function JournalEditor({ initialDate }: Props) {
     setQuoteLoading(true);
     setQuote(null);
     setQuoteOpenAi(null);
+    setQuoteMeta({
+      contentType: null,
+      sourceLabel: null,
+      authorName: null,
+      workTitle: null,
+      deliveryId: null,
+    });
     try {
       const res = await fetch("/api/journal/today-quote", {
         method: "POST",
@@ -202,11 +227,24 @@ export default function JournalEditor({ initialDate }: Props) {
         }),
       });
       const data = (await res.json()) as {
+        sentence?: string;
         quote?: string;
         openAi?: OpenAiCallStatus;
+        contentType?: string;
+        sourceLabel?: string;
+        authorName?: string | null;
+        workTitle?: string | null;
+        delivery?: { deliveryId?: string | null };
       };
-      setQuote(data.quote ?? null);
+      setQuote(data.sentence ?? data.quote ?? null);
       setQuoteOpenAi(data.openAi ?? null);
+      setQuoteMeta({
+        contentType: data.contentType ?? null,
+        sourceLabel: data.sourceLabel ?? null,
+        authorName: data.authorName ?? null,
+        workTitle: data.workTitle ?? null,
+        deliveryId: data.delivery?.deliveryId ?? null,
+      });
     } catch (err) {
       setQuoteOpenAi({
         kind: "failed",
@@ -330,6 +368,15 @@ export default function JournalEditor({ initialDate }: Props) {
           ? "저장됐어요."
           : "오늘의 기록이 최신 내용으로 반영되었어요."
       );
+
+      void reportQuestionFeedback({
+        questionDate: date,
+        eventType: "led_to_write",
+        payload: {
+          entryId: result.entry.id,
+          wasFirstSaveOfDay: result.xp.wasFirstSaveOfDay,
+        },
+      });
 
       const list = await storage.list();
       setAllEntries(list);
@@ -642,6 +689,11 @@ export default function JournalEditor({ initialDate }: Props) {
           quote={quote}
           quoteOpenAi={quoteOpenAi}
           quoteLoading={quoteLoading}
+          contentType={quoteMeta.contentType}
+          sourceLabel={quoteMeta.sourceLabel}
+          authorName={quoteMeta.authorName}
+          workTitle={quoteMeta.workTitle}
+          deliveryId={quoteMeta.deliveryId}
           onClose={() => setShowComplete(false)}
         />
       )}

@@ -12,19 +12,38 @@ function addDays(isoDate: string, delta: number): string {
   return `${y}-${m}-${day}`;
 }
 
+/** 질문 생성용: asOfDate 당일 기록은 절대 포함하지 않음 */
+export function entriesStrictlyBefore(
+  entries: JournalEntry[],
+  asOfDate: string
+): JournalEntry[] {
+  return entries.filter((e) => e.entryDate < asOfDate);
+}
+
+export type RecentAWindowOptions = {
+  /**
+   * true(기본): asOfDate 포함 (통계·저장 후 요약)
+   * false: asOfDate 전날까지 (상태 체크 전 질문 — 오늘 누수 방지)
+   */
+  includeAsOfDate?: boolean;
+};
+
 /**
- * asOfDate 포함 최근 `windowDays`일 구간의 카테고리별 평균 finalScore.
+ * 최근 `windowDays`일 구간의 카테고리별 평균 finalScore.
  * 해당 없음·미입력(final null) 제외. 날짜당 1건(이미 upsert된 대표 일기).
  */
 export function computeRecentAByCategory(
   entries: JournalEntry[],
   asOfDate: string,
   enabledCodes: CategoryCode[],
-  windowDays = 7
+  windowDays = 7,
+  opts?: RecentAWindowOptions
 ): Record<CategoryCode, number | null> {
-  const start = addDays(asOfDate, -(windowDays - 1));
+  const includeAsOfDate = opts?.includeAsOfDate !== false;
+  const end = includeAsOfDate ? asOfDate : addDays(asOfDate, -1);
+  const start = addDays(end, -(windowDays - 1));
   const inWindow = entries.filter(
-    (e) => e.entryDate >= start && e.entryDate <= asOfDate
+    (e) => e.entryDate >= start && e.entryDate <= end
   );
 
   const out = {} as Record<CategoryCode, number | null>;

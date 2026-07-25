@@ -5,6 +5,8 @@ import Link from "next/link";
 import { getDiaryStorage } from "@/lib/diary/getStorage";
 import { buildRealTestSeedEntries, buildTwoMonthDemoEntries } from "@/lib/diary/seedDemoEntries";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import AdminQuotesPanel from "@/components/admin/AdminQuotesPanel";
+import AdminInsightDebugPanel from "@/components/admin/AdminInsightDebugPanel";
 
 type DocRow = {
   id: string;
@@ -465,6 +467,32 @@ export default function AdminPage() {
             ))}
           </ul>
         )}
+      </div>
+
+      <div
+        className="p-4 border-2 space-y-3"
+        style={{ background: "var(--px-bg2)", borderColor: "var(--px-border)" }}
+      >
+        <p className="font-bold text-sm" style={{ color: "var(--px-accent)" }}>
+          일별 인사이트 디버그
+        </p>
+        <p className="text-xs" style={{ color: "var(--px-text2)" }}>
+          DailyInsightContext · 운세 · 문장 전달 · 노출 이벤트를 날짜별로 확인합니다.
+        </p>
+        <AdminInsightDebugPanel />
+      </div>
+
+      <div
+        className="p-4 border-2 space-y-3"
+        style={{ background: "var(--px-bg2)", borderColor: "var(--px-border)" }}
+      >
+        <p className="font-bold text-sm" style={{ color: "var(--px-accent)" }}>
+          명언 라이브러리 검수
+        </p>
+        <p className="text-xs" style={{ color: "var(--px-text2)" }}>
+          검증·저작권 확인 후에만 active로 노출됩니다. embedding은 저장 시 자동 생성됩니다.
+        </p>
+        <AdminQuotesPanel />
       </div>
 
       <div

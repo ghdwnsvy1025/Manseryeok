@@ -2,8 +2,11 @@
 
 import type { JournalScore } from "./scoreScale";
 
-/** 3 = A 점수 1~10 */
-export const JOURNAL_SCHEMA_VERSION = 3;
+/** 3 = A 점수 1~10 · 4 = 체크인 v2 (행복도 0~10 · mood_labels 등) */
+export const JOURNAL_SCHEMA_VERSION = 4;
+
+export const CHECKIN_VERSION_LEGACY = 1;
+export const CHECKIN_VERSION_V2 = 2;
 
 export type CategoryCode =
   | "emotional_balance"
@@ -75,18 +78,40 @@ export type JournalEntryTag = {
   confirmedByUser: boolean;
 };
 
+export type CoreStatePayload = {
+  ordinal: number | null;
+  isNotApplicable: boolean;
+};
+
+export type DomainScorePayload = {
+  code: string;
+  ordinal: number | null;
+  isNotApplicable: boolean;
+};
+
 export type JournalEntry = {
   id: string;
   userId: string | null;
   entryDate: string; // YYYY-MM-DD local date
   userTimezone: string;
   content: string;
-  overallSatisfaction: JournalScore | null;
+  /** 레거시/호환 만족도 (체크인 v2에서는 happiness와 동기화, 0~10 가능) */
+  overallSatisfaction: JournalScore | 0 | null;
+  /** 체크인 v2 행복도 0~10 */
+  happinessScore: number | null;
   moodLabel: string | null;
+  /** 체크인 v2 복수 기분 (≤3) */
+  moodLabels: string[];
   mainEventText: string | null;
   source: "new_diary" | "legacy_import";
   scores: CategoryScoreRecord[];
   tags: JournalEntryTag[];
+  /** 체크인 v2 핵심 상태 원본 */
+  coreStates: Record<string, CoreStatePayload> | null;
+  /** 체크인 v2 조건부 도메인 */
+  domainScores: DomainScorePayload[] | null;
+  /** 1=레거시 에디터, 2=체크인 v2 */
+  checkinVersion: number | null;
   /** 이 날짜에 XP를 이미 지급했는지 (수정 저장 시 중복 방지) */
   xpGranted: boolean;
   /** 최초 저장 시 지급된 XP (수정 시 유지) */

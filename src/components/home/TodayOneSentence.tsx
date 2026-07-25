@@ -37,6 +37,7 @@ export default function TodayOneSentence(props: Props) {
   const [evidence, setEvidence] = useState<TheoryEvidence[]>([]);
   const [showEvidence, setShowEvidence] = useState(false);
   const [showRaw, setShowRaw] = useState(false);
+  const relationLabelsKey = props.relationLabels.join("|");
 
   useEffect(() => {
     let cancelled = false;
@@ -78,8 +79,8 @@ export default function TodayOneSentence(props: Props) {
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
+    props,
     props.ganjiKo,
     props.stemKo,
     props.branchKo,
@@ -89,7 +90,7 @@ export default function TodayOneSentence(props: Props) {
     props.sameGanjiAvgCondition,
     props.totalEntryDays,
     props.recentWellbeing,
-    props.relationLabels.join("|"),
+    relationLabelsKey,
   ]);
 
   const tone =

@@ -75,6 +75,7 @@ function normalizeEntry(raw: JournalEntry): JournalEntry {
 
   const scale = (v: number | null | undefined): number | null => {
     if (v == null || !Number.isFinite(v)) return null;
+    if (v === 0) return 0;
     return migrateScoreToTen(v, schemaVersion);
   };
 
@@ -84,6 +85,20 @@ function normalizeEntry(raw: JournalEntry): JournalEntry {
     xpGranted: Boolean(raw.xpGranted),
     xpAwarded: typeof raw.xpAwarded === "number" ? raw.xpAwarded : 0,
     overallSatisfaction: scale(raw.overallSatisfaction) as JournalEntry["overallSatisfaction"],
+    happinessScore:
+      typeof raw.happinessScore === "number"
+        ? raw.happinessScore
+        : raw.happinessScore === null
+          ? null
+          : scale(raw.overallSatisfaction),
+    moodLabels: Array.isArray(raw.moodLabels)
+      ? raw.moodLabels.filter((m): m is string => typeof m === "string")
+      : raw.moodLabel
+        ? [raw.moodLabel]
+        : [],
+    coreStates: raw.coreStates ?? null,
+    domainScores: raw.domainScores ?? null,
+    checkinVersion: raw.checkinVersion ?? null,
     scores: (raw.scores ?? []).map((s) => {
       const userRaw =
         s.userScore !== undefined && s.userScore !== null
@@ -148,14 +163,21 @@ export class IndexedDbJournalStorage implements JournalStorage {
     const saveCheck = validateSaveScores({
       enabledCodes,
       scores: input.scores,
+      relaxEnabledCount: Boolean(input.relaxEnabledCount),
     });
     if (!saveCheck.ok) throw new Error(saveCheck.error);
 
     if (
       input.overallSatisfaction != null &&
-      (input.overallSatisfaction < 1 || input.overallSatisfaction > 10)
+      (input.overallSatisfaction < 0 || input.overallSatisfaction > 10)
     ) {
-      throw new Error("종합 만족도는 1~10만 허용됩니다.");
+      throw new Error("행복도/만족도는 0~10만 허용됩니다.");
+    }
+    if (
+      input.happinessScore != null &&
+      (input.happinessScore < 0 || input.happinessScore > 10)
+    ) {
+      throw new Error("행복도는 0~10만 허용됩니다.");
     }
 
     const now = new Date().toISOString();
@@ -197,11 +219,21 @@ export class IndexedDbJournalStorage implements JournalStorage {
       userTimezone: input.userTimezone ?? "Asia/Seoul",
       content: input.content,
       overallSatisfaction: input.overallSatisfaction,
+      happinessScore:
+        input.happinessScore !== undefined
+          ? input.happinessScore
+          : input.overallSatisfaction,
       moodLabel: input.moodLabel,
+      moodLabels:
+        input.moodLabels ??
+        (input.moodLabel ? [input.moodLabel] : []),
       mainEventText: input.mainEventText,
       source: "new_diary",
       scores,
       tags,
+      coreStates: input.coreStates ?? null,
+      domainScores: input.domainScores ?? null,
+      checkinVersion: input.checkinVersion ?? null,
       xpGranted: xp.xpGranted,
       xpAwarded: xp.xpAwarded,
       schemaVersion: JOURNAL_SCHEMA_VERSION,
@@ -260,6 +292,7 @@ export class MemoryJournalStorage implements JournalStorage {
       const saveCheck = validateSaveScores({
         enabledCodes,
         scores: input.scores,
+        relaxEnabledCount: Boolean(input.relaxEnabledCount),
       });
       if (!saveCheck.ok) throw new Error(saveCheck.error);
     } else {
@@ -294,7 +327,14 @@ export class MemoryJournalStorage implements JournalStorage {
       userTimezone: input.userTimezone ?? "Asia/Seoul",
       content: input.content,
       overallSatisfaction: input.overallSatisfaction,
+      happinessScore:
+        input.happinessScore !== undefined
+          ? input.happinessScore
+          : input.overallSatisfaction,
       moodLabel: input.moodLabel,
+      moodLabels:
+        input.moodLabels ??
+        (input.moodLabel ? [input.moodLabel] : []),
       mainEventText: input.mainEventText,
       source: "new_diary",
       scores,
@@ -303,6 +343,9 @@ export class MemoryJournalStorage implements JournalStorage {
         source: "user",
         confirmedByUser: true,
       })),
+      coreStates: input.coreStates ?? null,
+      domainScores: input.domainScores ?? null,
+      checkinVersion: input.checkinVersion ?? null,
       xpGranted: xp.xpGranted,
       xpAwarded: xp.xpAwarded,
       schemaVersion: JOURNAL_SCHEMA_VERSION,

@@ -24,6 +24,16 @@ describe("featureFlags (Phase 1 + 4 + 5)", () => {
     expect(DEFAULT_FEATURE_FLAGS.analysisNarrativeLlmEnabled).toBe(false);
     expect(DEFAULT_FEATURE_FLAGS.analysisCacheEnabled).toBe(false);
     expect(DEFAULT_FEATURE_FLAGS.sajuFeatureSnapshotEnabled).toBe(false);
+    expect(DEFAULT_FEATURE_FLAGS.checkinV2Enabled).toBe(false);
+    expect(DEFAULT_FEATURE_FLAGS.ragQuestionWordingEnabled).toBe(true);
+    expect(DEFAULT_FEATURE_FLAGS.ridgeQuestionLiveEnabled).toBe(false);
+    expect(DEFAULT_FEATURE_FLAGS.dailyFortuneV2Enabled).toBe(false);
+    expect(DEFAULT_FEATURE_FLAGS.fortuneDetailsEnabled).toBe(true);
+    expect(DEFAULT_FEATURE_FLAGS.verifiedQuoteEnabled).toBe(true);
+    expect(DEFAULT_FEATURE_FLAGS.quoteRagEnabled).toBe(true);
+    expect(DEFAULT_FEATURE_FLAGS.originalDailySentenceEnabled).toBe(true);
+    expect(DEFAULT_FEATURE_FLAGS.contentFeedbackEnabled).toBe(true);
+    expect(DEFAULT_FEATURE_FLAGS.exposureAdjustedEvaluationEnabled).toBe(false);
   });
 
   test("환경변수 미설정 시 OFF", () => {

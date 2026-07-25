@@ -81,7 +81,7 @@ export default function HomeEBlock({ stats }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [stats.avg7, stats.avg30, stats.best?.code, stats.worst?.code, stats.uniqueDays]);
+  }, [stats, stats.avg7, stats.avg30, stats.best?.code, stats.worst?.code, stats.uniqueDays]);
 
   const lv = stats.level;
 

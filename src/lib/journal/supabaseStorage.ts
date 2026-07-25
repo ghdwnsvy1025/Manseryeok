@@ -159,23 +159,47 @@ class SupabaseJournalStorage implements JournalStorage {
       confirmedByUser: t.confirmed_by_user !== false,
     }));
 
+    const overallRaw =
+      row.overall_satisfaction == null
+        ? null
+        : Number(row.overall_satisfaction);
+    const overallSatisfaction =
+      overallRaw === 0
+        ? 0
+        : (migrateScoreToTen(overallRaw, schemaVersion) as JournalEntry["overallSatisfaction"]);
+
     return {
       id: entryId,
       userId: this.userId,
       entryDate: String(row.entry_date),
       userTimezone: String(row.user_timezone ?? "Asia/Seoul"),
       content: String(row.content ?? ""),
-      overallSatisfaction: migrateScoreToTen(
-        row.overall_satisfaction == null
+      overallSatisfaction,
+      happinessScore:
+        row.happiness_score == null
           ? null
-          : Number(row.overall_satisfaction),
-        schemaVersion
-      ) as JournalEntry["overallSatisfaction"],
+          : Number(row.happiness_score),
       moodLabel: (row.mood_label as string | null) ?? null,
+      moodLabels: Array.isArray(row.mood_labels)
+        ? (row.mood_labels as unknown[]).filter(
+            (m): m is string => typeof m === "string"
+          )
+        : row.mood_label
+          ? [String(row.mood_label)]
+          : [],
       mainEventText: (row.main_event_text as string | null) ?? null,
       source: (row.source as JournalEntry["source"]) ?? "new_diary",
       scores: scoreRecords,
       tags: tagRecords,
+      coreStates:
+        row.core_states && typeof row.core_states === "object"
+          ? (row.core_states as JournalEntry["coreStates"])
+          : null,
+      domainScores: Array.isArray(row.domain_scores)
+        ? (row.domain_scores as JournalEntry["domainScores"])
+        : null,
+      checkinVersion:
+        typeof row.checkin_version === "number" ? row.checkin_version : null,
       xpGranted: Boolean(row.xp_granted),
       xpAwarded: typeof row.xp_awarded === "number" ? row.xp_awarded : 0,
       schemaVersion: Math.max(schemaVersion, JOURNAL_SCHEMA_VERSION),
@@ -200,6 +224,7 @@ class SupabaseJournalStorage implements JournalStorage {
     const saveCheck = validateSaveScores({
       enabledCodes,
       scores: input.scores,
+      relaxEnabledCount: Boolean(input.relaxEnabledCount),
     });
     if (!saveCheck.ok) throw new Error(saveCheck.error);
 
@@ -214,14 +239,18 @@ class SupabaseJournalStorage implements JournalStorage {
       allEntries,
     });
 
-    const upsertRow = {
+    const moodLabels =
+      input.moodLabels ??
+      (input.moodLabel ? [input.moodLabel] : []);
+
+    const upsertRow: Record<string, unknown> = {
       id,
       user_id: this.userId,
       entry_date: input.entryDate,
       user_timezone: input.userTimezone ?? "Asia/Seoul",
       content: input.content,
       overall_satisfaction: input.overallSatisfaction,
-      mood_label: input.moodLabel,
+      mood_label: input.moodLabel ?? moodLabels[0] ?? null,
       main_event_text: input.mainEventText,
       source: "new_diary",
       schema_version: JOURNAL_SCHEMA_VERSION,
@@ -229,12 +258,42 @@ class SupabaseJournalStorage implements JournalStorage {
       xp_awarded: xp.xpAwarded,
       updated_at: now,
       created_at: existing?.createdAt ?? now,
+      happiness_score:
+        input.happinessScore !== undefined
+          ? input.happinessScore
+          : input.overallSatisfaction,
+      mood_labels: moodLabels,
+      core_states: input.coreStates ?? null,
+      domain_scores: input.domainScores ?? null,
+      checkin_version: input.checkinVersion ?? null,
     };
 
     const { error: upErr } = await this.client
       .from("journal_entries")
       .upsert(upsertRow, { onConflict: "user_id,entry_date" });
-    if (upErr) throw new Error(upErr.message);
+    if (upErr) {
+      // 014 미적용 시 신규 컬럼 제거 후 재시도
+      if (
+        /happiness_score|mood_labels|core_states|domain_scores|checkin_version/i.test(
+          upErr.message
+        )
+      ) {
+        const {
+          happiness_score: _h,
+          mood_labels: _m,
+          core_states: _c,
+          domain_scores: _d,
+          checkin_version: _v,
+          ...legacy
+        } = upsertRow;
+        const { error: e2 } = await this.client
+          .from("journal_entries")
+          .upsert(legacy, { onConflict: "user_id,entry_date" });
+        if (e2) throw new Error(e2.message);
+      } else {
+        throw new Error(upErr.message);
+      }
+    }
 
     await this.client
       .from("category_scores")
@@ -242,34 +301,41 @@ class SupabaseJournalStorage implements JournalStorage {
       .eq("entry_id", id)
       .eq("user_id", this.userId);
 
-    const scoreRows = input.scores
-      .filter((s) => isCategoryCode(s.categoryCode))
-      .map((s) => {
-        const userScore = resolveUserScore(s);
-        const aiScore =
-          s.aiScore != null && Number.isFinite(s.aiScore) ? Number(s.aiScore) : null;
-        const finalScore =
-          s.finalScore !== undefined
-            ? s.finalScore
-            : computeFinalScore({
-                userScore,
-                aiScore,
-                isNotApplicable: s.isNotApplicable,
-              });
-        return {
-          id: generateId(),
-          entry_id: id,
-          user_id: this.userId,
-          category_code: s.categoryCode,
-          raw_score: userScore,
-          user_score: userScore,
-          ai_score: aiScore,
-          final_score: finalScore,
-          is_not_applicable: s.isNotApplicable,
-          updated_at: now,
-          created_at: now,
-        };
-      });
+    // (entry_id, category_code) 유니크 제약 때문에 같은 코드가 중복되면 마지막 값만 남긴다
+    const dedupedScores = Array.from(
+      new Map(
+        input.scores
+          .filter((s) => isCategoryCode(s.categoryCode))
+          .map((s) => [s.categoryCode, s])
+      ).values()
+    );
+
+    const scoreRows = dedupedScores.map((s) => {
+      const userScore = resolveUserScore(s);
+      const aiScore =
+        s.aiScore != null && Number.isFinite(s.aiScore) ? Number(s.aiScore) : null;
+      const finalScore =
+        s.finalScore !== undefined
+          ? s.finalScore
+          : computeFinalScore({
+              userScore,
+              aiScore,
+              isNotApplicable: s.isNotApplicable,
+            });
+      return {
+        id: generateId(),
+        entry_id: id,
+        user_id: this.userId,
+        category_code: s.categoryCode,
+        raw_score: userScore,
+        user_score: userScore,
+        ai_score: aiScore,
+        final_score: finalScore,
+        is_not_applicable: s.isNotApplicable,
+        updated_at: now,
+        created_at: now,
+      };
+    });
 
     if (scoreRows.length > 0) {
       const { error } = await this.client.from("category_scores").insert(scoreRows);

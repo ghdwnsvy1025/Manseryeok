@@ -1,5 +1,7 @@
 /**
- * C-3 오늘의 운세 — B + 학습 이론(RAG) 기반 5영역 × 2줄
+ * C-3 오늘의 운세
+ * - v1(레거시): B + RAG, 5영역×2줄
+ * - v2: DailyInsightContext 점수 → LLM은 문장만 (플래그)
  */
 import OpenAI from "openai";
 import type { BTheme } from "./bTheme";
@@ -9,6 +11,13 @@ import {
   theoryUsageRules,
   type TheoryEvidence,
 } from "./theoryContext";
+import type {
+  DailyInsightContext,
+  FortuneDomainResult,
+} from "./insight/types";
+import { scoreFortuneDomains, FORTUNE_SCORE_VERSION } from "./fortune/score";
+import { FORTUNE_DOMAIN_TITLES } from "./fortune/domains";
+import { validateFortuneText } from "./contentSafety";
 
 export type FortuneSection = {
   id: "personality" | "work" | "love" | "health" | "social";
@@ -21,6 +30,26 @@ export type TodayFortuneResult = {
   openAi: OpenAiCallStatus;
   theoryUsed: boolean;
   theoryEvidence: TheoryEvidence[];
+};
+
+export type TodayFortuneV2Result = {
+  version: "v2";
+  overall: FortuneDomainResult;
+  domains: FortuneDomainResult[];
+  scoringVersion: string;
+  openAi: OpenAiCallStatus;
+  theoryUsed: boolean;
+  theoryEvidence: TheoryEvidence[];
+  insight: Pick<
+    DailyInsightContext,
+    | "eventDate"
+    | "dataCutoffAt"
+    | "primaryKeyword"
+    | "tensionKeyword"
+    | "overallConfidence"
+    | "priorUniqueDays"
+    | "engineVersion"
+  >;
 };
 
 const TITLES: Record<FortuneSection["id"], string> = {
@@ -174,6 +203,216 @@ JSON: { "sections": [ { "id": "...", "lines": ["...", "..."] } ] }`,
       openAi: { kind: "failed", reason: "request_failed", detail: msg },
       theoryUsed: theory.used,
       theoryEvidence: theory.evidence,
+    };
+  }
+}
+
+function applyWordingPatch(
+  domains: FortuneDomainResult[],
+  raw: unknown
+): FortuneDomainResult[] {
+  if (!raw || typeof raw !== "object") return domains;
+  const arr = Array.isArray((raw as { domains?: unknown }).domains)
+    ? ((raw as { domains: unknown[] }).domains)
+    : null;
+  if (!arr) return domains;
+
+  return domains.map((d) => {
+    const found = arr.find(
+      (x) =>
+        x &&
+        typeof x === "object" &&
+        (x as { domain?: string }).domain === d.domain
+    ) as
+      | {
+          headline?: string;
+          summary?: string;
+          opportunity?: string;
+          caution?: string;
+          action?: string;
+        }
+      | undefined;
+    if (!found) return d;
+    return {
+      ...d,
+      headline:
+        typeof found.headline === "string" && found.headline.trim()
+          ? found.headline.trim()
+          : d.headline,
+      summary:
+        typeof found.summary === "string" && found.summary.trim()
+          ? found.summary.trim()
+          : d.summary,
+      opportunity:
+        typeof found.opportunity === "string" && found.opportunity.trim()
+          ? found.opportunity.trim()
+          : d.opportunity,
+      caution:
+        typeof found.caution === "string" && found.caution.trim()
+          ? found.caution.trim()
+          : d.caution,
+      action:
+        typeof found.action === "string" && found.action.trim()
+          ? found.action.trim()
+          : d.action,
+    };
+  });
+}
+
+function sanitizeDomainCopy(
+  domain: FortuneDomainResult,
+  fallback: FortuneDomainResult
+): FortuneDomainResult {
+  const fields: Array<keyof Pick<
+    FortuneDomainResult,
+    "headline" | "summary" | "opportunity" | "caution" | "action"
+  >> = ["headline", "summary", "opportunity", "caution", "action"];
+  const next = { ...domain };
+  for (const key of fields) {
+    const check = validateFortuneText(String(next[key] ?? ""));
+    if (!check.ok) next[key] = fallback[key];
+  }
+  return next;
+}
+
+/**
+ * v2 — 점수·영역·톤은 코드가 결정, LLM은 문장 다듬기만
+ */
+export async function generateTodayFortuneV2(
+  insight: DailyInsightContext,
+  opts?: { skipLlm?: boolean }
+): Promise<TodayFortuneV2Result> {
+  const scored = scoreFortuneDomains(insight);
+  const overall = scored.find((d) => d.domain === "overall")!;
+  const domains = scored.filter((d) => d.domain !== "overall");
+
+  const insightMeta: TodayFortuneV2Result["insight"] = {
+    eventDate: insight.eventDate,
+    dataCutoffAt: insight.dataCutoffAt,
+    primaryKeyword: insight.primaryKeyword,
+    tensionKeyword: insight.tensionKeyword,
+    overallConfidence: insight.overallConfidence,
+    priorUniqueDays: insight.priorUniqueDays,
+    engineVersion: insight.engineVersion,
+  };
+
+  if (opts?.skipLlm) {
+    return {
+      version: "v2",
+      overall,
+      domains,
+      scoringVersion: FORTUNE_SCORE_VERSION,
+      openAi: { kind: "skipped", detail: "skip_llm_preview" },
+      theoryUsed: false,
+      theoryEvidence: [],
+      insight: insightMeta,
+    };
+  }
+
+  const theory = await loadTheoryContext({
+    b: insight.bTheme,
+    ganjiKo: insight.ganjiKo,
+    purpose: "fortune",
+  });
+
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    return {
+      version: "v2",
+      overall,
+      domains,
+      scoringVersion: FORTUNE_SCORE_VERSION,
+      openAi: { kind: "skipped", detail: "no_api_key" },
+      theoryUsed: theory.used,
+      theoryEvidence: theory.evidence,
+      insight: insightMeta,
+    };
+  }
+
+  try {
+    const client = new OpenAI({ apiKey });
+    const completion = await client.chat.completions.create({
+      model: process.env.OPENAI_JOURNAL_SCORE_MODEL || "gpt-4o-mini",
+      temperature: 0.55,
+      response_format: { type: "json_object" },
+      messages: [
+        {
+          role: "system",
+          content: `당신은 사주 일기 앱의 '오늘의 운세' 문장 다듬기 담당입니다.
+규칙:
+- domain·tone·score·confidence는 절대 바꾸지 마세요. 문장만 자연스럽게.
+- 영역: overall, work, relationship, finance, health
+- 각 영역: headline, summary, opportunity, caution, action (한국어 1문장씩, 짧고 따뜻하게)
+- 건강은 에너지·피로·회복으로만. 의료 진단 금지.
+- 사주 전문용어·유명인 명언 인용 금지.
+${theoryUsageRules("fortune")}
+JSON: { "domains": [ { "domain": "...", "headline": "...", "summary": "...", "opportunity": "...", "caution": "...", "action": "..." } ] }`,
+        },
+        {
+          role: "user",
+          content: JSON.stringify({
+            titles: FORTUNE_DOMAIN_TITLES,
+            domains: scored.map((d) => ({
+              domain: d.domain,
+              title: d.title,
+              tone: d.tone,
+              score: d.score,
+              confidence: d.confidence,
+              draft: {
+                headline: d.headline,
+                summary: d.summary,
+                opportunity: d.opportunity,
+                caution: d.caution,
+                action: d.action,
+              },
+              evidenceCodes: d.evidenceCodes,
+            })),
+            primaryKeyword: insight.primaryKeyword,
+            tensionKeyword: insight.tensionKeyword,
+            ganjiKo: insight.ganjiKo,
+            theoryChunks: theory.chunks,
+          }),
+        },
+      ],
+    });
+
+    const raw = completion.choices[0]?.message?.content;
+    if (!raw) {
+      return {
+        version: "v2",
+        overall,
+        domains,
+        scoringVersion: FORTUNE_SCORE_VERSION,
+        openAi: { kind: "failed", reason: "missing_required" },
+        theoryUsed: theory.used,
+        theoryEvidence: theory.evidence,
+        insight: insightMeta,
+      };
+    }
+    const patched = applyWordingPatch(scored, JSON.parse(raw)).map((d, i) =>
+      sanitizeDomainCopy(d, scored[i]!)
+    );
+    return {
+      version: "v2",
+      overall: patched.find((d) => d.domain === "overall")!,
+      domains: patched.filter((d) => d.domain !== "overall"),
+      scoringVersion: FORTUNE_SCORE_VERSION,
+      openAi: { kind: "used" },
+      theoryUsed: theory.used,
+      theoryEvidence: theory.evidence,
+      insight: insightMeta,
+    };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return {
+      version: "v2",
+      overall,
+      domains,
+      scoringVersion: FORTUNE_SCORE_VERSION,
+      openAi: { kind: "failed", reason: "request_failed", detail: msg },
+      theoryUsed: theory.used,
+      theoryEvidence: theory.evidence,
+      insight: insightMeta,
     };
   }
 }

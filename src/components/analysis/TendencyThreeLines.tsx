@@ -23,6 +23,7 @@ export default function TendencyThreeLines({
   };
 }) {
   const [state, setState] = useState<State>({ status: "loading" });
+  const elementHintsKey = hints?.elementHints?.join("|") ?? "";
 
   useEffect(() => {
     let cancelled = false;
@@ -69,11 +70,12 @@ export default function TendencyThreeLines({
       cancelled = true;
     };
   }, [
+    hints,
     hints?.ganjiKo,
     hints?.heavenlyStem,
     hints?.earthlyBranch,
     hints?.tenGod,
-    hints?.elementHints?.join("|"),
+    elementHintsKey,
   ]);
 
   return (

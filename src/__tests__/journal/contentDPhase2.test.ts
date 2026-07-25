@@ -3,7 +3,7 @@ import {
   combineRecentAAndD,
   buildContentScoreBundle,
 } from "@/lib/journal/contentD";
-import { buildQuestionTemplate } from "@/lib/journal/todayQuestion";
+import { buildQuestionTemplate } from "@/lib/journal/todayQuestionTemplate";
 import { buildQuoteTemplate } from "@/lib/journal/todayQuote";
 import { buildBTheme } from "@/lib/journal/bTheme";
 import { buildDailySajuContext } from "@/lib/product/dailySajuContext";
@@ -53,7 +53,9 @@ describe("question/quote templates", () => {
       userTimezone: "Asia/Seoul",
       content: "피곤했다",
       overallSatisfaction: 2,
+      happinessScore: 2,
       moodLabel: "지침",
+      moodLabels: ["지침"],
       mainEventText: null,
       source: "new_diary",
       scores: [
@@ -74,6 +76,9 @@ describe("question/quote templates", () => {
         },
       ],
       tags: [],
+      coreStates: null,
+      domainScores: null,
+      checkinVersion: null,
       xpGranted: true,
       xpAwarded: 10,
       schemaVersion: 2,

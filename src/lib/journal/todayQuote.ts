@@ -1,19 +1,33 @@
 /**
- * 개인화된 오늘의 명언 — 저장 직후 (§16)
- * 유명 명언 인용 금지. OpenAI 실패 시 템플릿.
+ * 일기 저장 직후 콘텐츠 선택:
+ * 1) 검증 명언 → 2) 앱 오늘의 문장 → 3) 템플릿
  */
 import OpenAI from "openai";
-import { getCategoryByCode } from "./categoryCatalog";
 import { getTagName } from "./eventTagCatalog";
 import type { BTheme } from "./bTheme";
 import type { OpenAiCallStatus } from "./openaiStatus";
 import type { CategoryCode, JournalEntry } from "./types";
 import { isLowJournalScore } from "./scoreScale";
 import {
-  loadTheoryContext,
-  theoryUsageRules,
-  type TheoryEvidence,
-} from "./theoryContext";
+  CONTENT_SAFETY_VERSION,
+  validateTodaySentenceText,
+} from "./contentSafety";
+import { isTooSimilar } from "./contentOverlap";
+import {
+  inferTemplateTheme,
+  pickTemplateSentence,
+  SENTENCE_TEMPLATE_VERSION,
+} from "./quote/templates";
+import { filterSafeQuotes } from "./quote/safetyFilter";
+import { selectBestQuote, type QuoteSelectContext } from "./quote/select";
+import type { QuoteLibraryItem } from "./quote/types";
+import {
+  isOriginalDailySentenceEnabled,
+  isQuoteRagEnabled,
+  isVerifiedQuoteEnabled,
+} from "@/lib/app/featureFlags";
+
+export const SENTENCE_PROMPT_VERSION = "today-sentence-prompt-v2.0.0";
 
 export type TodayQuoteInput = {
   b: BTheme;
@@ -22,14 +36,46 @@ export type TodayQuoteInput = {
   trend: { delta: number | null; direction: "up" | "down" | "flat" | "unknown" };
   aiSummary?: string | null;
   ganjiKo?: string | null;
+  primaryKeyword?: string | null;
+  tensionKeyword?: string | null;
+  fortuneTheme?: string | null;
+  recentSentences?: string[];
+  quoteCandidates?: QuoteLibraryItem[];
+  recentQuoteIds?: string[];
+  recentAuthors?: string[];
 };
 
-export type TodayQuoteResult = {
+export type TodayContentDelivery = {
+  /** @deprecated */
   quote: string;
+  sentence: string;
+  contentType:
+    | "verified_quote"
+    | "app_original_sentence"
+    | "fallback_sentence";
+  sourceLabel: string;
+  authorName: string | null;
+  workTitle: string | null;
+  attribution: null | {
+    authorName: string | null;
+    workTitle: string | null;
+    sourceLabel: string;
+  };
+  quoteId: string | null;
+  selectionScore: number | null;
+  selectionReason: string;
+  generationContext: Record<string, unknown>;
+  promptVersion: string;
+  safetyFilterVersion: string;
   openAi: OpenAiCallStatus;
   theoryUsed: boolean;
-  theoryEvidence: TheoryEvidence[];
+  theoryEvidence: [];
 };
+
+function moodsOf(entry: JournalEntry): string[] {
+  if (entry.moodLabels?.length) return entry.moodLabels;
+  return entry.moodLabel ? [entry.moodLabel] : [];
+}
 
 function lowestFinal(entry: JournalEntry): {
   code: CategoryCode;
@@ -45,126 +91,271 @@ function lowestFinal(entry: JournalEntry): {
   return worst;
 }
 
-export function buildQuoteTemplate(input: TodayQuoteInput): string {
-  const mood = input.entry.moodLabel;
-  const tags = input.entry.tags
-    .map((t) => getTagName(t.tagCode))
-    .slice(0, 2)
-    .join(", ");
+function detectState(input: TodayQuoteInput) {
+  const moods = moodsOf(input.entry);
+  const tags = input.entry.tags.map((t) => t.tagCode);
   const low = lowestFinal(input.entry);
-  const lowName = low ? getCategoryByCode(low.code)?.name : null;
-  const kw = input.b.keywords[0] ?? "균형";
+  const happiness = input.entry.happinessScore ?? input.entry.overallSatisfaction;
+  const hardDay =
+    moods.some((m) => ["지침", "불안", "슬픔", "분노"].includes(m)) ||
+    (low != null && isLowJournalScore(low.score)) ||
+    tags.some((t) => /illness|conflict|mistake|pain/i.test(t));
+  const goodDay =
+    moods.some((m) => ["기쁨", "설렘"].includes(m)) ||
+    (typeof happiness === "number" && happiness >= 7);
+  const energy = input.entry.scores.find((s) => s.categoryCode === "energy");
+  const focus = input.entry.scores.find(
+    (s) => s.categoryCode === "focus_execution"
+  );
+  const overload =
+    (focus?.finalScore ?? 0) >= 7 && (energy?.finalScore ?? 10) <= 4;
+  const discrepancy =
+    input.aiSummary &&
+    low &&
+    typeof happiness === "number" &&
+    Math.abs(happiness - low.score) >= 4;
+  return { moods, tags, hardDay, goodDay, overload, discrepancy, low, happiness };
+}
 
-  if (mood === "지침" || mood === "불안" || (low && isLowJournalScore(low.score))) {
-    return `오늘의 피로는 당신이 약해서가 아니라, ${kw} 앞에서 애쓴 흔적일 수 있어요. ${
-      lowName ? `「${lowName}」이 무거웠다면, ` : ""
-    }이제는 잠시 속도를 낮추는 것도 오늘을 잘 살아낸 방식이에요.`;
+export function buildTodaySentenceTemplate(input: TodayQuoteInput): string {
+  const state = detectState(input);
+  const theme = inferTemplateTheme({
+    moods: state.moods,
+    hardDay: state.hardDay,
+    goodDay: state.goodDay,
+    overload: state.overload,
+    lowEnergy: state.hardDay,
+  });
+  return pickTemplateSentence(theme, input.recentSentences ?? []);
+}
+
+function clampSentence(text: string): string {
+  const t = text.trim().replace(/\s+/g, " ");
+  if (t.length <= 100) return t;
+  return t.slice(0, 100).replace(/\s+\S*$/, "").trim();
+}
+
+async function generateAppSentence(
+  input: TodayQuoteInput,
+  state: ReturnType<typeof detectState>,
+  fallback: string
+): Promise<{ text: string; openAi: OpenAiCallStatus }> {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    return { text: fallback, openAi: { kind: "skipped", detail: "no_api_key" } };
   }
 
-  if (input.trend.direction === "up") {
-    return `최근 흐름이 조금씩 나아지고 있어요. 오늘 ${
-      tags || "남긴 기록"
-    } 속에서 마음에 남은 작은 힘을 내일도 붙잡아 보세요.`;
-  }
+  const tone = state.hardDay
+    ? "acknowledge"
+    : state.overload
+      ? "pace"
+      : state.goodDay
+        ? "gentle_expand"
+        : state.discrepancy
+          ? "hold_both"
+          : "calm";
 
-  if (mood === "기쁨" || mood === "설렘") {
-    return `가벼운 마음이 찾아온 날이에요. ${kw}의 기운을 억지로 키우기보다, 지금 편안한 감각을 조금 더 오래 머무르게 해 주세요.`;
-  }
+  const constraints = [
+    "1~2문장, 최대 100자",
+    "유명인·책 인용 금지",
+    "작가명·출처 표기 금지",
+    "사주 전문용어 금지",
+    "운명·진단·억지긍정·힘내 금지",
+    "명령형 반복 금지",
+    "일기 원문 복사 금지",
+  ];
 
-  return `사람들과의 거리나 일의 속도가 마음처럼 조절되지 않는 날도 있어요. 오늘은 완벽한 답보다, 내 마음이 편해지는 ${kw}의 거리를 먼저 찾아보세요.`;
+  try {
+    const client = new OpenAI({ apiKey });
+    const attempt = async () => {
+      const completion = await client.chat.completions.create({
+        model: process.env.OPENAI_JOURNAL_SCORE_MODEL || "gpt-4o-mini",
+        temperature: 0.7,
+        response_format: { type: "json_object" },
+        messages: [
+          {
+            role: "system",
+            content: `당신은 일기 앱의 '오늘의 문장' 작성자입니다.
+역할: 하루를 따뜻하게 닫는 짧은 문장. 조언·훈계 금지.
+JSON만: { "sentence": "...", "tone": "...", "themes": ["..."] }`,
+          },
+          {
+            role: "user",
+            content: JSON.stringify({
+              primary_theme: input.primaryKeyword ?? input.b.keywords[0] ?? null,
+              secondary_theme: input.tensionKeyword ?? null,
+              fortune_theme: input.fortuneTheme ?? null,
+              emotions: state.moods,
+              state_summary: {
+                happiness: state.happiness,
+                hardDay: state.hardDay,
+                goodDay: state.goodDay,
+                overload: state.overload,
+                discrepancy: Boolean(state.discrepancy),
+                trend: input.trend.direction,
+              },
+              event_tags: state.tags.map((t) => getTagName(t)),
+              diary_features: (input.aiSummary ?? "").slice(0, 180),
+              tone,
+              recent_sentences: (input.recentSentences ?? []).slice(0, 5),
+              constraints,
+              templateHint: fallback,
+            }),
+          },
+        ],
+      });
+      const raw = completion.choices[0]?.message?.content;
+      if (!raw) return null;
+      const parsed = JSON.parse(raw) as { sentence?: string };
+      if (typeof parsed.sentence !== "string" || !parsed.sentence.trim()) {
+        return null;
+      }
+      return clampSentence(parsed.sentence);
+    };
+
+    let text = await attempt();
+    const recent = input.recentSentences ?? [];
+    if (
+      text &&
+      (!validateTodaySentenceText(text).ok || isTooSimilar(text, recent))
+    ) {
+      text = await attempt();
+    }
+    if (
+      !text ||
+      !validateTodaySentenceText(text).ok ||
+      isTooSimilar(text, recent)
+    ) {
+      return {
+        text: fallback,
+        openAi: { kind: "failed", reason: "quality_rejected" },
+      };
+    }
+    return { text, openAi: { kind: "used" } };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return {
+      text: fallback,
+      openAi: { kind: "failed", reason: "request_failed", detail: msg },
+    };
+  }
 }
 
 export async function generateTodayQuote(
   input: TodayQuoteInput
-): Promise<TodayQuoteResult> {
-  const fallback = buildQuoteTemplate(input);
-  const theory = await loadTheoryContext({
-    b: input.b,
-    ganjiKo: input.ganjiKo,
-    purpose: "quote",
-    matchCount: 5,
-  });
+): Promise<TodayContentDelivery> {
+  const state = detectState(input);
+  const generationContext = {
+    primaryKeyword: input.primaryKeyword ?? null,
+    secondaryKeyword: input.tensionKeyword ?? null,
+    fortuneTheme: input.fortuneTheme ?? null,
+    dominantEmotions: state.moods,
+    eventTags: state.tags,
+    stateSummary: {
+      happiness: state.happiness,
+      hardDay: state.hardDay,
+      goodDay: state.goodDay,
+      overload: state.overload,
+      discrepancy: Boolean(state.discrepancy),
+      recentAOverall: input.recentAOverall,
+      trend: input.trend.direction,
+    },
+  };
 
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) {
-    return {
-      quote: fallback,
-      openAi: { kind: "skipped", detail: "no_api_key" },
-      theoryUsed: theory.used,
-      theoryEvidence: theory.evidence,
-    };
-  }
+  const baseMeta = {
+    promptVersion: SENTENCE_PROMPT_VERSION,
+    safetyFilterVersion: CONTENT_SAFETY_VERSION,
+    theoryUsed: false as const,
+    theoryEvidence: [] as [],
+  };
 
-  const finals = input.entry.scores
-    .filter((s) => !s.isNotApplicable && s.finalScore != null)
-    .map((s) => ({
-      category: getCategoryByCode(s.categoryCode)?.name ?? s.categoryCode,
-      final: s.finalScore,
-      user: s.userScore,
-      ai: s.aiScore,
-    }));
-
-  try {
-    const client = new OpenAI({ apiKey });
-    const completion = await client.chat.completions.create({
-      model: process.env.OPENAI_JOURNAL_SCORE_MODEL || "gpt-4o-mini",
-      temperature: 0.75,
-      response_format: { type: "json_object" },
-      messages: [
-        {
-          role: "system",
-          content: `당신은 일기 저장 직후 '오늘의 명언'을 씁니다.
-규칙:
-- 1~2문장, 감성적이되 구체적.
-- 유명인 명언 인용·출처 흉내 금지.
-${theoryUsageRules("quote")}
-- JSON: { "quote": "..." }`,
-        },
-        {
-          role: "user",
-          content: JSON.stringify({
-            bTheme: input.b,
-            ganjiKo: input.ganjiKo ?? null,
-            mood: input.entry.moodLabel,
-            tags: input.entry.tags.map((t) => getTagName(t.tagCode)),
-            finals,
-            recentAOverall: input.recentAOverall,
-            trend: input.trend,
-            diarySummary: input.aiSummary ?? input.entry.content.slice(0, 400),
-            theoryChunks: theory.chunks,
-            templateHint: fallback,
-          }),
-        },
-      ],
+  // 1) 검증 명언
+  if (isVerifiedQuoteEnabled() && isQuoteRagEnabled()) {
+    const safe = filterSafeQuotes(input.quoteCandidates ?? [], {
+      hardDay: state.hardDay,
+      moods: state.moods,
+      tags: state.tags,
     });
-
-    const raw = completion.choices[0]?.message?.content;
-    if (!raw) {
+    const ctx: QuoteSelectContext = {
+      primaryKeyword: input.primaryKeyword,
+      tensionKeyword: input.tensionKeyword,
+      fortuneTheme: input.fortuneTheme,
+      moods: state.moods,
+      tags: state.tags,
+      hardDay: state.hardDay,
+      recentQuoteIds: input.recentQuoteIds ?? [],
+      recentAuthors: input.recentAuthors ?? [],
+    };
+    const best = selectBestQuote(safe, ctx);
+    if (best) {
+      const q = best.quote;
+      const sourceLabel = [q.authorName, q.workTitle].filter(Boolean).join(" · ") ||
+        "검증된 명언";
       return {
-        quote: fallback,
-        openAi: { kind: "failed", reason: "missing_required" },
-        theoryUsed: theory.used,
-        theoryEvidence: theory.evidence,
+        quote: q.quoteTextKo,
+        sentence: q.quoteTextKo,
+        contentType: "verified_quote",
+        sourceLabel,
+        authorName: q.authorName,
+        workTitle: q.workTitle,
+        attribution: {
+          authorName: q.authorName,
+          workTitle: q.workTitle,
+          sourceLabel,
+        },
+        quoteId: q.id,
+        selectionScore: best.score,
+        selectionReason: "verified_quote_selected",
+        generationContext,
+        openAi: { kind: "skipped", detail: "quote_library" },
+        ...baseMeta,
       };
     }
-    const parsed = JSON.parse(raw) as { quote?: string };
-    const quote =
-      typeof parsed.quote === "string" && parsed.quote.trim()
-        ? parsed.quote.trim().slice(0, 320)
-        : fallback;
+  }
+
+  // 2) 앱 오늘의 문장
+  const fallback = buildTodaySentenceTemplate(input);
+  if (isOriginalDailySentenceEnabled()) {
+    const gen = await generateAppSentence(input, state, fallback);
+    const usedFallback = gen.text === fallback;
     return {
-      quote,
-      openAi: { kind: "used" },
-      theoryUsed: theory.used,
-      theoryEvidence: theory.evidence,
-    };
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return {
-      quote: fallback,
-      openAi: { kind: "failed", reason: "request_failed", detail: msg },
-      theoryUsed: theory.used,
-      theoryEvidence: theory.evidence,
+      quote: gen.text,
+      sentence: gen.text,
+      contentType: usedFallback ? "fallback_sentence" : "app_original_sentence",
+      sourceLabel: usedFallback
+        ? "검수된 템플릿"
+        : "앱이 건넨 문장",
+      authorName: null,
+      workTitle: null,
+      attribution: null,
+      quoteId: null,
+      selectionScore: null,
+      selectionReason: usedFallback
+        ? `template:${SENTENCE_TEMPLATE_VERSION}`
+        : "app_original_sentence",
+      generationContext,
+      openAi: gen.openAi,
+      ...baseMeta,
     };
   }
+
+  // 3) 템플릿만
+  return {
+    quote: fallback,
+    sentence: fallback,
+    contentType: "fallback_sentence",
+    sourceLabel: "검수된 템플릿",
+    authorName: null,
+    workTitle: null,
+    attribution: null,
+    quoteId: null,
+    selectionScore: null,
+    selectionReason: `template:${SENTENCE_TEMPLATE_VERSION}`,
+    generationContext,
+    openAi: { kind: "skipped", detail: "flag_off" },
+    ...baseMeta,
+  };
 }
+
+/** @deprecated buildTodaySentenceTemplate 사용 */
+export const buildQuoteTemplate = buildTodaySentenceTemplate;

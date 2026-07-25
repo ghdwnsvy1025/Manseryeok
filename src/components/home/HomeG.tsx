@@ -44,6 +44,9 @@ export default function HomeG() {
 
   useEffect(() => {
     let cancelled = false;
+    const timeout = window.setTimeout(() => {
+      if (!cancelled) setLoading(false);
+    }, 12000);
     (async () => {
       try {
         const storage = await getJournalStorage();
@@ -61,12 +64,16 @@ export default function HomeG() {
         } catch {
           /* keep local */
         }
+      } catch {
+        /* show shell even if storage fails */
       } finally {
+        window.clearTimeout(timeout);
         if (!cancelled) setLoading(false);
       }
     })();
     return () => {
       cancelled = true;
+      window.clearTimeout(timeout);
     };
   }, []);
 
@@ -175,7 +182,12 @@ export default function HomeG() {
         </div>
       )}
 
-      <TodayFortunePanel todayDate={today} sajuProfile={profile} />
+      <TodayFortunePanel
+        todayDate={today}
+        sajuProfile={profile}
+        entries={entries}
+        enabledCodes={enabledCodes}
+      />
 
       <HomeEBlock stats={eStats} />
 

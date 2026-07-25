@@ -74,6 +74,7 @@ export function validateScorePayload(input: {
  * - 활성 카테고리만
  * - 중복 없음
  * - 미입력 거부 (1~10 또는 해당 없음 필수)
+ * - relaxEnabledCount: 체크인 v2처럼 4개 미만 활성 허용
  */
 export function validateSaveScores(input: {
   enabledCodes: CategoryCode[];
@@ -83,9 +84,31 @@ export function validateSaveScores(input: {
     rawScore?: number | null;
     isNotApplicable: boolean;
   }>;
+  relaxEnabledCount?: boolean;
 }): { ok: boolean; error?: string } {
-  const enabledCheck = validateEnabledCategorySelection(input.enabledCodes);
-  if (!enabledCheck.ok) return enabledCheck;
+  if (input.relaxEnabledCount) {
+    const unique = Array.from(new Set(input.enabledCodes));
+    if (unique.length !== input.enabledCodes.length) {
+      return { ok: false, error: "중복된 카테고리가 있습니다." };
+    }
+    for (const code of unique) {
+      if (!isCategoryCode(code)) {
+        return { ok: false, error: `알 수 없는 카테고리: ${code}` };
+      }
+    }
+    if (unique.length === 0) {
+      return { ok: false, error: "저장할 카테고리가 없습니다." };
+    }
+    if (unique.length > MAX_ENABLED_CATEGORIES) {
+      return {
+        ok: false,
+        error: `최대 ${MAX_ENABLED_CATEGORIES}개까지 선택할 수 있어요.`,
+      };
+    }
+  } else {
+    const enabledCheck = validateEnabledCategorySelection(input.enabledCodes);
+    if (!enabledCheck.ok) return enabledCheck;
+  }
 
   const enabledSet = new Set(input.enabledCodes);
   const codes = input.scores.map((s) => s.categoryCode);

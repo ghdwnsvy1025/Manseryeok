@@ -1,5 +1,6 @@
 /**
  * 관리자 학습 이론(RAG) → 오늘의 운세/질문/명언용 컨텍스트
+ * 질문 경로: 문장 다듬기 전용. 키워드·포커스 결정은 questionDecision에서 끝남.
  */
 import {
   matchKnowledgeChunks,
@@ -30,7 +31,7 @@ function buildQuery(opts: {
     opts.purpose === "fortune"
       ? "오늘의 운세 직장 연애 건강 대인 성격 힘과 균형 용신"
       : opts.purpose === "question"
-        ? "오늘의 질문 성찰 상담 문장 하루 주제"
+        ? "오늘의 질문 성찰 상담 문장 하루 주제 말투"
         : "오늘의 명언 위로 조언 상담 전달 따뜻한 문장";
 
   return [
@@ -90,8 +91,10 @@ export async function loadTheoryContext(opts: {
   }
 }
 
-/** 프롬프트에 넣을 공통 규칙 (왕초보용: AI에게 교과서 보고 말하라고 시키는 부분) */
-export function theoryUsageRules(kind: "fortune" | "question" | "quote"): string {
+/** 프롬프트에 넣을 공통 규칙 */
+export function theoryUsageRules(
+  kind: "fortune" | "question" | "quote"
+): string {
   const base = `
 학습된 사주 이론(theoryChunks)이 있으면 그것을 교과서처럼 사용하세요.
 - 청크에 없는 이론을 지어내지 마세요.
@@ -107,9 +110,10 @@ export function theoryUsageRules(kind: "fortune" | "question" | "quote"): string
   }
   if (kind === "question") {
     return `${base}
-질문 톤:
-- 이론의 오늘의 주제를 한 문장 성찰 질문으로 바꿉니다.
-- 예: "힘이 넘치는 날" → "오늘 속도를 조금만 늦춰도 괜찮았을 순간은?"`;
+질문 문장화 전용 (주제 결정은 이미 lockedDecision에서 끝남):
+- theoryChunks는 말투·비유만 참고합니다. 새 주제를 고르지 마세요.
+- lockedDecision.topKeywords / focusCategory를 유지한 채 문장만 다듬습니다.
+- 예: 키워드가 「회복·집중」이면 그 범위 안에서만 질문합니다.`;
   }
   return `${base}
 명언 톤:

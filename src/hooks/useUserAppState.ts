@@ -25,15 +25,32 @@ export function useUserAppState(): HookState {
   const refresh = useCallback(async () => {
     setLoading(true);
     setError(null);
+    const timeoutMs = (ms: number, label: string) =>
+      new Promise<never>((_, reject) => {
+        const t = setTimeout(
+          () => reject(new Error(`${label} 응답이 너무 오래 걸립니다.`)),
+          ms
+        );
+        // Node/브라우저 공통
+        return t;
+      });
+
     try {
+      const withTimeout = <T,>(p: Promise<T>, ms: number, label: string) =>
+        Promise.race([p, timeoutMs(ms, label)]);
+
       const [{ experienceMode, onboardingCompletedAt }, sajuProfile, storage] =
-        await Promise.all([
-          loadUserExperienceSettings(),
-          loadPrimarySajuProfile(),
-          getDiaryStorage(),
-        ]);
+        await withTimeout(
+          Promise.all([
+            loadUserExperienceSettings(),
+            loadPrimarySajuProfile(),
+            getDiaryStorage(),
+          ]),
+          12000,
+          "초기 상태"
+        );
       await cleanupDemoEntriesOnce(storage);
-      const entries = await storage.list();
+      const entries = await withTimeout(storage.list(), 10000, "일기 목록");
       setState(
         computeUserAppState({
           experienceMode,

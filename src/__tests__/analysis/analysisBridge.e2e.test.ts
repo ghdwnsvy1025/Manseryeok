@@ -91,10 +91,10 @@ describe("Phase 5 — analysis remote bridge", () => {
           versionMetadata: vm.versionMetadata,
           astrologyAvailable: vm.astrologyTheoryLayer?.available ?? false,
           recordAvailable: vm.personalRecordLayer?.available ?? false,
-          theoryTextPreview: (vm.astrologyTheoryLayer?.text || "").slice(0, 80),
-          recordTextPreview: (vm.personalRecordLayer?.text || "").slice(0, 80),
+          theoryTextPreview: (vm.astrologyTheoryLayer?.body || "").slice(0, 80),
+          recordTextPreview: (vm.personalRecordLayer?.body || "").slice(0, 80),
           suggestionTextPreview: (
-            vm.actionSuggestionLayer?.text || ""
+            vm.actionSuggestionLayer?.body || ""
           ).slice(0, 80),
         },
         privacy: { ok: privacy.ok, reasons: privacy.reasons },

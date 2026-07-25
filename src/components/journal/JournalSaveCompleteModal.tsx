@@ -11,6 +11,9 @@ import { getCategoryByCode } from "@/lib/journal/categoryCatalog";
 import { getTagName } from "@/lib/journal/eventTagCatalog";
 import type { JournalEntry } from "@/lib/journal/types";
 import type { JournalSaveResult } from "@/lib/journal/storage";
+import ContentFeedbackButtons from "@/components/journal/ContentFeedbackButtons";
+import { submitContentFeedback } from "@/lib/journal/contentFeedback";
+import { trackContentExposure } from "@/lib/journal/exposure";
 
 type Props = {
   entry: JournalEntry;
@@ -21,6 +24,11 @@ type Props = {
   quote: string | null;
   quoteOpenAi: OpenAiCallStatus | null;
   quoteLoading: boolean;
+  contentType?: string | null;
+  sourceLabel?: string | null;
+  authorName?: string | null;
+  workTitle?: string | null;
+  deliveryId?: string | null;
   onClose: () => void;
 };
 
@@ -33,9 +41,17 @@ export default function JournalSaveCompleteModal({
   quote,
   quoteOpenAi,
   quoteLoading,
+  contentType,
+  sourceLabel,
+  authorName,
+  workTitle,
+  deliveryId,
   onClose,
 }: Props) {
   const [gauge, setGauge] = useState(0);
+  const [savedLocal, setSavedLocal] = useState(false);
+  const isVerified = contentType === "verified_quote";
+  const title = isVerified ? "오늘의 명언" : "오늘의 문장";
 
   useEffect(() => {
     const target = Math.min(1, xp.totalXp > 0 ? 0.35 + (xp.gainedXp > 0 ? 0.4 : 0.15) : 0.2);
@@ -49,6 +65,67 @@ export default function JournalSaveCompleteModal({
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
   }, [xp.gainedXp, xp.totalXp]);
+
+  useEffect(() => {
+    if (!quote || quoteLoading) return;
+    void trackContentExposure({
+      eventDate: entry.entryDate,
+      contentType: contentType ?? "app_original_sentence",
+      contentId: deliveryId,
+      eventType: isVerified ? "quote_impression" : "sentence_impression",
+      metadata: { surface: "save_modal" },
+    });
+  }, [quote, quoteLoading, entry.entryDate, contentType, deliveryId, isVerified]);
+
+  const handleSave = () => {
+    if (!quote || typeof window === "undefined") return;
+    try {
+      const key = `manseryeok:saved-sentences:v1`;
+      const raw = window.localStorage.getItem(key);
+      const list = raw ? (JSON.parse(raw) as unknown[]) : [];
+      list.unshift({
+        text: quote,
+        contentType,
+        sourceLabel,
+        authorName,
+        workTitle,
+        entryDate: entry.entryDate,
+        savedAt: new Date().toISOString(),
+      });
+      window.localStorage.setItem(key, JSON.stringify(list.slice(0, 50)));
+      setSavedLocal(true);
+      void submitContentFeedback({
+        eventDate: entry.entryDate,
+        contentType: contentType ?? "app_original_sentence",
+        contentId: deliveryId,
+        saved: true,
+      });
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const handleShare = async () => {
+    if (!quote) return;
+    const shareText = isVerified
+      ? `${quote}\n— ${[authorName, workTitle].filter(Boolean).join(" · ")}`
+      : `${quote}\n— ${sourceLabel ?? "오늘의 문장"}`;
+    try {
+      if (navigator.share) {
+        await navigator.share({ text: shareText });
+      } else if (navigator.clipboard) {
+        await navigator.clipboard.writeText(shareText);
+      }
+      void submitContentFeedback({
+        eventDate: entry.entryDate,
+        contentType: contentType ?? "app_original_sentence",
+        contentId: deliveryId,
+        shared: true,
+      });
+    } catch {
+      /* ignore */
+    }
+  };
 
   return (
     <div
@@ -112,7 +189,7 @@ export default function JournalSaveCompleteModal({
             {entry.overallSatisfaction != null
               ? `${entry.overallSatisfaction}/10`
               : "-"}{" "}
-            · 기분 {entry.moodLabel ?? "-"} · 태그{" "}
+            · 기분 {entry.moodLabel ?? entry.moodLabels?.[0] ?? "-"} · 태그{" "}
             {entry.tags.map((t) => getTagName(t.tagCode)).join(", ") || "없음"}
           </p>
           <ul className="text-[11px] space-y-0.5" style={{ color: "var(--px-text2)" }}>
@@ -133,11 +210,14 @@ export default function JournalSaveCompleteModal({
         </section>
 
         <section
-          className="p-3 border space-y-1"
-          style={{ borderColor: "var(--px-border)", background: "var(--px-bg3)" }}
+          className="p-3 border space-y-1 animate-[fadeIn_0.45s_ease]"
+          style={{
+            borderColor: isVerified ? "var(--px-accent)" : "var(--px-border)",
+            background: "var(--px-bg3)",
+          }}
         >
           <p className="text-[10px] font-black" style={{ color: "var(--px-accent)" }}>
-            오늘의 명언
+            {title}
           </p>
           {quoteLoading ? (
             <p className="ui-hint">오늘의 문장을 만드는 중…</p>
@@ -150,8 +230,33 @@ export default function JournalSaveCompleteModal({
             </p>
           )}
           <p className="text-[10px]" style={{ color: "var(--px-text2)" }}>
-            생성된 문장입니다. 특정 인물의 명언이 아닙니다.
+            {isVerified
+              ? [authorName, workTitle, sourceLabel].filter(Boolean).join(" · ")
+              : sourceLabel ?? "앱이 오늘의 기록을 바탕으로 새로 쓴 문장입니다."}
           </p>
+          <div className="flex gap-2 pt-1">
+            <button
+              type="button"
+              className="text-[10px] px-2 py-1 border font-bold"
+              style={{ borderColor: "var(--px-border)", color: "var(--px-text)" }}
+              onClick={handleSave}
+            >
+              {savedLocal ? "저장됨" : "저장"}
+            </button>
+            <button
+              type="button"
+              className="text-[10px] px-2 py-1 border font-bold"
+              style={{ borderColor: "var(--px-border)", color: "var(--px-text)" }}
+              onClick={() => void handleShare()}
+            >
+              공유
+            </button>
+          </div>
+          <ContentFeedbackButtons
+            eventDate={entry.entryDate}
+            contentType={contentType ?? "app_original_sentence"}
+            contentId={deliveryId}
+          />
         </section>
 
         {shouldShowOpenAiStatus() && (
@@ -160,7 +265,7 @@ export default function JournalSaveCompleteModal({
               <p>점수 추출: {formatOpenAiStatus(openAiExtract)}</p>
             )}
             {quoteOpenAi && (
-              <p>명언: {formatOpenAiStatus(quoteOpenAi)}</p>
+              <p>오늘의 문장: {formatOpenAiStatus(quoteOpenAi)}</p>
             )}
           </div>
         )}
