@@ -85,12 +85,12 @@ export default function HomeHub({ state }: Props) {
       todayPillar.ganjiKo,
       state.todayDate
     );
-    const happiness = matched
-      .map((e) => e.happinessRating)
-      .filter((v): v is number => typeof v === "number");
-    const condition = matched
-      .map((e) => e.conditionRating)
-      .filter((v): v is number => typeof v === "number");
+    const happiness: number[] = [];
+    const condition: number[] = [];
+    for (const e of matched) {
+      if (typeof e.happinessRating === "number") happiness.push(e.happinessRating);
+      if (typeof e.conditionRating === "number") condition.push(e.conditionRating);
+    }
     return {
       count: matched.length,
       avgHappiness: avg(happiness),

@@ -163,7 +163,7 @@ export class SupabaseDiaryStorage implements DiaryStorage {
   private async resolveIdsByDate(
     dates: string[]
   ): Promise<Map<string, string>> {
-    const unique = [...new Set(dates.filter(Boolean))];
+    const unique = Array.from(new Set(dates.filter(Boolean)));
     const map = new Map<string, string>();
     if (unique.length === 0) return map;
 
