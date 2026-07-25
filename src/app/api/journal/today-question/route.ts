@@ -20,6 +20,11 @@ import type { SajuProfile } from "@/lib/diary/types";
 import { isRidgeQuestionLiveEnabled } from "@/lib/app/featureFlags";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import { buildDailyInsightContext } from "@/lib/journal/insight/buildContext";
+import {
+  resolveDailyInsightContext,
+  persistDailyQuestion,
+} from "@/lib/journal/insight/contextService";
+import { INSIGHT_ENGINE_VERSION } from "@/lib/journal/insight/types";
 
 export const runtime = "nodejs";
 
@@ -163,14 +168,57 @@ export async function POST(req: NextRequest) {
       })
     : null;
 
-  // 공통 컨텍스트 (질문 결정 로직 비변경 — 응답에만 첨부)
-  const insight = buildDailyInsightContext({
+  // 공통 DailyInsightContext — 질문·운세가 동일 context_id 공유
+  let insight = buildDailyInsightContext({
     eventDate: b.todayDate,
     entries: rawEntries,
     enabledCodes,
     sajuProfile: b.sajuProfile ?? null,
     keywordBiases,
   });
+  let contextId: string | null = null;
+  let questionId: string | null = null;
+
+  const sb = getSupabaseServerClient();
+  if (sb) {
+    const {
+      data: { user },
+    } = await sb.auth.getUser();
+    if (user?.id) {
+      const resolved = await resolveDailyInsightContext(sb, user.id, {
+        eventDate: b.todayDate,
+        entries: rawEntries,
+        enabledCodes,
+        sajuProfile: b.sajuProfile ?? null,
+        keywordBiases,
+      });
+      if (resolved) {
+        insight = resolved.ctx;
+        contextId = resolved.id;
+      }
+
+      questionId = await persistDailyQuestion(sb, {
+        userId: user.id,
+        questionDate: b.todayDate,
+        contextId,
+        questionText: result.question,
+        keywordCodes: decision.keywordScores.map((k) => k.code),
+        evidence: {
+          focusCategory: decision.focusCategory,
+          contentScore: decision.contentScore,
+          decisionEvidence: decision.evidence,
+          topKeywordLabels: decision.topKeywords,
+          primaryKeyword: insight.primaryKeyword,
+          tensionKeyword: insight.tensionKeyword,
+          engineVersion: insight.engineVersion,
+        },
+        confidence: insight.overallConfidence,
+        scoringVersion: INSIGHT_ENGINE_VERSION,
+        dataCutoffAt: insight.dataCutoffAt,
+        modelVersion: process.env.OPENAI_JOURNAL_SCORE_MODEL || "gpt-4o-mini",
+      });
+    }
+  }
 
   return Response.json({
     ...result,
@@ -187,7 +235,10 @@ export async function POST(req: NextRequest) {
       topKeywords: decision.topKeywords,
       evidence: decision.evidence,
     },
+    contextId,
+    questionId,
     insightContext: {
+      id: contextId,
       engineVersion: insight.engineVersion,
       dataCutoffAt: insight.dataCutoffAt,
       primaryKeyword: insight.primaryKeyword,
@@ -210,3 +261,4 @@ export async function POST(req: NextRequest) {
     },
   });
 }
+
