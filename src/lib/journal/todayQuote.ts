@@ -7,7 +7,6 @@ import { getTagName } from "./eventTagCatalog";
 import type { BTheme } from "./bTheme";
 import type { OpenAiCallStatus } from "./openaiStatus";
 import type { CategoryCode, JournalEntry } from "./types";
-import { isLowJournalScore } from "./scoreScale";
 import {
   CONTENT_SAFETY_VERSION,
   validateTodaySentenceText,
@@ -18,8 +17,12 @@ import {
   pickTemplateSentence,
   SENTENCE_TEMPLATE_VERSION,
 } from "./quote/templates";
-import { filterSafeQuotes } from "./quote/safetyFilter";
-import { selectBestQuote, type QuoteSelectContext } from "./quote/select";
+import { filterSafeQuotes, deriveHardDay } from "./quote/safetyFilter";
+import {
+  selectBestQuote,
+  type QuoteSelectContext,
+  type QuoteDeliveryWindow,
+} from "./quote/select";
 import type { QuoteLibraryItem } from "./quote/types";
 import {
   isOriginalDailySentenceEnabled,
@@ -41,7 +44,10 @@ export type TodayQuoteInput = {
   fortuneTheme?: string | null;
   recentSentences?: string[];
   quoteCandidates?: QuoteLibraryItem[];
+  recentDeliveries?: QuoteDeliveryWindow[];
+  /** @deprecated use recentDeliveries */
   recentQuoteIds?: string[];
+  /** @deprecated use recentDeliveries */
   recentAuthors?: string[];
 };
 
@@ -96,14 +102,16 @@ function detectState(input: TodayQuoteInput) {
   const tags = input.entry.tags.map((t) => t.tagCode);
   const low = lowestFinal(input.entry);
   const happiness = input.entry.happinessScore ?? input.entry.overallSatisfaction;
-  const hardDay =
-    moods.some((m) => ["지침", "불안", "슬픔", "분노"].includes(m)) ||
-    (low != null && isLowJournalScore(low.score)) ||
-    tags.some((t) => /illness|conflict|mistake|pain/i.test(t));
+  const energy = input.entry.scores.find((s) => s.categoryCode === "energy");
+  const hardDay = deriveHardDay({
+    moods,
+    eventTags: tags,
+    happiness: typeof happiness === "number" ? happiness : null,
+    lowEnergyScore: energy?.finalScore ?? low?.score ?? null,
+  });
   const goodDay =
     moods.some((m) => ["기쁨", "설렘"].includes(m)) ||
     (typeof happiness === "number" && happiness >= 7);
-  const energy = input.entry.scores.find((s) => s.categoryCode === "energy");
   const focus = input.entry.scores.find(
     (s) => s.categoryCode === "focus_execution"
   );
@@ -126,7 +134,17 @@ export function buildTodaySentenceTemplate(input: TodayQuoteInput): string {
     overload: state.overload,
     lowEnergy: state.hardDay,
   });
-  return pickTemplateSentence(theme, input.recentSentences ?? []);
+  const seed = [
+    input.entry.userId || "anon",
+    input.entry.entryDate,
+    theme,
+    input.primaryKeyword ?? "",
+    SENTENCE_TEMPLATE_VERSION,
+  ].join("|");
+  return pickTemplateSentence(theme, {
+    recent: input.recentSentences ?? [],
+    seed,
+  });
 }
 
 function clampSentence(text: string): string {
@@ -274,8 +292,26 @@ export async function generateTodayQuote(
     const safe = filterSafeQuotes(input.quoteCandidates ?? [], {
       hardDay: state.hardDay,
       moods: state.moods,
-      tags: state.tags,
+      eventTags: state.tags,
+      dominantStates: state.moods,
     });
+    const legacyDeliveries: QuoteDeliveryWindow[] = [
+      ...(input.recentDeliveries ?? []),
+      ...(input.recentQuoteIds ?? []).map((id) => ({
+        quoteId: id,
+        authorName: null,
+        sourceKey: null,
+        deliveredAt: input.entry.entryDate,
+        eventDate: input.entry.entryDate,
+      })),
+      ...(input.recentAuthors ?? []).map((author) => ({
+        quoteId: null,
+        authorName: author,
+        sourceKey: null,
+        deliveredAt: input.entry.entryDate,
+        eventDate: input.entry.entryDate,
+      })),
+    ];
     const ctx: QuoteSelectContext = {
       primaryKeyword: input.primaryKeyword,
       tensionKeyword: input.tensionKeyword,
@@ -283,8 +319,8 @@ export async function generateTodayQuote(
       moods: state.moods,
       tags: state.tags,
       hardDay: state.hardDay,
-      recentQuoteIds: input.recentQuoteIds ?? [],
-      recentAuthors: input.recentAuthors ?? [],
+      asOfDate: input.entry.entryDate,
+      recentDeliveries: legacyDeliveries,
     };
     const best = selectBestQuote(safe, ctx);
     if (best) {

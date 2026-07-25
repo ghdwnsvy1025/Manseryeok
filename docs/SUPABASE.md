@@ -47,8 +47,9 @@ Supabase Dashboard → **SQL Editor** → 아래 파일을 **순서대로** 실�
 15. [`017_fix_category_scores_1_to_10.sql`](../supabase/migrations/017_fix_category_scores_1_to_10.sql) — category_scores 1~10 제약 보정 (013 누락 시)
 16. [`018_daily_questions_context_id.sql`](../supabase/migrations/018_daily_questions_context_id.sql) — daily_questions.context_id FK
 17. [`019_checkin_mood_labels_max3.sql`](../supabase/migrations/019_checkin_mood_labels_max3.sql) — mood_labels 최대 3개 DB 제약
+18. [`020_seed_cicero_quote.sql`](../supabase/migrations/020_seed_cicero_quote.sql) — 키케로 명언 시드 (public_domain)
 
-> **점검:** `node scripts/verify-journal-008.mjs` · `node scripts/verify-checkin-014.mjs` · `node scripts/verify-daily-insight-015.mjs` · `node scripts/verify-category-scores-scale.mjs`  
+> **점검:** `node scripts/verify-journal-008.mjs` · `node scripts/verify-checkin-014.mjs` · `node scripts/verify-daily-insight-015.mjs` · `node scripts/verify-category-scores-scale.mjs` · `node scripts/seed-cicero-quote.mjs`  
 > 상세는 `docs/MIGRATION_STRATEGY.md` · `docs/FORTUNE_QUOTE_SPEC.md`.
 
 

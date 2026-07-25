@@ -186,27 +186,79 @@ export async function retrieveQuoteCandidates(
 
 export async function loadRecentDeliveries(
   userId: string,
-  limit = 30
+  opts?: { limit?: number; sinceDays?: number }
 ): Promise<
   Array<{
     quoteId: string | null;
+    authorName: string | null;
+    sourceKey: string | null;
     contentType: string;
     text: string | null;
     deliveredAt: string;
+    eventDate: string | null;
   }>
 > {
   const sb = getSupabaseServiceClient();
+  const sinceDays = opts?.sinceDays ?? 180;
+  const limit = opts?.limit ?? 200;
+  const since = new Date();
+  since.setUTCDate(since.getUTCDate() - sinceDays);
+  const sinceIso = since.toISOString();
+
   const { data, error } = await sb
     .from("daily_quote_deliveries")
-    .select("quote_id, content_type, generated_original_text, delivered_at")
+    .select(
+      "quote_id, content_type, generated_original_text, delivered_at, event_date, selection_reasons_json"
+    )
     .eq("user_id", userId)
+    .gte("delivered_at", sinceIso)
     .order("delivered_at", { ascending: false })
     .limit(limit);
   if (error || !data) return [];
-  return data.map((r) => ({
-    quoteId: (r.quote_id as string | null) ?? null,
-    contentType: String(r.content_type),
-    text: (r.generated_original_text as string | null) ?? null,
-    deliveredAt: String(r.delivered_at),
-  }));
+
+  // 작가/출처는 quote_library join 없이 context 또는 별도 조회
+  const quoteIds = data
+    .map((r) => r.quote_id as string | null)
+    .filter((id): id is string => Boolean(id));
+  const metaById = new Map<
+    string,
+    { authorName: string | null; sourceKey: string | null }
+  >();
+  if (quoteIds.length > 0) {
+    const { data: quotes } = await sb
+      .from("quote_library")
+      .select("id, author_name, source_url, work_title, publication_info")
+      .in("id", quoteIds);
+    for (const q of quotes ?? []) {
+      const sourceKey = q.source_url
+        ? `url:${q.source_url}`
+        : q.work_title
+          ? `work:${q.work_title}`
+          : q.publication_info
+            ? `pub:${q.publication_info}`
+            : null;
+      metaById.set(String(q.id), {
+        authorName: (q.author_name as string | null) ?? null,
+        sourceKey,
+      });
+    }
+  }
+
+  return data.map((r) => {
+    const id = (r.quote_id as string | null) ?? null;
+    const meta = id ? metaById.get(id) : undefined;
+    const ctx = (r.selection_reasons_json ?? {}) as Record<string, unknown>;
+    return {
+      quoteId: id,
+      authorName:
+        meta?.authorName ??
+        (typeof ctx.authorName === "string" ? ctx.authorName : null),
+      sourceKey: meta?.sourceKey ?? null,
+      contentType: String(r.content_type),
+      text: (r.generated_original_text as string | null) ?? null,
+      deliveredAt: String(r.delivered_at),
+      eventDate: r.event_date ? String(r.event_date) : null,
+    };
+  });
 }
+

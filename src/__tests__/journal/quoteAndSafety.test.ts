@@ -3,7 +3,7 @@ import {
   validateFortuneText,
   validateTodaySentenceText,
 } from "@/lib/journal/contentSafety";
-import { filterSafeQuotes } from "@/lib/journal/quote/safetyFilter";
+import { filterSafeQuotes, deriveHardDay } from "@/lib/journal/quote/safetyFilter";
 import { selectBestQuote } from "@/lib/journal/quote/select";
 import { isQuoteExposable, type QuoteLibraryItem } from "@/lib/journal/quote/types";
 import { isTooSimilar, jaccardSimilarity } from "@/lib/journal/contentOverlap";
@@ -112,8 +112,16 @@ describe("quote library filters", () => {
         moods: ["슬픔"],
         tags: [],
         hardDay: true,
-        recentQuoteIds: ["x"],
-        recentAuthors: [],
+        asOfDate: "2026-07-25",
+        recentDeliveries: [
+          {
+            quoteId: "x",
+            authorName: null,
+            sourceKey: null,
+            deliveredAt: "2026-07-20T00:00:00Z",
+            eventDate: "2026-07-20",
+          },
+        ],
         primaryKeyword: "회복",
       }
     );
@@ -156,10 +164,60 @@ describe("today sentence templates", () => {
     expect(s.length).toBeLessThanOrEqual(100);
   });
 
-  test("pickTemplateSentence avoids recent", () => {
-    const first = pickTemplateSentence("recovery");
-    const second = pickTemplateSentence("recovery", [first]);
+  test("pickTemplateSentence is deterministic for same seed", () => {
+    const a = pickTemplateSentence("recovery", {
+      seed: "user|2026-07-25|recovery|v",
+    });
+    const b2 = pickTemplateSentence("recovery", {
+      seed: "user|2026-07-25|recovery|v",
+    });
+    expect(a).toBe(b2);
+  });
+
+  test("pickTemplateSentence avoids recent when alternatives exist", () => {
+    const first = pickTemplateSentence("recovery", {
+      seed: "seed-a",
+    });
+    const second = pickTemplateSentence("recovery", {
+      recent: [first],
+      seed: "seed-a",
+    });
     expect(second).not.toBe(first);
+  });
+});
+
+describe("hard_day safety matrix", () => {
+  const positive = quote({
+    id: "pos",
+    quoteTextKo: "모든 것은 마음먹기에 달려 있다",
+    unsuitableStates: ["hard_day"],
+  });
+  const gentle = quote({
+    id: "gentle",
+    quoteTextKo: "오늘 견딘 마음도 기록될 가치가 있어요",
+    emotionalTone: ["인정", "동행"],
+    unsuitableStates: [],
+  });
+
+  test.each([
+    { moods: ["지침"], tags: [] as string[], happiness: 5 },
+    { moods: ["슬픔"], tags: ["illness"], happiness: 5 },
+    { moods: ["분노"], tags: ["conflict"], happiness: 5 },
+    { moods: ["평온"], tags: ["mistake"], happiness: 5 },
+    { moods: ["평온"], tags: [] as string[], happiness: 1 },
+  ])("excludes hard_day-unsuitable quote for %#", (opts) => {
+    const hardDay = deriveHardDay({
+      moods: opts.moods,
+      eventTags: opts.tags,
+      happiness: opts.happiness,
+    });
+    expect(hardDay).toBe(true);
+    const safe = filterSafeQuotes([positive, gentle], {
+      hardDay,
+      moods: opts.moods,
+      eventTags: opts.tags,
+    });
+    expect(safe.map((q) => q.id)).toEqual(["gentle"]);
   });
 });
 

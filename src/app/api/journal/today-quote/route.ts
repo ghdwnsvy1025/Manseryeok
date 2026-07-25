@@ -82,8 +82,7 @@ export async function POST(req: NextRequest) {
   const trend = computeRecentATrend(merged, b.entry.entryDate, codes);
 
   let quoteCandidates: QuoteLibraryItem[] = [];
-  let recentQuoteIds: string[] = [];
-  let recentAuthors: string[] = [];
+  let recentDeliveries: Awaited<ReturnType<typeof loadRecentDeliveries>> = [];
   let recentSentences: string[] = [];
   let userId: string | null = null;
 
@@ -94,11 +93,11 @@ export async function POST(req: NextRequest) {
     } = await sb.auth.getUser();
     userId = user?.id ?? null;
     if (userId) {
-      const recent = await loadRecentDeliveries(userId, 40);
-      recentQuoteIds = recent
-        .map((r) => r.quoteId)
-        .filter((id): id is string => Boolean(id));
-      recentSentences = recent
+      recentDeliveries = await loadRecentDeliveries(userId, {
+        sinceDays: 180,
+        limit: 200,
+      });
+      recentSentences = recentDeliveries
         .map((r) => r.text)
         .filter((t): t is string => Boolean(t));
     }
@@ -114,11 +113,10 @@ export async function POST(req: NextRequest) {
     ]
       .filter(Boolean)
       .join(" · ");
-    quoteCandidates = await retrieveQuoteCandidates(query || theme.plainSummary, 12);
-    recentAuthors = quoteCandidates
-      .filter((q) => recentQuoteIds.includes(q.id))
-      .map((q) => q.authorName)
-      .filter((a): a is string => Boolean(a));
+    quoteCandidates = await retrieveQuoteCandidates(
+      query || theme.plainSummary,
+      12
+    );
   }
 
   // 같은 날짜 이미 delivery 있으면 재생성하지 않음 (수정 저장 시 유지)
@@ -180,8 +178,7 @@ export async function POST(req: NextRequest) {
     fortuneTheme: overall?.headline ?? null,
     recentSentences,
     quoteCandidates,
-    recentQuoteIds,
-    recentAuthors,
+    recentDeliveries,
   });
 
   let deliveryId: string | null = null;

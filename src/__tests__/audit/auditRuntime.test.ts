@@ -402,7 +402,7 @@ describe("AUDIT quotes", () => {
     expect(safe.map((q) => q.id)).toEqual(["ok"]);
   });
 
-  test("GAP: hard_day unsuitableStates currently only matches moods/tags strings", () => {
+  test("hard_day unsuitableStates excludes quotes when hardDay=true", () => {
     const safe = filterSafeQuotes(
       [
         quote({
@@ -410,13 +410,19 @@ describe("AUDIT quotes", () => {
           quoteTextKo: "You can do anything! Cheer up!",
           unsuitableStates: ["hard_day"],
         }),
+        quote({
+          id: "ok",
+          quoteTextKo: "It is okay to rest today.",
+          unsuitableStates: [],
+          emotionalTone: ["??"],
+        }),
       ],
       { hardDay: true, moods: ["sad"], tags: [] }
     );
-    expect(safe.map((q) => q.id)).toEqual(["toopositive"]);
+    expect(safe.map((q) => q.id)).toEqual(["ok"]);
   });
 
-  test("recent quote/author receive repetition penalty", () => {
+  test("recent quote within 180d is blocked by date policy", () => {
     const best = selectBestQuote(
       [
         quote({ id: "recent", authorName: "ReuseAuthor" }),
@@ -433,8 +439,16 @@ describe("AUDIT quotes", () => {
         moods: ["tired"],
         tags: [],
         hardDay: true,
-        recentQuoteIds: ["recent"],
-        recentAuthors: ["ReuseAuthor"],
+        asOfDate: "2026-07-25",
+        recentDeliveries: [
+          {
+            quoteId: "recent",
+            authorName: "ReuseAuthor",
+            sourceKey: null,
+            deliveredAt: "2026-07-20T00:00:00Z",
+            eventDate: "2026-07-20",
+          },
+        ],
       }
     );
     expect(best?.quote.id).toBe("fresh");

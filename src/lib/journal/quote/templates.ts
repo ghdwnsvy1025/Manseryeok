@@ -1,7 +1,7 @@
 /**
- * 검수된 템플릿 폴백 풀 (주제별)
+ * 검수된 템플릿 폴백 풀 (주제별) — 결정적 선택
  */
-export const SENTENCE_TEMPLATE_VERSION = "sentence-templates-v1.0.0";
+export const SENTENCE_TEMPLATE_VERSION = "sentence-templates-v1.1.0";
 
 export type SentenceTemplateTheme =
   | "recovery"
@@ -47,14 +47,32 @@ export const SENTENCE_TEMPLATES: Record<
   ],
 };
 
+/** FNV-1a 32-bit — Math.random 대체 */
+export function stableHash(input: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < input.length; i++) {
+    h ^= input.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+
 export function pickTemplateSentence(
   theme: SentenceTemplateTheme,
-  recent: string[] = []
+  recentOrOpts: string[] | { recent?: string[]; seed: string } = []
 ): string {
+  const recent = Array.isArray(recentOrOpts)
+    ? recentOrOpts
+    : recentOrOpts.recent ?? [];
+  const seed = Array.isArray(recentOrOpts)
+    ? `${theme}:${SENTENCE_TEMPLATE_VERSION}`
+    : recentOrOpts.seed;
+
   const pool = SENTENCE_TEMPLATES[theme];
   const fresh = pool.filter((s) => !recent.includes(s));
   const list = fresh.length > 0 ? fresh : pool;
-  return list[Math.floor(Math.random() * list.length)] ?? pool[0]!;
+  const idx = stableHash(seed) % list.length;
+  return list[idx] ?? pool[0]!;
 }
 
 export function inferTemplateTheme(opts: {
@@ -68,7 +86,11 @@ export function inferTemplateTheme(opts: {
   if (opts.overload) return "action";
   if (opts.goodDay) return "achievement";
   if (opts.moods.some((m) => m === "평온" || m === "무덤덤")) return "stability";
-  if (opts.moods.some((m) => ["슬픔", "불안", "분노", "지침"].includes(m))) {
+  if (
+    opts.moods.some((m) =>
+      ["슬픔", "불안", "분노", "지침", "답답함"].includes(m)
+    )
+  ) {
     return "emotion";
   }
   return "emotion";
