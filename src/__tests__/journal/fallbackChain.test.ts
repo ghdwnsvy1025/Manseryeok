@@ -43,7 +43,7 @@ function entry(date: string): JournalEntry {
         updatedAt: "",
       },
     ],
-    tags: [{ id: "t1", entryId: `e-${date}`, tagCode: "rest", tagName: "휴식", createdAt: "" }],
+    tags: [{ tagCode: "rest", source: "user", confirmedByUser: true }],
     coreStates: null,
     domainScores: null,
     checkinVersion: 2,

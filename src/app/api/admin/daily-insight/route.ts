@@ -1,6 +1,10 @@
 import { NextRequest } from "next/server";
 import { requireAdmin } from "@/lib/auth/admin";
 import { getSupabaseServiceClient, isServiceRoleConfigured } from "@/lib/supabase/admin";
+import { getActiveKeywordMapping } from "@/lib/journal/keywords/mapping";
+import { CANONICAL_KEYWORD_VERSION } from "@/lib/journal/keywords/canonical";
+import { INSIGHT_ENGINE_VERSION } from "@/lib/journal/insight/types";
+import { FORTUNE_SCORE_VERSION } from "@/lib/journal/fortune/score";
 
 export const runtime = "nodejs";
 
@@ -64,6 +68,12 @@ export async function GET(req: NextRequest) {
   return Response.json({
     eventDate,
     userId,
+    versions: {
+      engine: INSIGHT_ENGINE_VERSION,
+      fortuneScore: FORTUNE_SCORE_VERSION,
+      canonicalKeywords: CANONICAL_KEYWORD_VERSION,
+      keywordMapping: getActiveKeywordMapping().mappingVersion,
+    },
     insight: insight.data ?? [],
     fortunes: fortune.data ?? [],
     deliveries: delivery.data ?? [],
