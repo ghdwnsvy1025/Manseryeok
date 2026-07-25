@@ -280,9 +280,11 @@ function sanitizeDomainCopy(
  */
 export async function generateTodayFortuneV2(
   insight: DailyInsightContext,
-  opts?: { skipLlm?: boolean }
+  opts?: { skipLlm?: boolean; onboardingCompleted?: boolean }
 ): Promise<TodayFortuneV2Result> {
-  const scored = scoreFortuneDomains(insight);
+  const scored = scoreFortuneDomains(insight, {
+    onboardingCompleted: opts?.onboardingCompleted,
+  });
   const overall = scored.find((d) => d.domain === "overall")!;
   const domains = scored.filter((d) => d.domain !== "overall");
 

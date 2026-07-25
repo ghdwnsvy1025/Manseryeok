@@ -15,8 +15,13 @@ import {
   FORTUNE_DOMAIN_ORDER,
   FORTUNE_DOMAIN_TITLES,
 } from "./domains";
+import {
+  computeBlendWeights,
+  type BlendWeights,
+} from "@/lib/journal/insight/dynamicWeights";
+import { JOURNAL_SCORE_CENTER } from "@/lib/journal/scoreScale";
 
-export const FORTUNE_SCORE_VERSION = "fortune-score-v1.1.0";
+export const FORTUNE_SCORE_VERSION = "fortune-score-v1.2.0";
 
 /** 1~10(또는 0~10) 사용자/최근 상태 점수 */
 export type TenPointScore = number;
@@ -47,29 +52,78 @@ export function normalizeKeywordStrength(raw: number): NormalizedScore {
   return clamp(0.25 + (1 - Math.exp(-raw / 3)) * 0.7, 0.2, 0.95);
 }
 
+/**
+ * 키워드 랭킹 점수는 "지금 다뤄야 할 주제"의 현저성(salience)이지 긍정도가 아니다.
+ * 최근 상태가 낮아 올라온 키워드(low_recent)는 결핍 신호이므로 운세 점수에
+ * 그대로 더하면 안 되고 뒤집어서 반영해야 한다.
+ */
+function keywordValence(
+  strength: NormalizedScore,
+  deficitRatio: number
+): NormalizedScore {
+  const d = clamp(deficitRatio, 0, 1);
+  return clamp(strength * (1 - d) + (1 - strength) * d, 0.05, 0.95);
+}
+
+/**
+ * 결핍 강도 0~1 — 단순히 "낮음"으로 잡혔는지가 아니라 얼마나 낮은지로 계산.
+ * 중립점(JOURNAL_SCORE_CENTER=5.5)에서 1점까지를 0→1로 매핑한다.
+ */
+function deficitRatioOf(
+  ctx: DailyInsightContext,
+  scores: Array<{ reasons: string[] }>
+): number {
+  if (scores.length === 0) return 0;
+  const span = JOURNAL_SCORE_CENTER - 1;
+  let total = 0;
+  for (const k of scores) {
+    const cats = k.reasons
+      .filter((r) => r.startsWith("low_recent:"))
+      .map((r) => r.slice("low_recent:".length) as CategoryCode);
+    if (cats.length === 0) continue;
+    const depths: number[] = [];
+    for (const c of cats) {
+      const v = ctx.recentState.contentScoreByCategory[c];
+      if (typeof v !== "number") continue;
+      depths.push(clamp((JOURNAL_SCORE_CENTER - v) / span, 0, 1));
+    }
+    total += avg(depths) ?? 0;
+  }
+  return clamp(total / scores.length, 0, 1);
+}
+
 function keywordScoreForDomain(
   ctx: DailyInsightContext,
   domain: FortuneDomainCode
-): { score: NormalizedScore; codes: string[]; confidence: number } {
+): {
+  score: NormalizedScore;
+  salience: NormalizedScore;
+  codes: string[];
+  confidence: number;
+} {
   const map = DOMAIN_KEYWORD_MAP[domain];
   const ranked = ctx.topKeywords;
   if (domain === "overall") {
     const top = ranked.slice(0, 3);
     const codes = top.map((k) => k.code);
     const raw = avg(top.map((k) => k.score)) ?? 1.5;
+    const salience = normalizeKeywordStrength(raw);
     return {
-      score: normalizeKeywordStrength(raw),
+      score: keywordValence(salience, deficitRatioOf(ctx, top)),
+      salience,
       codes,
       confidence: top.length ? 0.55 + top.length * 0.05 : 0.25,
     };
   }
   const matched = ranked.filter((k) => map.includes(k.code as never));
   if (matched.length === 0) {
-    return { score: 0.5, codes: [], confidence: 0.25 };
+    return { score: 0.5, salience: 0.5, codes: [], confidence: 0.25 };
   }
   const raw = avg(matched.map((k) => k.score)) ?? 1.5;
+  const salience = normalizeKeywordStrength(raw);
   return {
-    score: normalizeKeywordStrength(raw),
+    score: keywordValence(salience, deficitRatioOf(ctx, matched)),
+    salience,
     codes: matched.map((k) => k.code),
     confidence: clamp(0.4 + matched.length * 0.08, 0.3, 0.85),
   };
@@ -188,15 +242,31 @@ function templateCopy(
   };
 }
 
+export type FortuneScoreOptions = {
+  /** 온보딩 6문항 완료 여부 — 콜드스타트 개인 신호 보정 */
+  onboardingCompleted?: boolean;
+  /** 테스트·실험용 가중치 강제 지정 */
+  weights?: BlendWeights;
+};
+
 export function scoreFortuneDomains(
-  ctx: DailyInsightContext
+  ctx: DailyInsightContext,
+  opts: FortuneScoreOptions = {}
 ): FortuneDomainResult[] {
+  // 데이터량 기반 동적 가중치: 기록이 없으면 사주 prior 비중이 크고,
+  // 기록이 쌓일수록 최근 상태(개인 데이터) 비중이 커진다.
+  const w =
+    opts.weights ??
+    computeBlendWeights({
+      priorUniqueDays: ctx.priorUniqueDays,
+      onboardingCompleted: opts.onboardingCompleted,
+    });
+
   return FORTUNE_DOMAIN_ORDER.map((domain) => {
     const kw = keywordScoreForDomain(ctx, domain);
     const cat = categoryScoreForDomain(ctx, domain);
     const natal = natalBoost(ctx, domain);
 
-    // 최근 상태 55% + 키워드 25% + 사주 prior 20%
     // - 불확실성 패널티: 표본/신뢰도 낮으면 감점
     // - 반복 패널티: 동일 primary 키워드만 반복되면 소폭 감점(다양성)
     const recentPart = cat ?? kw.score;
@@ -215,9 +285,9 @@ export function scoreFortuneDomains(
         ? 0.03
         : 0;
     const score = clamp(
-      recentPart * 0.55 +
-        kw.score * 0.25 +
-        natal * 0.2 -
+      recentPart * w.recent +
+        kw.score * w.keyword +
+        natal * w.natal -
         uncertaintyPenalty -
         repetitionPenalty,
       0,

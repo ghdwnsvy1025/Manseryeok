@@ -98,6 +98,9 @@ export default function CheckInEditor({ initialDate }: Props) {
   const [message, setMessage] = useState("");
   const [draftHint, setDraftHint] = useState("");
   const [allEntries, setAllEntries] = useState<JournalEntry[]>([]);
+  const [personalImportance, setPersonalImportance] = useState<
+    Partial<Record<DomainCode, number>>
+  >({});
   const [sajuProfile, setSajuProfile] = useState<SajuProfile | null>(null);
   const [showComplete, setShowComplete] = useState(false);
   const [savedEntry, setSavedEntry] = useState<JournalEntry | null>(null);
@@ -144,6 +147,7 @@ export default function CheckInEditor({ initialDate }: Props) {
             tagCodes: nextTags,
             recentEntries: allEntries,
             asOfDate: date,
+            personalImportance,
           });
       const prevMap = new Map(preserve.map((d) => [d.code, d]));
       return selected.map((code) => {
@@ -157,7 +161,7 @@ export default function CheckInEditor({ initialDate }: Props) {
         );
       });
     },
-    [allEntries, date, showAllDomains]
+    [allEntries, date, showAllDomains, personalImportance]
   );
 
   const toggleTag = (code: string) => {
@@ -204,6 +208,23 @@ export default function CheckInEditor({ initialDate }: Props) {
           if (!cancelled && remote) setSajuProfile(remote);
         } catch {
           /* keep local */
+        }
+
+        // 온보딩 개인 중요도 — 실패해도 도메인 선택은 기본 규칙으로 동작
+        try {
+          const res = await fetch("/api/journal/onboarding");
+          if (res.ok && !cancelled) {
+            const json = (await res.json()) as {
+              profile?: { personalImportance?: Record<string, number> };
+            };
+            setPersonalImportance(
+              (json.profile?.personalImportance ?? {}) as Partial<
+                Record<DomainCode, number>
+              >
+            );
+          }
+        } catch {
+          /* ignore */
         }
 
         const existing = await storage.getByDate(date);

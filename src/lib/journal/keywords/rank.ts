@@ -11,7 +11,11 @@ import {
   type KeywordCode,
   type KeywordDefinition,
 } from "./catalog";
-import { isLowJournalScore } from "@/lib/journal/scoreScale";
+import {
+  isLowJournalScore,
+  JOURNAL_SCORE_CENTER,
+  JOURNAL_SCORE_MIN,
+} from "@/lib/journal/scoreScale";
 import { sajuHypothesisWeight } from "@/lib/journal/questionFeedback";
 import type { KeywordBiasMap } from "./learning";
 
@@ -48,6 +52,18 @@ function bump(
       reasons: [reason],
     });
   }
+}
+
+/** 최근 상태 점수(1~10) → 키워드 현저성 가산. 임계값 없이 연속 감소. */
+const SALIENCE_BASE = 0.3;
+const SALIENCE_RANGE = 2.2;
+/** 이 점수 이상이면 결핍 신호 없음 */
+const SALIENCE_ZERO_AT = JOURNAL_SCORE_CENTER + 1;
+
+export function recentSalienceBump(value: number): number {
+  const depth =
+    (SALIENCE_ZERO_AT - value) / (SALIENCE_ZERO_AT - JOURNAL_SCORE_MIN);
+  return SALIENCE_BASE + SALIENCE_RANGE * Math.max(0, Math.min(1, depth));
 }
 
 function matchBThemeKeyword(bWord: string): KeywordDefinition | undefined {
@@ -95,16 +111,14 @@ export function rankKeywordsForQuestion(opts: {
         ];
       const v = row?.value;
       if (v == null) continue;
-      if (isLowJournalScore(v)) {
-        bump(
-          map,
-          def,
-          2.0 + (5.5 - Math.min(v, 5.5)) * 0.3,
-          `low_recent:${cat}`
-        );
-      } else {
-        bump(map, def, 0.3, `recent:${cat}`);
-      }
+      // 현저성은 점수가 낮을수록 연속적으로 커진다.
+      // 임계값에서 계단처럼 튀면 5→6점 변화만으로 순위·운세가 급변한다.
+      bump(
+        map,
+        def,
+        recentSalienceBump(v),
+        isLowJournalScore(v) ? `low_recent:${cat}` : `recent:${cat}`
+      );
     }
   }
 

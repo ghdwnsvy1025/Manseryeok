@@ -110,4 +110,23 @@ describe("fortune score scale contract (F-1 fix)", () => {
     expect(blob.length).toBeGreaterThan(10);
     expect(s1.tone).toBe("caution");
   });
+
+  // ?? ??: ??? ?? ??? "??? ? ??"? ?????
+  // ??? ???? ???. ?? ??? ??? ??? ????.
+  test("keyword salience from deficit signals does not inflate the score", () => {
+    const s1 = overallAt(1);
+    const s10 = overallAt(10);
+    expect(s10.score).toBeGreaterThan(s1.score);
+    // ??(1?) ???? ???? ??(0.5)? ???? ? ??
+    expect(s1.score).toBeLessThan(0.5);
+  });
+
+  test("scores stay monotonic across the whole 1..10 range", () => {
+    const scores = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(
+      (lv) => overallAt(lv).score
+    );
+    for (let i = 1; i < scores.length; i += 1) {
+      expect(scores[i]).toBeGreaterThanOrEqual(scores[i - 1]!);
+    }
+  });
 });
