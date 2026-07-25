@@ -56,8 +56,12 @@ Supabase Dashboard → **SQL Editor** → 아래 파일을 **순서대로** 실�
 > 깨지지 않지만, 온보딩 저장·회상 신뢰도 필터·"그저 그래요" 피드백은
 > 조용히 무시됩니다. 적용 여부는 `node scripts/verify-gate-b-migrations.mjs`로 확인하세요.
 
-> **점검:** `node scripts/verify-journal-008.mjs` · `node scripts/verify-checkin-014.mjs` · `node scripts/verify-daily-insight-015.mjs` · `node scripts/verify-category-scores-scale.mjs` · `node scripts/seed-cicero-quote.mjs` · `node scripts/verify-gate-b-migrations.mjs`  
+> **점검:** `node scripts/verify-journal-008.mjs` · `node scripts/verify-checkin-014.mjs` · `node scripts/verify-daily-insight-015.mjs` · `node scripts/verify-category-scores-scale.mjs` · `node scripts/seed-cicero-quote.mjs` · `node scripts/backfill-quote-embeddings.mjs` · `node scripts/verify-gate-b-migrations.mjs` · `node scripts/verify-gate-17-db.mjs`  
 > 상세는 `docs/MIGRATION_STRATEGY.md` · `docs/FORTUNE_QUOTE_SPEC.md`.
+
+> **명언 RAG:** `016` RPC(`match_quote_library`)는 `embedding is not null`인 행만 검색합니다.
+> 시드만 넣고 embedding이 비어 있으면 RAG가 빈 결과를 내고 목록 폴백합니다.
+> `node scripts/backfill-quote-embeddings.mjs`로 누락 벡터를 채우세요.
 
 
 로그인 후 `Could not find the table 'public.diary_entries'` 가 보이면

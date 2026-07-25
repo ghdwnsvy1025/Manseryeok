@@ -202,4 +202,14 @@ describe("failure injection fallbacks", () => {
     expect(src).toContain("fall through");
     expect(src).toContain('.eq("active", true)');
   });
+
+  test("quote embedding backfill script is present for empty vectors", () => {
+    const src = readFileSync(
+      join(ROOT, "scripts/backfill-quote-embeddings.mjs"),
+      "utf8"
+    );
+    expect(src).toContain("text-embedding-3-small");
+    expect(src).toContain("match_quote_library");
+    expect(src).toContain("embedding=is.null");
+  });
 });
