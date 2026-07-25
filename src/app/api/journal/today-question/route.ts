@@ -18,7 +18,7 @@ import { isKeywordCode } from "@/lib/journal/keywords/catalog";
 import type { CategoryCode, JournalEntry } from "@/lib/journal/types";
 import { buildDailySajuContext } from "@/lib/product/dailySajuContext";
 import type { SajuProfile } from "@/lib/diary/types";
-import { isRidgeQuestionLiveEnabled } from "@/lib/app/featureFlags";
+import { isRidgeQuestionLiveEnabled, isPersonalizationTrainEnabled } from "@/lib/app/featureFlags";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import { buildDailyInsightContext } from "@/lib/journal/insight/buildContext";
 import {
@@ -26,6 +26,11 @@ import {
   persistDailyQuestion,
 } from "@/lib/journal/insight/contextService";
 import { INSIGHT_ENGINE_VERSION } from "@/lib/journal/insight/types";
+import {
+  buildShadowEvalReport,
+  diagnoseModelRows,
+  EVAL_METRICS_VERSION,
+} from "@/lib/personalization/evalMetrics";
 
 export const runtime = "nodejs";
 
@@ -169,6 +174,44 @@ export async function POST(req: NextRequest) {
       })
     : null;
 
+  // 섀도 평가 지표 — live 결정에 넣지 않는다
+  const actualScores: number[] = [];
+  const livePred: number[] = [];
+  const ridgePred: number[] = [];
+  if (ridgeShadow) {
+    for (const row of ridgeShadow) {
+      if (row.live == null || row.ridgeShadow == null) continue;
+      actualScores.push(row.live);
+      livePred.push(row.live);
+      ridgePred.push(row.ridgeShadow);
+    }
+  }
+  const shadowEval =
+    actualScores.length > 0
+      ? buildShadowEvalReport({
+          priorUniqueDays: keywords.priorUniqueDays,
+          actual: actualScores,
+          livePred,
+          ridgePred,
+          modelDiagnosis: diagnoseModelRows({
+            modelRows: 0,
+            trainFlagOn: isPersonalizationTrainEnabled(),
+            inferenceAttempted: shadowBundle != null,
+            sampleCount: keywords.priorUniqueDays,
+          }),
+        })
+      : {
+          version: EVAL_METRICS_VERSION,
+          overall: null,
+          byCohort: [],
+          modelRowDiagnosis: diagnoseModelRows({
+            modelRows: 0,
+            trainFlagOn: isPersonalizationTrainEnabled(),
+            inferenceAttempted: shadowBundle != null,
+            sampleCount: keywords.priorUniqueDays,
+          }),
+        };
+
   // 공통 DailyInsightContext — 질문·운세가 동일 context_id 공유
   let insight = buildDailyInsightContext({
     eventDate: b.todayDate,
@@ -255,6 +298,7 @@ export async function POST(req: NextRequest) {
       feedbackLearning: true,
     },
     ridgeShadow,
+    shadowEval,
     leakageGuard: {
       excludedToday: true,
       priorEntryCount: priorEntries.length,

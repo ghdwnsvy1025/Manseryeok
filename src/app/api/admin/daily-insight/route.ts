@@ -10,6 +10,7 @@ import {
   getFeatureFlags,
   isSajuRelationsScoringEnabled,
 } from "@/lib/app/featureFlags";
+import { EVAL_METRICS_VERSION } from "@/lib/personalization/evalMetrics";
 
 export const runtime = "nodejs";
 
@@ -80,6 +81,7 @@ export async function GET(req: NextRequest) {
       keywordMapping: getActiveKeywordMapping().mappingVersion,
       sajuRules: SAJU_RULE_VERSION,
       sajuRelationsScoring: isSajuRelationsScoringEnabled(),
+      ridgeEval: EVAL_METRICS_VERSION,
     },
     flags: {
       sajuRelationsScoringEnabled:
