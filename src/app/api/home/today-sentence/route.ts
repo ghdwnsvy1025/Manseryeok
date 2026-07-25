@@ -5,6 +5,14 @@ import {
   countReadyDocuments,
   matchKnowledgeChunks,
 } from "@/lib/knowledge/store";
+import {
+  pickTemplateSentence,
+  stableHash,
+} from "@/lib/journal/quote/templates";
+import {
+  classifyAndSanitizeError,
+  publicErrorDetail,
+} from "@/lib/app/publicErrors";
 
 export const runtime = "nodejs";
 
@@ -25,10 +33,24 @@ function isBody(v: unknown): v is Body {
   return typeof v === "object" && v !== null;
 }
 
+function homeTemplateSentence(ganjiKo: string): string {
+  const themes = [
+    "recovery",
+    "stability",
+    "emotion",
+    "relation",
+    "action",
+    "achievement",
+  ] as const;
+  const theme = themes[stableHash(ganjiKo) % themes.length]!;
+  return pickTemplateSentence(theme, { seed: `home:${ganjiKo}` });
+}
+
 /**
  * 홈 「오늘의 한 문장」
  * - no_theory: admin 학습 이론을 알 수 없음
  * - ok: 감성 한 문장 (이론 필수, 일기 통계는 있으면 보강)
+ * - LLM 실패 시에도 템플릿으로 ok 응답 (화면이 깨지지 않음)
  */
 export async function POST(req: NextRequest) {
   let body: unknown;
@@ -48,7 +70,6 @@ export async function POST(req: NextRequest) {
     body.sameGanjiAvgHappiness != null ||
     body.recentWellbeing != null;
 
-  // 1) 학습 이론 존재 여부
   let theoryReady = 0;
   let evidence: Array<{
     content: string;
@@ -59,10 +80,11 @@ export async function POST(req: NextRequest) {
     return Response.json({
       status: "no_theory",
       message: "알 수 없다",
-      detail: "학습 서버(Supabase service role)가 설정되지 않아 학습 내용을 알 수 없습니다.",
+      detail: "학습 서버가 설정되지 않아 학습 내용을 알 수 없습니다.",
       chunkCount: 0,
       sameGanjiCount,
       theoryEvidence: [],
+      fallback: null,
     });
   }
 
@@ -72,10 +94,11 @@ export async function POST(req: NextRequest) {
     return Response.json({
       status: "no_theory",
       message: "알 수 없다",
-      detail: "학습 문서 목록을 불러오지 못했습니다.",
+      detail: publicErrorDetail("rag"),
       chunkCount: 0,
       sameGanjiCount,
       theoryEvidence: [],
+      fallback: null,
     });
   }
 
@@ -87,6 +110,7 @@ export async function POST(req: NextRequest) {
       chunkCount: 0,
       sameGanjiCount,
       theoryEvidence: [],
+      fallback: null,
     });
   }
 
@@ -111,10 +135,11 @@ export async function POST(req: NextRequest) {
     return Response.json({
       status: "no_theory",
       message: "알 수 없다",
-      detail: "학습 내용 검색에 실패했습니다.",
+      detail: publicErrorDetail("rag"),
       chunkCount: 0,
       sameGanjiCount,
       theoryEvidence: [],
+      fallback: "rag_failed",
     });
   }
 
@@ -126,23 +151,29 @@ export async function POST(req: NextRequest) {
       chunkCount: 0,
       sameGanjiCount,
       theoryEvidence: [],
+      fallback: null,
     });
   }
 
   const chunks = evidence.map((e) => e.content);
+  const template = homeTemplateSentence(body.ganjiKo);
 
   if (!process.env.OPENAI_API_KEY) {
     return Response.json({
-      status: "no_theory",
-      message: "알 수 없다",
-      detail: "OPENAI_API_KEY가 없어 문장을 만들 수 없습니다.",
+      status: "ok",
+      message: template,
+      detail: publicErrorDetail("llm"),
       chunkCount: chunks.length,
       sameGanjiCount,
-      theoryEvidence: evidence,
+      theoryEvidence: evidence.map((item, index) => ({
+        ...item,
+        title: `근거 ${index + 1}`,
+        explanation: item.content,
+      })),
+      fallback: "template_no_api_key",
     });
   }
 
-  // 2) 감성 한 문장 + 근거 설명 — 이론 필수, 일기는 있으면 보강
   try {
     const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
     const completion = await client.chat.completions.create({
@@ -231,22 +262,22 @@ JSON만 출력:
       chunkCount: chunks.length,
       sameGanjiCount,
       theoryEvidence,
+      fallback: null,
     });
   } catch (err) {
-    return Response.json(
-      {
-        status: "error",
-        message: "알 수 없다",
-        detail: err instanceof Error ? err.message : "문장 생성 실패",
-        chunkCount: chunks.length,
-        sameGanjiCount,
-        theoryEvidence: evidence.map((item, index) => ({
-          ...item,
-          title: `근거 ${index + 1}`,
-          explanation: item.content,
-        })),
-      },
-      { status: 502 }
-    );
+    const sanitized = classifyAndSanitizeError(err);
+    return Response.json({
+      status: "ok",
+      message: template,
+      detail: sanitized.detail,
+      chunkCount: chunks.length,
+      sameGanjiCount,
+      theoryEvidence: evidence.map((item, index) => ({
+        ...item,
+        title: `근거 ${index + 1}`,
+        explanation: item.content,
+      })),
+      fallback: "template_llm_failed",
+    });
   }
 }
