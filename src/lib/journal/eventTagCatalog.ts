@@ -16,6 +16,8 @@ export const EVENT_TAG_CATALOG: EventTagDefinition[] = [
   { tagCode: "learning", name: "학습", sortOrder: 13, isActive: true, isSystem: true, schemaVersion: 1 },
   { tagCode: "work_pressure", name: "업무 압박", sortOrder: 14, isActive: true, isSystem: true, schemaVersion: 1 },
   { tagCode: "family", name: "가족", sortOrder: 15, isActive: true, isSystem: true, schemaVersion: 1 },
+  { tagCode: "none_special", name: "특별한 일 없음", sortOrder: 16, isActive: true, isSystem: true, schemaVersion: 1 },
+  { tagCode: "other", name: "기타", sortOrder: 17, isActive: true, isSystem: true, schemaVersion: 1 },
 ];
 
 export function getTagName(tagCode: string): string {

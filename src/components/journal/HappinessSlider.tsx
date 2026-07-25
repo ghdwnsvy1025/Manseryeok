@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  HAPPINESS_ANCHORS,
   HAPPINESS_DEFAULT_HINT,
   HAPPINESS_LABELS,
   HAPPINESS_MAX,
@@ -105,6 +106,31 @@ export default function HappinessSlider({
             </button>
           );
         })}
+      </div>
+
+      {/* 앵커는 선택값과 무관하게 항상 표시 */}
+      <div
+        className="grid grid-cols-3 gap-2 pt-1 text-[11px] leading-snug"
+        style={{ color: "var(--px-text2)" }}
+        aria-hidden={false}
+      >
+        {HAPPINESS_ANCHORS.map((a) => (
+          <p
+            key={a.value}
+            className={
+              a.value === 0
+                ? "text-left"
+                : a.value === 5
+                  ? "text-center"
+                  : "text-right"
+            }
+          >
+            <span className="font-black tabular-nums" style={{ color: ACCENT }}>
+              {a.value}
+            </span>{" "}
+            {a.label}
+          </p>
+        ))}
       </div>
     </div>
   );

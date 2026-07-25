@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { getJournalStorage } from "@/lib/journal/getStorage";
 import { getCategoryByCode } from "@/lib/journal/categoryCatalog";
@@ -24,8 +24,11 @@ import type { HappinessScore } from "@/lib/journal/happinessScale";
 import {
   CHECKIN_TAG_GROUPS,
   CORE_STATE_CODES,
+  DOMAIN_POOL_CODES,
   MAX_CHECKIN_TAGS,
   MAX_MOODS,
+  NONE_SPECIAL_TAG,
+  adaptLegacyCoreStates,
   type CoreStateCode,
   type DomainCode,
   type OrdinalScore,
@@ -58,10 +61,10 @@ type Props = {
 
 function emptyCore(): Record<CoreStateCode, CoreStateUi> {
   return {
-    emotional_balance: { ordinal: null, isNotApplicable: false },
     energy: { ordinal: null, isNotApplicable: false },
-    recovery_sleep: { ordinal: null, isNotApplicable: false },
     focus_execution: { ordinal: null, isNotApplicable: false },
+    physical_condition: { ordinal: null, isNotApplicable: false },
+    emotional_balance: { ordinal: null, isNotApplicable: false },
   };
 }
 
@@ -89,6 +92,7 @@ export default function CheckInEditor({ initialDate }: Props) {
   const [tags, setTags] = useState<string[]>([]);
   const [core, setCore] = useState<Record<CoreStateCode, CoreStateUi>>(emptyCore);
   const [domains, setDomains] = useState<DomainStateUi[]>([]);
+  const [showAllDomains, setShowAllDomains] = useState(false);
   const [existingId, setExistingId] = useState<string | undefined>();
   const [status, setStatus] = useState<"idle" | "loading" | "saving">("loading");
   const [message, setMessage] = useState("");
@@ -128,21 +132,50 @@ export default function CheckInEditor({ initialDate }: Props) {
     [allEntries]
   );
 
-  const syncDomainsFromTags = (
-    nextTags: string[],
-    preserve: DomainStateUi[]
-  ) => {
-    const selected = selectDailyDomains(nextTags);
-    const prevMap = new Map(preserve.map((d) => [d.code, d]));
-    return selected.map((code) => {
-      const prev = prevMap.get(code);
-      return (
-        prev ?? {
-          code,
-          ordinal: null as OrdinalScore | null,
-          isNotApplicable: false,
-        }
-      );
+  const syncDomainsFromTags = useCallback(
+    (
+      nextTags: string[],
+      preserve: DomainStateUi[],
+      expandAll = showAllDomains
+    ) => {
+      const selected = expandAll
+        ? [...DOMAIN_POOL_CODES]
+        : selectDailyDomains({
+            tagCodes: nextTags,
+            recentEntries: allEntries,
+            asOfDate: date,
+          });
+      const prevMap = new Map(preserve.map((d) => [d.code, d]));
+      return selected.map((code) => {
+        const prev = prevMap.get(code);
+        return (
+          prev ?? {
+            code,
+            ordinal: null as OrdinalScore | null,
+            isNotApplicable: false,
+          }
+        );
+      });
+    },
+    [allEntries, date, showAllDomains]
+  );
+
+  const toggleTag = (code: string) => {
+    setTags((prev) => {
+      let next: string[];
+      if (prev.includes(code)) {
+        next = prev.filter((t) => t !== code);
+      } else if (code === NONE_SPECIAL_TAG) {
+        next = [NONE_SPECIAL_TAG];
+      } else if (prev.includes(NONE_SPECIAL_TAG)) {
+        next = [code];
+      } else if (prev.length >= MAX_CHECKIN_TAGS) {
+        return prev;
+      } else {
+        next = [...prev, code];
+      }
+      setDomains((d) => syncDomainsFromTags(next, d));
+      return next;
     });
   };
 
@@ -198,9 +231,9 @@ export default function CheckInEditor({ initialDate }: Props) {
 
           const nextCore = emptyCore();
           if (existing.coreStates) {
+            const adapted = adaptLegacyCoreStates(existing.coreStates);
             for (const code of CORE_STATE_CODES) {
-              const row = existing.coreStates[code];
-              if (!row) continue;
+              const row = adapted[code];
               nextCore[code] = {
                 ordinal:
                   row.isNotApplicable || row.ordinal == null
@@ -282,6 +315,8 @@ export default function CheckInEditor({ initialDate }: Props) {
     return () => {
       cancelled = true;
     };
+    // syncDomainsFromTags는 로드 중 allEntries 갱신으로 바뀌므로 date만 의존
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reload only on date change
   }, [date]);
 
   // 자동 임시저장
@@ -309,21 +344,6 @@ export default function CheckInEditor({ initialDate }: Props) {
       if (prev.includes(m)) return prev.filter((x) => x !== m);
       if (prev.length >= MAX_MOODS) return prev;
       return [...prev, m];
-    });
-  };
-
-  const toggleTag = (code: string) => {
-    setTags((prev) => {
-      let next: string[];
-      if (prev.includes(code)) {
-        next = prev.filter((t) => t !== code);
-      } else if (prev.length >= MAX_CHECKIN_TAGS) {
-        return prev;
-      } else {
-        next = [...prev, code];
-      }
-      setDomains((d) => syncDomainsFromTags(next, d));
-      return next;
     });
   };
 
@@ -411,6 +431,30 @@ export default function CheckInEditor({ initialDate }: Props) {
       setMessage(check.error);
       setStatus("idle");
       return;
+    }
+
+    try {
+      const serverCheck = await fetch("/api/journal/checkin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          happiness,
+          moods,
+          tagCodes: tags,
+          core,
+          domains,
+        }),
+      });
+      if (!serverCheck.ok) {
+        const data = (await serverCheck.json().catch(() => ({}))) as {
+          error?: string;
+        };
+        setMessage(data.error ?? "서버 검증에 실패했어요.");
+        setStatus("idle");
+        return;
+      }
+    } catch {
+      // 오프라인 등 — 로컬 validateCheckInSave는 통과했으므로 저장 계속
     }
 
     try {
@@ -791,7 +835,23 @@ export default function CheckInEditor({ initialDate }: Props) {
 
       <section className="space-y-3">
         <p className="ui-section-title">오늘 열린 생활영역</p>
-        <p className="ui-hint">태그·기본 순서로 하루 2개만 묻습니다</p>
+        <p className="ui-hint">
+          최근 상태·사건·미질문 일수를 합산해 상위 2개만 묻습니다
+        </p>
+        <button
+          type="button"
+          className="text-xs font-bold underline"
+          style={{ color: "var(--px-accent)" }}
+          onClick={() => {
+            setShowAllDomains((v) => {
+              const next = !v;
+              setDomains((d) => syncDomainsFromTags(tags, d, next));
+              return next;
+            });
+          }}
+        >
+          {showAllDomains ? "추천 영역만 보기" : "다른 영역도 펼치기"}
+        </button>
         {domains.map((d) => {
           const cat = getCategoryByCode(d.code);
           return (

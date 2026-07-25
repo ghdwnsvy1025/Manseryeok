@@ -6,7 +6,7 @@ import type {
   JournalEntryTag,
   UserCategoryPreference,
 } from "./types";
-import { JOURNAL_SCHEMA_VERSION } from "./types";
+import { CHECKIN_VERSION_V2, JOURNAL_SCHEMA_VERSION } from "./types";
 import { migrateScoreToTen } from "./scoreScale";
 import { isCategoryCode } from "./categoryCatalog";
 import {
@@ -242,6 +242,43 @@ class SupabaseJournalStorage implements JournalStorage {
     const moodLabels =
       input.moodLabels ??
       (input.moodLabel ? [input.moodLabel] : []);
+
+    if (input.checkinVersion === 2 || input.checkinVersion === CHECKIN_VERSION_V2) {
+      const { validateCheckInSave } = await import(
+        "@/lib/journal/checkin/validation"
+      );
+      const { CORE_STATE_CODES } = await import(
+        "@/lib/journal/checkin/catalog"
+      );
+      type CoreStateCode = (typeof CORE_STATE_CODES)[number];
+      const coreUi = {} as Record<
+        CoreStateCode,
+        { ordinal: 1 | 2 | 3 | 4 | 5 | null; isNotApplicable: boolean }
+      >;
+      for (const code of CORE_STATE_CODES) {
+        const row = input.coreStates?.[code];
+        coreUi[code] = {
+          ordinal: (row?.ordinal as 1 | 2 | 3 | 4 | 5 | null) ?? null,
+          isNotApplicable: Boolean(row?.isNotApplicable),
+        };
+      }
+      const domainUi = (input.domainScores ?? []).map((d) => ({
+        code: d.code as import("@/lib/journal/checkin/catalog").DomainCode,
+        ordinal: (d.ordinal as 1 | 2 | 3 | 4 | 5 | null) ?? null,
+        isNotApplicable: Boolean(d.isNotApplicable),
+      }));
+      const v = validateCheckInSave({
+        happiness:
+          input.happinessScore !== undefined && input.happinessScore !== null
+            ? input.happinessScore
+            : input.overallSatisfaction,
+        moods: moodLabels,
+        tagCodes: input.tagCodes,
+        core: coreUi,
+        domains: domainUi,
+      });
+      if (!v.ok) throw new Error(v.error);
+    }
 
     const upsertRow: Record<string, unknown> = {
       id,

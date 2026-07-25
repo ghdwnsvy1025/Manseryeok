@@ -138,13 +138,15 @@ export const RECOMMENDED_ENABLED_CATEGORIES = 6;
 export { JOURNAL_SCORE_LABELS as SCORE_LABELS } from "./scoreScale";
 export type { JournalScore } from "./scoreScale";
 
+/** 체크인 v2 기분 9개 (최대 3개 선택) */
 export const MOOD_OPTIONS = [
   "기쁨",
   "평온",
   "설렘",
-  "지침",
   "불안",
   "분노",
+  "답답함",
   "슬픔",
+  "지침",
   "무덤덤",
 ] as const;

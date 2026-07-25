@@ -4,9 +4,9 @@ import type { CategoryCode, CategoryDefinition } from "./types";
 export const CATEGORY_CATALOG: CategoryDefinition[] = [
   {
     code: "emotional_balance",
-    name: "감정·만족도",
-    question: "오늘 감정은 편안하고 안정적이었나요?",
-    meaning: "감정 안정과 만족",
+    name: "마음의 여유",
+    question: "오늘 마음에 여유가 있었나요?",
+    meaning: "심리적 여유와 안정",
     sortOrder: 1,
     isActive: true,
     isSystem: true,
@@ -34,7 +34,7 @@ export const CATEGORY_CATALOG: CategoryDefinition[] = [
   },
   {
     code: "physical_condition",
-    name: "건강·신체 상태",
+    name: "몸 상태",
     question: "오늘 몸의 컨디션은 어땠나요?",
     meaning: "신체 체감 상태",
     sortOrder: 4,
@@ -44,7 +44,7 @@ export const CATEGORY_CATALOG: CategoryDefinition[] = [
   },
   {
     code: "focus_execution",
-    name: "집중·실행력",
+    name: "집중·실행",
     question: "계획한 일을 집중해서 실행했나요?",
     meaning: "집중, 결정, 마무리",
     sortOrder: 5,

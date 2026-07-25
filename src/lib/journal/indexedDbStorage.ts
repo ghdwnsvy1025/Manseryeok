@@ -180,6 +180,44 @@ export class IndexedDbJournalStorage implements JournalStorage {
       throw new Error("행복도는 0~10만 허용됩니다.");
     }
 
+    if (input.checkinVersion === 2) {
+      const { validateCheckInSave } = await import(
+        "@/lib/journal/checkin/validation"
+      );
+      const { CORE_STATE_CODES } = await import(
+        "@/lib/journal/checkin/catalog"
+      );
+      type CoreStateCode = (typeof CORE_STATE_CODES)[number];
+      const moodLabels =
+        input.moodLabels ?? (input.moodLabel ? [input.moodLabel] : []);
+      const coreUi = {} as Record<
+        CoreStateCode,
+        { ordinal: 1 | 2 | 3 | 4 | 5 | null; isNotApplicable: boolean }
+      >;
+      for (const code of CORE_STATE_CODES) {
+        const row = input.coreStates?.[code];
+        coreUi[code] = {
+          ordinal: (row?.ordinal as 1 | 2 | 3 | 4 | 5 | null) ?? null,
+          isNotApplicable: Boolean(row?.isNotApplicable),
+        };
+      }
+      const v = validateCheckInSave({
+        happiness:
+          input.happinessScore !== undefined && input.happinessScore !== null
+            ? input.happinessScore
+            : input.overallSatisfaction,
+        moods: moodLabels,
+        tagCodes: input.tagCodes,
+        core: coreUi,
+        domains: (input.domainScores ?? []).map((d) => ({
+          code: d.code as import("@/lib/journal/checkin/catalog").DomainCode,
+          ordinal: (d.ordinal as 1 | 2 | 3 | 4 | 5 | null) ?? null,
+          isNotApplicable: Boolean(d.isNotApplicable),
+        })),
+      });
+      if (!v.ok) throw new Error(v.error);
+    }
+
     const now = new Date().toISOString();
     const existing =
       (input.existingId
@@ -300,6 +338,44 @@ export class MemoryJournalStorage implements JournalStorage {
         const check = validateScorePayload(row);
         if (!check.ok) throw new Error(check.error);
       }
+    }
+
+    if (input.checkinVersion === 2) {
+      const { validateCheckInSave } = await import(
+        "@/lib/journal/checkin/validation"
+      );
+      const { CORE_STATE_CODES } = await import(
+        "@/lib/journal/checkin/catalog"
+      );
+      type CoreStateCode = (typeof CORE_STATE_CODES)[number];
+      const moodLabels =
+        input.moodLabels ?? (input.moodLabel ? [input.moodLabel] : []);
+      const coreUi = {} as Record<
+        CoreStateCode,
+        { ordinal: 1 | 2 | 3 | 4 | 5 | null; isNotApplicable: boolean }
+      >;
+      for (const code of CORE_STATE_CODES) {
+        const row = input.coreStates?.[code];
+        coreUi[code] = {
+          ordinal: (row?.ordinal as 1 | 2 | 3 | 4 | 5 | null) ?? null,
+          isNotApplicable: Boolean(row?.isNotApplicable),
+        };
+      }
+      const v = validateCheckInSave({
+        happiness:
+          input.happinessScore !== undefined && input.happinessScore !== null
+            ? input.happinessScore
+            : input.overallSatisfaction,
+        moods: moodLabels,
+        tagCodes: input.tagCodes,
+        core: coreUi,
+        domains: (input.domainScores ?? []).map((d) => ({
+          code: d.code as import("@/lib/journal/checkin/catalog").DomainCode,
+          ordinal: (d.ordinal as 1 | 2 | 3 | 4 | 5 | null) ?? null,
+          isNotApplicable: Boolean(d.isNotApplicable),
+        })),
+      });
+      if (!v.ok) throw new Error(v.error);
     }
 
     const now = new Date().toISOString();
