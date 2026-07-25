@@ -211,15 +211,15 @@ export async function POST(req: NextRequest) {
     if (!error && data?.id) {
       deliveryId = String(data.id);
       recorded = true;
+      // 여기는 "전달 생성" 시점이지 "사용자가 본" 시점이 아니다.
+      // 실제 impression은 모달이 렌더될 때 클라이언트가 발화한다.
+      // 둘 다 impression으로 찍으면 노출 수가 두 배로 부풀려진다.
       await sb.from("content_exposure_events").insert({
         user_id: userId,
         event_date: b.entry.entryDate,
         content_type: result.contentType,
         content_id: deliveryId,
-        event_type:
-          result.contentType === "verified_quote"
-            ? "quote_impression"
-            : "sentence_impression",
+        event_type: "delivered",
         metadata_json: { surface: "journal_save_complete" },
       });
     }

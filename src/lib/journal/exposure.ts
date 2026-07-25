@@ -2,9 +2,16 @@
  * 콘텐츠 노출 이벤트 — 질문/운세/문장 오염 관리용
  */
 
+/**
+ * 실제로 발화되는 이벤트만 둔다.
+ * 선언만 있고 아무데서도 쏘지 않는 타입은 "데이터가 없는 건지 기능이 없는 건지"
+ * 구분할 수 없게 만들기 때문에 추가하지 않는다. (exposureEvents 테스트가 강제)
+ *
+ * question_opened는 제거됨 — 오늘의 질문 카드는 항상 펼쳐진 채로 렌더되어
+ * "연다"는 동작 자체가 없다. 접히는 UI가 생기면 그때 다시 추가할 것.
+ */
 export const EXPOSURE_EVENT_TYPES = [
   "question_impression",
-  "question_opened",
   "fortune_summary_impression",
   "fortune_detail_opened",
   "fortune_domain_opened",

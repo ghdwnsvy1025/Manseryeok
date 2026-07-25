@@ -11,6 +11,7 @@ import { entriesStrictlyBefore } from "@/lib/journal/recentA";
 import { rankKeywordsForQuestion } from "@/lib/journal/keywords/rank";
 import {
   aggregateKeywordBiasesFromEvents,
+  LEARNABLE_FEEDBACK_EVENT_TYPES,
   type KeywordBiasMap,
 } from "@/lib/journal/keywords/learning";
 import { isKeywordCode } from "@/lib/journal/keywords/catalog";
@@ -61,7 +62,7 @@ async function loadServerFeedbackBiases(): Promise<KeywordBiasMap> {
     .from("question_feedback_events")
     .select("event_type, payload")
     .eq("user_id", user.id)
-    .in("event_type", ["fit_good", "fit_bad", "led_to_write", "skipped", "dismissed"])
+    .in("event_type", LEARNABLE_FEEDBACK_EVENT_TYPES)
     .order("created_at", { ascending: false })
     .limit(120);
 
@@ -261,4 +262,4 @@ export async function POST(req: NextRequest) {
     },
   });
 }
-
+

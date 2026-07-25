@@ -13,8 +13,23 @@ export type KeywordBiasMap = Partial<Record<KeywordCode, number>>;
 export const KEYWORD_BIAS_MIN = -3;
 export const KEYWORD_BIAS_MAX = 3;
 
+/**
+ * 학습에 실제로 반영되는 이벤트. shown은 가중치 0이라 제외.
+ * 새 이벤트를 추가하면 여기와 WEIGHTS를 함께 갱신해야 한다 (테스트가 강제).
+ */
+export const LEARNABLE_FEEDBACK_EVENT_TYPES = [
+  "fit_good",
+  "fit_neutral",
+  "fit_bad",
+  "led_to_write",
+  "skipped",
+  "dismissed",
+] as const;
+
 const WEIGHTS: Record<string, number> = {
   fit_good: 0.8,
+  // 중립은 "틀리진 않지만 와닿지 않음" — 아주 약한 감산으로 다양성을 유도
+  fit_neutral: -0.1,
   fit_bad: -1.0,
   led_to_write: 0.35,
   shown: 0,

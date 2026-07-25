@@ -5,6 +5,7 @@
 export const QUESTION_FEEDBACK_EVENT_TYPES = [
   "shown",
   "fit_good",
+  "fit_neutral",
   "fit_bad",
   "led_to_write",
   "skipped",
@@ -13,6 +14,48 @@ export const QUESTION_FEEDBACK_EVENT_TYPES = [
 
 export type QuestionFeedbackEventType =
   (typeof QUESTION_FEEDBACK_EVENT_TYPES)[number];
+
+export type FitLevel = "good" | "neutral" | "bad";
+
+/**
+ * 적합도 3단계.
+ * 2단계(맞아요/별로예요)는 "그저 그래요"를 표현할 수 없어서
+ * 애매한 경우 응답을 아예 안 하거나 한쪽으로 쏠린다.
+ */
+export const QUESTION_FIT_LEVELS: Array<{
+  level: FitLevel;
+  label: string;
+  eventType: QuestionFeedbackEventType;
+  rating: number;
+  /** 선택 후 안내 문구 */
+  ack: string;
+}> = [
+  {
+    level: "good",
+    label: "잘 맞아요",
+    eventType: "fit_good",
+    rating: 5,
+    ack: "잘 맞아요 — 다음 질문에 반영할게요.",
+  },
+  {
+    level: "neutral",
+    label: "그저 그래요",
+    eventType: "fit_neutral",
+    rating: 3,
+    ack: "그저 그래요 — 방향을 조금 바꿔볼게요.",
+  },
+  {
+    level: "bad",
+    label: "안 맞아요",
+    eventType: "fit_bad",
+    rating: 1,
+    ack: "안 맞아요 — 다음 질문에 참고할게요.",
+  },
+];
+
+export function isFitEventType(value: string): boolean {
+  return QUESTION_FIT_LEVELS.some((l) => l.eventType === value);
+}
 
 export type QuestionFeedbackInput = {
   questionDate: string;
@@ -104,9 +147,7 @@ export function hasLocalFitFeedback(
     const raw = window.localStorage.getItem(localKey(userHint, questionDate));
     if (!raw) return false;
     const log = JSON.parse(raw) as LocalFeedbackLog;
-    return log.events.some(
-      (e) => e.eventType === "fit_good" || e.eventType === "fit_bad"
-    );
+    return log.events.some((e) => isFitEventType(e.eventType));
   } catch {
     return false;
   }

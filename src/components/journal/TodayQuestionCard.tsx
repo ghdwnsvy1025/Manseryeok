@@ -6,9 +6,14 @@ import {
   shouldShowOpenAiStatus,
   type OpenAiCallStatus,
 } from "@/lib/journal/openaiStatus";
-import { hasLocalFitFeedback } from "@/lib/journal/questionFeedback";
+import {
+  hasLocalFitFeedback,
+  QUESTION_FIT_LEVELS,
+  type FitLevel,
+} from "@/lib/journal/questionFeedback";
 import { reportQuestionFeedback } from "@/lib/journal/reportQuestionFeedback";
 import { loadLocalKeywordBiases } from "@/lib/journal/keywords/learning";
+import { trackContentExposure } from "@/lib/journal/exposure";
 
 type KeywordRow = {
   code?: string;
@@ -57,11 +62,22 @@ export default function TodayQuestionCard({
   const [loading, setLoading] = useState(true);
   const [keywords, setKeywords] = useState<string[]>([]);
   const [keywordCodes, setKeywordCodes] = useState<string[]>([]);
-  const [fit, setFit] = useState<"good" | "bad" | null>(null);
+  const [fit, setFit] = useState<FitLevel | null>(null);
+  const [skipped, setSkipped] = useState(false);
   const [feedbackMsg, setFeedbackMsg] = useState("");
   const [debug, setDebug] = useState<DebugInfo | null>(null);
   const [debugOpen, setDebugOpen] = useState(false);
   const shownSent = useRef(false);
+  /**
+   * 언마운트 시 "응답 없이 떠남"(dismissed)을 실제로 발화하기 위한 최신 상태 스냅샷.
+   * cleanup 클로저는 옛 state를 보므로 ref로 들고 있어야 한다.
+   */
+  const answeredRef = useRef(false);
+  const dismissSentRef = useRef(false);
+  const contextRef = useRef<{
+    questionText: string | null;
+    keywords: string[];
+  }>({ questionText: null, keywords: [] });
   const codesKey = enabledCodes.join("|");
   const entriesKey = String(entries.length);
 
@@ -69,9 +85,13 @@ export default function TodayQuestionCard({
     let cancelled = false;
     setLoading(true);
     setFit(null);
+    setSkipped(false);
     setFeedbackMsg("");
     setDebug(null);
     shownSent.current = false;
+    answeredRef.current = false;
+    dismissSentRef.current = false;
+    contextRef.current = { questionText: null, keywords: [] };
     void (async () => {
       try {
         const res = await fetch("/api/journal/today-question", {
@@ -124,20 +144,33 @@ export default function TodayQuestionCard({
           keywords: rows,
         });
 
+        contextRef.current = {
+          questionText: q,
+          keywords: kwCodes.length > 0 ? kwCodes : kwLabels,
+        };
+
         if (hasLocalFitFeedback(todayDate)) {
           setFit("good");
+          answeredRef.current = true;
           setFeedbackMsg("오늘 피드백을 남겨주셨어요.");
         }
 
         if (q && !shownSent.current) {
           shownSent.current = true;
+          const kws = kwCodes.length > 0 ? kwCodes : kwLabels;
           void reportQuestionFeedback({
             questionDate: todayDate,
             eventType: "shown",
             questionText: q,
-            payload: {
-              keywords: kwCodes.length > 0 ? kwCodes : kwLabels,
-            },
+            payload: { keywords: kws },
+          });
+          // 통합 노출 로그에도 남긴다 — 노출 오염(같은 날 중복 노출) 관리는
+          // question_feedback_events가 아니라 content_exposure_events가 담당한다.
+          void trackContentExposure({
+            eventDate: todayDate,
+            contentType: "daily_question",
+            eventType: "question_impression",
+            metadata: { keywords: kws, surface: "journal_home" },
           });
         }
       } catch (err) {
@@ -155,22 +188,52 @@ export default function TodayQuestionCard({
     })();
     return () => {
       cancelled = true;
+      // 질문을 봤지만 아무 응답 없이 떠난 경우 — dismissed를 실제로 발화
+      if (
+        shownSent.current &&
+        !answeredRef.current &&
+        !dismissSentRef.current &&
+        contextRef.current.questionText
+      ) {
+        dismissSentRef.current = true;
+        void reportQuestionFeedback({
+          questionDate: todayDate,
+          eventType: "dismissed",
+          questionText: contextRef.current.questionText,
+          payload: { keywords: contextRef.current.keywords },
+        });
+      }
     };
   }, [todayDate, enabledCodes, entries, sajuProfile, codesKey, entriesKey]);
 
-  const sendFit = async (kind: "fit_good" | "fit_bad") => {
-    if (!question || fit) return;
-    setFit(kind === "fit_good" ? "good" : "bad");
-    setFeedbackMsg(
-      kind === "fit_good"
-        ? "맞아요 — 다음 질문에 반영할게요."
-        : "별로예요 — 다음 질문에 참고할게요."
-    );
+  const answered = fit != null || skipped;
+
+  const sendFit = async (level: FitLevel) => {
+    const option = QUESTION_FIT_LEVELS.find((l) => l.level === level);
+    if (!question || answered || !option) return;
+    setFit(level);
+    answeredRef.current = true;
+    setFeedbackMsg(option.ack);
     await reportQuestionFeedback({
       questionDate: todayDate,
-      eventType: kind,
+      eventType: option.eventType,
       questionText: question,
-      rating: kind === "fit_good" ? 5 : 2,
+      rating: option.rating,
+      payload: {
+        keywords: keywordCodes.length > 0 ? keywordCodes : keywords,
+      },
+    });
+  };
+
+  const sendSkip = async () => {
+    if (!question || answered) return;
+    setSkipped(true);
+    answeredRef.current = true;
+    setFeedbackMsg("건너뛰었어요 — 다음엔 다른 질문을 드릴게요.");
+    await reportQuestionFeedback({
+      questionDate: todayDate,
+      eventType: "skipped",
+      questionText: question,
       payload: {
         keywords: keywordCodes.length > 0 ? keywordCodes : keywords,
       },
@@ -213,35 +276,33 @@ export default function TodayQuestionCard({
           >
             이 질문이 오늘과 맞나요?
           </span>
+          {QUESTION_FIT_LEVELS.map((option) => (
+            <button
+              key={option.level}
+              type="button"
+              disabled={answered}
+              aria-pressed={fit === option.level}
+              onClick={() => void sendFit(option.level)}
+              className="px-2.5 py-1 text-[11px] font-black border-2 disabled:opacity-50"
+              style={{
+                borderColor:
+                  fit === option.level ? "var(--px-accent)" : "var(--px-border)",
+                color:
+                  fit === option.level ? "var(--px-accent)" : "var(--px-text)",
+                background: "var(--px-bg3)",
+              }}
+            >
+              {option.label}
+            </button>
+          ))}
           <button
             type="button"
-            disabled={fit != null}
-            aria-pressed={fit === "good"}
-            onClick={() => void sendFit("fit_good")}
-            className="px-2.5 py-1 text-[11px] font-black border-2 disabled:opacity-50"
-            style={{
-              borderColor:
-                fit === "good" ? "var(--px-accent)" : "var(--px-border)",
-              color: fit === "good" ? "var(--px-accent)" : "var(--px-text)",
-              background: "var(--px-bg3)",
-            }}
+            disabled={answered}
+            onClick={() => void sendSkip()}
+            className="text-[10px] font-bold underline disabled:opacity-50"
+            style={{ color: "var(--px-text2)" }}
           >
-            맞아요
-          </button>
-          <button
-            type="button"
-            disabled={fit != null}
-            aria-pressed={fit === "bad"}
-            onClick={() => void sendFit("fit_bad")}
-            className="px-2.5 py-1 text-[11px] font-black border-2 disabled:opacity-50"
-            style={{
-              borderColor:
-                fit === "bad" ? "var(--px-accent)" : "var(--px-border)",
-              color: fit === "bad" ? "var(--px-accent)" : "var(--px-text)",
-              background: "var(--px-bg3)",
-            }}
-          >
-            별로예요
+            건너뛰기
           </button>
           {feedbackMsg && <p className="ui-hint w-full">{feedbackMsg}</p>}
         </div>
