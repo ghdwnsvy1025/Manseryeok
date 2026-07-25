@@ -51,7 +51,7 @@ test.describe("Phase 6.1 — auth + legacy smoke", () => {
     ).toBeVisible({ timeout: 20_000 });
   });
 
-  test("bottom nav: 일기 · 홈 · 분석 only", async ({ page }) => {
+  test("bottom nav: 일기 · 홈 · 통계 only", async ({ page }) => {
     // Guest entry so home shell + AppNav render (not only WelcomeAuthGate content)
     await page.goto("/");
     const guest = page.getByRole("button", { name: /비로그인으로 시작/ });
@@ -62,7 +62,8 @@ test.describe("Phase 6.1 — auth + legacy smoke", () => {
     await expect(nav).toBeVisible({ timeout: 20_000 });
     await expect(nav.locator('a[href="/journal"]')).toBeVisible();
     await expect(nav.locator('a[href="/"]')).toBeVisible();
-    await expect(nav.locator('a[href="/analysis"]')).toBeVisible();
+    await expect(nav.locator('a[href="/stats"]')).toBeVisible();
+    await expect(nav.locator('a[href="/analysis"]')).toHaveCount(0);
     await expect(nav.locator('a[href="/journal/stats"]')).toHaveCount(0);
     await expect(nav.locator('a[href="/saju"]')).toHaveCount(0);
     await expect(nav.locator('a[href="/diary"]')).toHaveCount(0);

@@ -25,6 +25,7 @@ import {
   resolveDailyInsightContext,
   persistDailyQuestion,
 } from "@/lib/journal/insight/contextService";
+import { resolveInsightPersistClient } from "@/lib/journal/insight/persistClient";
 import { INSIGHT_ENGINE_VERSION } from "@/lib/journal/insight/types";
 import {
   buildShadowEvalReport,
@@ -223,12 +224,13 @@ export async function POST(req: NextRequest) {
   let contextId: string | null = null;
   let questionId: string | null = null;
 
-  const sb = getSupabaseServerClient();
-  if (sb) {
+  const sbAuth = getSupabaseServerClient();
+  if (sbAuth) {
     const {
       data: { user },
-    } = await sb.auth.getUser();
+    } = await sbAuth.auth.getUser();
     if (user?.id) {
+      const sb = resolveInsightPersistClient(sbAuth);
       const resolved = await resolveDailyInsightContext(sb, user.id, {
         eventDate: b.todayDate,
         entries: rawEntries,

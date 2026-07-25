@@ -24,6 +24,7 @@ import {
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import { loadOnboardingProfile } from "@/lib/journal/onboarding/load";
 import { computeBlendWeights } from "@/lib/journal/insight/dynamicWeights";
+import { resolveInsightPersistClient } from "@/lib/journal/insight/persistClient";
 
 export const runtime = "nodejs";
 
@@ -54,15 +55,17 @@ export async function POST(req: NextRequest) {
   const skipLlm = Boolean(b.skipLlm);
 
   if (isDailyFortuneV2Enabled()) {
-    const sb = getSupabaseServerClient();
+    const sbAuth = getSupabaseServerClient();
     let userId: string | null = null;
     let onboardingCompleted = false;
-    if (sb) {
+    let sb = sbAuth;
+    if (sbAuth) {
       const {
         data: { user },
-      } = await sb.auth.getUser();
+      } = await sbAuth.auth.getUser();
       userId = user?.id ?? null;
       if (userId) {
+        sb = resolveInsightPersistClient(sbAuth);
         onboardingCompleted = (await loadOnboardingProfile(sb, userId))
           .completed;
         const cached = await loadPersistedFortune(sb, userId, b.todayDate);
