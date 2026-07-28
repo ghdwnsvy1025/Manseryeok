@@ -50,7 +50,12 @@ export default function JournalCategoriesPage() {
           submitLabel="카테고리 저장"
           onSave={async (enabled) => {
             const storage = await getJournalStorage();
-            const next = buildPreferencesFromSelection(enabled, previous, null);
+            const next = buildPreferencesFromSelection(
+              enabled,
+              previous,
+              null,
+              previous.find((p) => p.sajuProfileId)?.sajuProfileId ?? null
+            );
             await storage.savePreferences(next);
             setPrevious(next);
             setInitial(enabled);

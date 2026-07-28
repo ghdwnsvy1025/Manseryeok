@@ -14,6 +14,8 @@ export type JournalScoreSaveRow = {
 
 export type JournalSaveInput = {
   entryDate: string;
+  /** Owning saju profile; required for cloud storage isolation */
+  sajuProfileId?: string | null;
   userTimezone?: string;
   content: string;
   overallSatisfaction: JournalScore | 0 | null;
@@ -65,4 +67,6 @@ export interface JournalStorage {
   list(): Promise<JournalEntry[]>;
   getPreferences(): Promise<UserCategoryPreference[]>;
   savePreferences(prefs: UserCategoryPreference[]): Promise<void>;
+  /** 해당 날짜 엔트리 삭제. 없으면 false */
+  deleteByDate?(entryDate: string): Promise<boolean>;
 }

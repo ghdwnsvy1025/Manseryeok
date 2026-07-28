@@ -11,7 +11,7 @@ import {
 export const CANONICAL_RANK_VERSION = "canonical-rank-v1.0.0";
 
 export type CanonicalSignal = {
-  /** 기분 라벨: 기쁨/평온/설렘/불안/분노/답답함/슬픔/지침/무덤덤 */
+  /** 기분 라벨 (MOOD_OPTIONS) */
   moods?: string[];
   /** 낮게 나온 카테고리 코드 */
   lowCategories?: string[];
@@ -32,12 +32,20 @@ type WeightMap = Partial<Record<CanonicalKeywordCode, number>>;
 
 const MOOD_WEIGHTS: Record<string, WeightMap> = {
   기쁨: { achievement: 1.0, vitality: 0.8, reflection_meaning: 0.4 },
+  뿌듯함: { achievement: 1.8, self_direction: 0.8, reflection_meaning: 0.5 },
   평온: { stability: 1.2, reflection_meaning: 0.6 },
   설렘: { change_acceptance: 2.0, execution: 0.5 },
   불안: { stability: 1.5, change_acceptance: 0.5 },
   분노: { relation_boundary: 2.0, emotion_expression: 1.5, stability: 0.8 },
+  짜증남: { emotion_expression: 1.6, relation_boundary: 1.0, stability: 0.6 },
   답답함: { emotion_expression: 1.5, relation_boundary: 1.2, stability: 0.5 },
   슬픔: { recovery: 1.2, emotion_expression: 1.0, emotion_awareness: 0.8 },
+  우울함: { recovery: 1.6, emotion_awareness: 1.2, emotion_expression: 0.6 },
+  후회스러움: {
+    reflection_meaning: 1.8,
+    responsibility_regulation: 1.2,
+    decision_organize: 0.5,
+  },
   지침: { recovery: 2.0, responsibility_regulation: 1.2 },
   무덤덤: { emotion_awareness: 1.4, reflection_meaning: 0.6 },
 };

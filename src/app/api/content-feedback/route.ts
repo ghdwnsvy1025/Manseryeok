@@ -4,6 +4,7 @@ import {
   type ContentFeedbackInput,
 } from "@/lib/journal/contentFeedback";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
+import { resolveActiveSajuProfileId } from "@/lib/diary/activeSajuProfile";
 
 export const runtime = "nodejs";
 
@@ -32,8 +33,18 @@ export async function POST(req: NextRequest) {
     return Response.json({ ok: true, recorded: false, reason: "anonymous" });
   }
 
+  const sajuProfileId = await resolveActiveSajuProfileId(sb, user.id);
+  if (!sajuProfileId) {
+    return Response.json({
+      ok: true,
+      recorded: false,
+      reason: "no_saju_profile",
+    });
+  }
+
   const { error } = await sb.from("content_feedback").insert({
     user_id: user.id,
+    saju_profile_id: sajuProfileId,
     event_date: input.eventDate,
     content_type: input.contentType,
     content_id: input.contentId ?? null,

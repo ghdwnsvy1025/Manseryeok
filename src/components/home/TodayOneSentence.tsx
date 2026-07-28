@@ -1,6 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import {
+  peekHomeSentence,
+  setHomeSentence,
+} from "@/lib/journal/homeSentenceCache";
 
 type Status =
   | "loading"
@@ -37,10 +41,19 @@ export default function TodayOneSentence(props: Props) {
   const [evidence, setEvidence] = useState<TheoryEvidence[]>([]);
   const [showEvidence, setShowEvidence] = useState(false);
   const [showRaw, setShowRaw] = useState(false);
-  const relationLabelsKey = props.relationLabels.join("|");
 
   useEffect(() => {
     let cancelled = false;
+
+    const cached = peekHomeSentence();
+    if (cached && (cached.status === "ok" || cached.status === "no_theory")) {
+      setStatus(cached.status as Status);
+      setMessage(cached.message);
+      setDetail(cached.detail);
+      setEvidence([]);
+      return;
+    }
+
     setStatus("loading");
     setMessage("");
     setDetail(null);
@@ -63,10 +76,16 @@ export default function TodayOneSentence(props: Props) {
         };
         if (cancelled) return;
         const next = data.status ?? "error";
-        setStatus(next === "loading" ? "error" : next);
-        setMessage(data.message ?? "알 수 없다");
-        setDetail(data.detail ?? null);
+        const resolved = next === "loading" ? "error" : next;
+        const msg = data.message ?? "알 수 없다";
+        const det = data.detail ?? null;
+        setStatus(resolved);
+        setMessage(msg);
+        setDetail(det);
         setEvidence(Array.isArray(data.theoryEvidence) ? data.theoryEvidence : []);
+        if (resolved === "ok" || resolved === "no_theory") {
+          setHomeSentence({ status: resolved, message: msg, detail: det });
+        }
       } catch {
         if (cancelled) return;
         setStatus("error");
@@ -79,19 +98,9 @@ export default function TodayOneSentence(props: Props) {
     return () => {
       cancelled = true;
     };
-  }, [
-    props,
-    props.ganjiKo,
-    props.stemKo,
-    props.branchKo,
-    props.tenGod,
-    props.sameGanjiCount,
-    props.sameGanjiAvgHappiness,
-    props.sameGanjiAvgCondition,
-    props.totalEntryDays,
-    props.recentWellbeing,
-    relationLabelsKey,
-  ]);
+    // 같은 날 캐시가 있으면 재요청하지 않음 (ganji만 날짜 신호로 사용)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [props.ganjiKo]);
 
   const tone =
     status === "ok"

@@ -4,18 +4,26 @@ import {
 import type { CategoryCode, UserCategoryPreference } from "./types";
 import { validateEnabledCategorySelection } from "./validation";
 
-const PREFS_KEY = "manseryeok_journal_category_prefs_v1";
+const PREFS_KEY_V1 = "manseryeok_journal_category_prefs_v1";
+const PREFS_KEY_PREFIX_V2 = "manseryeok_journal_category_prefs_v2:";
+
+function prefsKey(sajuProfileId: string | null | undefined): string {
+  if (sajuProfileId) return `${PREFS_KEY_PREFIX_V2}${sajuProfileId}`;
+  return PREFS_KEY_V1;
+}
 
 function nowIso(): string {
   return new Date().toISOString();
 }
 
 export function createDefaultPreferences(
-  userId: string | null = null
+  userId: string | null = null,
+  sajuProfileId: string | null = null
 ): UserCategoryPreference[] {
   const at = nowIso();
   return DEFAULT_RECOMMENDED_CODES.map((code, index) => ({
     userId,
+    sajuProfileId,
     categoryCode: code,
     enabled: true,
     sortOrder: index,
@@ -26,26 +34,41 @@ export function createDefaultPreferences(
 }
 
 export function loadCategoryPreferencesLocal(
-  userId: string | null = null
+  userId: string | null = null,
+  sajuProfileId: string | null = null
 ): UserCategoryPreference[] {
   if (typeof window === "undefined") {
-    return createDefaultPreferences(userId);
+    return createDefaultPreferences(userId, sajuProfileId);
   }
   try {
-    const raw = localStorage.getItem(PREFS_KEY);
-    if (!raw) return createDefaultPreferences(userId);
+    const key = prefsKey(sajuProfileId);
+    let raw = localStorage.getItem(key);
+    // Migrate legacy account-scoped prefs into this profile once
+    if (!raw && sajuProfileId) {
+      const legacy = localStorage.getItem(PREFS_KEY_V1);
+      if (legacy) {
+        localStorage.setItem(key, legacy);
+        raw = legacy;
+      }
+    }
+    if (!raw) return createDefaultPreferences(userId, sajuProfileId);
     const parsed = JSON.parse(raw) as UserCategoryPreference[];
     if (!Array.isArray(parsed) || parsed.length === 0) {
-      return createDefaultPreferences(userId);
+      return createDefaultPreferences(userId, sajuProfileId);
     }
-    return parsed.map((p) => ({ ...p, userId: userId ?? p.userId }));
+    return parsed.map((p) => ({
+      ...p,
+      userId: userId ?? p.userId,
+      sajuProfileId: sajuProfileId ?? p.sajuProfileId ?? null,
+    }));
   } catch {
-    return createDefaultPreferences(userId);
+    return createDefaultPreferences(userId, sajuProfileId);
   }
 }
 
 export function saveCategoryPreferencesLocal(
-  prefs: UserCategoryPreference[]
+  prefs: UserCategoryPreference[],
+  sajuProfileId?: string | null
 ): { ok: boolean; error?: string } {
   const enabled = prefs
     .filter((p) => p.enabled)
@@ -55,7 +78,9 @@ export function saveCategoryPreferencesLocal(
   if (!check.ok) return check;
 
   if (typeof window !== "undefined") {
-    localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
+    const profileId =
+      sajuProfileId ?? prefs.find((p) => p.sajuProfileId)?.sajuProfileId ?? null;
+    localStorage.setItem(prefsKey(profileId), JSON.stringify(prefs));
   }
   return { ok: true };
 }
@@ -63,7 +88,8 @@ export function saveCategoryPreferencesLocal(
 export function buildPreferencesFromSelection(
   enabledOrdered: CategoryCode[],
   previous: UserCategoryPreference[] | null,
-  userId: string | null = null
+  userId: string | null = null,
+  sajuProfileId: string | null = null
 ): UserCategoryPreference[] {
   const check = validateEnabledCategorySelection(enabledOrdered);
   if (!check.ok) {
@@ -82,6 +108,7 @@ export function buildPreferencesFromSelection(
     const prev = prevMap.get(code);
     result.push({
       userId,
+      sajuProfileId,
       categoryCode: code,
       enabled: true,
       sortOrder: order++,
@@ -89,16 +116,18 @@ export function buildPreferencesFromSelection(
       disabledAt: null,
       updatedAt: at,
     });
-    allCodes.delete(code);
   }
-  for (const code of Array.from(allCodes)) {
-    const prev = prevMap.get(code as CategoryCode);
-    if (!prev) continue;
+  for (const code of allCodes) {
+    if (enabledOrdered.includes(code)) continue;
+    const prev = prevMap.get(code);
     result.push({
-      ...prev,
       userId,
+      sajuProfileId,
+      categoryCode: code,
       enabled: false,
-      disabledAt: prev.disabledAt ?? at,
+      sortOrder: order++,
+      enabledAt: prev?.enabledAt ?? null,
+      disabledAt: at,
       updatedAt: at,
     });
   }

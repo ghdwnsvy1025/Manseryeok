@@ -1,5 +1,6 @@
 "use client";
 
+import { useRef } from "react";
 import {
   HAPPINESS_ANCHORS,
   HAPPINESS_DEFAULT_HINT,
@@ -10,6 +11,10 @@ import {
   type HappinessScore,
   clampHappinessScore,
 } from "@/lib/journal/happinessScale";
+import {
+  burstFromElement,
+  softPress,
+} from "@/lib/ui/clickBurst";
 
 type Props = {
   label: string;
@@ -29,10 +34,30 @@ export default function HappinessSlider({
 }: Props) {
   const display = value ?? HAPPINESS_DEFAULT_HINT;
   const committed = value != null;
+  const scoreRef = useRef<HTMLParagraphElement>(null);
+  const lastBurstAt = useRef(0);
 
-  const commit = (n: number) => {
+  const burst = (
+    score: HappinessScore,
+    el?: Element | null
+  ) => {
+    const now = Date.now();
+    if (now - lastBurstAt.current < 180) return;
+    lastBurstAt.current = now;
+
+    const origin = el ?? scoreRef.current;
+    softPress(origin);
+    burstFromElement(origin, { variant: "heart", value: score });
+  };
+
+  const commit = (
+    n: number,
+    el?: Element | null
+  ) => {
     if (disabled) return;
-    onChange(clampHappinessScore(n));
+    const score = clampHappinessScore(n);
+    onChange(score);
+    burst(score, el);
   };
 
   return (
@@ -44,6 +69,7 @@ export default function HappinessSlider({
           </p>
         </div>
         <p
+          ref={scoreRef}
           className="text-5xl font-black tabular-nums leading-none shrink-0"
           style={{
             color: committed ? ACCENT : "var(--px-text2)",
@@ -77,7 +103,17 @@ export default function HappinessSlider({
             ? `${display}점 ${HAPPINESS_LABELS[display]}`
             : "미선택"
         }
-        onChange={(e) => commit(Number(e.target.value))}
+        onChange={(e) => {
+          if (disabled) return;
+          onChange(clampHappinessScore(Number(e.target.value)));
+        }}
+        onPointerUp={(e) => {
+          if (disabled) return;
+          const score = clampHappinessScore(Number(e.currentTarget.value));
+          onChange(score);
+          // 슬라이더는 얇아서 숫자 표시 중심에서 방출
+          burst(score, scoreRef.current);
+        }}
         className="w-full cursor-pointer h-3 disabled:opacity-50"
         style={{ accentColor: ACCENT }}
       />
@@ -92,7 +128,7 @@ export default function HappinessSlider({
               disabled={disabled}
               aria-label={`${n}점 ${HAPPINESS_LABELS[n]}`}
               aria-pressed={on}
-              onClick={() => commit(n)}
+              onClick={(e) => commit(n, e.currentTarget)}
               className="py-2 text-[10px] font-black border tabular-nums"
               style={{
                 borderColor: on ? ACCENT : "var(--px-border)",
@@ -108,7 +144,6 @@ export default function HappinessSlider({
         })}
       </div>
 
-      {/* 앵커는 선택값과 무관하게 항상 표시 */}
       <div
         className="grid grid-cols-3 gap-2 pt-1 text-[11px] leading-snug"
         style={{ color: "var(--px-text2)" }}

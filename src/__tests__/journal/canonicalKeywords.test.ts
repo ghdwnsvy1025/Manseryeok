@@ -100,6 +100,22 @@ describe("canonical keyword golden tests", () => {
     ]);
   });
 
+  test("뿌듯함 → 성취 신호가 올라간다", () => {
+    const { top } = rankCanonicalKeywords({
+      moods: ["뿌듯함"],
+      highCategories: ["work_study"],
+    });
+    expect(top[0]?.plainLabel).toBe("성취");
+  });
+
+  test("우울함·후회스러움은 회복·성찰 쪽으로", () => {
+    const { top } = rankCanonicalKeywords({
+      moods: ["우울함", "후회스러움"],
+    });
+    const labels = top.map((t) => t.plainLabel);
+    expect(labels).toEqual(expect.arrayContaining(["회복", "성찰·의미"]));
+  });
+
   test("deterministic: same input yields same ranking", () => {
     const input = {
       moods: ["지침"],

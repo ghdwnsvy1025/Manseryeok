@@ -17,6 +17,7 @@ function entry(date: string): JournalEntry {
   return {
     id: `e-${date}`,
     userId: "u-fallback",
+    sajuProfileId: "p1",
     entryDate: date,
     userTimezone: "Asia/Seoul",
     content: "오늘은 조금 지침이 남았다.",

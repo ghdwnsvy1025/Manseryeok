@@ -5,12 +5,15 @@ import {
   ORDINAL_VALUES,
   type OrdinalScore,
 } from "@/lib/journal/checkin/catalog";
+import { celebrateClick } from "@/lib/ui/clickBurst";
 
 type Props = {
   label: string;
   value: OrdinalScore | null;
   onChange: (value: OrdinalScore) => void;
   disabled?: boolean;
+  /** 기본: 매우 나쁨~매우 좋음. 사건 반응용으로 짧은 라벨을 넘길 수 있음 */
+  labels?: Record<OrdinalScore, string>;
 };
 
 export default function OrdinalPicker({
@@ -18,6 +21,7 @@ export default function OrdinalPicker({
   value,
   onChange,
   disabled,
+  labels = ORDINAL_LABELS,
 }: Props) {
   return (
     <div
@@ -27,14 +31,18 @@ export default function OrdinalPicker({
     >
       {ORDINAL_VALUES.map((n) => {
         const on = value === n;
+        const text = labels[n];
         return (
           <button
             key={n}
             type="button"
             disabled={disabled}
-            aria-label={`${n} · ${ORDINAL_LABELS[n]}`}
+            aria-label={`${n} · ${text}`}
             aria-pressed={on}
-            onClick={() => onChange(n)}
+            onClick={(e) => {
+              onChange(n);
+              celebrateClick(e, { variant: "ordinal", value: n });
+            }}
             className="min-h-[3rem] px-1 py-2 border-2 flex flex-col items-center justify-center gap-0.5"
             style={{
               borderColor: on ? "var(--px-accent)" : "var(--px-border)",
@@ -50,7 +58,7 @@ export default function OrdinalPicker({
               {n}
             </span>
             <span className="text-[9px] font-bold leading-tight text-center">
-              {ORDINAL_LABELS[n]}
+              {text}
             </span>
           </button>
         );

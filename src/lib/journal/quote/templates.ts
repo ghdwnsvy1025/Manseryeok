@@ -86,9 +86,19 @@ export function inferTemplateTheme(opts: {
   if (opts.overload) return "action";
   if (opts.goodDay) return "achievement";
   if (opts.moods.some((m) => m === "평온" || m === "무덤덤")) return "stability";
+  if (opts.moods.some((m) => m === "뿌듯함" || m === "기쁨")) return "achievement";
   if (
     opts.moods.some((m) =>
-      ["슬픔", "불안", "분노", "지침", "답답함"].includes(m)
+      [
+        "슬픔",
+        "우울함",
+        "불안",
+        "분노",
+        "짜증남",
+        "지침",
+        "답답함",
+        "후회스러움",
+      ].includes(m)
     )
   ) {
     return "emotion";

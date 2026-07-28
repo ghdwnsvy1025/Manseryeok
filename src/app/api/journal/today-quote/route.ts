@@ -17,6 +17,7 @@ import type { CategoryCode, JournalEntry } from "@/lib/journal/types";
 import { buildDailySajuContext } from "@/lib/product/dailySajuContext";
 import type { SajuProfile } from "@/lib/diary/types";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
+import { resolveActiveSajuProfileId } from "@/lib/diary/activeSajuProfile";
 import {
   isQuoteRagEnabled,
   isVerifiedQuoteEnabled,
@@ -85,6 +86,7 @@ export async function POST(req: NextRequest) {
   let recentDeliveries: Awaited<ReturnType<typeof loadRecentDeliveries>> = [];
   let recentSentences: string[] = [];
   let userId: string | null = null;
+  let sajuProfileId: string | null = null;
 
   const sb = getSupabaseServerClient();
   if (sb) {
@@ -93,9 +95,12 @@ export async function POST(req: NextRequest) {
     } = await sb.auth.getUser();
     userId = user?.id ?? null;
     if (userId) {
+      sajuProfileId =
+        b.sajuProfile?.id ?? (await resolveActiveSajuProfileId(sb, userId));
       recentDeliveries = await loadRecentDeliveries(userId, {
         sinceDays: 180,
         limit: 200,
+        sajuProfileId: sajuProfileId ?? undefined,
       });
       recentSentences = recentDeliveries
         .map((r) => r.text)
@@ -119,14 +124,15 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // 같은 날짜 이미 delivery 있으면 재생성하지 않음 (수정 저장 시 유지)
-  if (sb && userId) {
+  // 같은 날짜·프로필 이미 delivery 있으면 재생성하지 않음 (수정 저장 시 유지)
+  if (sb && userId && sajuProfileId) {
     const { data: existing } = await sb
       .from("daily_quote_deliveries")
       .select(
         "id, content_type, generated_original_text, quote_id, selection_score, selection_reasons_json"
       )
       .eq("user_id", userId)
+      .eq("saju_profile_id", sajuProfileId)
       .eq("event_date", b.entry.entryDate)
       .order("delivered_at", { ascending: false })
       .limit(1)
@@ -183,11 +189,12 @@ export async function POST(req: NextRequest) {
 
   let deliveryId: string | null = null;
   let recorded = false;
-  if (sb && userId) {
+  if (sb && userId && sajuProfileId) {
     const { data, error } = await sb
       .from("daily_quote_deliveries")
       .insert({
         user_id: userId,
+        saju_profile_id: sajuProfileId,
         event_date: b.entry.entryDate,
         journal_entry_id: UUID_RE.test(b.entry.id) ? b.entry.id : null,
         quote_id: result.quoteId,
@@ -216,6 +223,7 @@ export async function POST(req: NextRequest) {
       // 둘 다 impression으로 찍으면 노출 수가 두 배로 부풀려진다.
       await sb.from("content_exposure_events").insert({
         user_id: userId,
+        saju_profile_id: sajuProfileId,
         event_date: b.entry.entryDate,
         content_type: result.contentType,
         content_id: deliveryId,

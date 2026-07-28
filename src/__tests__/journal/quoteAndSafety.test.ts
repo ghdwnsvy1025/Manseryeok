@@ -134,6 +134,7 @@ describe("today sentence templates", () => {
     const entry = {
       id: "e",
       userId: "u",
+      sajuProfileId: "p1",
       entryDate: "2026-07-25",
       userTimezone: "Asia/Seoul",
       content: "",

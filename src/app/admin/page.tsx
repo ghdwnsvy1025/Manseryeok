@@ -7,6 +7,7 @@ import { buildRealTestSeedEntries, buildTwoMonthDemoEntries } from "@/lib/diary/
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import AdminQuotesPanel from "@/components/admin/AdminQuotesPanel";
 import AdminInsightDebugPanel from "@/components/admin/AdminInsightDebugPanel";
+import AdminJournalMonthSeedPanel from "@/components/admin/AdminJournalMonthSeedPanel";
 
 type DocRow = {
   id: string;
@@ -493,6 +494,13 @@ export default function AdminPage() {
           검증·저작권 확인 후에만 active로 노출됩니다. embedding은 저장 시 자동 생성됩니다.
         </p>
         <AdminQuotesPanel />
+      </div>
+
+      <div
+        className="p-4 border-2 space-y-3"
+        style={{ background: "var(--px-bg2)", borderColor: "var(--px-border)" }}
+      >
+        <AdminJournalMonthSeedPanel />
       </div>
 
       <div

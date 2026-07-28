@@ -129,6 +129,25 @@ export function ordinalToJournalScore(
   return map[ordinal];
 }
 
+/** 카테고리 A(1~10) → 5단계 (로드 복원용) */
+export function journalScoreToOrdinal(score: number): OrdinalScore | null {
+  if (!Number.isFinite(score)) return null;
+  const exact: Record<number, OrdinalScore> = {
+    1: 1,
+    3: 2,
+    5: 3,
+    8: 4,
+    10: 5,
+  };
+  if (exact[score] != null) return exact[score]!;
+  if (score <= 1.5) return 1;
+  if (score <= 3.5) return 2;
+  if (score <= 5.5) return 3;
+  if (score <= 8.5) return 4;
+  if (score <= 10) return 5;
+  return null;
+}
+
 /** 레거시 핵심 상태(수면 포함) → 신규 4항목 어댑터 */
 export function adaptLegacyCoreStates(
   raw: Record<string, { ordinal: number | null; isNotApplicable?: boolean }> | null | undefined

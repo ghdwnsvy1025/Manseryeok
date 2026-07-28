@@ -12,13 +12,15 @@ import type { OnboardingAnswers } from "./questions";
 
 export async function loadOnboardingProfile(
   sb: SupabaseClient,
-  userId: string
+  userId: string,
+  sajuProfileId: string
 ): Promise<OnboardingProfile> {
   try {
     const { data, error } = await sb
       .from("journal_onboarding_profiles")
       .select("answers, derived")
       .eq("user_id", userId)
+      .eq("saju_profile_id", sajuProfileId)
       .maybeSingle();
     if (error || !data) return EMPTY_ONBOARDING_PROFILE;
 

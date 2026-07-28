@@ -186,7 +186,7 @@ export async function retrieveQuoteCandidates(
 
 export async function loadRecentDeliveries(
   userId: string,
-  opts?: { limit?: number; sinceDays?: number }
+  opts?: { limit?: number; sinceDays?: number; sajuProfileId?: string }
 ): Promise<
   Array<{
     quoteId: string | null;
@@ -205,7 +205,7 @@ export async function loadRecentDeliveries(
   since.setUTCDate(since.getUTCDate() - sinceDays);
   const sinceIso = since.toISOString();
 
-  const { data, error } = await sb
+  let query = sb
     .from("daily_quote_deliveries")
     .select(
       "quote_id, content_type, generated_original_text, delivered_at, event_date, selection_reasons_json"
@@ -214,6 +214,10 @@ export async function loadRecentDeliveries(
     .gte("delivered_at", sinceIso)
     .order("delivered_at", { ascending: false })
     .limit(limit);
+  if (opts?.sajuProfileId) {
+    query = query.eq("saju_profile_id", opts.sajuProfileId);
+  }
+  const { data, error } = await query;
   if (error || !data) return [];
 
   // 작가/출처는 quote_library join 없이 context 또는 별도 조회

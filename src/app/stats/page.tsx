@@ -1,12 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import {
   buildGanjiCollection,
   getCollectionSummary,
-  type GanjiCollectionEntry,
-  type GanjiCollectionStatus,
 } from "@/lib/diary/collection";
 import { createDiaryEntry } from "@/lib/diary/createEntry";
 import { getDiaryStorage } from "@/lib/diary/getStorage";
@@ -15,17 +12,27 @@ import { getJournalStorage } from "@/lib/journal/getStorage";
 import { CATEGORY_CATALOG, getCategoryByCode } from "@/lib/journal/categoryCatalog";
 import { getEnabledCodesOrdered } from "@/lib/journal/preferences";
 import {
-  buildHomeEStats,
+  averageHappinessInRange,
   categorySeries,
-  type HappinessPoint,
+  happinessSeries,
 } from "@/lib/journal/homeStats";
+import {
+  buildCollectionMission,
+  buildReflectWriteCta,
+  buildWeeklyReport,
+  computeRecordStreak,
+  happinessByGanji,
+} from "@/lib/journal/statsInsight";
+import TrendOverlayChart from "@/components/stats/TrendOverlayChart";
+import StatsSummaryStrip from "@/components/stats/StatsSummaryStrip";
+import StatsMissionChip from "@/components/stats/StatsMissionChip";
+import StatsReflectCta from "@/components/stats/StatsReflectCta";
+import JournalRecordCalendar from "@/components/stats/JournalRecordCalendar";
+import CharacterHappinessHeatmap from "@/components/stats/CharacterHappinessHeatmap";
+import StatsGanjiCollection from "@/components/stats/StatsGanjiCollection";
+import { deltaTone, happinessTone } from "@/lib/journal/statsTone";
 import type { CategoryCode, JournalEntry } from "@/lib/journal/types";
 import { todayDateString } from "@/lib/diary/dayPillar";
-import {
-  formatOpenAiStatus,
-  shouldShowOpenAiStatus,
-  type OpenAiCallStatus,
-} from "@/lib/journal/openaiStatus";
 
 /** 일기·저널 날짜를 합쳐 도감용 엔트리 생성 (날짜당 1건) */
 function collectionSourceEntries(
@@ -44,14 +51,25 @@ function collectionSourceEntries(
   return Array.from(byDate.values());
 }
 
-const STATUS_STYLE: Record<
-  GanjiCollectionStatus,
-  { border: string; opacity: number }
-> = {
-  locked: { border: "var(--px-border)", opacity: 0.35 },
-  discovered: { border: "#60a5fa", opacity: 1 },
-  pattern: { border: "var(--px-accent)", opacity: 1 },
-};
+function shiftDate(iso: string, delta: number): string {
+  const d = new Date(`${iso}T12:00:00+09:00`);
+  d.setDate(d.getDate() + delta);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function monthBounds(year: number, month: number): { from: string; to: string } {
+  const from = `${year}-${String(month).padStart(2, "0")}-01`;
+  const lastDay = new Date(year, month, 0).getDate();
+  const to = `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+  return { from, to };
+}
+
+function monthLabel(year: number, month: number): string {
+  return `${year}년 ${month}월`;
+}
 
 const LINE_COLORS = [
   "#fbbf24",
@@ -65,123 +83,19 @@ const LINE_COLORS = [
   "#a3e635",
 ];
 
-function shiftDate(iso: string, delta: number): string {
-  const d = new Date(`${iso}T12:00:00+09:00`);
-  d.setDate(d.getDate() + delta);
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
-
-function MultiLineChart({
-  series,
-}: {
-  series: Array<{ code: CategoryCode; color: string; points: HappinessPoint[] }>;
-}) {
-  const allDates = Array.from(
-    new Set(series.flatMap((s) => s.points.map((p) => p.date)))
-  ).sort();
-  if (allDates.length < 2 || series.every((s) => s.points.length === 0)) {
-    return (
-      <p className="ui-hint py-6 text-center">그래프를 그릴 기록이 부족합니다.</p>
-    );
-  }
-  const w = 320;
-  const h = 140;
-  const pad = 12;
-
-  const lines = series.map((s) => {
-    const map = new Map(s.points.map((p) => [p.date, p.value]));
-    const pts = allDates
-      .map((date, i) => {
-        const v = map.get(date);
-        if (v == null) return null;
-        const x = pad + (i / Math.max(1, allDates.length - 1)) * (w - pad * 2);
-        const y = h - pad - ((v - 1) / 9) * (h - pad * 2);
-        return `${x},${y}`;
-      })
-      .filter(Boolean)
-      .join(" ");
-    return { ...s, pts };
-  });
-
-  return (
-    <svg viewBox={`0 0 ${w} ${h}`} className="w-full h-36" role="img">
-      {[2, 4, 6, 8, 10].map((v) => {
-        const y = h - pad - ((v - 1) / 9) * (h - pad * 2);
-        return (
-          <line
-            key={v}
-            x1={pad}
-            x2={w - pad}
-            y1={y}
-            y2={y}
-            stroke="var(--px-border)"
-            strokeWidth="1"
-            opacity={0.5}
-          />
-        );
-      })}
-      {lines.map(
-        (l) =>
-          l.pts && (
-            <polyline
-              key={l.code}
-              fill="none"
-              stroke={l.color}
-              strokeWidth="2"
-              points={l.pts}
-            />
-          )
-      )}
-    </svg>
-  );
-}
-
-function CollectionTile({ item }: { item: GanjiCollectionEntry }) {
-  const style = STATUS_STYLE[item.status];
-  return (
-    <div
-      className="p-1.5 border text-center min-h-[3.2rem] flex flex-col justify-center"
-      style={{
-        borderColor: style.border,
-        background: "var(--px-bg3)",
-        opacity: style.opacity,
-      }}
-      title={item.status === "locked" ? "미수집" : `${item.entryCount}회`}
-    >
-      <p
-        className="text-xs font-black leading-none"
-        style={{
-          color: item.status === "locked" ? "var(--px-text2)" : "var(--px-accent)",
-        }}
-      >
-        {item.ganjiKo}
-      </p>
-      {item.status !== "locked" && (
-        <p className="text-[9px] font-bold mt-0.5" style={{ color: "#4ade80" }}>
-          {item.entryCount}회
-        </p>
-      )}
-    </div>
-  );
-}
-
 /**
- * I — 통계: 간지 도감 + A 그래프(7/30일) + 최근 상태
+ * 기록 탭 — 홈(대시보드)과 역할 분리
+ * 요약 → 추이 → 캘린더 → 사주 패턴 → 도감
  */
 export default function StatsPage() {
   const today = todayDateString();
   const [diaryEntries, setDiaryEntries] = useState<DiaryEntry[]>([]);
   const [journalEntries, setJournalEntries] = useState<JournalEntry[]>([]);
   const [enabledCodes, setEnabledCodes] = useState<CategoryCode[]>([]);
-  const [range, setRange] = useState<"7" | "30">("7");
+  const [viewYear, setViewYear] = useState(() => Number(today.slice(0, 4)));
+  const [viewMonth, setViewMonth] = useState(() => Number(today.slice(5, 7)));
   const [selected, setSelected] = useState<CategoryCode[]>([]);
   const [loading, setLoading] = useState(true);
-  const [recentMsg, setRecentMsg] = useState<string | null>(null);
-  const [recentOpenAi, setRecentOpenAi] = useState<OpenAiCallStatus | null>(null);
-  const [recentLoading, setRecentLoading] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -201,7 +115,7 @@ export default function StatsPage() {
         setJournalEntries(jList);
         const enabled = getEnabledCodesOrdered(prefs);
         setEnabledCodes(enabled);
-        setSelected(enabled.slice(0, 3));
+        setSelected(enabled.slice(0, 1));
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -223,23 +137,144 @@ export default function StatsPage() {
     () => getCollectionSummary(collectionEntries),
     [collectionEntries]
   );
-
-  const eStats = useMemo(
-    () => buildHomeEStats(journalEntries, today, enabledCodes),
-    [journalEntries, today, enabledCodes]
+  const ganjiHappiness = useMemo(
+    () => happinessByGanji(journalEntries),
+    [journalEntries]
   );
 
-  const from = range === "7" ? shiftDate(today, -6) : shiftDate(today, -29);
+  const weeklyReport = useMemo(
+    () => buildWeeklyReport(journalEntries, today),
+    [journalEntries, today]
+  );
 
-  const chartSeries = useMemo(
+  const streak = useMemo(
+    () => computeRecordStreak(journalEntries, today),
+    [journalEntries, today]
+  );
+
+  const mission = useMemo(
+    () =>
+      buildCollectionMission(
+        journalEntries,
+        today,
+        collection.map((c) => ({
+          ganjiKo: c.ganjiKo,
+          status: c.status,
+          entryCount: c.entryCount,
+        }))
+      ),
+    [journalEntries, today, collection]
+  );
+
+  const avg30 = useMemo(
+    () => averageHappinessInRange(journalEntries, shiftDate(today, -29), today),
+    [journalEntries, today]
+  );
+
+  const uniqueDays = useMemo(
+    () => new Set(journalEntries.map((e) => e.entryDate)).size,
+    [journalEntries]
+  );
+
+  const monthRecordedDays = useMemo(() => {
+    const prefix = today.slice(0, 7);
+    const dates = new Set(
+      journalEntries
+        .filter((e) => e.entryDate.startsWith(prefix))
+        .map((e) => e.entryDate)
+    );
+    return dates.size;
+  }, [journalEntries, today]);
+
+  const { from: monthFrom, to: monthTo } = useMemo(
+    () => monthBounds(viewYear, viewMonth),
+    [viewYear, viewMonth]
+  );
+
+  const prevMonthBounds = useMemo(() => {
+    const d = new Date(viewYear, viewMonth - 2, 1);
+    return monthBounds(d.getFullYear(), d.getMonth() + 1);
+  }, [viewYear, viewMonth]);
+
+  const rangeDates = useMemo(() => {
+    const out: string[] = [];
+    let cursor = monthFrom;
+    while (cursor <= monthTo) {
+      out.push(cursor);
+      cursor = shiftDate(cursor, 1);
+    }
+    return out;
+  }, [monthFrom, monthTo]);
+
+  const happinessPoints = useMemo(
+    () => happinessSeries(journalEntries, monthFrom, monthTo),
+    [journalEntries, monthFrom, monthTo]
+  );
+
+  const overlays = useMemo(
     () =>
       selected.map((code, i) => ({
         code,
+        name: getCategoryByCode(code)?.name ?? code,
         color: LINE_COLORS[i % LINE_COLORS.length]!,
-        points: categorySeries(journalEntries, code, from, today),
+        points: categorySeries(journalEntries, code, monthFrom, monthTo),
       })),
-    [selected, journalEntries, from, today]
+    [selected, journalEntries, monthFrom, monthTo]
   );
+
+  const rangeAvg = useMemo(() => {
+    if (happinessPoints.length === 0) return null;
+    const sum = happinessPoints.reduce((a, p) => a + p.value, 0);
+    return Math.round((sum / happinessPoints.length) * 10) / 10;
+  }, [happinessPoints]);
+
+  const prevMonthAvg = useMemo(
+    () =>
+      averageHappinessInRange(
+        journalEntries,
+        prevMonthBounds.from,
+        prevMonthBounds.to
+      ),
+    [journalEntries, prevMonthBounds]
+  );
+
+  /** 월 비교 — 문장과 증감 숫자를 나눠 증감에만 색을 준다 */
+  const monthCompare = useMemo<{ text: string; delta: number | null }>(() => {
+    if (rangeAvg == null && prevMonthAvg == null) {
+      return { text: "기록이 쌓이면 지난달과 비교할 수 있어요", delta: null };
+    }
+    if (rangeAvg == null) {
+      return { text: "이달 기록이 아직 없어요", delta: null };
+    }
+    if (prevMonthAvg == null) {
+      return { text: "지난달 기록이 없어 비교는 다음 달부터", delta: null };
+    }
+    const delta = Math.round((rangeAvg - prevMonthAvg) * 10) / 10;
+    if (Math.abs(delta) < 0.3) {
+      return { text: "지난달과 비슷해요", delta: null };
+    }
+    return { text: "지난달보다", delta };
+  }, [rangeAvg, prevMonthAvg]);
+
+  const reflectCta = useMemo(
+    () =>
+      buildReflectWriteCta(journalEntries, today, {
+        viewMonthAvg: rangeAvg,
+        prevMonthAvg,
+      }),
+    [journalEntries, today, rangeAvg, prevMonthAvg]
+  );
+
+  const shiftViewMonth = (delta: number) => {
+    const next = new Date(viewYear, viewMonth - 1 + delta, 1);
+    setViewYear(next.getFullYear());
+    setViewMonth(next.getMonth() + 1);
+  };
+
+  const setViewMonthAbsolute = (year: number, month: number) => {
+    setViewYear(year);
+    setViewMonth(month);
+  };
 
   const toggle = (code: CategoryCode) => {
     setSelected((prev) =>
@@ -247,145 +282,224 @@ export default function StatsPage() {
     );
   };
 
-  const loadRecentStatus = async () => {
-    setRecentLoading(true);
-    setRecentMsg(null);
-    try {
-      const res = await fetch("/api/journal/recent-status", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ stats: eStats }),
-      });
-      const data = (await res.json()) as {
-        message?: string;
-        openAi?: OpenAiCallStatus;
-      };
-      setRecentMsg(data.message ?? null);
-      setRecentOpenAi(data.openAi ?? null);
-    } catch (err) {
-      setRecentOpenAi({
-        kind: "failed",
-        reason: "network",
-        detail: err instanceof Error ? err.message : String(err),
-      });
-    } finally {
-      setRecentLoading(false);
-    }
-  };
-
   return (
-    <div className="space-y-5 pb-10">
-      <header className="space-y-1">
-        <h1 className="text-lg font-black" style={{ color: "var(--px-accent)" }}>
-          ■ 통계
-        </h1>
-        <p className="ui-hint">간지 도감과 카테고리 추이를 한곳에서 봅니다.</p>
+    <div className="stats-page">
+      <header className="space-y-0.5">
+        <h1 className="ui-page-title">■ 기록</h1>
+        <p className="ui-hint">숫자로 보고, 간지로 모읍니다</p>
       </header>
 
-      <section className="space-y-2">
-        <div className="flex items-baseline justify-between">
-          <p className="ui-section-title">간지 도감</p>
-          <p className="ui-hint">
-            {summary.ganjiCollected}/60 · 패턴{" "}
-            {collection.filter((c) => c.status === "pattern").length}
-          </p>
-        </div>
-        {loading ? (
-          <p className="ui-hint">불러오는 중…</p>
-        ) : (
-          <div className="grid grid-cols-5 gap-1">
-            {collection.map((item) => (
-              <CollectionTile key={item.ganjiKo} item={item} />
-            ))}
-          </div>
-        )}
-        <Link
-          href="/diary/collection"
-          className="text-[11px] font-bold underline"
-          style={{ color: "#60a5fa" }}
-        >
-          도감 전체 보기
-        </Link>
-      </section>
+      {loading ? (
+        <p className="ui-hint">불러오는 중…</p>
+      ) : (
+        <>
+          <StatsSummaryStrip
+            avg30={avg30}
+            monthRecordedDays={monthRecordedDays}
+            streakDays={streak.current}
+            recordedToday={streak.recordedToday}
+          />
 
-      <section className="space-y-2">
-        <p className="ui-section-title">카테고리 추이</p>
-        <div className="flex gap-2">
-          {(["7", "30"] as const).map((r) => (
-            <button
-              key={r}
-              type="button"
-              onClick={() => setRange(r)}
-              className="px-3 py-1.5 text-xs font-bold border-2"
-              style={{
-                borderColor: range === r ? "var(--px-accent)" : "var(--px-border)",
-                color: range === r ? "var(--px-accent)" : "var(--px-text2)",
-                background: "var(--px-bg3)",
-              }}
-            >
-              {r === "7" ? "7일" : "30일"}
-            </button>
-          ))}
-        </div>
-        <div className="flex flex-wrap gap-1">
-          {(enabledCodes.length > 0
-            ? enabledCodes
-            : CATEGORY_CATALOG.map((c) => c.code)
-          ).map((code, i) => {
-            const on = selected.includes(code);
-            return (
+          <StatsMissionChip mission={mission} />
+
+          <div className="stats-section">
+            <div className="flex items-center justify-between gap-2">
               <button
-                key={code}
                 type="button"
-                onClick={() => toggle(code)}
-                className="px-2 py-1 text-[10px] font-bold border"
+                onClick={() => shiftViewMonth(-1)}
+                className="px-2.5 py-1.5 text-xs font-bold border-2"
                 style={{
-                  borderColor: on
-                    ? LINE_COLORS[i % LINE_COLORS.length]
-                    : "var(--px-border)",
-                  color: on
-                    ? LINE_COLORS[i % LINE_COLORS.length]
-                    : "var(--px-text2)",
+                  borderColor: "var(--px-border)",
+                  color: "var(--px-text2)",
+                  background: "var(--px-bg3)",
                 }}
               >
-                {getCategoryByCode(code)?.name ?? code}
+                ‹
               </button>
-            );
-          })}
-        </div>
-        <div
-          className="p-2 border-2"
-          style={{ borderColor: "var(--px-border)", background: "var(--px-bg2)" }}
-        >
-          <MultiLineChart series={chartSeries} />
-        </div>
-      </section>
-
-      <section className="space-y-2">
-        <button
-          type="button"
-          className="ui-primary-btn w-full py-3 text-sm"
-          disabled={recentLoading}
-          onClick={() => void loadRecentStatus()}
-        >
-          {recentLoading ? "분석 중…" : "최근 상태"}
-        </button>
-        {recentMsg && (
-          <div
-            className="p-3 border space-y-1"
-            style={{ borderColor: "var(--px-border)", background: "var(--px-bg3)" }}
-          >
-            <p className="text-xs leading-relaxed font-bold" style={{ color: "var(--px-text)" }}>
-              {recentMsg}
-            </p>
-            {shouldShowOpenAiStatus() && recentOpenAi && (
-              <p className="text-[10px]" style={{ color: "var(--px-text2)" }}>
-                {formatOpenAiStatus(recentOpenAi)}
+              <p
+                className="text-base font-black tabular-nums"
+                style={{ color: "var(--px-text-on-panel)" }}
+              >
+                {monthLabel(viewYear, viewMonth)}
               </p>
-            )}
+              <button
+                type="button"
+                onClick={() => shiftViewMonth(1)}
+                className="px-2.5 py-1.5 text-xs font-bold border-2"
+                style={{
+                  borderColor: "var(--px-border)",
+                  color: "var(--px-text2)",
+                  background: "var(--px-bg3)",
+                }}
+              >
+                ›
+              </button>
+            </div>
+            <p className="stats-insight">
+              {monthCompare.text}
+              {monthCompare.delta != null ? (
+                <span
+                  className="ml-1 tabular-nums"
+                  style={{ color: deltaTone(monthCompare.delta) }}
+                >
+                  {monthCompare.delta > 0
+                    ? `+${monthCompare.delta.toFixed(1)}`
+                    : monthCompare.delta.toFixed(1)}
+                </span>
+              ) : null}
+            </p>
           </div>
-        )}
-      </section>
+
+          <section className="stats-section">
+            <div className="stats-section-head">
+              <p className="ui-section-title">행복도 추이</p>
+              <p className="tabular-nums shrink-0">
+                <span
+                  className="stats-metric !text-lg"
+                  style={
+                    rangeAvg != null
+                      ? { color: happinessTone(rangeAvg) }
+                      : undefined
+                  }
+                >
+                  {rangeAvg != null ? rangeAvg.toFixed(1) : "-"}
+                </span>
+                {rangeAvg != null ? (
+                  <span className="stats-metric-unit">/10</span>
+                ) : null}
+                {happinessPoints.length > 0 ? (
+                  <span className="stats-label ml-1.5">
+                    {happinessPoints.length}일
+                  </span>
+                ) : null}
+              </p>
+            </div>
+
+            <div className="stats-panel space-y-2">
+              <TrendOverlayChart
+                happiness={happinessPoints}
+                overlays={overlays}
+                dates={rangeDates}
+              />
+              <div
+                className="flex flex-wrap items-center gap-x-3 gap-y-1.5 pt-2"
+                style={{ borderTop: "1px solid var(--px-border)" }}
+              >
+                <span
+                  className="inline-flex items-center gap-1 text-[11px] font-extrabold"
+                  style={{ color: "var(--px-text)" }}
+                >
+                  <span
+                    className="inline-block w-4 h-[3px]"
+                    style={{ background: "var(--px-accent)" }}
+                    aria-hidden
+                  />
+                  행복도
+                </span>
+                {overlays.map((o) => (
+                  <span
+                    key={o.code}
+                    className="inline-flex items-center gap-1 text-[11px] font-bold"
+                    style={{ color: "var(--px-text2)" }}
+                  >
+                    <span
+                      className="inline-block w-4 h-0.5"
+                      style={{
+                        background: `repeating-linear-gradient(90deg, ${o.color} 0 4px, transparent 4px 7px)`,
+                      }}
+                      aria-hidden
+                    />
+                    {o.name}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            {selected.length >= 4 ? (
+              <div
+                className="px-2.5 py-2 border-2 flex items-center justify-between gap-2"
+                role="status"
+                style={{
+                  borderColor: "#fbbf24",
+                  background:
+                    "color-mix(in srgb, #fbbf24 12%, var(--px-bg3))",
+                }}
+              >
+                <p className="stats-status-warn">
+                  겹침 {selected.length}개 · 비교할 항목만 남기세요
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setSelected([])}
+                  className="stats-link shrink-0"
+                >
+                  모두 끄기
+                </button>
+              </div>
+            ) : (
+              <p className="stats-label">겹쳐 볼 항목</p>
+            )}
+            <div className="flex flex-wrap gap-1.5">
+              {(enabledCodes.length > 0
+                ? enabledCodes
+                : CATEGORY_CATALOG.map((c) => c.code)
+              ).map((code) => {
+                const on = selected.includes(code);
+                const colorIdx = selected.indexOf(code);
+                const color =
+                  on && colorIdx >= 0
+                    ? LINE_COLORS[colorIdx % LINE_COLORS.length]
+                    : undefined;
+                return (
+                  <button
+                    key={code}
+                    type="button"
+                    onClick={() => toggle(code)}
+                    className={`stats-chip${on ? " is-on" : ""}`}
+                    style={
+                      on && color
+                        ? ({
+                            ["--chip-accent" as string]: color,
+                          } as CSSProperties)
+                        : undefined
+                    }
+                    aria-pressed={on}
+                  >
+                    {getCategoryByCode(code)?.name ?? code}
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+
+          <JournalRecordCalendar
+            entries={journalEntries}
+            today={today}
+            weeklyReport={weeklyReport}
+            year={viewYear}
+            month={viewMonth}
+            onMonthChange={setViewMonthAbsolute}
+          />
+
+          <StatsReflectCta cta={reflectCta} />
+
+          <CharacterHappinessHeatmap
+            entries={journalEntries}
+            uniqueDays={uniqueDays}
+          />
+
+          <StatsGanjiCollection
+            collection={collection}
+            collected={summary.ganjiCollected}
+            patternCount={
+              collection.filter((c) => c.status === "pattern").length
+            }
+            ganjiHappiness={ganjiHappiness}
+            mission={mission}
+            showMissionBanner={false}
+          />
+        </>
+      )}
     </div>
   );
 }

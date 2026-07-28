@@ -73,6 +73,7 @@ describe("D-1 recompute", () => {
     const entry: JournalEntry = {
       id: "e1",
       userId: "u",
+      sajuProfileId: "p1",
       entryDate: "2026-07-21",
       userTimezone: "Asia/Seoul",
       content: "",

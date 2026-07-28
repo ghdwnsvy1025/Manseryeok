@@ -44,6 +44,7 @@ function entry(opts: {
   return {
     id: `e-${opts.date}`,
     userId: "audit-user",
+    sajuProfileId: "p1",
     entryDate: opts.date,
     userTimezone: "Asia/Seoul",
     content: opts.content ?? "",

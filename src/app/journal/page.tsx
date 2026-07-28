@@ -10,11 +10,18 @@ import { isCheckinV2Enabled } from "@/lib/app/featureFlags";
 function JournalPageInner() {
   const params = useSearchParams();
   const forceLegacy = params.get("legacy") === "1";
+  const dateParam = params.get("date");
+  const initialDate =
+    dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam) ? dateParam : undefined;
   const useCheckin = isCheckinV2Enabled() && !forceLegacy;
 
   return (
     <NewDiaryGate>
-      {useCheckin ? <CheckInEditor /> : <JournalEditor />}
+      {useCheckin ? (
+        <CheckInEditor initialDate={initialDate} />
+      ) : (
+        <JournalEditor initialDate={initialDate} />
+      )}
     </NewDiaryGate>
   );
 }

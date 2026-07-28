@@ -23,7 +23,20 @@ export function deriveHardDay(opts: {
 }): boolean {
   const moods = opts.moods ?? [];
   const tags = opts.eventTags ?? [];
-  if (moods.some((m) => ["슬픔", "지침", "불안", "분노", "답답함"].includes(m))) {
+  if (
+    moods.some((m) =>
+      [
+        "슬픔",
+        "우울함",
+        "지침",
+        "불안",
+        "분노",
+        "짜증남",
+        "답답함",
+        "후회스러움",
+      ].includes(m)
+    )
+  ) {
     return true;
   }
   if (

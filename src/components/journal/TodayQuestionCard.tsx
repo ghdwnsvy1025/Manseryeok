@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   formatOpenAiStatus,
   shouldShowOpenAiStatus,
@@ -51,15 +51,17 @@ type Props = {
   sajuProfile: unknown | null;
 };
 
+type Phase = "idle" | "loading" | "ready";
+
 export default function TodayQuestionCard({
   todayDate,
   enabledCodes,
   entries,
   sajuProfile,
 }: Props) {
+  const [phase, setPhase] = useState<Phase>("idle");
   const [question, setQuestion] = useState<string | null>(null);
   const [openAi, setOpenAi] = useState<OpenAiCallStatus | null>(null);
-  const [loading, setLoading] = useState(true);
   const [keywords, setKeywords] = useState<string[]>([]);
   const [keywordCodes, setKeywordCodes] = useState<string[]>([]);
   const [fit, setFit] = useState<FitLevel | null>(null);
@@ -78,117 +80,29 @@ export default function TodayQuestionCard({
     questionText: string | null;
     keywords: string[];
   }>({ questionText: null, keywords: [] });
-  const codesKey = enabledCodes.join("|");
-  const entriesKey = String(entries.length);
+  const requestIdRef = useRef(0);
 
+  // 날짜가 바뀌면 다시 눌러서 받게 한다 — 자동 재호출로 OpenAI를 쓰지 않는다.
   useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
+    requestIdRef.current += 1;
+    setPhase("idle");
+    setQuestion(null);
+    setOpenAi(null);
+    setKeywords([]);
+    setKeywordCodes([]);
     setFit(null);
     setSkipped(false);
     setFeedbackMsg("");
     setDebug(null);
+    setDebugOpen(false);
     shownSent.current = false;
     answeredRef.current = false;
     dismissSentRef.current = false;
     contextRef.current = { questionText: null, keywords: [] };
-    void (async () => {
-      try {
-        const res = await fetch("/api/journal/today-question", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            todayDate,
-            enabledCodes,
-            entries,
-            sajuProfile,
-            keywordBiases: loadLocalKeywordBiases(),
-          }),
-        });
-        const data = (await res.json()) as DebugInfo & {
-          question?: string;
-          openAi?: OpenAiCallStatus;
-          error?: string;
-          keywords?: KeywordRow[];
-        };
-        if (cancelled) return;
-        const q = !res.ok
-          ? "오늘 하루, 마음에 가장 남는 순간은 무엇이었나요?"
-          : data.question ?? null;
-        setQuestion(q);
-        setOpenAi(
-          !res.ok
-            ? {
-                kind: "failed",
-                reason: "request_failed",
-                detail: data.error,
-              }
-            : data.openAi ?? null
-        );
-        const rows = Array.isArray(data.keywords) ? data.keywords : [];
-        const kwLabels = rows
-          .map((k) => k.plainLabel)
-          .filter((x): x is string => Boolean(x));
-        const kwCodes = rows
-          .map((k) => k.code)
-          .filter((x): x is string => Boolean(x));
-        setKeywords(kwLabels);
-        setKeywordCodes(kwCodes);
-        setDebug({
-          isolation: data.isolation,
-          decision: data.decision,
-          sajuWeight: data.sajuWeight,
-          priorUniqueDays: data.priorUniqueDays,
-          feedbackBiasApplied: data.feedbackBiasApplied,
-          leakageGuard: data.leakageGuard,
-          keywords: rows,
-        });
+  }, [todayDate]);
 
-        contextRef.current = {
-          questionText: q,
-          keywords: kwCodes.length > 0 ? kwCodes : kwLabels,
-        };
-
-        if (hasLocalFitFeedback(todayDate)) {
-          setFit("good");
-          answeredRef.current = true;
-          setFeedbackMsg("오늘 피드백을 남겨주셨어요.");
-        }
-
-        if (q && !shownSent.current) {
-          shownSent.current = true;
-          const kws = kwCodes.length > 0 ? kwCodes : kwLabels;
-          void reportQuestionFeedback({
-            questionDate: todayDate,
-            eventType: "shown",
-            questionText: q,
-            payload: { keywords: kws },
-          });
-          // 통합 노출 로그에도 남긴다 — 노출 오염(같은 날 중복 노출) 관리는
-          // question_feedback_events가 아니라 content_exposure_events가 담당한다.
-          void trackContentExposure({
-            eventDate: todayDate,
-            contentType: "daily_question",
-            eventType: "question_impression",
-            metadata: { keywords: kws, surface: "journal_home" },
-          });
-        }
-      } catch (err) {
-        if (!cancelled) {
-          setQuestion("오늘 하루, 마음에 가장 남는 순간은 무엇이었나요?");
-          setOpenAi({
-            kind: "failed",
-            reason: "network",
-            detail: err instanceof Error ? err.message : String(err),
-          });
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
+  useEffect(() => {
     return () => {
-      cancelled = true;
-      // 질문을 봤지만 아무 응답 없이 떠난 경우 — dismissed를 실제로 발화
       if (
         shownSent.current &&
         !answeredRef.current &&
@@ -204,7 +118,112 @@ export default function TodayQuestionCard({
         });
       }
     };
-  }, [todayDate, enabledCodes, entries, sajuProfile, codesKey, entriesKey]);
+  }, [todayDate]);
+
+  const loadQuestion = useCallback(async () => {
+    if (phase === "loading") return;
+    const requestId = ++requestIdRef.current;
+    setPhase("loading");
+    setFit(null);
+    setSkipped(false);
+    setFeedbackMsg("");
+    setDebug(null);
+    shownSent.current = false;
+    answeredRef.current = false;
+    dismissSentRef.current = false;
+    contextRef.current = { questionText: null, keywords: [] };
+
+    try {
+      const res = await fetch("/api/journal/today-question", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          todayDate,
+          enabledCodes,
+          entries,
+          sajuProfile,
+          keywordBiases: loadLocalKeywordBiases(),
+        }),
+      });
+      const data = (await res.json()) as DebugInfo & {
+        question?: string;
+        openAi?: OpenAiCallStatus;
+        error?: string;
+        keywords?: KeywordRow[];
+      };
+      if (requestId !== requestIdRef.current) return;
+
+      const q = !res.ok
+        ? "오늘 하루, 마음에 가장 남는 순간은 무엇이었나요?"
+        : data.question ?? null;
+      setQuestion(q);
+      setOpenAi(
+        !res.ok
+          ? {
+              kind: "failed",
+              reason: "request_failed",
+              detail: data.error,
+            }
+          : data.openAi ?? null
+      );
+      const rows = Array.isArray(data.keywords) ? data.keywords : [];
+      const kwLabels = rows
+        .map((k) => k.plainLabel)
+        .filter((x): x is string => Boolean(x));
+      const kwCodes = rows
+        .map((k) => k.code)
+        .filter((x): x is string => Boolean(x));
+      setKeywords(kwLabels);
+      setKeywordCodes(kwCodes);
+      setDebug({
+        isolation: data.isolation,
+        decision: data.decision,
+        sajuWeight: data.sajuWeight,
+        priorUniqueDays: data.priorUniqueDays,
+        feedbackBiasApplied: data.feedbackBiasApplied,
+        leakageGuard: data.leakageGuard,
+        keywords: rows,
+      });
+
+      contextRef.current = {
+        questionText: q,
+        keywords: kwCodes.length > 0 ? kwCodes : kwLabels,
+      };
+
+      if (hasLocalFitFeedback(todayDate)) {
+        setFit("good");
+        answeredRef.current = true;
+        setFeedbackMsg("오늘 피드백을 남겨주셨어요.");
+      }
+
+      if (q && !shownSent.current) {
+        shownSent.current = true;
+        const kws = kwCodes.length > 0 ? kwCodes : kwLabels;
+        void reportQuestionFeedback({
+          questionDate: todayDate,
+          eventType: "shown",
+          questionText: q,
+          payload: { keywords: kws },
+        });
+        void trackContentExposure({
+          eventDate: todayDate,
+          contentType: "daily_question",
+          eventType: "question_impression",
+          metadata: { keywords: kws, surface: "journal_home" },
+        });
+      }
+      setPhase("ready");
+    } catch (err) {
+      if (requestId !== requestIdRef.current) return;
+      setQuestion("오늘 하루, 마음에 가장 남는 순간은 무엇이었나요?");
+      setOpenAi({
+        kind: "failed",
+        reason: "network",
+        detail: err instanceof Error ? err.message : String(err),
+      });
+      setPhase("ready");
+    }
+  }, [phase, todayDate, enabledCodes, entries, sajuProfile]);
 
   const answered = fit != null || skipped;
 
@@ -242,6 +261,32 @@ export default function TodayQuestionCard({
 
   const showDebug = shouldShowOpenAiStatus();
 
+  if (phase === "idle") {
+    return (
+      <button
+        type="button"
+        onClick={() => void loadQuestion()}
+        className="w-full text-left p-3 border-2 space-y-1"
+        style={{
+          borderColor: "var(--px-border2)",
+          background: "var(--px-bg2)",
+          boxShadow: "2px 2px 0 #000",
+          color: "var(--px-text-on-panel)",
+        }}
+      >
+        <p
+          className="text-[10px] font-black tracking-wider"
+          style={{ color: "var(--px-text2)" }}
+        >
+          오늘의 질문
+        </p>
+        <p className="text-sm font-black" style={{ color: "var(--px-accent)" }}>
+          눌러서 오늘의 질문 받기
+        </p>
+      </button>
+    );
+  }
+
   return (
     <section
       className="p-3 border-2 space-y-2"
@@ -257,7 +302,7 @@ export default function TodayQuestionCard({
       >
         오늘의 질문
       </p>
-      {loading ? (
+      {phase === "loading" ? (
         <p className="ui-hint">질문을 준비하는 중…</p>
       ) : (
         <p
@@ -268,7 +313,7 @@ export default function TodayQuestionCard({
         </p>
       )}
 
-      {!loading && question && (
+      {phase === "ready" && question && (
         <div className="flex flex-wrap items-center gap-2 pt-1">
           <span
             className="text-[10px] font-bold"

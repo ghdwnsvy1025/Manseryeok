@@ -2,8 +2,12 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { getJournalStorage } from "@/lib/journal/getStorage";
-import { getCategoryByCode } from "@/lib/journal/categoryCatalog";
+import { notifyJournalProgressChanged } from "@/lib/journal/streak";
+import { notifyProgressCelebration } from "@/lib/ui/motionEvents";
+import { setLastSavedCheckIn } from "@/lib/journal/lastSavedCheckIn";
+import { getCategoryByCode, isCategoryCode } from "@/lib/journal/categoryCatalog";
 import { EVENT_TAG_CATALOG } from "@/lib/journal/eventTagCatalog";
 import {
   getEnabledCodesOrdered,
@@ -29,6 +33,7 @@ import TodayQuestionCard from "@/components/journal/TodayQuestionCard";
 import JournalSaveCompleteModal from "@/components/journal/JournalSaveCompleteModal";
 import ScoreSlider from "@/components/journal/ScoreSlider";
 import { reportQuestionFeedback } from "@/lib/journal/reportQuestionFeedback";
+import { peekDayQuote, setDayQuote } from "@/lib/journal/dayQuoteCache";
 
 const WEEKDAY_KO = ["일", "월", "화", "수", "목", "금", "토"] as const;
 const HAPPINESS_PINK = "#f472b6";
@@ -55,10 +60,13 @@ function parseDateParts(iso: string) {
 }
 
 export default function JournalEditor({ initialDate }: Props) {
+  const router = useRouter();
   const [date, setDate] = useState(initialDate ?? todayDateString());
   const dateInputRef = useRef<HTMLInputElement>(null);
   const dateParts = useMemo(() => parseDateParts(date), [date]);
   const [enabledCodes, setEnabledCodes] = useState<CategoryCode[]>([]);
+  /** 수정 중일 때, 이 기록에 원래 있던 카테고리 코드 */
+  const [entryScoreCodes, setEntryScoreCodes] = useState<CategoryCode[]>([]);
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
   const [content, setContent] = useState("");
   const [overall, setOverall] = useState<JournalScore | null>(null);
@@ -94,12 +102,23 @@ export default function JournalEditor({ initialDate }: Props) {
   });
   const [savedUniqueDays, setSavedUniqueDays] = useState(0);
 
+  /**
+   * 새 기록: 카테고리 설정의 활성 목록
+   * 수정: 이 기록에 원래 있던 활성 카테고리만 표시
+   * (나중에 설정에서 켠 카테고리는 숨기고 저장 시 해당 없음 처리)
+   */
+  const scoreFormCodes = useMemo(() => {
+    if (!existingId || entryScoreCodes.length === 0) return enabledCodes;
+    const onEntry = enabledCodes.filter((c) => entryScoreCodes.includes(c));
+    return onEntry.length > 0 ? onEntry : enabledCodes;
+  }, [existingId, entryScoreCodes, enabledCodes]);
+
   const completedScoreCount = useMemo(() => {
-    return enabledCodes.filter((code) => {
+    return scoreFormCodes.filter((code) => {
       const s = scores[code];
       return s && (s.isNotApplicable || s.rawScore != null);
     }).length;
-  }, [enabledCodes, scores]);
+  }, [scoreFormCodes, scores]);
 
   const uniqueDays = useMemo(
     () => new Set(allEntries.map((e) => e.entryDate)).size,
@@ -160,15 +179,20 @@ export default function JournalEditor({ initialDate }: Props) {
           setMainEvent(existing.mainEventText ?? "");
           setTags(existing.tags.map((t) => t.tagCode));
           const map: Record<string, ScoreUi> = {};
+          const onEntry: CategoryCode[] = [];
           for (const s of existing.scores) {
+            if (!isCategoryCode(s.categoryCode)) continue;
+            onEntry.push(s.categoryCode);
             map[s.categoryCode] = {
               rawScore: s.userScore ?? s.rawScore,
               isNotApplicable: s.isNotApplicable,
             };
           }
+          setEntryScoreCodes(onEntry);
           setScores(map);
         } else {
           setExistingId(undefined);
+          setEntryScoreCodes([]);
           setContent("");
           setOverall(null);
           setMood(null);
@@ -204,6 +228,21 @@ export default function JournalEditor({ initialDate }: Props) {
     summary: string | null,
     entries: JournalEntry[]
   ) => {
+    const cached = peekDayQuote(entry.entryDate);
+    if (cached) {
+      setQuote(cached.quote);
+      setQuoteOpenAi({ kind: "skipped", detail: "cached_same_day" });
+      setQuoteMeta({
+        contentType: cached.contentType,
+        sourceLabel: cached.sourceLabel,
+        authorName: cached.authorName,
+        workTitle: cached.workTitle,
+        deliveryId: cached.deliveryId,
+      });
+      setQuoteLoading(false);
+      return;
+    }
+
     setQuoteLoading(true);
     setQuote(null);
     setQuoteOpenAi(null);
@@ -236,15 +275,25 @@ export default function JournalEditor({ initialDate }: Props) {
         workTitle?: string | null;
         delivery?: { deliveryId?: string | null };
       };
-      setQuote(data.sentence ?? data.quote ?? null);
+      const text = data.sentence ?? data.quote ?? null;
+      setQuote(text);
       setQuoteOpenAi(data.openAi ?? null);
-      setQuoteMeta({
+      const meta = {
         contentType: data.contentType ?? null,
         sourceLabel: data.sourceLabel ?? null,
         authorName: data.authorName ?? null,
         workTitle: data.workTitle ?? null,
         deliveryId: data.delivery?.deliveryId ?? null,
-      });
+      };
+      setQuoteMeta(meta);
+      if (text?.trim()) {
+        setDayQuote({
+          entryDate: entry.entryDate,
+          quote: text,
+          ...meta,
+          at: Date.now(),
+        });
+      }
     } catch (err) {
       setQuoteOpenAi({
         kind: "failed",
@@ -261,22 +310,23 @@ export default function JournalEditor({ initialDate }: Props) {
     setMessage("");
     setOpenAiStatus(null);
     setAiSummary(null);
+    const editingExisting = Boolean(existingId);
     try {
       let aiByCode: Record<string, number | null> = {};
       let extractStatus: OpenAiCallStatus = {
         kind: "skipped",
-        detail: "본문 없음",
+        detail: editingExisting ? "수정 저장 — 기존 분석 유지" : "본문 없음",
       };
       let summary: string | null = null;
 
-      if (content.trim()) {
+      if (!editingExisting && content.trim()) {
         try {
           const res = await fetch("/api/journal/extract-scores", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               content,
-              enabledCodes,
+              enabledCodes: scoreFormCodes,
               moodLabel: mood,
               mainEventText: mainEvent.trim() || null,
             }),
@@ -296,7 +346,7 @@ export default function JournalEditor({ initialDate }: Props) {
           } else {
             extractStatus = data.openAi ?? { kind: "used" };
             summary = data.summary ?? null;
-            for (const code of enabledCodes) {
+            for (const code of scoreFormCodes) {
               const sc = data.scores?.[code]?.score;
               aiByCode[code] =
                 typeof sc === "number" && sc >= 1 && sc <= 10
@@ -317,7 +367,9 @@ export default function JournalEditor({ initialDate }: Props) {
       setAiSummary(summary);
 
       const storage = await getJournalStorage();
-      const scorePayload = enabledCodes.map((categoryCode) => {
+
+      // 화면에 보이는 카테고리 = 사용자 입력
+      const visiblePayload = scoreFormCodes.map((categoryCode) => {
         const s = scores[categoryCode];
         const userScore = s?.isNotApplicable ? null : s?.rawScore ?? null;
         const isNotApplicable = Boolean(s?.isNotApplicable);
@@ -331,6 +383,25 @@ export default function JournalEditor({ initialDate }: Props) {
         };
       });
 
+      // 기록에 있었지만 지금은 카테고리 설정에서 끈 것 → 값 유지(숨김)
+      const preservedDisabled = entryScoreCodes
+        .filter((c) => !enabledCodes.includes(c))
+        .map((categoryCode) => {
+          const s = scores[categoryCode];
+          const userScore = s?.isNotApplicable ? null : s?.rawScore ?? null;
+          return {
+            categoryCode,
+            userScore,
+            rawScore: userScore,
+            aiScore: null as number | null,
+            isNotApplicable: Boolean(s?.isNotApplicable ?? userScore == null),
+          };
+        });
+
+      // 수정 시 설정에서만 새로 켠 카테고리는 이 기록에 넣지 않음(화면·검증 모두 제외)
+      const scorePayload = [...visiblePayload, ...preservedDisabled];
+      const saveEnabledCodes = scorePayload.map((s) => s.categoryCode);
+
       const saveInput = {
         entryDate: date,
         content,
@@ -339,7 +410,7 @@ export default function JournalEditor({ initialDate }: Props) {
         mainEventText: mainEvent.trim() || null,
         scores: scorePayload,
         tagCodes: tags,
-        enabledCodes,
+        enabledCodes: saveEnabledCodes,
         existingId,
       };
 
@@ -360,14 +431,34 @@ export default function JournalEditor({ initialDate }: Props) {
             };
 
       setExistingId(result.entry.id);
+      setEntryScoreCodes(
+        result.entry.scores
+          .map((s) => s.categoryCode)
+          .filter(isCategoryCode)
+      );
       setSavedEntry(result.entry);
       setSaveMeta(result.xp);
+      setQuote(null);
+      setQuoteLoading(true);
+      setQuoteOpenAi(null);
+      setQuoteMeta({
+        contentType: null,
+        sourceLabel: null,
+        authorName: null,
+        workTitle: null,
+        deliveryId: null,
+      });
       setShowComplete(true);
-      setMessage(
-        result.xp.wasFirstSaveOfDay
-          ? "저장됐어요."
-          : "오늘의 기록이 최신 내용으로 반영되었어요."
-      );
+      setLastSavedCheckIn(result.entry);
+      notifyJournalProgressChanged();
+      notifyProgressCelebration({
+        gainedXp: result.xp.gainedXp,
+        leveledUp: result.xp.leveledUp,
+        level: result.xp.level,
+        previousLevel: result.xp.previousLevel,
+        wasFirstSaveOfDay: result.xp.wasFirstSaveOfDay,
+        suppressXpToast: true,
+      });
 
       void reportQuestionFeedback({
         questionDate: date,
@@ -553,7 +644,7 @@ export default function JournalEditor({ initialDate }: Props) {
           <p className="ui-section-title">카테고리 점수</p>
           <div className="flex items-baseline gap-2 shrink-0">
             <p className="ui-hint">
-              입력 {completedScoreCount}/{enabledCodes.length}
+              입력 {completedScoreCount}/{scoreFormCodes.length}
             </p>
             <Link
               href="/journal/categories"
@@ -564,7 +655,7 @@ export default function JournalEditor({ initialDate }: Props) {
             </Link>
           </div>
         </div>
-        {enabledCodes.map((code) => {
+        {scoreFormCodes.map((code) => {
           const cat = getCategoryByCode(code);
           const s = scores[code] ?? { rawScore: null, isNotApplicable: false };
           return (
@@ -694,7 +785,10 @@ export default function JournalEditor({ initialDate }: Props) {
           authorName={quoteMeta.authorName}
           workTitle={quoteMeta.workTitle}
           deliveryId={quoteMeta.deliveryId}
-          onClose={() => setShowComplete(false)}
+          onClose={() => {
+            setShowComplete(false);
+            router.push("/");
+          }}
         />
       )}
     </div>

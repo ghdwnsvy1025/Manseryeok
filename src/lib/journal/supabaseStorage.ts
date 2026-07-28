@@ -24,6 +24,7 @@ import { fuseTextAndUserScore } from "./textAlphaFusion";
 import { resolveUserScore } from "./buildScores";
 import { applyJournalXpOnSave } from "./xp";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { resolveActiveSajuProfileId } from "@/lib/diary/activeSajuProfile";
 
 function generateId(): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
@@ -34,9 +35,6 @@ function generateId(): string {
 
 /**
  * 마이그레이션이 아직 원격에 적용되지 않았을 수 있는 컬럼들.
- * 마이그레이션은 Supabase 대시보드에서 수동 실행하므로 배포가 먼저 나갈 수 있다.
- * 그때 저장 전체가 실패하면 안 되므로, 없는 컬럼만 떼고 재시도한다.
- *
  *  - 014: happiness_score / mood_labels / core_states / domain_scores / checkin_version
  *  - 022: first_recorded_at
  */
@@ -58,7 +56,7 @@ export function missingGatedColumns(message: string): string[] {
 
 /**
  * Supabase journal storage.
- * 테이블이 아직 없으면 null을 반환해 IndexedDB로 폴백.
+ * 테이블이 아직 없거나 active saju 프로필/025 컬럼이 없으면 null → IndexedDB 폴백.
  */
 export async function getSupabaseJournalStorage(): Promise<JournalStorage | null> {
   const client = getSupabaseBrowserClient();
@@ -73,11 +71,25 @@ export async function getSupabaseJournalStorage(): Promise<JournalStorage | null
     return null;
   }
 
-  return new SupabaseJournalStorage(user.id);
+  const profileId = await resolveActiveSajuProfileId(client, user.id);
+  if (!profileId) return null;
+
+  const colProbe = await client
+    .from("journal_entries")
+    .select("saju_profile_id")
+    .limit(1);
+  if (colProbe.error) {
+    return null;
+  }
+
+  return new SupabaseJournalStorage(user.id, profileId);
 }
 
 class SupabaseJournalStorage implements JournalStorage {
-  constructor(private userId: string) {}
+  constructor(
+    private userId: string,
+    private sajuProfileId: string
+  ) {}
 
   private get client() {
     const c = getSupabaseBrowserClient();
@@ -85,11 +97,16 @@ class SupabaseJournalStorage implements JournalStorage {
     return c;
   }
 
-  async getByDate(entryDate: string): Promise<JournalEntry | null> {
-    const { data: row, error } = await this.client
+  private scopedEntries() {
+    return this.client
       .from("journal_entries")
       .select("*")
       .eq("user_id", this.userId)
+      .eq("saju_profile_id", this.sajuProfileId);
+  }
+
+  async getByDate(entryDate: string): Promise<JournalEntry | null> {
+    const { data: row, error } = await this.scopedEntries()
       .eq("entry_date", entryDate)
       .maybeSingle();
     if (error) throw new Error(error.message);
@@ -98,18 +115,63 @@ class SupabaseJournalStorage implements JournalStorage {
   }
 
   async list(): Promise<JournalEntry[]> {
-    const { data, error } = await this.client
-      .from("journal_entries")
-      .select("*")
-      .eq("user_id", this.userId)
-      .order("entry_date", { ascending: false });
+    const { data, error } = await this.scopedEntries().order("entry_date", {
+      ascending: false,
+    });
     if (error) throw new Error(error.message);
-    const rows = data ?? [];
-    const out: JournalEntry[] = [];
-    for (const row of rows) {
-      out.push(await this.hydrate(row as Record<string, unknown>));
+    const rows = (data ?? []) as Record<string, unknown>[];
+    if (rows.length === 0) return [];
+
+    const ids = rows.map((row) => String(row.id));
+    const [{ data: allScores }, { data: allTags }] = await Promise.all([
+      this.client
+        .from("category_scores")
+        .select("*")
+        .eq("user_id", this.userId)
+        .in("entry_id", ids),
+      this.client
+        .from("journal_entry_tags")
+        .select("*")
+        .eq("user_id", this.userId)
+        .in("entry_id", ids),
+    ]);
+
+    const scoresByEntry = new Map<string, Record<string, unknown>[]>();
+    for (const s of allScores ?? []) {
+      const entryId = String((s as { entry_id: string }).entry_id);
+      const bucket = scoresByEntry.get(entryId);
+      if (bucket) bucket.push(s as Record<string, unknown>);
+      else scoresByEntry.set(entryId, [s as Record<string, unknown>]);
     }
-    return out;
+    const tagsByEntry = new Map<string, Record<string, unknown>[]>();
+    for (const t of allTags ?? []) {
+      const entryId = String((t as { entry_id: string }).entry_id);
+      const bucket = tagsByEntry.get(entryId);
+      if (bucket) bucket.push(t as Record<string, unknown>);
+      else tagsByEntry.set(entryId, [t as Record<string, unknown>]);
+    }
+
+    return rows.map((row) => {
+      const entryId = String(row.id);
+      return this.assembleEntry(
+        row,
+        scoresByEntry.get(entryId) ?? [],
+        tagsByEntry.get(entryId) ?? []
+      );
+    });
+  }
+
+  async deleteByDate(entryDate: string): Promise<boolean> {
+    const existing = await this.getByDate(entryDate);
+    if (!existing) return false;
+    const { error } = await this.client
+      .from("journal_entries")
+      .delete()
+      .eq("id", existing.id)
+      .eq("user_id", this.userId)
+      .eq("saju_profile_id", this.sajuProfileId);
+    if (error) throw new Error(error.message);
+    return true;
   }
 
   private mapScoreRow(
@@ -159,8 +221,6 @@ class SupabaseJournalStorage implements JournalStorage {
 
   private async hydrate(row: Record<string, unknown>): Promise<JournalEntry> {
     const entryId = String(row.id);
-    const schemaVersion =
-      typeof row.schema_version === "number" ? row.schema_version : 1;
     const [{ data: scores }, { data: tags }] = await Promise.all([
       this.client
         .from("category_scores")
@@ -173,14 +233,29 @@ class SupabaseJournalStorage implements JournalStorage {
         .eq("entry_id", entryId)
         .eq("user_id", this.userId),
     ]);
+    return this.assembleEntry(
+      row,
+      (scores ?? []) as Record<string, unknown>[],
+      (tags ?? []) as Record<string, unknown>[]
+    );
+  }
 
-    const scoreRecords: CategoryScoreRecord[] = (scores ?? []).map((s) =>
-      this.mapScoreRow(entryId, s as Record<string, unknown>, schemaVersion)
+  private assembleEntry(
+    row: Record<string, unknown>,
+    scores: Record<string, unknown>[],
+    tags: Record<string, unknown>[]
+  ): JournalEntry {
+    const entryId = String(row.id);
+    const schemaVersion =
+      typeof row.schema_version === "number" ? row.schema_version : 1;
+
+    const scoreRecords: CategoryScoreRecord[] = scores.map((s) =>
+      this.mapScoreRow(entryId, s, schemaVersion)
     );
 
-    const tagRecords: JournalEntryTag[] = (tags ?? []).map((t) => ({
+    const tagRecords: JournalEntryTag[] = tags.map((t) => ({
       tagCode: String(t.tag_code),
-      source: t.source ?? "user",
+      source: (t.source as JournalEntryTag["source"] | null) ?? "user",
       confirmedByUser: t.confirmed_by_user !== false,
     }));
 
@@ -191,19 +266,22 @@ class SupabaseJournalStorage implements JournalStorage {
     const overallSatisfaction =
       overallRaw === 0
         ? 0
-        : (migrateScoreToTen(overallRaw, schemaVersion) as JournalEntry["overallSatisfaction"]);
+        : (migrateScoreToTen(
+            overallRaw,
+            schemaVersion
+          ) as JournalEntry["overallSatisfaction"]);
 
     return {
       id: entryId,
       userId: this.userId,
+      sajuProfileId:
+        (row.saju_profile_id as string | null) ?? this.sajuProfileId,
       entryDate: String(row.entry_date),
       userTimezone: String(row.user_timezone ?? "Asia/Seoul"),
       content: String(row.content ?? ""),
       overallSatisfaction,
       happinessScore:
-        row.happiness_score == null
-          ? null
-          : Number(row.happiness_score),
+        row.happiness_score == null ? null : Number(row.happiness_score),
       moodLabel: (row.mood_label as string | null) ?? null,
       moodLabels: Array.isArray(row.mood_labels)
         ? (row.mood_labels as unknown[]).filter(
@@ -237,18 +315,14 @@ class SupabaseJournalStorage implements JournalStorage {
     };
   }
 
-  /**
-   * 없는 컬럼을 하나씩 떼어내며 재시도한다.
-   * PostgREST는 한 번에 한 컬럼만 알려주므로 게이트 컬럼 수만큼 시도한다.
-   */
   private async upsertEntryRow(row: Record<string, unknown>): Promise<void> {
     let attempt = { ...row };
     const dropped: string[] = [];
 
     for (let i = 0; i <= MIGRATION_GATED_ENTRY_COLUMNS.length; i += 1) {
-      const { error } = await this.client
-        .from("journal_entries")
-        .upsert(attempt, { onConflict: "user_id,entry_date" });
+      const { error } = await this.client.from("journal_entries").upsert(attempt, {
+        onConflict: "user_id,saju_profile_id,entry_date",
+      });
       if (!error) return;
 
       const missing = missingGatedColumns(error.message).filter(
@@ -289,6 +363,7 @@ class SupabaseJournalStorage implements JournalStorage {
     const now = new Date().toISOString();
     const existing = await this.getByDate(input.entryDate);
     const id = existing?.id ?? generateId();
+    const profileId = input.sajuProfileId || this.sajuProfileId;
 
     const allEntries = await this.list();
     const xp = applyJournalXpOnSave({
@@ -298,10 +373,12 @@ class SupabaseJournalStorage implements JournalStorage {
     });
 
     const moodLabels =
-      input.moodLabels ??
-      (input.moodLabel ? [input.moodLabel] : []);
+      input.moodLabels ?? (input.moodLabel ? [input.moodLabel] : []);
 
-    if (input.checkinVersion === 2 || input.checkinVersion === CHECKIN_VERSION_V2) {
+    if (
+      input.checkinVersion === 2 ||
+      input.checkinVersion === CHECKIN_VERSION_V2
+    ) {
       const { validateCheckInSave } = await import(
         "@/lib/journal/checkin/validation"
       );
@@ -341,6 +418,7 @@ class SupabaseJournalStorage implements JournalStorage {
     const upsertRow: Record<string, unknown> = {
       id,
       user_id: this.userId,
+      saju_profile_id: profileId,
       entry_date: input.entryDate,
       user_timezone: input.userTimezone ?? "Asia/Seoul",
       content: input.content,
@@ -353,7 +431,6 @@ class SupabaseJournalStorage implements JournalStorage {
       xp_awarded: xp.xpAwarded,
       updated_at: now,
       created_at: existing?.createdAt ?? now,
-      // 최초 기록 시각은 한 번 정해지면 재저장으로 갱신하지 않는다
       first_recorded_at: existing?.firstRecordedAt ?? existing?.createdAt ?? now,
       happiness_score:
         input.happinessScore !== undefined
@@ -373,7 +450,6 @@ class SupabaseJournalStorage implements JournalStorage {
       .eq("entry_id", id)
       .eq("user_id", this.userId);
 
-    // (entry_id, category_code) 유니크 제약 때문에 같은 코드가 중복되면 마지막 값만 남긴다
     const dedupedScores = Array.from(
       new Map(
         input.scores
@@ -385,7 +461,9 @@ class SupabaseJournalStorage implements JournalStorage {
     const scoreRows = dedupedScores.map((s) => {
       const userScore = resolveUserScore(s);
       const aiScore =
-        s.aiScore != null && Number.isFinite(s.aiScore) ? Number(s.aiScore) : null;
+        s.aiScore != null && Number.isFinite(s.aiScore)
+          ? Number(s.aiScore)
+          : null;
       const finalScore =
         s.finalScore !== undefined
           ? s.finalScore
@@ -412,9 +490,10 @@ class SupabaseJournalStorage implements JournalStorage {
     });
 
     if (scoreRows.length > 0) {
-      const { error } = await this.client.from("category_scores").insert(scoreRows);
+      const { error } = await this.client
+        .from("category_scores")
+        .insert(scoreRows);
       if (error) {
-        // 마이그레이션 012 미적용 시 구 컬럼만으로 재시도
         if (/user_score|ai_score|final_score|xp_/i.test(error.message)) {
           const legacyRows = scoreRows.map(
             ({ user_score: _u, ai_score: _a, final_score: _f, ...rest }) => rest
@@ -443,7 +522,9 @@ class SupabaseJournalStorage implements JournalStorage {
         source: "user",
         confirmed_by_user: true,
       }));
-      const { error } = await this.client.from("journal_entry_tags").insert(tagRows);
+      const { error } = await this.client
+        .from("journal_entry_tags")
+        .insert(tagRows);
       if (error) throw new Error(error.message);
     }
 
@@ -456,15 +537,17 @@ class SupabaseJournalStorage implements JournalStorage {
     const { data, error } = await this.client
       .from("user_category_preferences")
       .select("*")
-      .eq("user_id", this.userId);
+      .eq("user_id", this.userId)
+      .eq("saju_profile_id", this.sajuProfileId);
     if (error) {
-      return loadCategoryPreferencesLocal(this.userId);
+      return loadCategoryPreferencesLocal(this.userId, this.sajuProfileId);
     }
     if (!data || data.length === 0) {
-      return createDefaultPreferences(this.userId);
+      return createDefaultPreferences(this.userId, this.sajuProfileId);
     }
     return data.map((p) => ({
       userId: this.userId,
+      sajuProfileId: this.sajuProfileId,
       categoryCode: p.category_code,
       enabled: Boolean(p.enabled),
       sortOrder: p.sort_order ?? 0,
@@ -475,11 +558,12 @@ class SupabaseJournalStorage implements JournalStorage {
   }
 
   async savePreferences(prefs: UserCategoryPreference[]): Promise<void> {
-    const local = saveCategoryPreferencesLocal(prefs);
+    const local = saveCategoryPreferencesLocal(prefs, this.sajuProfileId);
     if (!local.ok) throw new Error(local.error);
 
     const rows = prefs.map((p) => ({
       user_id: this.userId,
+      saju_profile_id: this.sajuProfileId,
       category_code: p.categoryCode,
       enabled: p.enabled,
       sort_order: p.sortOrder,
@@ -490,7 +574,7 @@ class SupabaseJournalStorage implements JournalStorage {
 
     const { error } = await this.client
       .from("user_category_preferences")
-      .upsert(rows, { onConflict: "user_id,category_code" });
+      .upsert(rows, { onConflict: "user_id,saju_profile_id,category_code" });
     if (error) throw new Error(error.message);
   }
 }

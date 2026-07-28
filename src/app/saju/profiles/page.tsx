@@ -97,6 +97,10 @@ export default function SajuProfilesPage() {
       const activated = await setActiveSajuProfile(profileId);
       if (activated) {
         applyProfileToSettings(activated);
+        const { resetJournalStorageCache } = await import(
+          "@/lib/journal/getStorage"
+        );
+        resetJournalStorageCache();
         notifySajuProfileChanged();
       }
       await refresh();
@@ -187,6 +191,9 @@ export default function SajuProfilesPage() {
           style={{ color: "var(--px-text)" }}
         >
           {diaryLine}
+        </p>
+        <p className="ui-hint max-w-sm mx-auto">
+          프로필을 바꾸면 일기·질문·운세·명언·카테고리 설정도 그 프로필 기준으로 바뀝니다.
         </p>
       </div>
 

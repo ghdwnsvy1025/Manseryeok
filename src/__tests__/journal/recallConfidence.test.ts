@@ -115,6 +115,7 @@ function entry(
   return {
     id: `e-${date}`,
     userId: "u",
+    sajuProfileId: "p1",
     entryDate: date,
     userTimezone: "Asia/Seoul",
     content: "",

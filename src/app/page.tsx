@@ -1,14 +1,24 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import WelcomeAuthGate from "@/components/auth/WelcomeAuthGate";
 import SajuProfileSetup from "@/components/home/SajuProfileSetup";
 import HomeHub from "@/components/home/HomeHub";
 import HomeG from "@/components/home/HomeG";
+import HomeSaveCelebration from "@/components/home/HomeSaveCelebration";
 import { useUserAppState } from "@/hooks/useUserAppState";
 import { isNewDiaryEnabled } from "@/lib/app/featureFlags";
 import { disableGuestMode } from "@/lib/auth/guestMode";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+
+function withCelebration(node: ReactNode) {
+  return (
+    <>
+      <HomeSaveCelebration />
+      {node}
+    </>
+  );
+}
 
 export default function HomePage() {
   const { state, loading, error, refresh } = useUserAppState();
@@ -71,6 +81,37 @@ export default function HomePage() {
     return <WelcomeAuthGate onGuest={() => setEntryAllowed(true)} />;
   }
 
+  // 새 일기 홈은 자체 로딩이 있으므로, 레거시 diary 상태 대기에 붙잡히지 않는다
+  if (newDiary) {
+    if (error && !state) {
+      return (
+        <div className="p-4 space-y-2">
+          <p className="text-sm font-bold" style={{ color: "#f87171" }}>
+            {error}
+          </p>
+          <button
+            type="button"
+            className="ui-primary-btn px-3 py-2 text-xs"
+            onClick={() => void refresh()}
+          >
+            다시 시도
+          </button>
+        </div>
+      );
+    }
+    // 온보딩 미완료만 설정으로 — 로딩 중이어도 로컬에 프로필/온보딩이 있으면 홈 진입
+    if (!loading && (!state || state.kind === "new_user")) {
+      return <SajuProfileSetup onCompleted={() => void refresh()} />;
+    }
+    if (loading && !state) {
+      return <p className="ui-hint p-4">불러오는 중...</p>;
+    }
+    if (state?.kind === "new_user") {
+      return <SajuProfileSetup onCompleted={() => void refresh()} />;
+    }
+    return withCelebration(<HomeG />);
+  }
+
   if (loading) {
     return <p className="ui-hint p-4">불러오는 중...</p>;
   }
@@ -96,10 +137,5 @@ export default function HomePage() {
     return <SajuProfileSetup onCompleted={() => void refresh()} />;
   }
 
-  // G — 새 홈 (journal 플래그 ON)
-  if (newDiary) {
-    return <HomeG />;
-  }
-
-  return <HomeHub state={state} />;
+  return withCelebration(<HomeHub state={state} />);
 }

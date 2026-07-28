@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import ModeSwitcher from "@/components/product/ModeSwitcher";
+import HeaderProgressBadge from "@/components/HeaderProgressBadge";
 import {
   isPersonalizationEnabled,
 } from "@/lib/app/featureFlags";
@@ -320,6 +321,8 @@ export default function ProfileHeader() {
           )}
         </p>
       </div>
+
+      <HeaderProgressBadge />
 
       {!profile && (
         <Link href="/saju" className="text-xs font-bold underline shrink-0" style={{ color: "var(--px-accent)" }}>

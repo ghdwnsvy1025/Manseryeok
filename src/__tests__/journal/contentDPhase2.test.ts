@@ -49,6 +49,7 @@ describe("question/quote templates", () => {
     const entry: JournalEntry = {
       id: "1",
       userId: "u",
+      sajuProfileId: "p1",
       entryDate: "2026-07-23",
       userTimezone: "Asia/Seoul",
       content: "피곤했다",

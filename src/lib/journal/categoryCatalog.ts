@@ -97,8 +97,9 @@ export const CATEGORY_CATALOG: CategoryDefinition[] = [
 export const DEFAULT_RECOMMENDED_CODES: CategoryCode[] = [
   "emotional_balance",
   "energy",
-  "recovery_sleep",
+  "physical_condition",
   "focus_execution",
+  "recovery_sleep",
   "work_study",
   "relationship",
 ];

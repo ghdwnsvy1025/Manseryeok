@@ -19,6 +19,7 @@ function makeEntries(n: number): JournalEntry[] {
     out.push({
       id: `e-${i}`,
       userId: "u-perf",
+      sajuProfileId: "p-perf",
       entryDate,
       userTimezone: "Asia/Seoul",
       content: "",
@@ -110,7 +111,7 @@ describe("hot-path performance smoke", () => {
           lowCategories: ["energy"],
           tags: ["rest"],
         });
-        computeBlendWeights({ priorUniqueDays: i, onboardingCompleted: true });
+        computeBlendWeights({ totalXp: i * 40, onboardingCompleted: true });
       }
     });
     expect(ms).toBeLessThan(50);

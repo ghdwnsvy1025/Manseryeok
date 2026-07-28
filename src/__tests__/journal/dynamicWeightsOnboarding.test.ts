@@ -2,8 +2,9 @@ import { describe, expect, test } from "@jest/globals";
 import {
   computeBlendWeights,
   dataMaturityTier,
-  MATURITY_DAYS,
-  ONBOARDING_DAY_BONUS,
+  maturityTargetXp,
+  ONBOARDING_XP_BONUS,
+  PERSONALIZATION_MATURITY_LEVEL,
 } from "@/lib/journal/insight/dynamicWeights";
 import {
   ONBOARDING_QUESTIONS,
@@ -12,65 +13,73 @@ import {
   type OnboardingAnswers,
 } from "@/lib/journal/onboarding/questions";
 import { deriveOnboardingProfile } from "@/lib/journal/onboarding/profile";
+import { cumulativeXpForLevel } from "@/lib/product/personalizationLevel";
 
-describe("data-volume driven dynamic weights", () => {
+describe("XP-driven dynamic weights", () => {
   test("weights always sum to 1", () => {
-    for (const days of [0, 1, 5, 15, 30, 45, 60, 120]) {
-      const w = computeBlendWeights({ priorUniqueDays: days });
+    for (const xp of [0, 50, 180, 500, 2000, 5000, 20000]) {
+      const w = computeBlendWeights({ totalXp: xp });
       expect(Math.abs(w.recent + w.keyword + w.natal - 1)).toBeLessThan(1e-9);
     }
   });
 
   test("cold start leans on natal prior; mature leans on personal data", () => {
-    const cold = computeBlendWeights({ priorUniqueDays: 0 });
-    const mature = computeBlendWeights({ priorUniqueDays: MATURITY_DAYS });
+    const cold = computeBlendWeights({ totalXp: 0 });
+    const mature = computeBlendWeights({
+      totalXp: maturityTargetXp(),
+    });
 
     expect(cold.natal).toBeGreaterThan(cold.recent);
     expect(mature.recent).toBeGreaterThan(mature.natal);
     expect(mature.recent).toBeGreaterThan(cold.recent);
     expect(mature.natal).toBeLessThan(cold.natal);
+    expect(mature.maturity).toBe(1);
+    expect(mature.tier).toBe("mature");
   });
 
-  test("recent weight increases monotonically with data volume", () => {
+  test("recent weight increases monotonically with XP", () => {
     let prev = -1;
-    for (const days of [0, 3, 10, 20, 40, 60, 90]) {
-      const w = computeBlendWeights({ priorUniqueDays: days });
+    for (const xp of [0, 100, 400, 1000, 2043, 5000]) {
+      const w = computeBlendWeights({ totalXp: xp });
       expect(w.recent).toBeGreaterThanOrEqual(prev);
       prev = w.recent;
     }
   });
 
-  test("weights saturate beyond maturity horizon", () => {
-    const at60 = computeBlendWeights({ priorUniqueDays: 60 });
-    const at365 = computeBlendWeights({ priorUniqueDays: 365 });
-    expect(at365.recent).toBe(at60.recent);
-    expect(at365.natal).toBe(at60.natal);
-    expect(at365.tier).toBe("mature");
+  test("weights saturate at Lv5 target XP", () => {
+    const target = maturityTargetXp();
+    expect(target).toBe(cumulativeXpForLevel(PERSONALIZATION_MATURITY_LEVEL));
+    const atTarget = computeBlendWeights({ totalXp: target });
+    const beyond = computeBlendWeights({ totalXp: target * 3 });
+    expect(beyond.recent).toBe(atTarget.recent);
+    expect(beyond.natal).toBe(atTarget.natal);
+    expect(beyond.tier).toBe("mature");
   });
 
-  test("onboarding grants effective-day bonus at cold start", () => {
-    const without = computeBlendWeights({ priorUniqueDays: 0 });
+  test("onboarding grants XP bonus at cold start", () => {
+    const without = computeBlendWeights({ totalXp: 0 });
     const withOnb = computeBlendWeights({
-      priorUniqueDays: 0,
+      totalXp: 0,
       onboardingCompleted: true,
     });
-    expect(withOnb.effectiveDays).toBe(ONBOARDING_DAY_BONUS);
+    expect(withOnb.effectiveXp).toBe(ONBOARDING_XP_BONUS);
     expect(withOnb.recent).toBeGreaterThan(without.recent);
     expect(withOnb.natal).toBeLessThan(without.natal);
   });
 
-  test("tiers", () => {
+  test("tiers by maturity", () => {
     expect(dataMaturityTier(0)).toBe("cold");
-    expect(dataMaturityTier(6)).toBe("cold");
-    expect(dataMaturityTier(7)).toBe("warming");
-    expect(dataMaturityTier(29)).toBe("warming");
-    expect(dataMaturityTier(30)).toBe("warm");
-    expect(dataMaturityTier(60)).toBe("mature");
+    expect(dataMaturityTier(0.1)).toBe("cold");
+    expect(dataMaturityTier(0.12)).toBe("warming");
+    expect(dataMaturityTier(0.39)).toBe("warming");
+    expect(dataMaturityTier(0.4)).toBe("warm");
+    expect(dataMaturityTier(0.99)).toBe("warm");
+    expect(dataMaturityTier(1)).toBe("mature");
   });
 
   test("negative / NaN input is treated as zero", () => {
-    expect(computeBlendWeights({ priorUniqueDays: -5 }).effectiveDays).toBe(0);
-    expect(computeBlendWeights({ priorUniqueDays: NaN }).effectiveDays).toBe(0);
+    expect(computeBlendWeights({ totalXp: -5 }).effectiveXp).toBe(0);
+    expect(computeBlendWeights({ totalXp: NaN }).effectiveXp).toBe(0);
   });
 });
 
@@ -120,7 +129,6 @@ describe("onboarding 6-question survey", () => {
 
     expect(profile.completed).toBe(true);
     expect(profile.completeness).toBe(1);
-    // 1순위로 고른 잠·휴식이 2순위 일·공부보다 중요도가 높아야 한다
     expect(profile.personalImportance.recovery_sleep!).toBeGreaterThan(
       profile.personalImportance.work_study!
     );

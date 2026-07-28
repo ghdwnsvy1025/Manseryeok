@@ -26,10 +26,12 @@ function buildQuery(opts: {
   b: BTheme;
   ganjiKo?: string | null;
   purpose: "fortune" | "question" | "quote";
+  /** 원국 지배 십신·영역 긴장 등 추가 힌트 */
+  extraHints?: string[];
 }): string {
   const purposeHint =
     opts.purpose === "fortune"
-      ? "오늘의 운세 직장 연애 건강 대인 성격 힘과 균형 용신"
+      ? "오늘의 운세 직장 연애 건강 대인 성격 힘과 균형 용신 재성 인성 십신 일진"
       : opts.purpose === "question"
         ? "오늘의 질문 성찰 상담 문장 하루 주제 말투"
         : "오늘의 명언 위로 조언 상담 전달 따뜻한 문장";
@@ -39,6 +41,7 @@ function buildQuery(opts: {
     opts.b.tenGod,
     ...opts.b.keywords,
     opts.b.plainSummary,
+    ...(opts.extraHints ?? []),
     purposeHint,
   ]
     .filter(Boolean)
@@ -54,6 +57,7 @@ export async function loadTheoryContext(opts: {
   ganjiKo?: string | null;
   purpose: "fortune" | "question" | "quote";
   matchCount?: number;
+  extraHints?: string[];
 }): Promise<TheoryContext> {
   if (!isServiceRoleConfigured()) {
     return {
@@ -105,8 +109,11 @@ export function theoryUsageRules(
   if (kind === "fortune") {
     return `${base}
 운세 톤:
-- 각 영역은 "오늘 기운의 컨셉 한 줄 + 실천/마음가짐 한 줄"
-- 교과서 문장 복붙 금지. 오늘의 키워드(십신·간지)에 맞게 재해석.`;
+- 종합(overall): 학습 이론 + 원국 특징 + 오늘 간지를 엮어, 사용자가 바로 이해할 수 있는 쉬운 말 3문장으로 summary에 넣으세요. headline은 한 줄 컨셉.
+- 나머지 영역: 그 테마에 맞는 원국 특징과 오늘 글자(일진)의 만남을 바탕으로 headline 1 + summary 1~2문장. opportunity/caution/action은 짧게.
+- 사용자에게 보이는 문장에는 십신·재성·인성·원국 등 전문용어를 쓰지 마세요. 쉬운 일상어만.
+- 교과서 문장 복붙 금지. natalDaySignals의 tensionPlain·keywords를 우선 재료로 쓰세요.
+- domain·tone·score·confidence는 바꾸지 마세요.`;
   }
   if (kind === "question") {
     return `${base}

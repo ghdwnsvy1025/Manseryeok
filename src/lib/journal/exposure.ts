@@ -15,6 +15,7 @@ export const EXPOSURE_EVENT_TYPES = [
   "fortune_summary_impression",
   "fortune_detail_opened",
   "fortune_domain_opened",
+  "fortune_evidence_opened",
   "checkin_started",
   "checkin_completed",
   "diary_started",

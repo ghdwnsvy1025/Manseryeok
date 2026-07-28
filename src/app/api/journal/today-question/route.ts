@@ -20,6 +20,7 @@ import { buildDailySajuContext } from "@/lib/product/dailySajuContext";
 import type { SajuProfile } from "@/lib/diary/types";
 import { isRidgeQuestionLiveEnabled, isPersonalizationTrainEnabled } from "@/lib/app/featureFlags";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
+import { resolveActiveSajuProfileId } from "@/lib/diary/activeSajuProfile";
 import { buildDailyInsightContext } from "@/lib/journal/insight/buildContext";
 import {
   resolveDailyInsightContext,
@@ -56,7 +57,9 @@ function sanitizeBiases(raw: unknown): KeywordBiasMap {
   return out;
 }
 
-async function loadServerFeedbackBiases(): Promise<KeywordBiasMap> {
+async function loadServerFeedbackBiases(
+  sajuProfileId?: string | null
+): Promise<KeywordBiasMap> {
   const sb = getSupabaseServerClient();
   if (!sb) return {};
   const {
@@ -64,13 +67,17 @@ async function loadServerFeedbackBiases(): Promise<KeywordBiasMap> {
   } = await sb.auth.getUser();
   if (!user) return {};
 
-  const { data, error } = await sb
+  let query = sb
     .from("question_feedback_events")
     .select("event_type, payload")
     .eq("user_id", user.id)
     .in("event_type", LEARNABLE_FEEDBACK_EVENT_TYPES)
     .order("created_at", { ascending: false })
     .limit(120);
+  if (sajuProfileId) {
+    query = query.eq("saju_profile_id", sajuProfileId);
+  }
+  const { data, error } = await query;
 
   if (error || !data) return {};
 
@@ -121,7 +128,22 @@ export async function POST(req: NextRequest) {
   const ridgeLive = isRidgeQuestionLiveEnabled();
 
   const clientBiases = sanitizeBiases(b.keywordBiases);
-  const serverBiases = await loadServerFeedbackBiases();
+
+  const sbAuthEarly = getSupabaseServerClient();
+  let earlySajuProfileId: string | null = b.sajuProfile?.id ?? null;
+  if (!earlySajuProfileId && sbAuthEarly) {
+    const {
+      data: { user: earlyUser },
+    } = await sbAuthEarly.auth.getUser();
+    if (earlyUser?.id) {
+      earlySajuProfileId = await resolveActiveSajuProfileId(
+        sbAuthEarly,
+        earlyUser.id
+      );
+    }
+  }
+
+  const serverBiases = await loadServerFeedbackBiases(earlySajuProfileId);
   const keywordBiases = mergeBiases(serverBiases, clientBiases);
 
   const ctx = buildDailySajuContext(b.todayDate, b.sajuProfile ?? null);
@@ -224,45 +246,52 @@ export async function POST(req: NextRequest) {
   let contextId: string | null = null;
   let questionId: string | null = null;
 
-  const sbAuth = getSupabaseServerClient();
+  const sbAuth = sbAuthEarly ?? getSupabaseServerClient();
   if (sbAuth) {
     const {
       data: { user },
     } = await sbAuth.auth.getUser();
     if (user?.id) {
       const sb = resolveInsightPersistClient(sbAuth);
-      const resolved = await resolveDailyInsightContext(sb, user.id, {
-        eventDate: b.todayDate,
-        entries: rawEntries,
-        enabledCodes,
-        sajuProfile: b.sajuProfile ?? null,
-        keywordBiases,
-      });
-      if (resolved) {
-        insight = resolved.ctx;
-        contextId = resolved.id;
-      }
+      const sajuProfileId =
+        earlySajuProfileId ??
+        (await resolveActiveSajuProfileId(sb, user.id));
+      if (sajuProfileId) {
+        const resolved = await resolveDailyInsightContext(sb, user.id, {
+          eventDate: b.todayDate,
+          entries: rawEntries,
+          enabledCodes,
+          sajuProfile: b.sajuProfile ?? null,
+          sajuProfileId,
+          keywordBiases,
+        });
+        if (resolved) {
+          insight = resolved.ctx;
+          contextId = resolved.id;
+        }
 
-      questionId = await persistDailyQuestion(sb, {
-        userId: user.id,
-        questionDate: b.todayDate,
-        contextId,
-        questionText: result.question,
-        keywordCodes: decision.keywordScores.map((k) => k.code),
-        evidence: {
-          focusCategory: decision.focusCategory,
-          contentScore: decision.contentScore,
-          decisionEvidence: decision.evidence,
-          topKeywordLabels: decision.topKeywords,
-          primaryKeyword: insight.primaryKeyword,
-          tensionKeyword: insight.tensionKeyword,
-          engineVersion: insight.engineVersion,
-        },
-        confidence: insight.overallConfidence,
-        scoringVersion: INSIGHT_ENGINE_VERSION,
-        dataCutoffAt: insight.dataCutoffAt,
-        modelVersion: process.env.OPENAI_JOURNAL_SCORE_MODEL || "gpt-4o-mini",
-      });
+        questionId = await persistDailyQuestion(sb, {
+          userId: user.id,
+          sajuProfileId,
+          questionDate: b.todayDate,
+          contextId,
+          questionText: result.question,
+          keywordCodes: decision.keywordScores.map((k) => k.code),
+          evidence: {
+            focusCategory: decision.focusCategory,
+            contentScore: decision.contentScore,
+            decisionEvidence: decision.evidence,
+            topKeywordLabels: decision.topKeywords,
+            primaryKeyword: insight.primaryKeyword,
+            tensionKeyword: insight.tensionKeyword,
+            engineVersion: insight.engineVersion,
+          },
+          confidence: insight.overallConfidence,
+          scoringVersion: INSIGHT_ENGINE_VERSION,
+          dataCutoffAt: insight.dataCutoffAt,
+          modelVersion: process.env.OPENAI_JOURNAL_SCORE_MODEL || "gpt-4o-mini",
+        });
+      }
     }
   }
 

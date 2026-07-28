@@ -13,8 +13,8 @@ type NavItem = {
 };
 
 /**
- * 하단 탭: 홈(G) · 일기(H) · 통계(I)
- * 분석은 상단 메뉴 백업으로 이동
+ * 하단 탭: 홈 · 일기 · 기록
+ * 홈=오늘 대시보드, 기록=추이·캘린더·사주 패턴 심화
  */
 export default function AppNav() {
   const pathname = usePathname();
@@ -42,8 +42,8 @@ export default function AppNav() {
     },
     {
       href: "/stats",
-      label: "통계",
-      icon: "統",
+      label: "기록",
+      icon: "曆",
       main: false,
       isActive: (path) =>
         path === "/stats" ||

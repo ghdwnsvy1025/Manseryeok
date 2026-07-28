@@ -40,7 +40,26 @@ function loadEnvLocal(): Record<string, string> {
   return env;
 }
 
+/**
+ * write-flags.mjs가 남긴 .env.development.local은 next dev에서 .env.local보다
+ * 우선하므로, 지우지 않으면 이후 모든 개발 서버가 E2E 보수 플래그로 뜬다.
+ */
+function removeE2eDevEnvOverride() {
+  const p = path.resolve(".env.development.local");
+  try {
+    if (!fs.existsSync(p)) return;
+    const text = fs.readFileSync(p, "utf8");
+    if (!text.includes("NEXT_PUBLIC_E2E_CONSERVATIVE_FLAGS")) return;
+    fs.rmSync(p, { force: true });
+    fs.rmSync(path.resolve(".next"), { recursive: true, force: true });
+  } catch {
+    /* best effort */
+  }
+}
+
 async function globalTeardown() {
+  removeE2eDevEnvOverride();
+
   const credPath = path.resolve("e2e/.auth/credentials.json");
   if (!fs.existsSync(credPath)) return;
   const cred = JSON.parse(fs.readFileSync(credPath, "utf8")) as {

@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
+import { resolveActiveSajuProfileId } from "@/lib/diary/activeSajuProfile";
 import {
   validateQuestionFeedbackInput,
   type QuestionFeedbackInput,
@@ -56,6 +57,15 @@ export async function POST(req: NextRequest) {
     });
   }
 
+  const sajuProfileId = await resolveActiveSajuProfileId(sb, user.id);
+  if (!sajuProfileId) {
+    return Response.json({
+      ok: true,
+      stored: "client_local",
+      detail: "no_saju_profile",
+    });
+  }
+
   let questionId = input.questionId ?? null;
 
   // 질문이 있으면 당일 daily_questions upsert 후 id 연결
@@ -65,6 +75,7 @@ export async function POST(req: NextRequest) {
       .from("daily_questions")
       .select("id")
       .eq("user_id", user.id)
+      .eq("saju_profile_id", sajuProfileId)
       .eq("question_date", input.questionDate)
       .maybeSingle();
 
@@ -77,12 +88,14 @@ export async function POST(req: NextRequest) {
           updated_at: now,
         })
         .eq("id", existing.id)
-        .eq("user_id", user.id);
+        .eq("user_id", user.id)
+        .eq("saju_profile_id", sajuProfileId);
     } else {
       const { data: inserted } = await sb
         .from("daily_questions")
         .insert({
           user_id: user.id,
+          saju_profile_id: sajuProfileId,
           question_date: input.questionDate,
           question_text: input.questionText.trim().slice(0, 500),
           keyword_codes: input.payload?.keywords ?? [],
@@ -97,6 +110,7 @@ export async function POST(req: NextRequest) {
 
   const { error } = await sb.from("question_feedback_events").insert({
     user_id: user.id,
+    saju_profile_id: sajuProfileId,
     question_id: questionId,
     question_date: input.questionDate,
     event_type: input.eventType,

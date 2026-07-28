@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
+import { resolveActiveSajuProfileId } from "@/lib/diary/activeSajuProfile";
 import {
   ONBOARDING_QUESTIONS,
   ONBOARDING_VERSION,
@@ -39,10 +40,21 @@ export async function GET() {
     });
   }
 
+  const sajuProfileId = await resolveActiveSajuProfileId(sb, user.id);
+  if (!sajuProfileId) {
+    return Response.json({
+      version: ONBOARDING_VERSION,
+      questions: ONBOARDING_QUESTIONS,
+      answers: {},
+      profile: EMPTY_ONBOARDING_PROFILE,
+    });
+  }
+
   const { data } = await sb
     .from(TABLE)
     .select("answers, derived, completeness, completed, onboarding_version")
     .eq("user_id", user.id)
+    .eq("saju_profile_id", sajuProfileId)
     .maybeSingle();
 
   const answers = (data?.answers ?? {}) as OnboardingAnswers;
@@ -89,9 +101,23 @@ export async function POST(req: NextRequest) {
     return Response.json({ ok: true, persisted: false, profile });
   }
 
+  const sajuProfileId = await resolveActiveSajuProfileId(sb, user.id);
+  if (!sajuProfileId) {
+    return Response.json(
+      {
+        ok: false,
+        persisted: false,
+        error: "활성 사주 프로필이 필요합니다.",
+        profile,
+      },
+      { status: 400 }
+    );
+  }
+
   const { error } = await sb.from(TABLE).upsert(
     {
       user_id: user.id,
+      saju_profile_id: sajuProfileId,
       onboarding_version: ONBOARDING_VERSION,
       answers,
       derived: profile,
@@ -99,7 +125,7 @@ export async function POST(req: NextRequest) {
       completed: profile.completed,
       updated_at: new Date().toISOString(),
     },
-    { onConflict: "user_id" }
+    { onConflict: "user_id,saju_profile_id" }
   );
 
   if (error) {

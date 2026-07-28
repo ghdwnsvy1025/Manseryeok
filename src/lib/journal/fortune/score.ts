@@ -21,7 +21,7 @@ import {
 } from "@/lib/journal/insight/dynamicWeights";
 import { JOURNAL_SCORE_CENTER } from "@/lib/journal/scoreScale";
 
-export const FORTUNE_SCORE_VERSION = "fortune-score-v1.2.0";
+export const FORTUNE_SCORE_VERSION = "fortune-score-v1.3.0";
 
 /** 1~10(또는 0~10) 사용자/최근 상태 점수 */
 export type TenPointScore = number;
@@ -94,7 +94,8 @@ function deficitRatioOf(
 
 function keywordScoreForDomain(
   ctx: DailyInsightContext,
-  domain: FortuneDomainCode
+  domain: FortuneDomainCode,
+  maturity: number
 ): {
   score: NormalizedScore;
   salience: NormalizedScore;
@@ -103,29 +104,74 @@ function keywordScoreForDomain(
 } {
   const map = DOMAIN_KEYWORD_MAP[domain];
   const ranked = ctx.topKeywords;
+  const natalSig = ctx.natalDay?.byDomain[domain];
+
+  // 개인 키워드 점수 (기존)
+  let personalScore: NormalizedScore;
+  let personalCodes: string[];
+  let personalConf: number;
+  let salience: NormalizedScore;
+
   if (domain === "overall") {
     const top = ranked.slice(0, 3);
-    const codes = top.map((k) => k.code);
+    personalCodes = top.map((k) => k.code);
     const raw = avg(top.map((k) => k.score)) ?? 1.5;
-    const salience = normalizeKeywordStrength(raw);
-    return {
-      score: keywordValence(salience, deficitRatioOf(ctx, top)),
-      salience,
-      codes,
-      confidence: top.length ? 0.55 + top.length * 0.05 : 0.25,
-    };
+    salience = normalizeKeywordStrength(raw);
+    personalScore = keywordValence(salience, deficitRatioOf(ctx, top));
+    personalConf = top.length ? 0.55 + top.length * 0.05 : 0.25;
+  } else {
+    const matched = ranked.filter((k) => map.includes(k.code as never));
+    if (matched.length === 0) {
+      personalScore = 0.5;
+      salience = 0.5;
+      personalCodes = [];
+      personalConf = 0.25;
+    } else {
+      const raw = avg(matched.map((k) => k.score)) ?? 1.5;
+      salience = normalizeKeywordStrength(raw);
+      personalScore = keywordValence(salience, deficitRatioOf(ctx, matched));
+      personalCodes = matched.map((k) => k.code);
+      personalConf = clamp(0.4 + matched.length * 0.08, 0.3, 0.85);
+    }
   }
-  const matched = ranked.filter((k) => map.includes(k.code as never));
-  if (matched.length === 0) {
-    return { score: 0.5, salience: 0.5, codes: [], confidence: 0.25 };
-  }
-  const raw = avg(matched.map((k) => k.score)) ?? 1.5;
-  const salience = normalizeKeywordStrength(raw);
+
+  // 원국×일진 키워드 — 콜드스타트에서 주 신호
+  const natalCodes = natalSig?.keywordCodes ?? [];
+  const natalScore = natalSig?.natalScore ?? 0.5;
+  const t = clamp(maturity, 0, 1);
+  const score = clamp(natalScore * (1 - t) + personalScore * t, 0.05, 0.95);
+
+  // 키워드 칩: 사주 비중 높을수록 natal 우선, 데이터 쌓이면 개인 우선
+  const codes =
+    t < 0.45
+      ? [
+          ...natalCodes,
+          ...personalCodes.filter((c) => !natalCodes.includes(c as never)),
+        ].slice(0, 4)
+      : [
+          ...personalCodes,
+          ...natalCodes.filter((c) => !personalCodes.includes(c)),
+        ].slice(0, 4);
+
+  // natal만 있고 personal 비면 natal로 채움
+  const finalCodes =
+    codes.length > 0
+      ? codes
+      : natalCodes.length > 0
+        ? natalCodes.slice(0, 4)
+        : domain === "overall"
+          ? ranked.slice(0, 3).map((k) => k.code)
+          : (DOMAIN_KEYWORD_MAP[domain] ?? []).slice(0, 3);
+
   return {
-    score: keywordValence(salience, deficitRatioOf(ctx, matched)),
+    score,
     salience,
-    codes: matched.map((k) => k.code),
-    confidence: clamp(0.4 + matched.length * 0.08, 0.3, 0.85),
+    codes: finalCodes,
+    confidence: clamp(
+      personalConf * t + (natalSig ? 0.7 : 0.3) * (1 - t),
+      0.25,
+      0.9
+    ),
   };
 }
 
@@ -147,6 +193,10 @@ function categoryScoreForDomain(
 }
 
 function natalBoost(ctx: DailyInsightContext, domain: FortuneDomainCode): number {
+  const sig = ctx.natalDay?.byDomain[domain];
+  if (sig) return sig.natalScore;
+
+  // 프로필 없을 때 기존 힌트 폴백
   const hints = ctx.natalPrior.focusHints.map((h) => h.toLowerCase());
   const w = ctx.natalPrior.sajuWeight;
   if (domain === "overall") return 0.5 + w * 0.1;
@@ -182,15 +232,24 @@ function templateCopy(
   FortuneDomainResult,
   "headline" | "summary" | "opportunity" | "caution" | "action"
 > {
-  const pk = ctx.primaryKeyword ?? "균형";
-  const tk = ctx.tensionKeyword ?? "리듬";
+  const sig = ctx.natalDay?.byDomain[domain];
+  const pk = ctx.primaryKeyword ?? sig?.keywordLabels[0] ?? "균형";
+  const tk = ctx.tensionKeyword ?? sig?.keywordLabels[1] ?? "리듬";
   const titles = FORTUNE_DOMAIN_TITLES;
+  const tension = sig?.tensionPlain;
 
   if (domain === "overall") {
+    const trait =
+      ctx.natalDay?.overallTraitPlain ??
+      ctx.bTheme.plainSummary ??
+      "오늘의 흐름을 차분히 읽어 보세요.";
+    const dayLine = tension
+      ? tension
+      : `오늘은 ${pk}와 ${tk} 사이, 중간 속도가 핵심입니다.`;
     if (tone === "supportive") {
       return {
         headline: `${pk} 흐름이 오늘의 중심입니다`,
-        summary: `최근 ${pk} 신호가 비교적 안정적입니다. ${ctx.bTheme.plainSummary}`,
+        summary: `${trait} ${dayLine} 작은 선택을 밀고 나가기 좋은 날입니다.`,
         opportunity: `${pk}를 하루의 기준으로 두면 선택이 가벼워집니다.`,
         caution: `${tk}와 충돌할 때는 속도를 한 칸만 낮추세요.`,
         action: "오늘 할 일 중 하나를 짧게 마무리해보세요.",
@@ -199,7 +258,7 @@ function templateCopy(
     if (tone === "caution") {
       return {
         headline: `${tk} 신호를 살피며 리듬을 조절할 날`,
-        summary: `최근 ${pk}와 ${tk}가 함께 보입니다. 무리한 확장보다 정리가 유리합니다.`,
+        summary: `${trait} ${dayLine} 무리한 확장보다 정리가 유리합니다.`,
         opportunity: "작은 정리가 다음날 여유를 만듭니다.",
         caution: "감정·피로가 겹치면 결정은 내일로 미뤄도 됩니다.",
         action: "오늘은 목록을 줄이고 한 가지만 끝내보세요.",
@@ -207,7 +266,7 @@ function templateCopy(
     }
     return {
       headline: `${pk}와 ${tk} 사이, 균형이 핵심`,
-      summary: `오늘은 ${pk}를 중심에 두고 ${tk}를 보조 신호로 보세요. ${ctx.bTheme.plainSummary}`,
+      summary: `${trait} ${dayLine}`,
       opportunity: "중간 속도가 가장 오래 갑니다.",
       caution: "한쪽으로 치우치면 피로가 먼저 옵니다.",
       action: "오전·오후 리듬을 짧게 나눠 보세요.",
@@ -215,6 +274,36 @@ function templateCopy(
   }
 
   const label = titles[domain];
+  // 영역별: 원국×일진 긴장이 있으면 그걸로 문장 차별화
+  if (sig && tension) {
+    const kw = sig.keywordLabels.slice(0, 2).join("·") || pk;
+    if (sig.tensionKind === "support") {
+      return {
+        headline: `${label}, ${kw} 쪽이 힘을 받습니다`,
+        summary: tension,
+        opportunity: "작은 진전을 쌓기 좋은 타이밍입니다.",
+        caution: "과신은 피하고 페이스를 지키세요.",
+        action: `${label}에서 오늘 끝낼 한 가지를 고르세요.`,
+      };
+    }
+    if (sig.tensionKind === "tension") {
+      return {
+        headline: `${label}, ${kw} 사이에서 속도를 고르세요`,
+        summary: tension,
+        opportunity: "정리와 점검이 기회를 만듭니다.",
+        caution: "한쪽으로만 밀면 소모가 큽니다.",
+        action: `${label}에서 부담 하나를 줄여보세요.`,
+      };
+    }
+    return {
+      headline: `${label}, ${kw}를 함께 보세요`,
+      summary: tension,
+      opportunity: "중간 선택이 결과를 안정시킵니다.",
+      caution: "극단적 결정은 피하세요.",
+      action: `${label}에서 오늘 할 일을 하나만 정하세요.`,
+    };
+  }
+
   if (tone === "supportive") {
     return {
       headline: `${label}, ${pk}가 힘을 보탭니다`,
@@ -245,6 +334,8 @@ function templateCopy(
 export type FortuneScoreOptions = {
   /** 온보딩 6문항 완료 여부 — 콜드스타트 개인 신호 보정 */
   onboardingCompleted?: boolean;
+  /** 누적 journal XP — 맞춤도(운세 비중) 계산 */
+  totalXp?: number;
   /** 테스트·실험용 가중치 강제 지정 */
   weights?: BlendWeights;
 };
@@ -253,17 +344,17 @@ export function scoreFortuneDomains(
   ctx: DailyInsightContext,
   opts: FortuneScoreOptions = {}
 ): FortuneDomainResult[] {
-  // 데이터량 기반 동적 가중치: 기록이 없으면 사주 prior 비중이 크고,
-  // 기록이 쌓일수록 최근 상태(개인 데이터) 비중이 커진다.
+  // XP 기반 동적 가중치: XP가 없으면 사주 prior 비중이 크고,
+  // Lv5까지 쌓일수록 최근 상태(개인 데이터) 비중이 커진다.
   const w =
     opts.weights ??
     computeBlendWeights({
-      priorUniqueDays: ctx.priorUniqueDays,
+      totalXp: opts.totalXp ?? 0,
       onboardingCompleted: opts.onboardingCompleted,
     });
 
   return FORTUNE_DOMAIN_ORDER.map((domain) => {
-    const kw = keywordScoreForDomain(ctx, domain);
+    const kw = keywordScoreForDomain(ctx, domain, w.maturity);
     const cat = categoryScoreForDomain(ctx, domain);
     const natal = natalBoost(ctx, domain);
 

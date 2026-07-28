@@ -26,8 +26,9 @@ import { buildCategoryScoreRecords } from "./buildScores";
 import { applyJournalXpOnSave } from "./xp";
 
 const DB_NAME = "manseryeok-journal";
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const ENTRY_STORE = "journal_entries";
+const LOCAL_PROFILE = "local";
 
 function generateId(): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
@@ -36,17 +37,28 @@ function generateId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
+function profileDateKey(sajuProfileId: string, entryDate: string): string {
+  return `${sajuProfileId}::${entryDate}`;
+}
+
 function openDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
     request.onerror = () => reject(request.error);
     request.onsuccess = () => resolve(request.result);
-    request.onupgradeneeded = () => {
+    request.onupgradeneeded = (event) => {
       const db = request.result;
+      const tx = request.transaction!;
       if (!db.objectStoreNames.contains(ENTRY_STORE)) {
         const store = db.createObjectStore(ENTRY_STORE, { keyPath: "id" });
-        store.createIndex("entryDate", "entryDate", { unique: true });
+        store.createIndex("entryDate", "entryDate", { unique: false });
         store.createIndex("updatedAt", "updatedAt", { unique: false });
+        store.createIndex("profileDate", "profileDateKey", { unique: true });
+      } else if (event.oldVersion < 2) {
+        const store = tx.objectStore(ENTRY_STORE);
+        if (!store.indexNames.contains("profileDate")) {
+          store.createIndex("profileDate", "profileDateKey", { unique: true });
+        }
       }
     };
   });
@@ -81,6 +93,7 @@ function normalizeEntry(raw: JournalEntry): JournalEntry {
 
   return {
     ...raw,
+    sajuProfileId: raw.sajuProfileId ?? null,
     schemaVersion: Math.max(schemaVersion, JOURNAL_SCHEMA_VERSION),
     xpGranted: Boolean(raw.xpGranted),
     xpAwarded: typeof raw.xpAwarded === "number" ? raw.xpAwarded : 0,
@@ -123,18 +136,42 @@ function normalizeEntry(raw: JournalEntry): JournalEntry {
   };
 }
 
+type StoredJournalEntry = JournalEntry & { profileDateKey?: string };
+
 export class IndexedDbJournalStorage implements JournalStorage {
+  constructor(private sajuProfileId: string = LOCAL_PROFILE) {}
+
   async getByDate(entryDate: string): Promise<JournalEntry | null> {
     const db = await openDb();
     return new Promise((resolve, reject) => {
       const tx = db.transaction(ENTRY_STORE, "readonly");
       const store = tx.objectStore(ENTRY_STORE);
-      const index = store.index("entryDate");
-      const req = index.get(entryDate);
+      const key = profileDateKey(this.sajuProfileId, entryDate);
+      if (store.indexNames.contains("profileDate")) {
+        const req = store.index("profileDate").get(key);
+        req.onerror = () => reject(req.error);
+        req.onsuccess = () => {
+          const row = req.result as JournalEntry | undefined;
+          resolve(row ? normalizeEntry(row) : null);
+          db.close();
+        };
+        return;
+      }
+      // legacy v1: unique entryDate only
+      const req = store.index("entryDate").get(entryDate);
       req.onerror = () => reject(req.error);
       req.onsuccess = () => {
         const row = req.result as JournalEntry | undefined;
-        resolve(row ? normalizeEntry(row) : null);
+        if (!row) {
+          resolve(null);
+        } else if (
+          row.sajuProfileId &&
+          row.sajuProfileId !== this.sajuProfileId
+        ) {
+          resolve(null);
+        } else {
+          resolve(normalizeEntry(row));
+        }
         db.close();
       };
     });
@@ -144,7 +181,20 @@ export class IndexedDbJournalStorage implements JournalStorage {
     const all = await runStore("readonly", (store) => store.getAll());
     return (all as JournalEntry[])
       .map(normalizeEntry)
+      .filter(
+        (e) =>
+          !e.sajuProfileId ||
+          e.sajuProfileId === this.sajuProfileId ||
+          (this.sajuProfileId === LOCAL_PROFILE && !e.sajuProfileId)
+      )
       .sort((a, b) => b.entryDate.localeCompare(a.entryDate));
+  }
+
+  async deleteByDate(entryDate: string): Promise<boolean> {
+    const existing = await this.getByDate(entryDate);
+    if (!existing) return false;
+    await runStore("readwrite", (store) => store.delete(existing.id));
+    return true;
   }
 
   async save(input: JournalSaveInput): Promise<JournalEntry> {
@@ -251,9 +301,12 @@ export class IndexedDbJournalStorage implements JournalStorage {
       allEntries,
     });
 
-    const entry: JournalEntry = {
+    const profileId =
+      input.sajuProfileId || base?.sajuProfileId || this.sajuProfileId;
+    const entry: StoredJournalEntry = {
       id,
       userId: base?.userId ?? null,
+      sajuProfileId: profileId,
       entryDate: input.entryDate,
       userTimezone: input.userTimezone ?? "Asia/Seoul",
       content: input.content,
@@ -279,6 +332,7 @@ export class IndexedDbJournalStorage implements JournalStorage {
       firstRecordedAt: base?.firstRecordedAt ?? base?.createdAt ?? now,
       createdAt: base?.createdAt ?? now,
       updatedAt: now,
+      profileDateKey: profileDateKey(profileId, input.entryDate),
     };
 
     await runStore("readwrite", (store) => store.put(entry));
@@ -286,32 +340,52 @@ export class IndexedDbJournalStorage implements JournalStorage {
   }
 
   async getPreferences(): Promise<UserCategoryPreference[]> {
-    return loadCategoryPreferencesLocal(null);
+    return loadCategoryPreferencesLocal(null, this.sajuProfileId);
   }
 
   async savePreferences(prefs: UserCategoryPreference[]): Promise<void> {
-    const result = saveCategoryPreferencesLocal(prefs);
+    const result = saveCategoryPreferencesLocal(prefs, this.sajuProfileId);
     if (!result.ok) throw new Error(result.error);
   }
 }
 
-export function getIndexedDbJournalStorage(): JournalStorage {
-  return new IndexedDbJournalStorage();
+export function getIndexedDbJournalStorage(
+  sajuProfileId: string | null = LOCAL_PROFILE
+): JournalStorage {
+  return new IndexedDbJournalStorage(sajuProfileId ?? LOCAL_PROFILE);
 }
 
 /** 테스트용 인메모리 저장소 */
 export class MemoryJournalStorage implements JournalStorage {
-  private entries = new Map<string, JournalEntry>();
   private prefs: UserCategoryPreference[] | null = null;
+  constructor(
+    private sajuProfileId: string = "test-profile",
+    private entries: Map<string, JournalEntry> = new Map()
+  ) {}
+
+  private matchesProfile(e: JournalEntry): boolean {
+    return (e.sajuProfileId ?? this.sajuProfileId) === this.sajuProfileId;
+  }
 
   async getByDate(entryDate: string): Promise<JournalEntry | null> {
-    return Array.from(this.entries.values()).find((e) => e.entryDate === entryDate) ?? null;
+    return (
+      Array.from(this.entries.values()).find(
+        (e) => e.entryDate === entryDate && this.matchesProfile(e)
+      ) ?? null
+    );
   }
 
   async list(): Promise<JournalEntry[]> {
-    return Array.from(this.entries.values()).sort((a, b) =>
-      b.entryDate.localeCompare(a.entryDate)
-    );
+    return Array.from(this.entries.values())
+      .filter((e) => this.matchesProfile(e))
+      .sort((a, b) => b.entryDate.localeCompare(a.entryDate));
+  }
+
+  async deleteByDate(entryDate: string): Promise<boolean> {
+    const existing = await this.getByDate(entryDate);
+    if (!existing) return false;
+    this.entries.delete(existing.id);
+    return true;
   }
 
   async save(input: JournalSaveInput): Promise<JournalEntry> {
@@ -399,9 +473,12 @@ export class MemoryJournalStorage implements JournalStorage {
       allEntries,
     });
 
+    const profileId =
+      input.sajuProfileId || existing?.sajuProfileId || this.sajuProfileId;
     const entry: JournalEntry = {
       id,
       userId: "test-user",
+      sajuProfileId: profileId,
       entryDate: input.entryDate,
       userTimezone: input.userTimezone ?? "Asia/Seoul",
       content: input.content,
@@ -434,7 +511,13 @@ export class MemoryJournalStorage implements JournalStorage {
     };
     this.entries.set(id, entry);
     Array.from(this.entries.entries()).forEach(([k, v]) => {
-      if (v.entryDate === entry.entryDate && k !== id) this.entries.delete(k);
+      if (
+        v.entryDate === entry.entryDate &&
+        (v.sajuProfileId ?? this.sajuProfileId) === profileId &&
+        k !== id
+      ) {
+        this.entries.delete(k);
+      }
     });
     return { entry, xp: xp.result };
   }
@@ -442,7 +525,7 @@ export class MemoryJournalStorage implements JournalStorage {
   async getPreferences(): Promise<UserCategoryPreference[]> {
     if (this.prefs) return this.prefs;
     const { createDefaultPreferences } = await import("./preferences");
-    return createDefaultPreferences("test-user");
+    return createDefaultPreferences("test-user", this.sajuProfileId);
   }
 
   async savePreferences(prefs: UserCategoryPreference[]): Promise<void> {
@@ -450,6 +533,10 @@ export class MemoryJournalStorage implements JournalStorage {
     const { validateEnabledCategorySelection } = await import("./validation");
     const check = validateEnabledCategorySelection(enabled as CategoryCode[]);
     if (!check.ok) throw new Error(check.error);
-    this.prefs = prefs.map((p) => ({ ...p, userId: "test-user" }));
+    this.prefs = prefs.map((p) => ({
+      ...p,
+      userId: "test-user",
+      sajuProfileId: this.sajuProfileId,
+    }));
   }
 }

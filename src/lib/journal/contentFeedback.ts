@@ -12,9 +12,9 @@ export type ContentFeedbackRating =
   (typeof CONTENT_FEEDBACK_RATINGS)[number];
 
 export const CONTENT_FEEDBACK_LABELS: Record<ContentFeedbackRating, string> = {
-  loved: "마음에 남아요",
-  ok: "괜찮아요",
-  not_for_me: "나와 맞지 않아요",
+  loved: "잘 맞아요",
+  ok: "보통이에요",
+  not_for_me: "안 맞아요",
 };
 
 export type ContentFeedbackInput = {

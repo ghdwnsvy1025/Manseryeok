@@ -1,6 +1,6 @@
 /**
  * DailyInsightContext / daily_fortunes / daily_questions 영속화
- * — 동일 (user_id, event_date) 스냅샷은 생성 후 덮어쓰지 않음
+ * — 동일 (user_id, saju_profile_id, event_date) 스냅샷은 생성 후 덮어쓰지 않음
  * — skipLlm과 무관하게 점수·컨텍스트는 저장
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -15,21 +15,29 @@ export type LoadedInsightContext = {
 export async function loadPersistedInsightContext(
   sb: SupabaseClient,
   userId: string,
-  eventDate: string
+  eventDate: string,
+  sajuProfileId: string
 ): Promise<DailyInsightContext | null> {
-  const loaded = await loadInsightContextRow(sb, userId, eventDate);
+  const loaded = await loadInsightContextRow(
+    sb,
+    userId,
+    eventDate,
+    sajuProfileId
+  );
   return loaded?.ctx ?? null;
 }
 
 export async function loadInsightContextRow(
   sb: SupabaseClient,
   userId: string,
-  eventDate: string
+  eventDate: string,
+  sajuProfileId: string
 ): Promise<{ id: string; ctx: DailyInsightContext } | null> {
   const { data, error } = await sb
     .from("daily_insight_contexts")
     .select("id, context_json")
     .eq("user_id", userId)
+    .eq("saju_profile_id", sajuProfileId)
     .eq("event_date", eventDate)
     .maybeSingle();
   if (error || !data?.id || !data.context_json) return null;
@@ -48,10 +56,16 @@ export async function loadOrBuildDailyInsightContext(
   opts: {
     userId: string;
     eventDate: string;
+    sajuProfileId: string;
     build: () => DailyInsightContext;
   }
 ): Promise<LoadedInsightContext | null> {
-  const existing = await loadInsightContextRow(sb, opts.userId, opts.eventDate);
+  const existing = await loadInsightContextRow(
+    sb,
+    opts.userId,
+    opts.eventDate,
+    opts.sajuProfileId
+  );
   if (existing) {
     return { id: existing.id, ctx: existing.ctx, created: false };
   }
@@ -61,7 +75,12 @@ export async function loadOrBuildDailyInsightContext(
     built.eventDate = opts.eventDate;
   }
 
-  const inserted = await insertInsightContextOnce(sb, opts.userId, built);
+  const inserted = await insertInsightContextOnce(
+    sb,
+    opts.userId,
+    opts.sajuProfileId,
+    built
+  );
   if (inserted) {
     return { id: inserted, ctx: built, created: true };
   }
@@ -70,7 +89,8 @@ export async function loadOrBuildDailyInsightContext(
   const afterConflict = await loadInsightContextRow(
     sb,
     opts.userId,
-    opts.eventDate
+    opts.eventDate,
+    opts.sajuProfileId
   );
   if (afterConflict) {
     return { id: afterConflict.id, ctx: afterConflict.ctx, created: false };
@@ -82,30 +102,39 @@ export async function loadOrBuildDailyInsightContext(
 export async function persistInsightContext(
   sb: SupabaseClient,
   userId: string,
+  sajuProfileId: string,
   ctx: DailyInsightContext
 ): Promise<string | null> {
-  const existing = await loadInsightContextRow(sb, userId, ctx.eventDate);
+  const existing = await loadInsightContextRow(
+    sb,
+    userId,
+    ctx.eventDate,
+    sajuProfileId
+  );
   if (existing) return existing.id;
-  return insertInsightContextOnce(sb, userId, ctx);
+  return insertInsightContextOnce(sb, userId, sajuProfileId, ctx);
 }
 
 export async function persistDailyInsightContext(
   sb: SupabaseClient,
   userId: string,
+  sajuProfileId: string,
   ctx: DailyInsightContext
 ): Promise<string | null> {
-  return persistInsightContext(sb, userId, ctx);
+  return persistInsightContext(sb, userId, sajuProfileId, ctx);
 }
 
 async function insertInsightContextOnce(
   sb: SupabaseClient,
   userId: string,
+  sajuProfileId: string,
   ctx: DailyInsightContext
 ): Promise<string | null> {
   const { data, error } = await sb
     .from("daily_insight_contexts")
     .insert({
       user_id: userId,
+      saju_profile_id: sajuProfileId,
       event_date: ctx.eventDate,
       timezone: ctx.timezone,
       data_cutoff_at: ctx.dataCutoffAt,
@@ -126,6 +155,7 @@ async function insertInsightContextOnce(
       message: error.message,
       details: error.details,
       eventDate: ctx.eventDate,
+      sajuProfileId,
     });
   }
 
@@ -144,7 +174,8 @@ export type PersistedFortune = {
 export async function loadPersistedFortune(
   sb: SupabaseClient,
   userId: string,
-  eventDate: string
+  eventDate: string,
+  sajuProfileId: string
 ): Promise<PersistedFortune | null> {
   const { data: fortune, error } = await sb
     .from("daily_fortunes")
@@ -152,6 +183,7 @@ export async function loadPersistedFortune(
       "id, context_id, overall_headline, overall_summary, scoring_version"
     )
     .eq("user_id", userId)
+    .eq("saju_profile_id", sajuProfileId)
     .eq("event_date", eventDate)
     .maybeSingle();
   if (error || !fortune) return null;
@@ -188,12 +220,13 @@ export async function loadPersistedFortune(
 
 /**
  * 운세 점수 스냅샷 insert-once.
- * 이미 행이 있으면 점수·섹션을 덮어쓰지 않는다 (문장만 갱신하려면 updateFortuneWording 사용).
+ * 이미 행이 있어도 scoring_version 이 다르면 점수·섹션을 업그레이드 교체한다.
  */
 export async function persistFortune(
   sb: SupabaseClient,
   opts: {
     userId: string;
+    sajuProfileId: string;
     eventDate: string;
     contextId: string | null;
     overall: FortuneDomainResult;
@@ -206,15 +239,25 @@ export async function persistFortune(
   const existing = await loadPersistedFortune(
     sb,
     opts.userId,
-    opts.eventDate
+    opts.eventDate,
+    opts.sajuProfileId
   );
-  if (existing) return existing.id;
+  if (existing && existing.scoringVersion === opts.scoringVersion) {
+    return existing.id;
+  }
+
+  // 엔진 버전 변경 → 기존 행 삭제 후 재삽입
+  if (existing?.id) {
+    await sb.from("daily_fortune_sections").delete().eq("daily_fortune_id", existing.id);
+    await sb.from("daily_fortunes").delete().eq("id", existing.id);
+  }
 
   const all = [opts.overall, ...opts.domains];
   const { data: fortune, error } = await sb
     .from("daily_fortunes")
     .insert({
       user_id: opts.userId,
+      saju_profile_id: opts.sajuProfileId,
       event_date: opts.eventDate,
       context_id: opts.contextId,
       overall_headline: opts.overall.headline,
@@ -235,10 +278,16 @@ export async function persistFortune(
         message: error.message,
         details: error.details,
         eventDate: opts.eventDate,
+        sajuProfileId: opts.sajuProfileId,
       });
     }
     // 동시 insert — 재조회
-    const again = await loadPersistedFortune(sb, opts.userId, opts.eventDate);
+    const again = await loadPersistedFortune(
+      sb,
+      opts.userId,
+      opts.eventDate,
+      opts.sajuProfileId
+    );
     return again?.id ?? null;
   }
 
@@ -266,6 +315,7 @@ export async function updateFortuneWording(
   sb: SupabaseClient,
   opts: {
     userId: string;
+    sajuProfileId: string;
     eventDate: string;
     overall: FortuneDomainResult;
     domains: FortuneDomainResult[];
@@ -275,7 +325,8 @@ export async function updateFortuneWording(
   const existing = await loadPersistedFortune(
     sb,
     opts.userId,
-    opts.eventDate
+    opts.eventDate,
+    opts.sajuProfileId
   );
   if (!existing) return false;
 
@@ -289,7 +340,8 @@ export async function updateFortuneWording(
       generated_at: new Date().toISOString(),
     })
     .eq("id", existing.id)
-    .eq("user_id", opts.userId);
+    .eq("user_id", opts.userId)
+    .eq("saju_profile_id", opts.sajuProfileId);
 
   const all = [opts.overall, ...opts.domains];
   for (const d of all) {
@@ -320,7 +372,8 @@ export type PersistedQuestion = {
 export async function loadPersistedQuestion(
   sb: SupabaseClient,
   userId: string,
-  questionDate: string
+  questionDate: string,
+  sajuProfileId: string
 ): Promise<PersistedQuestion | null> {
   const { data, error } = await sb
     .from("daily_questions")
@@ -328,6 +381,7 @@ export async function loadPersistedQuestion(
       "id, context_id, question_text, keyword_codes, evidence, scoring_version"
     )
     .eq("user_id", userId)
+    .eq("saju_profile_id", sajuProfileId)
     .eq("question_date", questionDate)
     .maybeSingle();
   if (error || !data?.id) return null;
@@ -353,6 +407,7 @@ export async function persistDailyQuestion(
   sb: SupabaseClient,
   opts: {
     userId: string;
+    sajuProfileId: string;
     questionDate: string;
     contextId: string | null;
     questionText: string;
@@ -367,7 +422,8 @@ export async function persistDailyQuestion(
   const existing = await loadPersistedQuestion(
     sb,
     opts.userId,
-    opts.questionDate
+    opts.questionDate,
+    opts.sajuProfileId
   );
   if (existing) {
     if (!existing.contextId && opts.contextId) {
@@ -375,7 +431,8 @@ export async function persistDailyQuestion(
         .from("daily_questions")
         .update({ context_id: opts.contextId })
         .eq("id", existing.id)
-        .eq("user_id", opts.userId);
+        .eq("user_id", opts.userId)
+        .eq("saju_profile_id", opts.sajuProfileId);
     }
     return existing.id;
   }
@@ -385,6 +442,7 @@ export async function persistDailyQuestion(
     .from("daily_questions")
     .insert({
       user_id: opts.userId,
+      saju_profile_id: opts.sajuProfileId,
       question_date: opts.questionDate,
       context_id: opts.contextId,
       question_text: opts.questionText.slice(0, 500),
@@ -404,8 +462,8 @@ export async function persistDailyQuestion(
   const again = await loadPersistedQuestion(
     sb,
     opts.userId,
-    opts.questionDate
+    opts.questionDate,
+    opts.sajuProfileId
   );
   return again?.id ?? null;
 }
-

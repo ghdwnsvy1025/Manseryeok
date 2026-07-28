@@ -92,6 +92,8 @@ export type DomainScorePayload = {
 export type JournalEntry = {
   id: string;
   userId: string | null;
+  /** Owning saju profile — journal data is isolated per profile */
+  sajuProfileId: string | null;
   entryDate: string; // YYYY-MM-DD local date
   userTimezone: string;
   content: string;
@@ -128,6 +130,7 @@ export type JournalEntry = {
 
 export type UserCategoryPreference = {
   userId: string | null;
+  sajuProfileId: string | null;
   categoryCode: CategoryCode;
   enabled: boolean;
   sortOrder: number;
@@ -143,15 +146,19 @@ export const RECOMMENDED_ENABLED_CATEGORIES = 6;
 export { JOURNAL_SCORE_LABELS as SCORE_LABELS } from "./scoreScale";
 export type { JournalScore } from "./scoreScale";
 
-/** 체크인 v2 기분 9개 (최대 3개 선택) */
+/** 체크인 v2 기분 (최대 3개 선택) — 키워드 랭킹·문장 안전필터와 연동 */
 export const MOOD_OPTIONS = [
   "기쁨",
-  "평온",
+  "뿌듯함",
   "설렘",
+  "평온",
+  "무덤덤",
+  "지침",
+  "답답함",
+  "짜증남",
   "불안",
   "분노",
-  "답답함",
   "슬픔",
-  "지침",
-  "무덤덤",
+  "우울함",
+  "후회스러움",
 ] as const;

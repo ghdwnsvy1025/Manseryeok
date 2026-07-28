@@ -18,6 +18,7 @@ import type {
 import { scoreFortuneDomains, FORTUNE_SCORE_VERSION } from "./fortune/score";
 import { FORTUNE_DOMAIN_TITLES } from "./fortune/domains";
 import { validateFortuneText } from "./contentSafety";
+import { computeBlendWeights } from "./insight/dynamicWeights";
 
 export type FortuneSection = {
   id: "personality" | "work" | "love" | "health" | "social";
@@ -280,10 +281,15 @@ function sanitizeDomainCopy(
  */
 export async function generateTodayFortuneV2(
   insight: DailyInsightContext,
-  opts?: { skipLlm?: boolean; onboardingCompleted?: boolean }
+  opts?: {
+    skipLlm?: boolean;
+    onboardingCompleted?: boolean;
+    totalXp?: number;
+  }
 ): Promise<TodayFortuneV2Result> {
   const scored = scoreFortuneDomains(insight, {
     onboardingCompleted: opts?.onboardingCompleted,
+    totalXp: opts?.totalXp,
   });
   const overall = scored.find((d) => d.domain === "overall")!;
   const domains = scored.filter((d) => d.domain !== "overall");
@@ -311,10 +317,29 @@ export async function generateTodayFortuneV2(
     };
   }
 
+  const theoryHints = insight.natalDay
+    ? [
+        ...insight.natalDay.natalDominant,
+        insight.natalDay.todayStemGod ?? "",
+        insight.natalDay.overallTraitPlain,
+        ...Object.values(insight.natalDay.byDomain).flatMap((d) => [
+          d.tensionPlain,
+          ...d.natalGods,
+        ]),
+      ].filter(Boolean)
+    : [];
+
   const theory = await loadTheoryContext({
     b: insight.bTheme,
     ganjiKo: insight.ganjiKo,
     purpose: "fortune",
+    matchCount: 8,
+    extraHints: theoryHints,
+  });
+
+  const blend = computeBlendWeights({
+    totalXp: opts?.totalXp ?? 0,
+    onboardingCompleted: opts?.onboardingCompleted,
   });
 
   const apiKey = process.env.OPENAI_API_KEY;
@@ -340,13 +365,16 @@ export async function generateTodayFortuneV2(
       messages: [
         {
           role: "system",
-          content: `당신은 사주 일기 앱의 '오늘의 운세' 문장 다듬기 담당입니다.
+          content: `당신은 사주 일기 앱의 '오늘의 운세' 문장 담당입니다.
 규칙:
-- domain·tone·score·confidence는 절대 바꾸지 마세요. 문장만 자연스럽게.
+- domain·tone·score·confidence·evidenceCodes는 절대 바꾸지 마세요.
 - 영역: overall, work, relationship, finance, health
-- 각 영역: headline, summary, opportunity, caution, action (한국어 1문장씩, 짧고 따뜻하게)
+- overall.summary 는 반드시 쉬운 한국어 문장 3개(각 문장 끝 마침표). 원국의 특유한 성향이 오늘 간지와 만나 어떻게 읽히는지를 학습 이론(theoryChunks)에 근거해 설명.
+- 다른 영역: headline 1문장 + summary 1~2문장. 그 테마에 맞는 원국 특징과 오늘 글자를 엮을 것.
+- opportunity / caution / action 은 각 1문장, 실천 가능하고 짧게.
 - 건강은 에너지·피로·회복으로만. 의료 진단 금지.
-- 사주 전문용어·유명인 명언 인용 금지.
+- 사용자 문장에 사주 전문용어(십신·재성·인성·원국·대운 등) 금지. 쉬운 말만.
+- blendWeights.maturity 가 낮으면 사주×일진 신호를 중심에, 높으면 draft의 개인 키워드·최근 상태를 더 반영.
 ${theoryUsageRules("fortune")}
 JSON: { "domains": [ { "domain": "...", "headline": "...", "summary": "...", "opportunity": "...", "caution": "...", "action": "..." } ] }`,
         },
@@ -354,6 +382,35 @@ JSON: { "domains": [ { "domain": "...", "headline": "...", "summary": "...", "op
           role: "user",
           content: JSON.stringify({
             titles: FORTUNE_DOMAIN_TITLES,
+            blendWeights: {
+              recent: blend.recent,
+              keyword: blend.keyword,
+              natal: blend.natal,
+              maturity: blend.maturity,
+              tier: blend.tier,
+              effectiveXp: blend.effectiveXp,
+            },
+            natalDay: insight.natalDay
+              ? {
+                  ganjiKo: insight.natalDay.ganjiKo,
+                  overallTraitPlain: insight.natalDay.overallTraitPlain,
+                  todayStemGod: insight.natalDay.todayStemGod,
+                  relationLabels: insight.natalDay.relationLabels,
+                  natalDominant: insight.natalDay.natalDominant,
+                  byDomain: Object.fromEntries(
+                    Object.entries(insight.natalDay.byDomain).map(([k, v]) => [
+                      k,
+                      {
+                        natalPlain: v.natalPlain,
+                        todayPlain: v.todayPlain,
+                        tensionKind: v.tensionKind,
+                        tensionPlain: v.tensionPlain,
+                        keywordLabels: v.keywordLabels,
+                      },
+                    ])
+                  ),
+                }
+              : null,
             domains: scored.map((d) => ({
               domain: d.domain,
               title: d.title,
@@ -372,6 +429,7 @@ JSON: { "domains": [ { "domain": "...", "headline": "...", "summary": "...", "op
             primaryKeyword: insight.primaryKeyword,
             tensionKeyword: insight.tensionKeyword,
             ganjiKo: insight.ganjiKo,
+            priorUniqueDays: insight.priorUniqueDays,
             theoryChunks: theory.chunks,
           }),
         },

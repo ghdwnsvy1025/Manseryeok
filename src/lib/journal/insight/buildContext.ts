@@ -9,6 +9,7 @@ import type { KeywordBiasMap } from "@/lib/journal/keywords/learning";
 import type { CategoryCode, JournalEntry } from "@/lib/journal/types";
 import { buildDailySajuContext } from "@/lib/product/dailySajuContext";
 import type { SajuProfile } from "@/lib/diary/types";
+import { buildNatalDayInsight } from "@/lib/journal/fortune/natalDaySignal";
 import {
   INSIGHT_ENGINE_VERSION,
   type DailyInsightContext,
@@ -86,6 +87,11 @@ export function buildDailyInsightContext(opts: {
         100
     ) / 100;
 
+  const natalDay = buildNatalDayInsight(
+    opts.eventDate,
+    opts.sajuProfile ?? null
+  );
+
   return {
     eventDate: opts.eventDate,
     timezone: opts.timezone ?? "Asia/Seoul",
@@ -117,5 +123,6 @@ export function buildDailyInsightContext(opts: {
     priorUniqueDays: ranking.priorUniqueDays,
     feedbackBiasApplied: ranking.feedbackBiasApplied,
     overallConfidence,
+    natalDay,
   };
 }

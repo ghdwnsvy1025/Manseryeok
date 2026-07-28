@@ -11,7 +11,7 @@ export const PERSONALIZATION_MAX_LEVEL = 10;
 export const XP_PER_DAY_TARGET = 18;
 
 export function formatPersonalizationLevel(level: number): string {
-  return `L${Math.max(0, Math.floor(level))}`;
+  return `Lv${Math.max(0, Math.floor(level))}`;
 }
 
 /**

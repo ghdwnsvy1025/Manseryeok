@@ -35,6 +35,7 @@ function entryWithScore(
   return {
     id: `e-${date}-${code}`,
     userId: "u",
+    sajuProfileId: "p1",
     entryDate: date,
     userTimezone: "Asia/Seoul",
     content,
@@ -165,6 +166,21 @@ describe("checkin v2 contract (step 3)", () => {
         domains: [],
       }).ok
     ).toBe(false);
+  });
+
+  test("rejects core state marked not applicable", () => {
+    const core = {
+      ...validCore(),
+      energy: { ordinal: null, isNotApplicable: true },
+    };
+    const result = validateCheckInSave({
+      happiness: 5,
+      moods: ["평온"],
+      tagCodes: [],
+      core,
+      domains: [],
+    });
+    expect(result.ok).toBe(false);
   });
 
   test("ordinal maps to 1~10", () => {

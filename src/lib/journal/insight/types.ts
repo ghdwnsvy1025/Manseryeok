@@ -4,8 +4,9 @@
 import type { BTheme } from "@/lib/journal/bTheme";
 import type { KeywordScore } from "@/lib/journal/keywords/rank";
 import type { CategoryCode } from "@/lib/journal/types";
+import type { NatalDayInsight } from "@/lib/journal/fortune/natalDaySignal";
 
-export const INSIGHT_ENGINE_VERSION = "insight-v1.0.0";
+export const INSIGHT_ENGINE_VERSION = "insight-v1.1.0";
 
 export type FortuneDomainCode =
   | "overall"
@@ -47,6 +48,8 @@ export type DailyInsightContext = {
   priorUniqueDays: number;
   feedbackBiasApplied: boolean;
   overallConfidence: number;
+  /** 원국×오늘 일진 구조화 신호 (프로필 없으면 null) */
+  natalDay: NatalDayInsight | null;
 };
 
 export type FortuneDomainResult = {

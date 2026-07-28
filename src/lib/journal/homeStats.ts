@@ -3,6 +3,10 @@
  */
 import { getCategoryByCode } from "@/lib/journal/categoryCatalog";
 import { bestWorstCategories } from "@/lib/journal/d1Aggregates";
+import {
+  CORE_STATE_CODES,
+  DOMAIN_POOL_CODES,
+} from "@/lib/journal/checkin/catalog";
 import type { CategoryCode, JournalEntry } from "@/lib/journal/types";
 import {
   progressFromTotalXp,
@@ -67,12 +71,41 @@ export function happinessSeries(
   return points;
 }
 
+export type CategoryAverage = {
+  code: CategoryCode;
+  name: string;
+  average: number;
+};
+
+function toNamed(
+  row: { code: CategoryCode; average: number } | null
+): CategoryAverage | null {
+  if (!row) return null;
+  return {
+    code: row.code,
+    name: getCategoryByCode(row.code)?.name ?? row.code,
+    average: row.average,
+  };
+}
+
 export type HomeEStats = {
   avg7: number | null;
   avg30: number | null;
   series30: HappinessPoint[];
-  best: { code: CategoryCode; name: string; average: number } | null;
-  worst: { code: CategoryCode; name: string; average: number } | null;
+  /** 핵심 상태 Best/Worst (매일 필수 4항목) */
+  coreBest: CategoryAverage | null;
+  coreWorst: CategoryAverage | null;
+  /** 선택 생활영역 Best/Worst (찍힌 날만 평균) */
+  domainBest: CategoryAverage | null;
+  domainWorst: CategoryAverage | null;
+  /**
+   * @deprecated coreBest 와 동일 — 기존 호출부 호환
+   */
+  best: CategoryAverage | null;
+  /**
+   * @deprecated coreWorst 와 동일 — 기존 호출부 호환
+   */
+  worst: CategoryAverage | null;
   level: PersonalizationLevelProgress;
   uniqueDays: number;
 };
@@ -80,35 +113,40 @@ export type HomeEStats = {
 export function buildHomeEStats(
   entries: JournalEntry[],
   today: string,
-  enabledCodes: CategoryCode[]
+  _enabledCodes: CategoryCode[]
 ): HomeEStats {
   const from7 = shiftDate(today, -6);
   const from30 = shiftDate(today, -29);
-  const { best, worst } = bestWorstCategories(
+
+  // 핵심/선택은 체크인 카탈로그 기준으로 분리 비교 (설정 enabled 와 무관)
+  const core = bestWorstCategories(
     entries,
     from7,
     today,
-    enabledCodes
+    [...CORE_STATE_CODES]
   );
+  const domain = bestWorstCategories(
+    entries,
+    from7,
+    today,
+    [...DOMAIN_POOL_CODES]
+  );
+
+  const coreBest = toNamed(core.best);
+  const coreWorst = toNamed(core.worst);
+  const domainBest = toNamed(domain.best);
+  const domainWorst = toNamed(domain.worst);
 
   return {
     avg7: averageHappinessInRange(entries, from7, today),
     avg30: averageHappinessInRange(entries, from30, today),
     series30: happinessSeries(entries, from30, today),
-    best: best
-      ? {
-          code: best.code,
-          name: getCategoryByCode(best.code)?.name ?? best.code,
-          average: best.average,
-        }
-      : null,
-    worst: worst
-      ? {
-          code: worst.code,
-          name: getCategoryByCode(worst.code)?.name ?? worst.code,
-          average: worst.average,
-        }
-      : null,
+    coreBest,
+    coreWorst,
+    domainBest,
+    domainWorst,
+    best: coreBest,
+    worst: coreWorst,
     level: progressFromTotalXp(totalJournalXp(entries)),
     uniqueDays: new Set(entries.map((e) => e.entryDate)).size,
   };

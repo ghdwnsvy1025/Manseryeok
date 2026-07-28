@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { ViewModeProvider } from "@/contexts/ViewModeContext";
 import AppNav from "@/components/AppNav";
 import ProfileHeader from "@/components/ProfileHeader";
+import ProgressCelebrationHost from "@/components/motion/ProgressCelebrationHost";
+import ClickBurstHost from "@/components/motion/ClickBurstHost";
 
 const CONTENT_CLASS =
   "flex-1 min-h-0 min-w-0 overflow-x-hidden overflow-y-auto app-hide-scrollbar px-2 py-2 w-full";
@@ -47,6 +49,8 @@ export default function ClientShell({ children }: { children: React.ReactNode })
               <div className="w-full shrink-0">
                 <AppNav />
               </div>
+              <ProgressCelebrationHost />
+              <ClickBurstHost />
             </div>
           )}
         </div>
