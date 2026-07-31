@@ -5,6 +5,7 @@ import Link from "next/link";
 import TodayFortunePanel from "@/components/home/TodayFortunePanel";
 import TodayStatusCard from "@/components/home/TodayStatusCard";
 import TodayRecordPrompt from "@/components/home/TodayRecordPrompt";
+import YesterdayGapPrompt from "@/components/home/YesterdayGapPrompt";
 import HomeEBlock from "@/components/home/HomeEBlock";
 import { getJournalStorage } from "@/lib/journal/getStorage";
 import { getEnabledCodesOrdered } from "@/lib/journal/preferences";
@@ -13,6 +14,7 @@ import { buildWeekTopicSummary } from "@/lib/journal/topics/weekTopics";
 import { buildWeekTopicSupportItems } from "@/lib/journal/topics/topicSupport";
 import type { CategoryCode, JournalEntry } from "@/lib/journal/types";
 import { todayDateString } from "@/lib/diary/dayPillar";
+import { yesterdayOf } from "@/lib/journal/emptyDays";
 import { getPillarsForDate } from "@/lib/diary/dayPillar";
 import { getPillarTenGods } from "@/lib/diary/currentDaeun";
 import {
@@ -267,6 +269,10 @@ export default function HomeG() {
     () => entries.find((e) => e.entryDate === today) ?? null,
     [entries, today]
   );
+  const yesterdayMissing = useMemo(() => {
+    const y = yesterdayOf(today);
+    return !entries.some((e) => e.entryDate === y);
+  }, [entries, today]);
   const entryDates = useMemo(
     () => entries.map((e) => e.entryDate),
     [entries]
@@ -500,6 +506,10 @@ export default function HomeG() {
 
       {!todayEntry && (
         <TodayRecordPrompt todayDate={today} entryDates={entryDates} />
+      )}
+
+      {yesterdayMissing && entries.length > 0 && (
+        <YesterdayGapPrompt todayDate={today} entryDates={entryDates} />
       )}
 
       <TodayStatusCard

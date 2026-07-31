@@ -33,7 +33,7 @@ export default function TodayRecordPrompt({ todayDate, entryDates }: Props) {
         <p className="text-xs leading-snug" style={{ color: "var(--px-text2)" }}>
           {streak.atRisk
             ? `연속 ${streak.days}일을 이어가려면 오늘 기록이 필요해요`
-            : "흐름을 본 김에, 오늘 한 줄을 남겨보세요"}
+            : "기록이 쌓일수록 레벨·운세 맞춤이 깊어져요"}
         </p>
       </div>
       <Link

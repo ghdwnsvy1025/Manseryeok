@@ -5,6 +5,10 @@ import Link from "next/link";
 import { getPillarsForDate } from "@/lib/diary/dayPillar";
 import { dayHappiness } from "@/lib/journal/homeStats";
 import { buildMonthCells, type WeeklyReport } from "@/lib/journal/statsInsight";
+import {
+  countEmptyDaysInMonth,
+  entryDateSet,
+} from "@/lib/journal/emptyDays";
 import WeeklyReportCard from "@/components/stats/WeeklyReportCard";
 import JournalDayReportModal from "@/components/stats/JournalDayReportModal";
 import { happinessTone } from "@/lib/journal/statsTone";
@@ -48,6 +52,30 @@ export default function JournalRecordCalendar({
     }
     return map;
   }, [entries, year, month]);
+
+  const allDates = useMemo(() => entryDateSet(entries), [entries]);
+
+  const emptyInMonth = useMemo(
+    () =>
+      countEmptyDaysInMonth({
+        year,
+        month,
+        todayIso: today,
+        dates: allDates,
+      }),
+    [year, month, today, allDates]
+  );
+
+  const nearestEmpty = useMemo(() => {
+    const prefix = `${year}-${String(month).padStart(2, "0")}`;
+    const lastDay = new Date(year, month, 0).getDate();
+    for (let d = lastDay; d >= 1; d -= 1) {
+      const iso = `${prefix}-${String(d).padStart(2, "0")}`;
+      if (iso > today) continue;
+      if (!allDates.has(iso)) return iso;
+    }
+    return null;
+  }, [year, month, today, allDates]);
 
   const cells = useMemo(() => buildMonthCells(year, month), [year, month]);
   const monthList = useMemo(
@@ -118,6 +146,44 @@ export default function JournalRecordCalendar({
           </div>
         )}
 
+        {emptyInMonth > 0 && nearestEmpty && (
+          <div
+            className="flex items-center justify-between gap-2 p-2.5 border-2"
+            style={{
+              borderColor: "var(--px-accent)",
+              background:
+                "color-mix(in srgb, var(--px-accent) 12%, var(--px-bg3))",
+            }}
+          >
+            <div className="min-w-0 space-y-0.5">
+              <p
+                className="text-[12px] font-black"
+                style={{ color: "var(--px-accent)" }}
+              >
+                빈 날 {emptyInMonth}개 · 탭해서 메우기
+              </p>
+              <p
+                className="text-[10px] font-bold leading-snug"
+                style={{ color: "var(--px-text2)" }}
+              >
+                메울수록 운세·패턴이 더 정확해져요
+              </p>
+            </div>
+            <Link
+              href={`/journal?date=${nearestEmpty}`}
+              className="shrink-0 px-2.5 py-1.5 text-[11px] font-black border-2"
+              style={{
+                borderColor: "#000",
+                background: "var(--px-accent)",
+                color: "#111",
+                boxShadow: "2px 2px 0 #000",
+              }}
+            >
+              가까운 빈 날
+            </Link>
+          </div>
+        )}
+
         <div className="grid grid-cols-7 gap-1 text-center">
           {["일", "월", "화", "수", "목", "금", "토"].map((label) => (
             <div key={label} className="stats-label py-1">
@@ -132,28 +198,37 @@ export default function JournalRecordCalendar({
             const happiness = entry ? dayHappiness(entry) : null;
             const ganji = getPillarsForDate(cell.date).dayPillar.ganjiKo;
             const isToday = cell.date === today;
+            const isFuture = cell.date > today;
+            const isGap = !entry && !isFuture;
             const cellClass = `min-h-[52px] p-1 flex flex-col items-center justify-center gap-0.5 w-full ${
-              isToday ? "border-2" : "border"
+              isToday || isGap ? "border-2" : "border"
             }`;
             const cellStyle = {
               borderColor: isToday
                 ? "var(--px-accent)"
-                : entry
-                  ? "var(--px-border2)"
-                  : "var(--px-border)",
+                : isGap
+                  ? "var(--px-accent)"
+                  : entry
+                    ? "var(--px-border2)"
+                    : "var(--px-border)",
+              borderStyle: isGap ? ("dashed" as const) : ("solid" as const),
               background: entry
                 ? happiness != null
                   ? `color-mix(in srgb, ${happinessTone(happiness)} 16%, var(--px-bg3))`
                   : "color-mix(in srgb, var(--px-accent) 10%, var(--px-bg3))"
-                : "var(--px-bg3)",
+                : isGap
+                  ? "color-mix(in srgb, var(--px-accent) 8%, var(--px-bg3))"
+                  : "var(--px-bg3)",
               boxShadow: isToday ? "1px 1px 0 #000" : undefined,
-            } as const;
+              opacity: isFuture ? 0.45 : 1,
+            };
             const cellInner = (
               <>
                 <span
                   className="text-[13px] font-extrabold leading-none tabular-nums"
                   style={{
-                    color: isToday ? "var(--px-accent)" : "var(--px-text)",
+                    color:
+                      isToday || isGap ? "var(--px-accent)" : "var(--px-text)",
                   }}
                 >
                   {cell.day}
@@ -178,6 +253,13 @@ export default function JournalRecordCalendar({
                       {ganji}
                     </span>
                   </>
+                ) : isGap ? (
+                  <span
+                    className="text-[9px] font-black leading-none"
+                    style={{ color: "var(--px-accent)" }}
+                  >
+                    메우기
+                  </span>
                 ) : (
                   <span
                     className="text-[10px] leading-none"
@@ -204,6 +286,19 @@ export default function JournalRecordCalendar({
               );
             }
 
+            if (isFuture) {
+              return (
+                <div
+                  key={cell.date}
+                  className={cellClass}
+                  style={cellStyle}
+                  aria-label={`${cell.date} 미래`}
+                >
+                  {cellInner}
+                </div>
+              );
+            }
+
             return (
               <Link
                 key={cell.date}
@@ -218,7 +313,10 @@ export default function JournalRecordCalendar({
           })}
         </div>
 
-        <p className="stats-label tabular-nums">{monthList.length}일</p>
+        <p className="stats-label tabular-nums">
+          기록 {monthList.length}일
+          {emptyInMonth > 0 ? ` · 빈 날 ${emptyInMonth}개` : ""}
+        </p>
       </div>
 
       {monthList.length > 0 && (
