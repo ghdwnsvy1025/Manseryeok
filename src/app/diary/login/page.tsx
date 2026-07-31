@@ -61,7 +61,25 @@ function safeNextPath(raw: string | null): string | null {
   return raw;
 }
 
+function friendlyAuthError(raw: string): string {
+  const lower = raw.toLowerCase();
+  if (lower.includes("email not confirmed")) {
+    return "이메일 인증이 아직 안 됐어요. 가입 메일의 링크를 눌러 주세요.";
+  }
+  if (lower.includes("invalid login credentials")) {
+    return "이메일 또는 비밀번호가 맞지 않아요.";
+  }
+  if (lower.includes("user already registered")) {
+    return "이미 가입된 이메일이에요. 로그인으로 전환해 보세요.";
+  }
+  return raw;
+}
+
 export default function DiaryLoginPage() {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [mode, setMode] = useState<"login" | "signup">("login");
+  const [showEmail, setShowEmail] = useState(false);
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [importReady, setImportReady] = useState<ImportReady | null>(null);
@@ -185,6 +203,77 @@ export default function DiaryLoginPage() {
     });
     if (error) {
       setMessage(`${error.message} (돌아갈 주소: ${redirectTo})`);
+      setLoading(false);
+    }
+  };
+
+  const handleEmailSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) {
+      setMessage("로그인 서버가 설정되지 않았습니다.");
+      return;
+    }
+
+    setLoading(true);
+    setMessage("");
+    disableGuestMode();
+
+    try {
+      void import("@/lib/analytics/posthog")
+        .then(({ ANALYTICS_EVENTS, captureEvent }) => {
+          captureEvent(ANALYTICS_EVENTS.authEmailSubmitted, { mode });
+        })
+        .catch(() => undefined);
+
+      if (mode === "signup") {
+        const nextPath = nextPathRef.current
+          ? `/diary/login?email=confirmed&next=${encodeURIComponent(nextPathRef.current)}`
+          : "/diary/login?email=confirmed";
+        stashAuthNextPath(nextPath);
+        const { data, error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            emailRedirectTo: getAuthCallbackUrl(),
+          },
+        });
+        if (error) throw error;
+        if (data.session) {
+          setCurrentEmail(data.user?.email ?? email);
+          setShowLoginForm(false);
+          const needsImport = await prepareImportPrompt();
+          if (!needsImport) {
+            goHomeOrNext();
+            return;
+          }
+          setMessage("이 기기 옛 기록을 계정에 합칠까요?");
+        } else {
+          setMessage(
+            "가입 확인 메일을 보냈어요. 메일의 링크를 누르면 가입이 완료됩니다."
+          );
+          setMode("login");
+        }
+      } else {
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+        if (error) throw error;
+        setCurrentEmail(data.user.email ?? email);
+        setShowLoginForm(false);
+        const needsImport = await prepareImportPrompt();
+        if (!needsImport) {
+          goHomeOrNext();
+          return;
+        }
+        setMessage("이 기기 옛 기록을 계정에 합칠까요?");
+      }
+    } catch (err) {
+      const raw =
+        err instanceof Error ? err.message : "처리에 실패했습니다.";
+      setMessage(friendlyAuthError(raw));
+    } finally {
       setLoading(false);
     }
   };
@@ -320,7 +409,7 @@ export default function DiaryLoginPage() {
                 className="text-[12px] font-bold leading-snug"
                 style={{ color: "var(--px-text2)" }}
               >
-                Google로 시작하면 확인 메일 없이 바로 로그인돼요.
+                Google이면 확인 메일 없이 바로 로그인돼요.
               </p>
               <button
                 type="button"
@@ -336,6 +425,117 @@ export default function DiaryLoginPage() {
               >
                 {loading ? "연결 중…" : "Google로 계속하기"}
               </button>
+
+              <button
+                type="button"
+                disabled={loading}
+                onClick={() => setShowEmail((v) => !v)}
+                className="w-full px-3 py-2.5 text-sm font-bold border-2"
+                style={{
+                  borderColor: "var(--px-border)",
+                  background: "var(--px-bg2)",
+                  color: "var(--px-text2)",
+                }}
+                aria-expanded={showEmail}
+              >
+                {showEmail ? "이메일 접기" : "이메일로 가입·로그인"}
+              </button>
+
+              {showEmail && (
+                <form onSubmit={handleEmailSubmit} className="space-y-3">
+                  <div className="grid grid-cols-2 gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setMode("signup")}
+                      className="px-2 py-2 text-xs font-bold border"
+                      style={{
+                        borderColor:
+                          mode === "signup"
+                            ? "var(--px-accent)"
+                            : "var(--px-border)",
+                        color:
+                          mode === "signup"
+                            ? "var(--px-accent)"
+                            : "var(--px-text2)",
+                      }}
+                    >
+                      가입
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setMode("login")}
+                      className="px-2 py-2 text-xs font-bold border"
+                      style={{
+                        borderColor:
+                          mode === "login"
+                            ? "var(--px-accent)"
+                            : "var(--px-border)",
+                        color:
+                          mode === "login"
+                            ? "var(--px-accent)"
+                            : "var(--px-text2)",
+                      }}
+                    >
+                      로그인
+                    </button>
+                  </div>
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="이메일"
+                    aria-label="이메일"
+                    required
+                    className="w-full px-3 py-3 text-base border-2"
+                    style={{
+                      background: "var(--px-bg2)",
+                      borderColor: "var(--px-border)",
+                      color: "var(--px-text)",
+                    }}
+                  />
+                  <input
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="비밀번호 (8자 이상)"
+                    aria-label="비밀번호"
+                    required
+                    minLength={8}
+                    autoComplete={
+                      mode === "signup" ? "new-password" : "current-password"
+                    }
+                    className="w-full px-3 py-3 text-base border-2"
+                    style={{
+                      background: "var(--px-bg2)",
+                      borderColor: "var(--px-border)",
+                      color: "var(--px-text)",
+                    }}
+                  />
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full px-4 py-3.5 text-base font-black border-2"
+                    style={{
+                      background: "var(--px-bg3)",
+                      borderColor: "var(--px-border)",
+                      color: "var(--px-text-on-panel)",
+                    }}
+                  >
+                    {loading
+                      ? "처리 중..."
+                      : mode === "login"
+                        ? "로그인"
+                        : "가입하기"}
+                  </button>
+                  <p
+                    className="text-[10px] font-bold leading-snug"
+                    style={{ color: "var(--px-text2)" }}
+                  >
+                    가입 시 확인 메일이 필요할 수 있어요. 막히면 Google을
+                    써주세요.
+                  </p>
+                </form>
+              )}
 
               {!loggedIn && (
                 <button
