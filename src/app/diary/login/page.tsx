@@ -10,15 +10,21 @@ import {
 import {
   ensureAnonymousSession,
   isAnonymousUser,
+  startGoogleAuth,
 } from "@/lib/auth/anonymousSession";
 import { autoMigrateLocalJournalToAccount } from "@/lib/auth/autoMigrateLocalJournal";
-import { disableGuestMode, enableGuestMode } from "@/lib/auth/guestMode";
-import { takeAuthNextPath } from "@/lib/auth/redirectOrigin";
+import { disableGuestMode, enableGuestMode, isGuestMode } from "@/lib/auth/guestMode";
+import {
+  getAuthCallbackUrl,
+  stashAuthNextPath,
+  takeAuthNextPath,
+} from "@/lib/auth/redirectOrigin";
 import { resetDiaryStorageCache } from "@/lib/diary/getStorage";
 import { resetJournalStorageCache } from "@/lib/journal/getStorage";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import WelcomeAuthGate from "@/components/auth/WelcomeAuthGate";
 import { useRouter } from "next/navigation";
+import { ANALYTICS_EVENTS, captureEvent } from "@/lib/analytics/posthog";
 
 function Section({
   title,
@@ -52,14 +58,16 @@ function safeNextPath(raw: string | null): string | null {
   return raw;
 }
 
+type AuthKind = "google" | "anonymous" | "guest" | null;
+
 export default function DiaryLoginPage() {
   const router = useRouter();
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [currentEmail, setCurrentEmail] = useState<string | null>(null);
-  const [authProvider, setAuthProvider] = useState<string | null>(null);
-  const [isAnonymous, setIsAnonymous] = useState(false);
+  const [authKind, setAuthKind] = useState<AuthKind>(null);
   const [authReady, setAuthReady] = useState(false);
+  /** 로그아웃 직후·미로그인 시 WelcomeAuthGate */
   const [showLoginForm, setShowLoginForm] = useState(false);
   const oauthHandled = useRef(false);
   const nextPathRef = useRef<string | null>(null);
@@ -75,31 +83,33 @@ export default function DiaryLoginPage() {
     nextPathRef.current = safeNextPath(params.get("next"));
 
     if (!supabase) {
+      setAuthKind(isGuestMode() ? "guest" : null);
+      setShowLoginForm(!isGuestMode());
       setAuthReady(true);
-      setShowLoginForm(true);
       return;
     }
 
     void (async () => {
       const { data } = await supabase.auth.getUser();
       if (data.user) {
-        const anon = isAnonymousUser(data.user);
-        setIsAnonymous(anon);
-        if (anon) {
+        if (isAnonymousUser(data.user)) {
           enableGuestMode();
+          setAuthKind("anonymous");
           setCurrentEmail(null);
-          setAuthProvider("anonymous");
-          setShowLoginForm(true);
+          setShowLoginForm(false);
         } else {
           disableGuestMode();
+          setAuthKind("google");
           setCurrentEmail(data.user.email ?? "소셜 계정");
-          setAuthProvider(String(data.user.app_metadata?.provider ?? "google"));
           setShowLoginForm(false);
         }
-      } else {
+      } else if (isGuestMode()) {
+        setAuthKind("guest");
         setCurrentEmail(null);
-        setAuthProvider(null);
-        setIsAnonymous(false);
+        setShowLoginForm(false);
+      } else {
+        setAuthKind(null);
+        setCurrentEmail(null);
         setShowLoginForm(true);
       }
       setAuthReady(true);
@@ -108,11 +118,12 @@ export default function DiaryLoginPage() {
     const authError = params.get("authError");
     if (authError) {
       const messages: Record<string, string> = {
-        missing_code: "로그인 인증 코드가 없습니다. 다시 시도해주세요.",
+        missing_code:
+          "로그인 인증을 끝내지 못했어요. Google로 다시 시도해 주세요.",
         not_configured: "로그인 서버가 설정되지 않았습니다.",
         exchange_failed: "로그인 세션을 만들지 못했습니다. 다시 시도해주세요.",
         identity_already_exists:
-          "이미 가입된 Google 계정이에요. 익명 기록은 그대로 두고, 그 Google 계정으로는 따로 로그인해야 해요.",
+          "이미 가입된 Google 계정이에요. 그 계정으로 다시 로그인해 주세요.",
       };
       setMessage(messages[authError] ?? "소셜 로그인에 실패했습니다.");
       setShowLoginForm(true);
@@ -126,7 +137,6 @@ export default function DiaryLoginPage() {
         try {
           disableGuestMode();
           await syncLocalSajuProfileToAccount();
-          // 선택 UI 없이 로컬 → 계정 자동 이관 후 홈
           await autoMigrateLocalJournalToAccount();
           goHomeOrNext();
         } catch {
@@ -141,19 +151,19 @@ export default function DiaryLoginPage() {
 
   const handleLogout = async () => {
     const supabase = getSupabaseBrowserClient();
-    if (!supabase) return;
     setLoading(true);
     setMessage("");
     try {
-      await supabase.auth.signOut();
+      if (supabase) {
+        await supabase.auth.signOut();
+      }
       disableGuestMode();
       reconcileLocalStateWithAuthUser(null);
       clearLocalAccountScopedState({ notify: true });
       resetDiaryStorageCache();
       resetJournalStorageCache();
       setCurrentEmail(null);
-      setAuthProvider(null);
-      setIsAnonymous(false);
+      setAuthKind(null);
       setShowLoginForm(true);
     } catch (err) {
       setMessage(err instanceof Error ? err.message : "로그아웃에 실패했습니다.");
@@ -162,105 +172,131 @@ export default function DiaryLoginPage() {
     }
   };
 
-  const handleSwitchAccount = async () => {
-    await handleLogout();
+  const handleLinkGoogle = async () => {
+    setLoading(true);
+    setMessage("");
+    captureEvent(ANALYTICS_EVENTS.authGoogleClicked);
+    await ensureAnonymousSession();
+    stashAuthNextPath("/diary/login?oauth=success");
+    const result = await startGoogleAuth({ redirectTo: getAuthCallbackUrl() });
+    if (!result.ok) {
+      setMessage(result.error ?? "Google 연결에 실패했어요.");
+      setLoading(false);
+    }
   };
-
-  const loggedInGoogle = Boolean(currentEmail) && !isAnonymous;
 
   if (!authReady) {
     return <p className="ui-hint p-4">불러오는 중…</p>;
   }
 
-  const showAuthGate = !loggedInGoogle || showLoginForm;
-  const showAccountPanel = loggedInGoogle && !showLoginForm;
+  const showAuthGate = showLoginForm || authKind === null;
+  const showAccountPanel = !showAuthGate;
+
+  const kindLabel =
+    authKind === "google"
+      ? "Google 계정"
+      : authKind === "anonymous"
+        ? "비로그인 (익명)"
+        : authKind === "guest"
+          ? "비로그인 (이 기기)"
+          : "알 수 없음";
 
   return (
     <div className="max-w-md mx-auto space-y-4 pb-8">
-      {!showAuthGate && (
-        <header>
-          <h2
-            className="text-xl font-black"
-            style={{ color: "var(--px-accent)" }}
-          >
-            계정 및 설정
-          </h2>
-        </header>
-      )}
-
       {showAccountPanel && (
-        <Section title="계정">
-          <div className="space-y-3">
-            <div
-              className="p-3.5 border-2 space-y-1"
-              style={{
-                borderColor: "var(--px-border)",
-                background: "var(--px-bg2)",
-              }}
+        <>
+          <header>
+            <h2
+              className="text-xl font-black"
+              style={{ color: "var(--px-accent)" }}
             >
-              <p
-                className="text-sm font-black"
-                style={{ color: "var(--px-accent)" }}
+              계정 및 설정
+            </h2>
+          </header>
+
+          <Section title="계정">
+            <div className="space-y-3">
+              <div
+                className="p-3.5 border-2 space-y-1"
+                style={{
+                  borderColor: "var(--px-border)",
+                  background: "var(--px-bg2)",
+                }}
               >
-                {authProvider === "google" ? "Google 계정" : "로그인됨"}
-              </p>
-              {currentEmail && currentEmail !== "소셜 계정" && (
                 <p
-                  className="text-xs font-bold break-all"
-                  style={{ color: "var(--px-text2)" }}
+                  className="text-sm font-black"
+                  style={{ color: "var(--px-accent)" }}
                 >
-                  {currentEmail}
+                  {kindLabel}
                 </p>
-              )}
-              <p className="text-[11px] font-bold" style={{ color: "var(--px-text2)" }}>
-                Google로 로그인하면 이 기기 기록이 계정에 자동으로 이어집니다.
-              </p>
+                {authKind === "google" &&
+                  currentEmail &&
+                  currentEmail !== "소셜 계정" && (
+                    <p
+                      className="text-xs font-bold break-all"
+                      style={{ color: "var(--px-text2)" }}
+                    >
+                      {currentEmail}
+                    </p>
+                  )}
+                {(authKind === "anonymous" || authKind === "guest") && (
+                  <>
+                    <p
+                      className="text-[11px] font-bold"
+                      style={{ color: "var(--px-text2)" }}
+                    >
+                      Google로 이어가면 기록이 계정에 자동으로 저장돼요.
+                    </p>
+                    <button
+                      type="button"
+                      disabled={loading}
+                      onClick={() => void handleLinkGoogle()}
+                      className="w-full px-4 py-3.5 text-base font-black border-2"
+                      style={{
+                        borderColor: "#000",
+                        background: "var(--px-accent)",
+                        color: "#111",
+                        boxShadow: "3px 3px 0 #000",
+                      }}
+                    >
+                      {loading ? "연결 중…" : "Google로 이어가기"}
+                    </button>
+                  </>
+                )}
+              </div>
+              <button
+                type="button"
+                disabled={loading}
+                onClick={() => void handleLogout()}
+                className="w-full px-4 py-3.5 text-base font-black border-2"
+                style={{
+                  borderColor: "var(--px-border)",
+                  background: "var(--px-bg2)",
+                  color: "var(--px-text-on-panel)",
+                }}
+              >
+                로그아웃
+              </button>
             </div>
-            <button
-              type="button"
-              disabled={loading}
-              onClick={() => void handleLogout()}
-              className="w-full px-4 py-3.5 text-base font-black border-2"
-              style={{
-                borderColor: "var(--px-border)",
-                background: "var(--px-bg2)",
-                color: "var(--px-text-on-panel)",
-              }}
-            >
-              로그아웃
-            </button>
-            <button
-              type="button"
-              disabled={loading}
-              onClick={() => void handleSwitchAccount()}
-              className="w-full py-2 text-sm font-bold underline"
-              style={{ color: "var(--px-text2)", background: "transparent" }}
-            >
-              다른 계정으로 전환
-            </button>
-          </div>
-        </Section>
+          </Section>
+
+          <Section title="설정">
+            <InstallAppButton surface="settings" />
+          </Section>
+        </>
       )}
 
       {showAuthGate && (
         <WelcomeAuthGate
-          authNextPath={
-            nextPathRef.current
-              ? `/diary/login?oauth=success&next=${encodeURIComponent(nextPathRef.current)}`
-              : "/diary/login?oauth=success"
-          }
+          authNextPath="/diary/login?oauth=success"
           onGuest={async () => {
             await ensureAnonymousSession();
             void autoMigrateLocalJournalToAccount();
+            setAuthKind(isGuestMode() ? "guest" : "anonymous");
+            setShowLoginForm(false);
             router.push("/");
           }}
         />
-      )}
-
-      {showAccountPanel && (
-        <Section title="설정">
-          <InstallAppButton surface="settings" />
-        </Section>
       )}
 
       {message && (

@@ -27,13 +27,7 @@ export function clearFirstVisitWelcomeSeen(): void {
   }
 }
 
-/** 소개 팝업을 띄울 메인 탭·관련 경로 */
+/** 소개 팝업은 홈(/)에서만 */
 export function isFirstVisitWelcomePath(pathname: string): boolean {
-  if (pathname === "/") return true;
-  if (pathname.startsWith("/journal")) return true;
-  if (pathname.startsWith("/stats")) return true;
-  if (pathname.startsWith("/diary") && !pathname.startsWith("/diary/login")) {
-    return true;
-  }
-  return false;
+  return pathname === "/";
 }
