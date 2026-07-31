@@ -164,7 +164,7 @@ export async function loadUserExperienceSettings(): Promise<{
         };
         saveLocalUserProfile(profile);
         return {
-          experienceMode: profile.experienceMode,
+          experienceMode: profile.experienceMode ?? localMode ?? DEFAULT_EXPERIENCE_MODE,
           onboardingCompletedAt: localOnboarding,
           profile,
         };
