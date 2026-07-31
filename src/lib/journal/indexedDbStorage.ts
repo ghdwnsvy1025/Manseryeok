@@ -355,6 +355,27 @@ export function getIndexedDbJournalStorage(
   return new IndexedDbJournalStorage(sajuProfileId ?? LOCAL_PROFILE);
 }
 
+/** 프로필 구분 없이 이 기기 IndexedDB에 있는 일기 전부 (게스트→계정 이관용) */
+export async function listAllLocalJournalEntries(): Promise<JournalEntry[]> {
+  if (typeof indexedDB === "undefined") return [];
+  try {
+    const all = await runStore("readonly", (store) => store.getAll());
+    const byDate = new Map<string, JournalEntry>();
+    for (const raw of all as JournalEntry[]) {
+      const entry = normalizeEntry(raw);
+      const prev = byDate.get(entry.entryDate);
+      if (!prev || entry.updatedAt > prev.updatedAt) {
+        byDate.set(entry.entryDate, entry);
+      }
+    }
+    return Array.from(byDate.values()).sort((a, b) =>
+      b.entryDate.localeCompare(a.entryDate)
+    );
+  } catch {
+    return [];
+  }
+}
+
 /** 테스트용 인메모리 저장소 */
 export class MemoryJournalStorage implements JournalStorage {
   private prefs: UserCategoryPreference[] | null = null;

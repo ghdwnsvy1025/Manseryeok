@@ -958,7 +958,7 @@ export default function TodayFortunePanel({
         ) {
           const authHint =
             res.status === 401 || data.error?.includes("로그인")
-              ? " 로그인 상태를 확인한 뒤 다시 눌러주세요."
+              ? " 잠시 후 다시 눌러주세요."
               : "";
           setLoadError(
             (data.error ||

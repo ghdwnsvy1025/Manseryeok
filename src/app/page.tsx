@@ -1,14 +1,16 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
-import WelcomeAuthGate from "@/components/auth/WelcomeAuthGate";
 import SajuProfileSetup from "@/components/home/SajuProfileSetup";
 import HomeHub from "@/components/home/HomeHub";
 import HomeG from "@/components/home/HomeG";
 import HomeSaveCelebration from "@/components/home/HomeSaveCelebration";
 import { useUserAppState } from "@/hooks/useUserAppState";
 import { isNewDiaryEnabled } from "@/lib/app/featureFlags";
-import { disableGuestMode, isGuestMode } from "@/lib/auth/guestMode";
+import {
+  disableGuestMode,
+  enableGuestMode,
+} from "@/lib/auth/guestMode";
 import {
   loadLocalSajuProfiles,
   SAJU_PROFILE_CHANGED_EVENT,
@@ -31,6 +33,11 @@ function localHasSajuProfile(): boolean {
   } catch {
     return false;
   }
+}
+
+function enterAsGuest(setEntryAllowed: (v: boolean) => void) {
+  enableGuestMode();
+  setEntryAllowed(true);
 }
 
 export default function HomePage() {
@@ -60,15 +67,22 @@ export default function HomePage() {
   useEffect(() => {
     const supabase = getSupabaseBrowserClient();
     if (!supabase) {
-      // 서버 미설정이어도 게스트로 테스트 가능
-      if (isGuestMode()) setEntryAllowed(true);
+      // 서버 미설정이어도 게스트로 바로 사용
+      enterAsGuest(setEntryAllowed);
       setAuthReady(true);
       return;
     }
 
     let cancelled = false;
     const timeout = window.setTimeout(() => {
-      if (!cancelled) setAuthReady(true);
+      if (!cancelled) {
+        // 세션 확인이 느리면 게스트로 진입 (이후 로그인 시 덮어씀)
+        setEntryAllowed((prev) => {
+          if (!prev) enableGuestMode();
+          return true;
+        });
+        setAuthReady(true);
+      }
     }, 1000);
 
     void supabase.auth
@@ -79,14 +93,14 @@ export default function HomePage() {
         if (signedIn) {
           disableGuestMode();
           setEntryAllowed(true);
-        } else if (isGuestMode()) {
-          setEntryAllowed(true);
+        } else {
+          enterAsGuest(setEntryAllowed);
         }
         setAuthReady(true);
       })
       .catch(() => {
         if (cancelled) return;
-        if (isGuestMode()) setEntryAllowed(true);
+        enterAsGuest(setEntryAllowed);
         setAuthReady(true);
       });
 
@@ -107,19 +121,8 @@ export default function HomePage() {
     };
   }, []);
 
-  if (!authReady) {
+  if (!authReady || !entryAllowed) {
     return <p className="ui-hint p-4">불러오는 중...</p>;
-  }
-
-  if (!entryAllowed) {
-    return (
-      <WelcomeAuthGate
-        onGuest={() => {
-          setEntryAllowed(true);
-          void refresh();
-        }}
-      />
-    );
   }
 
   const hasProfile = Boolean(state?.hasSajuProfile) || localProfileHint;
@@ -132,7 +135,7 @@ export default function HomePage() {
     return <SajuProfileSetup onCompleted={() => void refresh()} />;
   }
 
-  // 프로필 있으면 홈 — state 유무와 무관하게 더 이상 로딩에 가두지 않음
+  // 프로필 생기면 홈 — state 유무와 무관하게 더 이상 로딩에 가두지 않음
   if (newDiary || !state) {
     return withCelebration(<HomeG />);
   }

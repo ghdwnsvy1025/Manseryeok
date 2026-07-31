@@ -29,8 +29,8 @@ import { buildFortuneEvidence } from "@/lib/journal/fortune/evidence";
 import { buildNatalDayInsight } from "@/lib/journal/fortune/natalDaySignal";
 import { resolveInsightPersistClient } from "@/lib/journal/insight/persistClient";
 import { totalJournalXp } from "@/lib/product/personalizationLevel";
-import { requireAuthUser } from "@/lib/api/requireAuth";
-import { checkLlmRateLimit } from "@/lib/api/rateLimit";
+import { getOptionalAuthUser } from "@/lib/api/requireAuth";
+import { checkLlmRateLimit, clientIpFromRequest } from "@/lib/api/rateLimit";
 import type { DailyInsightContext } from "@/lib/journal/insight/types";
 import { sajuProfileFortuneFingerprint } from "@/lib/journal/fortune/profileFingerprint";
 
@@ -59,11 +59,16 @@ function withNatalDay(
 }
 
 export async function POST(req: NextRequest) {
-  const auth = await requireAuthUser();
-  if (!auth.ok) return auth.response;
+  const auth = await getOptionalAuthUser();
+  const rateLimitKey = auth.user
+    ? auth.user.id
+    : `guest:${clientIpFromRequest(req)}`;
 
   try {
-    return await handleTodayFortune(req, auth.user.id);
+    return await handleTodayFortune(req, {
+      authUserId: auth.user?.id ?? null,
+      rateLimitKey,
+    });
   } catch (err) {
     const detail = err instanceof Error ? err.message : String(err);
     console.error("[today-fortune]", detail);
@@ -74,7 +79,11 @@ export async function POST(req: NextRequest) {
   }
 }
 
-async function handleTodayFortune(req: NextRequest, authUserId: string) {
+async function handleTodayFortune(
+  req: NextRequest,
+  opts: { authUserId: string | null; rateLimitKey: string }
+) {
+  const { authUserId, rateLimitKey } = opts;
   let body: unknown;
   try {
     body = await req.json();
@@ -99,7 +108,8 @@ async function handleTodayFortune(req: NextRequest, authUserId: string) {
     let sajuProfileId: string | null = null;
     let onboardingCompleted = false;
     let sb = sbAuth;
-    if (sbAuth) {
+    // 로그인 사용자만 서버 캐시·저장 — 게스트는 요청 본문 프로필로 생성
+    if (sbAuth && userId) {
       sb = resolveInsightPersistClient(sbAuth);
       sajuProfileId =
         b.sajuProfile?.id ??
@@ -199,7 +209,7 @@ async function handleTodayFortune(req: NextRequest, authUserId: string) {
 
     // 캐시 미스일 때만 LLM 한도 적용
     if (!skipLlm) {
-      const limited = checkLlmRateLimit(authUserId);
+      const limited = checkLlmRateLimit(rateLimitKey);
       if (!limited.ok) return limited.response;
     }
 
@@ -237,7 +247,7 @@ async function handleTodayFortune(req: NextRequest, authUserId: string) {
       priorUniqueDays: insight.priorUniqueDays ?? 0,
     });
 
-    // skipLlm이어도 컨텍스트·점수 스냅샷은 반드시 저장
+    // skipLlm이어도 컨텍스트·점수 스냅샷은 반드시 저장 (로그인만)
     if (sb && userId && sajuProfileId) {
       if (!contextId) {
         const resolved = await resolveDailyInsightContext(sb, userId, {
@@ -282,7 +292,7 @@ async function handleTodayFortune(req: NextRequest, authUserId: string) {
     });
   }
 
-  const limited = checkLlmRateLimit(authUserId);
+  const limited = checkLlmRateLimit(rateLimitKey);
   if (!limited.ok) return limited.response;
 
   const ctx = buildDailySajuContext(b.todayDate, b.sajuProfile ?? null);
