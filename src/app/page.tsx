@@ -8,7 +8,7 @@ import HomeG from "@/components/home/HomeG";
 import HomeSaveCelebration from "@/components/home/HomeSaveCelebration";
 import { useUserAppState } from "@/hooks/useUserAppState";
 import { isNewDiaryEnabled } from "@/lib/app/featureFlags";
-import { disableGuestMode } from "@/lib/auth/guestMode";
+import { disableGuestMode, isGuestMode } from "@/lib/auth/guestMode";
 import {
   loadLocalSajuProfiles,
   SAJU_PROFILE_CHANGED_EVENT,
@@ -60,7 +60,8 @@ export default function HomePage() {
   useEffect(() => {
     const supabase = getSupabaseBrowserClient();
     if (!supabase) {
-      setEntryAllowed(false);
+      // 서버 미설정이어도 게스트로 테스트 가능
+      if (isGuestMode()) setEntryAllowed(true);
       setAuthReady(true);
       return;
     }
@@ -78,11 +79,15 @@ export default function HomePage() {
         if (signedIn) {
           disableGuestMode();
           setEntryAllowed(true);
+        } else if (isGuestMode()) {
+          setEntryAllowed(true);
         }
         setAuthReady(true);
       })
       .catch(() => {
-        if (!cancelled) setAuthReady(true);
+        if (cancelled) return;
+        if (isGuestMode()) setEntryAllowed(true);
+        setAuthReady(true);
       });
 
     const {

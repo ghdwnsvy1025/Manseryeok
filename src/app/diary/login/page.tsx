@@ -13,15 +13,13 @@ import {
   clearLocalAccountScopedState,
   reconcileLocalStateWithAuthUser,
 } from "@/lib/diary/profileStorage";
-import { disableGuestMode, enableGuestMode } from "@/lib/auth/guestMode";
-import {
-  getAuthCallbackUrl,
-  stashAuthNextPath,
-  takeAuthNextPath,
-} from "@/lib/auth/redirectOrigin";
+import { disableGuestMode } from "@/lib/auth/guestMode";
+import { takeAuthNextPath } from "@/lib/auth/redirectOrigin";
 import type { DiaryEntry } from "@/lib/diary/types";
 import type { DiaryStorage } from "@/lib/diary/storage";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import WelcomeAuthGate from "@/components/auth/WelcomeAuthGate";
+import { useRouter } from "next/navigation";
 
 type ImportReady = {
   localEntries: DiaryEntry[];
@@ -62,6 +60,7 @@ function safeNextPath(raw: string | null): string | null {
 }
 
 export default function DiaryLoginPage() {
+  const router = useRouter();
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [importReady, setImportReady] = useState<ImportReady | null>(null);
@@ -159,39 +158,6 @@ export default function DiaryLoginPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleGoogleLogin = async () => {
-    const supabase = getSupabaseBrowserClient();
-    if (!supabase) {
-      setMessage("로그인 서버가 설정되지 않았습니다.");
-      return;
-    }
-
-    setLoading(true);
-    setMessage("");
-    disableGuestMode();
-    void import("@/lib/analytics/posthog")
-      .then(({ ANALYTICS_EVENTS, captureEvent }) => {
-        captureEvent(ANALYTICS_EVENTS.authGoogleClicked);
-      })
-      .catch(() => undefined);
-    const nextPath = nextPathRef.current
-      ? `/diary/login?oauth=success&next=${encodeURIComponent(nextPathRef.current)}`
-      : "/diary/login?oauth=success";
-    stashAuthNextPath(nextPath);
-    const redirectTo = getAuthCallbackUrl();
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo,
-        queryParams: { hl: "ko", prompt: "select_account" },
-      },
-    });
-    if (error) {
-      setMessage(`${error.message} (돌아갈 주소: ${redirectTo})`);
-      setLoading(false);
-    }
-  };
-
   const handleLogout = async () => {
     const supabase = getSupabaseBrowserClient();
     if (!supabase) return;
@@ -199,6 +165,7 @@ export default function DiaryLoginPage() {
     setMessage("");
     try {
       await supabase.auth.signOut();
+      disableGuestMode();
       reconcileLocalStateWithAuthUser(null);
       clearLocalAccountScopedState({ notify: true });
       resetDiaryStorageCache();
@@ -207,7 +174,6 @@ export default function DiaryLoginPage() {
       setShowLoginForm(true);
       setImportReady(null);
       setHasLocalBackup(false);
-      setMessage("로그아웃했어요.");
     } catch (err) {
       setMessage(err instanceof Error ? err.message : "로그아웃에 실패했습니다.");
     } finally {
@@ -222,6 +188,7 @@ export default function DiaryLoginPage() {
     setMessage("");
     try {
       await supabase.auth.signOut();
+      disableGuestMode();
       reconcileLocalStateWithAuthUser(null);
       clearLocalAccountScopedState({ notify: true });
       resetDiaryStorageCache();
@@ -257,16 +224,21 @@ export default function DiaryLoginPage() {
     return <p className="ui-hint p-4">불러오는 중…</p>;
   }
 
+  const showAuthGate = !importReady && (!loggedIn || showLoginForm);
+  const showAccountPanel = !importReady && loggedIn && !showLoginForm;
+
   return (
     <div className="max-w-md mx-auto space-y-4 pb-8">
-      <header>
-        <h2
-          className="text-xl font-black"
-          style={{ color: "var(--px-accent)" }}
-        >
-          계정 및 설정
-        </h2>
-      </header>
+      {!showAuthGate && (
+        <header>
+          <h2
+            className="text-xl font-black"
+            style={{ color: "var(--px-accent)" }}
+          >
+            계정 및 설정
+          </h2>
+        </header>
+      )}
 
       {importReady && (
         <LocalImportPanel
@@ -278,104 +250,74 @@ export default function DiaryLoginPage() {
         />
       )}
 
-      {!importReady && (
+      {showAccountPanel && (
         <Section title="계정">
-          {loggedIn && !showLoginForm ? (
-            <div className="space-y-3">
-              <div
-                className="p-3.5 border-2 space-y-1"
-                style={{
-                  borderColor: "var(--px-border)",
-                  background: "var(--px-bg2)",
-                }}
-              >
-                <p
-                  className="text-sm font-black"
-                  style={{ color: "var(--px-accent)" }}
-                >
-                  {authProvider === "google"
-                    ? "Google 계정"
-                    : authProvider === "email"
-                      ? "이메일 계정"
-                      : "로그인됨"}
-                </p>
-                {currentEmail && currentEmail !== "소셜 계정" && (
-                  <p
-                    className="text-xs font-bold break-all"
-                    style={{ color: "var(--px-text2)" }}
-                  >
-                    {currentEmail}
-                  </p>
-                )}
-              </div>
-              <button
-                type="button"
-                disabled={loading}
-                onClick={() => void handleLogout()}
-                className="w-full px-4 py-3.5 text-base font-black border-2"
-                style={{
-                  borderColor: "var(--px-border)",
-                  background: "var(--px-bg2)",
-                  color: "var(--px-text-on-panel)",
-                }}
-              >
-                로그아웃
-              </button>
-              <button
-                type="button"
-                disabled={loading}
-                onClick={() => void handleSwitchAccount()}
-                className="w-full py-2 text-sm font-bold underline"
-                style={{ color: "var(--px-text2)", background: "transparent" }}
-              >
-                다른 계정으로 전환
-              </button>
-            </div>
-          ) : (
-            <div className="space-y-3">
+          <div className="space-y-3">
+            <div
+              className="p-3.5 border-2 space-y-1"
+              style={{
+                borderColor: "var(--px-border)",
+                background: "var(--px-bg2)",
+              }}
+            >
               <p
-                className="text-[12px] font-bold leading-snug"
-                style={{ color: "var(--px-text2)" }}
+                className="text-sm font-black"
+                style={{ color: "var(--px-accent)" }}
               >
-                계정은 Google로 연결해요. 확인 메일 없이 바로 로그인됩니다.
+                {authProvider === "google" ? "Google 계정" : "로그인됨"}
               </p>
-              <button
-                type="button"
-                onClick={() => void handleGoogleLogin()}
-                disabled={loading}
-                className="w-full px-4 py-4 text-base font-black border-2"
-                style={{
-                  background: "var(--px-accent)",
-                  borderColor: "#000",
-                  color: "#111",
-                  boxShadow: "4px 4px 0 #000",
-                }}
-              >
-                {loading ? "연결 중…" : "Google로 계속하기"}
-              </button>
-
-              {!loggedIn && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    enableGuestMode();
-                    window.location.href = "/";
-                  }}
-                  className="w-full py-2 text-sm font-bold underline"
-                  style={{ color: "var(--px-text2)", background: "transparent" }}
+              {currentEmail && currentEmail !== "소셜 계정" && (
+                <p
+                  className="text-xs font-bold break-all"
+                  style={{ color: "var(--px-text2)" }}
                 >
-                  로그인 없이 둘러보기
-                </button>
+                  {currentEmail}
+                </p>
               )}
             </div>
-          )}
+            <button
+              type="button"
+              disabled={loading}
+              onClick={() => void handleLogout()}
+              className="w-full px-4 py-3.5 text-base font-black border-2"
+              style={{
+                borderColor: "var(--px-border)",
+                background: "var(--px-bg2)",
+                color: "var(--px-text-on-panel)",
+              }}
+            >
+              로그아웃
+            </button>
+            <button
+              type="button"
+              disabled={loading}
+              onClick={() => void handleSwitchAccount()}
+              className="w-full py-2 text-sm font-bold underline"
+              style={{ color: "var(--px-text2)", background: "transparent" }}
+            >
+              다른 계정으로 전환
+            </button>
+          </div>
         </Section>
       )}
 
-      {!importReady && (
+      {showAuthGate && (
+        <WelcomeAuthGate
+          authNextPath={
+            nextPathRef.current
+              ? `/diary/login?oauth=success&next=${encodeURIComponent(nextPathRef.current)}`
+              : "/diary/login?oauth=success"
+          }
+          onGuest={() => {
+            router.push("/");
+          }}
+        />
+      )}
+
+      {showAccountPanel && (
         <Section title="설정">
           <InstallAppButton surface="settings" />
-          {loggedIn && !showLoginForm && hasLocalBackup && (
+          {hasLocalBackup && (
             <button
               type="button"
               disabled={loading}
