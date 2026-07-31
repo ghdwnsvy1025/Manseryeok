@@ -17,6 +17,11 @@ export const ANALYTICS_EVENTS = {
   questionShown: "question_shown",
   quoteShown: "quote_shown",
   feedbackSubmitted: "feedback_submitted",
+  installPromptShown: "install_prompt_shown",
+  installClicked: "install_clicked",
+  installAccepted: "install_accepted",
+  installDismissed: "install_dismissed",
+  installCompleted: "install_completed",
 } as const;
 
 export type AnalyticsEvent =

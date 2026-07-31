@@ -180,22 +180,26 @@ export default function JournalRecordCalendar({
             const isToday = cell.date === today;
             const isFuture = cell.date > today;
             const isGap = !entry && !isFuture;
-            const cellClass = `min-h-[52px] p-1 flex flex-col items-center justify-center gap-0.5 w-full ${
-              isToday ? "border-2" : "border"
-            }`;
+            const cellClass = `min-h-[52px] p-1 flex flex-col items-center justify-center gap-0.5 w-full border`;
             const cellStyle = {
               borderColor: isToday
                 ? "var(--px-accent)"
-                : entry
-                  ? "var(--px-border2)"
-                  : "var(--px-border)",
+                : isGap
+                  ? "color-mix(in srgb, var(--px-accent) 35%, var(--px-border))"
+                  : entry
+                    ? "var(--px-border2)"
+                    : "var(--px-border)",
+              borderStyle: isGap ? ("dashed" as const) : ("solid" as const),
+              borderWidth: isToday ? 2 : 1,
               background: entry
                 ? happiness != null
                   ? `color-mix(in srgb, ${happinessTone(happiness)} 16%, var(--px-bg3))`
                   : "color-mix(in srgb, var(--px-accent) 10%, var(--px-bg3))"
-                : "var(--px-bg3)",
+                : isGap
+                  ? "color-mix(in srgb, var(--px-accent) 6%, var(--px-bg3))"
+                  : "var(--px-bg3)",
               boxShadow: isToday ? "1px 1px 0 #000" : undefined,
-              opacity: isFuture ? 0.45 : isGap ? 0.85 : 1,
+              opacity: isFuture ? 0.45 : 1,
             };
             const cellInner = (
               <>
@@ -229,10 +233,14 @@ export default function JournalRecordCalendar({
                   </>
                 ) : (
                   <span
-                    className="text-[10px] leading-none"
-                    style={{ color: "var(--px-border2)" }}
+                    className="text-[9px] font-bold leading-none"
+                    style={{
+                      color: isGap
+                        ? "color-mix(in srgb, var(--px-accent) 55%, var(--px-text2))"
+                        : "var(--px-border2)",
+                    }}
                   >
-                    {isGap ? "·" : "·"}
+                    {isGap ? "빈" : "·"}
                   </span>
                 )}
               </>

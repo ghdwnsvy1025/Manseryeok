@@ -6,6 +6,7 @@ import TodayFortunePanel from "@/components/home/TodayFortunePanel";
 import TodayStatusCard from "@/components/home/TodayStatusCard";
 import TodayRecordPrompt from "@/components/home/TodayRecordPrompt";
 import YesterdayGapPrompt from "@/components/home/YesterdayGapPrompt";
+import InstallAppNudge from "@/components/home/InstallAppNudge";
 import HomeEBlock from "@/components/home/HomeEBlock";
 import { getJournalStorage } from "@/lib/journal/getStorage";
 import { getEnabledCodesOrdered } from "@/lib/journal/preferences";
@@ -511,6 +512,8 @@ export default function HomeG() {
       {yesterdayMissing && entries.length > 0 && (
         <YesterdayGapPrompt todayDate={today} entryDates={entryDates} />
       )}
+
+      {entries.length > 0 && <InstallAppNudge hasEntries />}
 
       <TodayStatusCard
         stats={eStats}

@@ -495,7 +495,7 @@ export default function DiaryLoginPage() {
 
       {!importReady && (
         <Section title="설정">
-          <InstallAppButton />
+          <InstallAppButton surface="settings" />
           {loggedIn && !showLoginForm && hasLocalBackup && (
             <button
               type="button"

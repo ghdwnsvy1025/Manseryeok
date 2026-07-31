@@ -12,10 +12,15 @@ import type { JournalEntry } from "@/lib/journal/types";
 import type { JournalSaveResult } from "@/lib/journal/storage";
 import ContentFeedbackButtons from "@/components/journal/ContentFeedbackButtons";
 import OpenAiOriginHint from "@/components/journal/OpenAiOriginHint";
+import InstallAppButton from "@/components/InstallAppButton";
 import { submitContentFeedback } from "@/lib/journal/contentFeedback";
 import { trackContentExposure } from "@/lib/journal/exposure";
 import { burstFromElement, prefersReducedMotion } from "@/lib/ui/clickBurst";
 import { XP_GAUGE_FILL, XP_GAIN_COLOR } from "@/lib/ui/xpGauge";
+import {
+  isInstallNudgeDismissed,
+  isStandaloneDisplay,
+} from "@/lib/pwa/installState";
 
 const QUOTE_LOADING_HINTS = [
   "문장을 고르는 중…",
@@ -117,6 +122,7 @@ export default function JournalSaveCompleteModal({
   const [sharedLocal, setSharedLocal] = useState(false);
   const [showDetail, setShowDetail] = useState(false);
   const [loadingHintIdx, setLoadingHintIdx] = useState(0);
+  const [showInstall, setShowInstall] = useState(false);
   const closeRef = useRef<HTMLButtonElement>(null);
   const gaugeRef = useRef<HTMLDivElement>(null);
   const xpFloatRef = useRef<HTMLParagraphElement>(null);
@@ -316,6 +322,14 @@ export default function JournalSaveCompleteModal({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
+
+  useEffect(() => {
+    if (isStandaloneDisplay() || isInstallNudgeDismissed()) {
+      setShowInstall(false);
+      return;
+    }
+    setShowInstall(true);
+  }, []);
 
   useEffect(() => {
     if (!quote || quoteLoading) return;
@@ -771,12 +785,15 @@ export default function JournalSaveCompleteModal({
         </div>
 
         <div
-          className="shrink-0 p-3 border-t-2"
+          className="shrink-0 p-3 border-t-2 space-y-2"
           style={{
             borderColor: "var(--px-border)",
             background: "var(--px-bg2)",
           }}
         >
+          {showInstall && (
+            <InstallAppButton compact surface="save_complete" />
+          )}
           <button
             ref={closeRef}
             type="button"

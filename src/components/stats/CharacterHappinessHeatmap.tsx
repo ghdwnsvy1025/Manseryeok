@@ -18,7 +18,7 @@ const ELEM_COLORS: Record<Element, string> = {
   water: "#60a5fa",
 };
 
-const UNLOCK_DAYS = 1;
+const UNLOCK_DAYS = 2;
 
 type Tab = "stem" | "branch";
 
@@ -40,7 +40,7 @@ function HappinessTile({
   row: CharacterHappiness;
   compact?: boolean;
 }) {
-  const insufficient = row.count < 1;
+  const insufficient = row.count < 2;
   const borderColor = row.element
     ? ELEM_COLORS[row.element]
     : row.average != null
@@ -146,7 +146,14 @@ export default function CharacterHappinessHeatmap({
     <section className="stats-section" aria-label="나의 사주 패턴">
       <div className="stats-emphasize-head">
         <p className="stats-emphasize-title">사주 패턴</p>
-        {unlocked && data.overall != null ? (
+        {!unlocked ? (
+          <p
+            className="text-xs font-black tabular-nums"
+            style={{ color: "var(--px-text2)" }}
+          >
+            {uniqueDays}/{UNLOCK_DAYS}일
+          </p>
+        ) : data.overall != null ? (
           <p className="tabular-nums shrink-0 text-right">
             <span
               className="text-lg font-black"
@@ -156,14 +163,7 @@ export default function CharacterHappinessHeatmap({
             </span>
             <span className="stats-metric-unit">/10</span>
           </p>
-        ) : (
-          <p
-            className="text-xs font-black tabular-nums"
-            style={{ color: "var(--px-text2)" }}
-          >
-            {uniqueDays === 0 ? "기록 필요" : `${uniqueDays}일`}
-          </p>
-        )}
+        ) : null}
       </div>
 
       {!unlocked ? (
@@ -173,13 +173,25 @@ export default function CharacterHappinessHeatmap({
             style={{ color: "var(--px-text-on-panel)" }}
           >
             {uniqueDays === 0
-              ? "기록을 남기면 천간·지지 패턴이 열려요"
-              : "패턴을 준비하는 중…"}
+              ? "기록이 쌓이면 천간·지지 패턴이 열려요"
+              : `${uniqueDays}/2일 · 상대 비교는 이틀부터`}
           </p>
-          {uniqueDays === 0 && (
+          {uniqueDays === 0 ? (
             <Link href="/journal" className="stats-link inline-block">
               기록하기 →
             </Link>
+          ) : (
+            <div className="stats-progress-track" aria-hidden>
+              <div
+                className="stats-progress-fill"
+                style={{
+                  width: `${Math.min(
+                    100,
+                    Math.round((uniqueDays / UNLOCK_DAYS) * 100)
+                  )}%`,
+                }}
+              />
+            </div>
           )}
         </div>
       ) : (
