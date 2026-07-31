@@ -44,11 +44,13 @@ export default function WelcomeAuthGate({
     setMessage("");
     captureEvent(ANALYTICS_EVENTS.authGoogleClicked);
 
-    // 가능하면 익명 세션을 만든 뒤 linkIdentity (user_id 유지)
-    await ensureAnonymousSession();
+    // 로그인 화면은 일반 OAuth (linkIdentity는 인증코드 누락·기존 계정 충돌이 잦음)
     stashAuthNextPath(authNextPath);
     const redirectTo = getAuthCallbackUrl();
-    const result = await startGoogleAuth({ redirectTo });
+    const result = await startGoogleAuth({
+      redirectTo,
+      preferLink: false,
+    });
     if (!result.ok) {
       setLoading(null);
       setMessage(result.error ?? "Google 연결에 실패했어요.");

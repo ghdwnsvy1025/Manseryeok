@@ -221,3 +221,17 @@ export function peekLastSavedForm(entryDate: string): SavedCheckInForm | null {
   const rebuilt = formFromEntry(snap.entry);
   return isSavedFormComplete(rebuilt) ? rebuilt : snap.form;
 }
+
+export function clearLastSavedCheckIn(): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.sessionStorage.removeItem(LAST_SAVED_CHECKIN_KEY);
+  } catch {
+    /* ignore */
+  }
+  try {
+    window.localStorage.removeItem(LAST_SAVED_CHECKIN_KEY);
+  } catch {
+    /* ignore */
+  }
+}

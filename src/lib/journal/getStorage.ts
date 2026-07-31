@@ -40,7 +40,7 @@ export async function getJournalStorage(): Promise<JournalStorage> {
   }
 
   const primary = await loadPrimarySajuProfile();
-  const profileId = primary?.id ?? "local";
+  let profileId = primary?.id ?? "local";
 
   if (cached && cachedProfileId === profileId) return cached;
 
@@ -55,7 +55,37 @@ export async function getJournalStorage(): Promise<JournalStorage> {
     }
   }
 
-  cached = getIndexedDbJournalStorage(profileId);
+  let local = getIndexedDbJournalStorage(profileId);
+  // 프로필이 바뀌어 빈 저장소인데, 예전 프로필 id에 일기가 남아 있으면 복구
+  try {
+    const listed = await local.list();
+    if (listed.length === 0) {
+      const { listAllLocalJournalEntries } = await import(
+        "@/lib/journal/indexedDbStorage"
+      );
+      const all = await listAllLocalJournalEntries();
+      if (all.length > 0) {
+        const recoveredId = all[0]?.sajuProfileId || "local";
+        if (recoveredId !== profileId) {
+          profileId = recoveredId;
+          local = getIndexedDbJournalStorage(profileId);
+          try {
+            const { clearLastSavedCheckIn } = await import(
+              "@/lib/journal/lastSavedCheckIn"
+            );
+            clearLastSavedCheckIn();
+          } catch {
+            /* ignore */
+          }
+        }
+      }
+    }
+  } catch {
+    /* keep primary-scoped storage */
+  }
+
+  cached = local;
+  cachedProfileId = profileId;
   return cached;
 }
 

@@ -26,7 +26,6 @@ function isAnonymousDisabledError(message: string | undefined): boolean {
 export async function ensureAnonymousSession(): Promise<{
   ok: boolean;
   user: User | null;
-  /** 서버에서 익명 로그인이 꺼져 로컬 게스트만 쓰는 경우 */
   localGuestOnly?: boolean;
   error?: string;
 }> {
@@ -47,7 +46,6 @@ export async function ensureAnonymousSession(): Promise<{
 
   const { data, error } = await supabase.auth.signInAnonymously();
   if (error || !data.user) {
-    // Anonymous 미활성 등 — 기기 로컬 게스트로 계속 사용 가능하게
     enableGuestMode();
     return {
       ok: true,
@@ -64,11 +62,14 @@ export async function ensureAnonymousSession(): Promise<{
 }
 
 /**
- * 익명 → Google: linkIdentity로 user_id 유지.
- * 익명 세션이 없으면 일반 OAuth (Anonymous 미활성·로그아웃 직후 포함).
+ * Google 로그인.
+ * - preferLink + 익명 세션: linkIdentity 시도 (user_id 유지)
+ * - 실패하거나 익명 없음: 일반 OAuth (안정적)
  */
 export async function startGoogleAuth(opts: {
   redirectTo: string;
+  /** true면 익명일 때 linkIdentity 우선 (기본 false — 로그인 화면은 OAuth) */
+  preferLink?: boolean;
 }): Promise<{ ok: boolean; error?: string; code?: string }> {
   const supabase = getSupabaseBrowserClient();
   if (!supabase) {
@@ -83,7 +84,7 @@ export async function startGoogleAuth(opts: {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (user && isAnonymousUser(user)) {
+  if (opts.preferLink && user && isAnonymousUser(user)) {
     const { error } = await supabase.auth.linkIdentity({
       provider: "google",
       options: {
@@ -91,37 +92,38 @@ export async function startGoogleAuth(opts: {
         queryParams: { hl: "ko" },
       },
     });
-    if (error) {
-      const msg = error.message ?? "";
-      const alreadyLinked =
-        /already.*(linked|registered|exists)/i.test(msg) ||
-        /identity.*another user/i.test(msg) ||
-        error.code === "identity_already_exists";
+    if (!error) return { ok: true };
+    // 이미 가입된 Google 등이면 아래 OAuth로 폴백하지 않고 안내
+    const msg = error.message ?? "";
+    const alreadyLinked =
+      /already.*(linked|registered|exists)/i.test(msg) ||
+      /identity.*another user/i.test(msg) ||
+      error.code === "identity_already_exists";
+    if (alreadyLinked) {
       return {
         ok: false,
-        code: alreadyLinked ? "identity_already_exists" : "link_failed",
-        error: alreadyLinked
-          ? "이미 가입된 Google 계정이에요. 그 계정으로 바로 로그인하면 지금 익명 기록은 이어지지 않아요."
-          : `Google 연결에 실패했어요. (${msg})`,
+        code: "identity_already_exists",
+        error:
+          "이미 가입된 Google 계정이에요. 아래에서 같은 계정으로 다시 로그인해 주세요.",
       };
     }
-    return { ok: true };
+    // 그 외 link 실패 → OAuth 폴백
   }
 
-  // 세션 없음·로컬 게스트·이미 Google 아님: 일반 OAuth
   disableGuestMode();
   const { error } = await supabase.auth.signInWithOAuth({
     provider: "google",
     options: {
       redirectTo: opts.redirectTo,
       queryParams: { hl: "ko" },
+      skipBrowserRedirect: false,
     },
   });
   if (error) {
     return {
       ok: false,
       code: "oauth_failed",
-      error: `Google 로그인을 시작하지 못했어요. (${opts.redirectTo})`,
+      error: `Google 로그인을 시작하지 못했어요. (${error.message || opts.redirectTo})`,
     };
   }
   return { ok: true };

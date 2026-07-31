@@ -6,7 +6,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import HeaderProgressBadge from "@/components/HeaderProgressBadge";
 import { openBetaFeedback } from "@/components/feedback/BetaFeedbackHost";
 import {
-  clearLocalAccountScopedState,
   loadJournalSajuProfile,
   profileDisplayName,
   PROFILES_LIST_EVENT,
@@ -19,7 +18,6 @@ import { lockEntry } from "@/lib/auth/entryGate";
 import { disableGuestMode } from "@/lib/auth/guestMode";
 import { resetDiaryStorageCache } from "@/lib/diary/getStorage";
 import { resetJournalStorageCache } from "@/lib/journal/getStorage";
-import { clearFirstVisitWelcomeSeen } from "@/lib/app/firstVisitWelcome";
 
 function birthDateLabel(profile: SajuProfile): string {
   return profile.birthDate.replaceAll("-", ".");
@@ -190,13 +188,12 @@ export default function ProfileHeader() {
                       /* ignore */
                     }
                   }
+                  // 로컬 프로필·일기는 유지 — 비로그인 재진입 시 그대로 사용
                   disableGuestMode();
                   lockEntry();
                   reconcileLocalStateWithAuthUser(null);
-                  clearLocalAccountScopedState({ notify: true });
                   resetDiaryStorageCache();
                   resetJournalStorageCache();
-                  clearFirstVisitWelcomeSeen();
                   window.location.href = "/";
                 })();
               }}

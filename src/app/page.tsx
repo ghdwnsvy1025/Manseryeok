@@ -76,6 +76,14 @@ export default function HomePage() {
       if (params.get("oauth") === "success") {
         unlockEntry();
         disableGuestMode();
+        try {
+          const { syncLocalSajuProfileToAccount } = await import(
+            "@/lib/diary/profileStorage"
+          );
+          await syncLocalSajuProfileToAccount();
+        } catch {
+          /* ignore */
+        }
         void autoMigrateLocalJournalToAccount();
         window.history.replaceState({}, "", "/");
       }

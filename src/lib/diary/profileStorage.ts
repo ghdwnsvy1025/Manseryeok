@@ -107,8 +107,10 @@ export function clearLocalAccountScopedState(opts?: {
 }
 
 /**
- * auth user가 바뀌면 로컬 계정 스코프 상태를 비운다.
- * 예외: 비로그인(게스트) → 첫 로그인, 그리고 로컬 프로필이 익명이면 이관용으로 유지.
+ * auth user가 바뀌면 로컬 계정 스코프 상태를 정리한다.
+ * - 로그아웃(→ null): 기기 로컬 프로필·일기 유지 (비로그인 재진입)
+ * - 게스트 → 첫 로그인: 로컬 유지 후 이관
+ * - 다른 계정으로 전환: 이관 불가면 이전 캐시 삭제
  */
 export function reconcileLocalStateWithAuthUser(userId: string | null): void {
   if (typeof window === "undefined") return;
@@ -120,18 +122,25 @@ export function reconcileLocalStateWithAuthUser(userId: string | null): void {
   }
   if (userId === prev) return;
 
-  const preserveGuest =
-    Boolean(userId) &&
-    !prev &&
-    localProfilesSafeToMigrate(loadLocalSajuProfiles(), userId!);
+  // 로그아웃: 로컬 데이터는 지우지 않음
+  if (!userId) {
+    try {
+      localStorage.removeItem(LAST_AUTH_USER_KEY);
+    } catch {
+      /* ignore */
+    }
+    return;
+  }
 
-  if (!preserveGuest) {
-    clearLocalAccountScopedState({ notify: true });
+  // 다른 로그인 사용자로 바뀔 때, 로컬이 그 계정 것이 아니면 비움
+  if (prev && prev !== userId) {
+    if (!localProfilesSafeToMigrate(loadLocalSajuProfiles(), userId)) {
+      clearLocalAccountScopedState({ notify: true });
+    }
   }
 
   try {
-    if (userId) localStorage.setItem(LAST_AUTH_USER_KEY, userId);
-    else localStorage.removeItem(LAST_AUTH_USER_KEY);
+    localStorage.setItem(LAST_AUTH_USER_KEY, userId);
   } catch {
     /* ignore */
   }
