@@ -7,10 +7,9 @@ import {
   isFirstVisitWelcomePath,
   markFirstVisitWelcomeSeen,
 } from "@/lib/app/firstVisitWelcome";
-import { loadLocalSajuProfiles } from "@/lib/diary/profileStorage";
 
 /**
- * 앱을 처음 쓸 때(사주 프로필이 생긴 뒤) 한 번만 보이는 소개 팝업.
+ * 앱을 처음 쓸 때 홈에서 한 번만 보이는 소개 팝업.
  */
 export default function FirstVisitWelcome() {
   const pathname = usePathname();
@@ -19,7 +18,6 @@ export default function FirstVisitWelcome() {
   useEffect(() => {
     if (hasSeenFirstVisitWelcome()) return;
     if (!isFirstVisitWelcomePath(pathname)) return;
-    if (loadLocalSajuProfiles().length === 0) return;
 
     const t = window.setTimeout(() => setOpen(true), 450);
     return () => window.clearTimeout(t);

@@ -1,18 +1,21 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
+import WelcomeAuthGate from "@/components/auth/WelcomeAuthGate";
 import SajuProfileSetup from "@/components/home/SajuProfileSetup";
 import HomeHub from "@/components/home/HomeHub";
 import HomeG from "@/components/home/HomeG";
 import HomeSaveCelebration from "@/components/home/HomeSaveCelebration";
 import { useUserAppState } from "@/hooks/useUserAppState";
 import { isNewDiaryEnabled } from "@/lib/app/featureFlags";
-import {
-  ensureAnonymousSession,
-  isAnonymousUser,
-} from "@/lib/auth/anonymousSession";
+import { isAnonymousUser } from "@/lib/auth/anonymousSession";
 import { autoMigrateLocalJournalToAccount } from "@/lib/auth/autoMigrateLocalJournal";
-import { disableGuestMode, enableGuestMode } from "@/lib/auth/guestMode";
+import { isEntryUnlocked, unlockEntry, hideShellChrome, showShellChrome } from "@/lib/auth/entryGate";
+import {
+  disableGuestMode,
+  enableGuestMode,
+  isGuestMode,
+} from "@/lib/auth/guestMode";
 import {
   loadLocalSajuProfiles,
   SAJU_PROFILE_CHANGED_EVENT,
@@ -37,12 +40,14 @@ function localHasSajuProfile(): boolean {
   }
 }
 
+type Phase = "loading" | "login" | "saju" | "home";
+
 export default function HomePage() {
   const { state, refresh } = useUserAppState();
-  const [authReady, setAuthReady] = useState(false);
-  const [entryAllowed, setEntryAllowed] = useState(false);
+  const [phase, setPhase] = useState<Phase>("loading");
   const [localProfileHint, setLocalProfileHint] = useState(false);
-  const [waitedForProfile, setWaitedForProfile] = useState(false);
+  const [sajuDone, setSajuDone] = useState(false);
+  const [loginError, setLoginError] = useState("");
   const newDiary = isNewDiaryEnabled();
 
   useEffect(() => {
@@ -57,73 +62,148 @@ export default function HomePage() {
   }, [state]);
 
   useEffect(() => {
-    const t = window.setTimeout(() => setWaitedForProfile(true), 1500);
-    return () => window.clearTimeout(t);
-  }, []);
-
-  useEffect(() => {
     const supabase = getSupabaseBrowserClient();
-    if (!supabase) {
-      enableGuestMode();
-      setEntryAllowed(true);
-      setAuthReady(true);
-      return;
-    }
-
     let cancelled = false;
 
-    void (async () => {
+    const goAfterAuth = () => {
+      const hasProfile = localHasSajuProfile() || sajuDone;
+      setPhase(hasProfile ? "home" : "saju");
+    };
+
+    const resolvePhase = async () => {
+      // OAuth 성공 복귀
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("oauth") === "success") {
+        unlockEntry();
+        disableGuestMode();
+        void autoMigrateLocalJournalToAccount();
+        window.history.replaceState({}, "", "/");
+      }
+      const authError = params.get("authError");
+      if (authError) {
+        const messages: Record<string, string> = {
+          missing_code: "로그인 인증을 끝내지 못했어요. 다시 시도해 주세요.",
+          not_configured: "로그인 서버가 설정되지 않았습니다.",
+          exchange_failed: "로그인 세션을 만들지 못했어요. 다시 시도해 주세요.",
+          identity_already_exists:
+            "이미 가입된 Google 계정이에요. 그 계정으로 다시 로그인해 주세요.",
+        };
+        setLoginError(messages[authError] ?? "로그인에 실패했습니다.");
+        window.history.replaceState({}, "", "/");
+      }
+
+      if (!supabase) {
+        if (isEntryUnlocked() || isGuestMode()) {
+          if (isGuestMode()) unlockEntry();
+          goAfterAuth();
+        } else {
+          setPhase("login");
+        }
+        return;
+      }
+
       try {
         const { data } = await supabase.auth.getSession();
         if (cancelled) return;
-        if (data.session?.user) {
-          if (isAnonymousUser(data.session.user)) enableGuestMode();
-          else disableGuestMode();
-          setEntryAllowed(true);
+        const user = data.session?.user ?? null;
+
+        if (user && !isAnonymousUser(user)) {
+          unlockEntry();
+          disableGuestMode();
           void autoMigrateLocalJournalToAccount();
-        } else {
-          const anon = await ensureAnonymousSession();
-          if (cancelled) return;
-          setEntryAllowed(Boolean(anon.user) || anon.ok);
-          void autoMigrateLocalJournalToAccount();
+          goAfterAuth();
+          return;
         }
+
+        if (
+          isEntryUnlocked() &&
+          (isGuestMode() || (user && isAnonymousUser(user)))
+        ) {
+          if (user && isAnonymousUser(user)) enableGuestMode();
+          void autoMigrateLocalJournalToAccount();
+          goAfterAuth();
+          return;
+        }
+
+        setPhase("login");
       } catch {
-        if (cancelled) return;
-        enableGuestMode();
-        setEntryAllowed(true);
-      } finally {
-        if (!cancelled) setAuthReady(true);
+        if (!cancelled) setPhase("login");
       }
-    })();
+    };
+
+    void resolvePhase();
+
+    if (!supabase) return;
 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
       if (cancelled) return;
-      if (session?.user) {
-        if (isAnonymousUser(session.user)) enableGuestMode();
-        else disableGuestMode();
-        setEntryAllowed(true);
-        setAuthReady(true);
+      const user = session?.user;
+      if (user && !isAnonymousUser(user)) {
+        unlockEntry();
+        disableGuestMode();
+        void autoMigrateLocalJournalToAccount();
+        setPhase((prev) => {
+          if (prev === "login" || prev === "loading") {
+            return localHasSajuProfile() || sajuDone ? "home" : "saju";
+          }
+          return prev;
+        });
       }
     });
+
     return () => {
       cancelled = true;
       subscription.unsubscribe();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  if (!authReady || !entryAllowed) {
+  useEffect(() => {
+    if (phase !== "saju") return;
+    if (localProfileHint || state?.hasSajuProfile) {
+      setSajuDone(true);
+      setPhase("home");
+    }
+  }, [phase, localProfileHint, state?.hasSajuProfile]);
+
+  useEffect(() => {
+    if (phase === "login" || phase === "saju" || phase === "loading") {
+      hideShellChrome();
+    } else if (phase === "home") {
+      showShellChrome();
+    }
+  }, [phase]);
+
+  if (phase === "loading") {
     return <p className="ui-hint p-4">불러오는 중...</p>;
   }
 
-  const hasProfile = Boolean(state?.hasSajuProfile) || localProfileHint;
+  if (phase === "login") {
+    return (
+      <WelcomeAuthGate
+        authNextPath="/?oauth=success"
+        initialMessage={loginError}
+        onGuest={() => {
+          setPhase(localHasSajuProfile() ? "home" : "saju");
+          void refresh();
+        }}
+      />
+    );
+  }
 
-  if (!hasProfile) {
-    if (!waitedForProfile && state === null) {
-      return <p className="ui-hint p-4">불러오는 중...</p>;
-    }
-    return <SajuProfileSetup onCompleted={() => void refresh()} />;
+  if (phase === "saju") {
+    return (
+      <SajuProfileSetup
+        onCompleted={() => {
+          setSajuDone(true);
+          setLocalProfileHint(localHasSajuProfile());
+          setPhase("home");
+          void refresh();
+        }}
+      />
+    );
   }
 
   if (newDiary || !state) {

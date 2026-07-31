@@ -6,12 +6,20 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import HeaderProgressBadge from "@/components/HeaderProgressBadge";
 import { openBetaFeedback } from "@/components/feedback/BetaFeedbackHost";
 import {
+  clearLocalAccountScopedState,
   loadJournalSajuProfile,
   profileDisplayName,
   PROFILES_LIST_EVENT,
+  reconcileLocalStateWithAuthUser,
   SAJU_PROFILE_CHANGED_EVENT,
 } from "@/lib/diary/profileStorage";
 import type { SajuProfile } from "@/lib/diary/types";
+import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { lockEntry } from "@/lib/auth/entryGate";
+import { disableGuestMode } from "@/lib/auth/guestMode";
+import { resetDiaryStorageCache } from "@/lib/diary/getStorage";
+import { resetJournalStorageCache } from "@/lib/journal/getStorage";
+import { clearFirstVisitWelcomeSeen } from "@/lib/app/firstVisitWelcome";
 
 function birthDateLabel(profile: SajuProfile): string {
   return profile.birthDate.replaceAll("-", ".");
@@ -164,15 +172,44 @@ export default function ProfileHeader() {
             >
               버그·어색한 문장·아이디어
             </p>
-            <Link
-              href="/diary/login"
-              onClick={closeMenu}
-              className="block px-3 py-2.5 text-center text-sm font-bold border"
-              style={menuLinkStyle}
+            <div
+              className="h-px w-full"
+              style={{ background: "var(--px-border)" }}
+              aria-hidden
+            />
+            <button
+              type="button"
+              onClick={() => {
+                closeMenu();
+                void (async () => {
+                  const supabase = getSupabaseBrowserClient();
+                  if (supabase) {
+                    try {
+                      await supabase.auth.signOut();
+                    } catch {
+                      /* ignore */
+                    }
+                  }
+                  disableGuestMode();
+                  lockEntry();
+                  reconcileLocalStateWithAuthUser(null);
+                  clearLocalAccountScopedState({ notify: true });
+                  resetDiaryStorageCache();
+                  resetJournalStorageCache();
+                  clearFirstVisitWelcomeSeen();
+                  window.location.href = "/";
+                })();
+              }}
+              className="block w-full px-3 py-2.5 text-center text-sm font-black border"
+              style={{
+                borderColor: "var(--px-border)",
+                color: "var(--px-text-on-panel)",
+                background: "var(--px-bg2)",
+              }}
               role="menuitem"
             >
-              계정 및 설정
-            </Link>
+              로그아웃
+            </button>
           </div>
         )}
       </div>

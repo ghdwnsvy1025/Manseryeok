@@ -4,10 +4,10 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { takeAuthNextPath } from "@/lib/auth/redirectOrigin";
+import { unlockEntry } from "@/lib/auth/entryGate";
 
 /**
  * OAuth / linkIdentity 콜백 — 클라이언트에서 code·hash 모두 처리.
- * (서버 route만 쓰면 hash 토큰·PKCE 쿠키 불일치로 missing_code가 자주 남)
  */
 export default function AuthCallbackPage() {
   const router = useRouter();
@@ -26,7 +26,7 @@ export default function AuthCallbackPage() {
         url.searchParams.get("error_description");
 
       if (!supabase) {
-        router.replace("/diary/login?authError=not_configured");
+        router.replace("/?authError=not_configured");
         return;
       }
 
@@ -37,8 +37,8 @@ export default function AuthCallbackPage() {
           /identity.*another user/i.test(raw);
         router.replace(
           already
-            ? "/diary/login?authError=identity_already_exists"
-            : "/diary/login?authError=exchange_failed"
+            ? "/?authError=identity_already_exists"
+            : "/?authError=exchange_failed"
         );
         return;
       }
@@ -53,40 +53,39 @@ export default function AuthCallbackPage() {
             if (!cancelled) {
               router.replace(
                 already
-                  ? "/diary/login?authError=identity_already_exists"
-                  : "/diary/login?authError=exchange_failed"
+                  ? "/?authError=identity_already_exists"
+                  : "/?authError=exchange_failed"
               );
             }
             return;
           }
         } else {
-          // implicit / hash 세션 — detectSessionInUrl이 파싱했는지 확인
           const { data } = await supabase.auth.getSession();
           if (!data.session) {
-            // hash에 토큰이 있으면 한 번 더 시도
             const hash = url.hash?.replace(/^#/, "") ?? "";
             if (hash.includes("access_token")) {
               setHint("세션을 확인하는 중…");
               await new Promise((r) => setTimeout(r, 400));
               const again = await supabase.auth.getSession();
               if (!again.data.session && !cancelled) {
-                router.replace("/diary/login?authError=missing_code");
+                router.replace("/?authError=missing_code");
                 return;
               }
             } else if (!cancelled) {
-              router.replace("/diary/login?authError=missing_code");
+              router.replace("/?authError=missing_code");
               return;
             }
           }
         }
 
-        const next = takeAuthNextPath("/diary/login?oauth=success");
+        unlockEntry();
+        const next = takeAuthNextPath("/?oauth=success");
         if (!cancelled) {
           window.location.replace(next);
         }
       } catch {
         if (!cancelled) {
-          router.replace("/diary/login?authError=exchange_failed");
+          router.replace("/?authError=exchange_failed");
         }
       }
     })();

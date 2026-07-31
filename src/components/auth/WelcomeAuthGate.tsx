@@ -5,6 +5,7 @@ import {
   ensureAnonymousSession,
   startGoogleAuth,
 } from "@/lib/auth/anonymousSession";
+import { unlockEntry } from "@/lib/auth/entryGate";
 import {
   getAuthCallbackUrl,
   stashAuthNextPath,
@@ -12,73 +13,63 @@ import {
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { ANALYTICS_EVENTS, captureEvent } from "@/lib/analytics/posthog";
 import { autoMigrateLocalJournalToAccount } from "@/lib/auth/autoMigrateLocalJournal";
+import { enableGuestMode } from "@/lib/auth/guestMode";
 
 type Props = {
   onGuest: () => void;
-  title?: string;
-  subtitle?: string;
   authNextPath?: string;
+  /** OAuth 등 외부에서 넘긴 안내 문구 */
+  initialMessage?: string;
 };
 
-const GOOGLE_BENEFITS = [
-  "확인 메일·비밀번호 없이 3초 만에 시작",
-  "같은 기기에서 쓰던 기록이 Google 계정으로 이어져요",
-  "폰을 바꿔도 일기·운세·패턴이 그대로",
-] as const;
-
 /**
- * 시작/로그아웃 공통 — 게스트 + Google
- * Anonymous 서버 설정이 없어도 게스트·Google OAuth는 동작.
+ * 최초/로그아웃 후 — 로그인만 (Google 위 · 비로그인 아래)
  */
 export default function WelcomeAuthGate({
   onGuest,
-  title = "시작하기",
-  subtitle = "먼저 둘러보고, 마음에 들면 Google로 이어서 저장하세요.",
-  authNextPath = "/diary/login?oauth=success",
+  authNextPath = "/?oauth=success",
+  initialMessage = "",
 }: Props) {
-  const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState("");
-
-  const startAsGuest = async () => {
-    setLoading(true);
-    setMessage("");
-    // Anonymous 꺼져 있어도 로컬 게스트로 진입
-    await ensureAnonymousSession();
-    void autoMigrateLocalJournalToAccount();
-    setLoading(false);
-    onGuest();
-  };
+  const [loading, setLoading] = useState<"google" | "guest" | null>(null);
+  const [message, setMessage] = useState(initialMessage);
 
   const startGoogle = async () => {
     const supabase = getSupabaseBrowserClient();
     if (!supabase) {
-      setMessage(
-        "현재 로그인 서버가 설정되지 않았습니다. 비로그인으로 먼저 사용할 수 있어요."
-      );
+      setMessage("로그인 서버가 설정되지 않았습니다.");
       return;
     }
 
-    setLoading(true);
+    setLoading("google");
     setMessage("");
     captureEvent(ANALYTICS_EVENTS.authGoogleClicked);
 
-    // 익명 가능하면 만들어 linkIdentity, 안 되면 그냥 OAuth
+    // 가능하면 익명 세션을 만든 뒤 linkIdentity (user_id 유지)
     await ensureAnonymousSession();
-
     stashAuthNextPath(authNextPath);
     const redirectTo = getAuthCallbackUrl();
     const result = await startGoogleAuth({ redirectTo });
     if (!result.ok) {
-      setLoading(false);
+      setLoading(null);
       setMessage(result.error ?? "Google 연결에 실패했어요.");
-      return;
     }
   };
 
+  const startAsGuest = async () => {
+    setLoading("guest");
+    setMessage("");
+    await ensureAnonymousSession();
+    enableGuestMode();
+    unlockEntry();
+    void autoMigrateLocalJournalToAccount();
+    setLoading(null);
+    onGuest();
+  };
+
   return (
-    <div className="max-w-md mx-auto space-y-4 pb-6">
+    <div className="max-w-md mx-auto space-y-4 pb-6 pt-6 px-1">
       <section
-        className="p-4 border-2 space-y-1 text-center"
+        className="p-5 border-2 space-y-2 text-center"
         style={{
           background: "var(--px-bg2)",
           borderColor: "var(--px-accent)",
@@ -88,49 +79,22 @@ export default function WelcomeAuthGate({
         <p className="text-xs font-bold" style={{ color: "var(--px-text2)" }}>
           오늘의 사주 일기
         </p>
-        <h1 className="text-lg font-black" style={{ color: "var(--px-accent)" }}>
-          {title}
+        <h1 className="text-xl font-black" style={{ color: "var(--px-accent)" }}>
+          로그인
         </h1>
-        <p className="text-xs font-bold pt-1" style={{ color: "var(--px-text2)" }}>
-          {subtitle}
+        <p className="text-xs font-bold leading-relaxed" style={{ color: "var(--px-text2)" }}>
+          시작하려면 Google 또는 비로그인 중 하나를 골라 주세요.
         </p>
       </section>
 
       <section
         className="p-4 border-2 space-y-3"
         style={{ background: "var(--px-bg3)", borderColor: "var(--px-border)" }}
-        aria-label="시작 방법 선택"
+        aria-label="로그인 방법"
       >
         <button
           type="button"
-          disabled={loading}
-          onClick={() => void startAsGuest()}
-          className="w-full px-4 py-4 text-base font-black border-2"
-          style={{
-            background: "var(--px-bg2)",
-            borderColor: "#000",
-            color: "var(--px-text-on-panel)",
-            boxShadow: "3px 3px 0 #000",
-          }}
-        >
-          {loading ? "준비 중…" : "로그인 없이 바로 써보기"}
-        </button>
-        <p
-          className="text-[11px] font-bold text-center leading-snug"
-          style={{ color: "var(--px-text2)" }}
-        >
-          바로 시작 · Google로 바꾸면 기록이 이어져요
-        </p>
-
-        <div
-          className="h-px w-full"
-          style={{ background: "var(--px-border)" }}
-          aria-hidden
-        />
-
-        <button
-          type="button"
-          disabled={loading}
+          disabled={loading !== null}
           onClick={() => void startGoogle()}
           className="w-full px-4 py-4 text-base font-black border-2"
           style={{
@@ -140,11 +104,16 @@ export default function WelcomeAuthGate({
             boxShadow: "4px 4px 0 #000",
           }}
         >
-          {loading ? "연결 중…" : "Google로 이어가기"}
+          {loading === "google" ? "연결 중…" : "Google로 시작하기"}
         </button>
-
-        <ul className="space-y-1.5 pt-0.5" aria-label="Google 로그인 장점">
-          {GOOGLE_BENEFITS.map((line) => (
+        <ul className="space-y-1.5" aria-label="Google 로그인 장점">
+          {(
+            [
+              "확인 메일·비밀번호 없이 바로 시작",
+              "기기 바꿔도 기록이 이어져요",
+              "이 기기 기록도 계정에 자동 저장",
+            ] as const
+          ).map((line) => (
             <li
               key={line}
               className="text-[11px] font-bold leading-snug pl-2"
@@ -157,6 +126,33 @@ export default function WelcomeAuthGate({
             </li>
           ))}
         </ul>
+
+        <div
+          className="h-px w-full"
+          style={{ background: "var(--px-border)" }}
+          aria-hidden
+        />
+
+        <button
+          type="button"
+          disabled={loading !== null}
+          onClick={() => void startAsGuest()}
+          className="w-full px-4 py-4 text-base font-black border-2"
+          style={{
+            background: "var(--px-bg2)",
+            borderColor: "#000",
+            color: "var(--px-text-on-panel)",
+            boxShadow: "3px 3px 0 #000",
+          }}
+        >
+          {loading === "guest" ? "준비 중…" : "비로그인으로 시작하기"}
+        </button>
+        <p
+          className="text-[11px] font-bold text-center leading-snug"
+          style={{ color: "var(--px-text2)" }}
+        >
+          베타 테스트용 · 나중에 Google로 이어갈 수 있어요
+        </p>
       </section>
 
       {message && (
