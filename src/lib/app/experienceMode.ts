@@ -112,6 +112,17 @@ export async function loadUserExperienceSettings(): Promise<{
         }
         if (profile.onboardingCompletedAt) {
           markOnboardingCompletedLocal(profile.onboardingCompletedAt);
+        } else if (localOnboarding) {
+          // 원격 행은 있는데 온보딩 시각만 비어 있으면 로컬을 유지·복구
+          // (saveSajuProfile upsert 직후 completeOnboarding 전에 읽히거나
+          //  원격 upsert 실패 시 로컬을 지워 홈 진입이 막히던 문제)
+          profile = {
+            ...profile,
+            onboardingCompletedAt: localOnboarding,
+            experienceMode:
+              profile.experienceMode ?? localMode ?? DEFAULT_EXPERIENCE_MODE,
+          };
+          saveLocalUserProfile(profile);
         } else {
           try {
             localStorage.removeItem(ONBOARDING_DONE_KEY);
@@ -119,15 +130,46 @@ export async function loadUserExperienceSettings(): Promise<{
             /* ignore */
           }
         }
-        // 로그인 상태에서는 원격(또는 방금 동기화한 profile)만 신뢰 — 이전 계정 로컬 키로 폴백 금지
+        // 로그인 상태: 원격 + (필요 시) 로컬 온보딩 복구값
         return {
-          experienceMode: profile.experienceMode ?? null,
-          onboardingCompletedAt: profile.onboardingCompletedAt ?? null,
+          experienceMode: profile.experienceMode ?? localMode ?? null,
+          onboardingCompletedAt:
+            profile.onboardingCompletedAt ?? localOnboarding ?? null,
           profile,
         };
       }
 
-      // 원격 user_profiles 없음 — 이전 계정 온보딩/모드를 물려받지 않음
+      // 원격 user_profiles 없음 — 이전 계정 캐시 대신, 방금 로컬 온보딩만 있으면 유지
+      if (localOnboarding) {
+        const now = new Date().toISOString();
+        profile = {
+          id: user.id,
+          locale: "ko-KR",
+          timezone: "Asia/Seoul",
+          activeSajuProfileId:
+            loadLocalUserProfile()?.activeJournalProfileId ??
+            loadLocalUserProfile()?.activeSajuProfileId ??
+            null,
+          activeJournalProfileId:
+            loadLocalUserProfile()?.activeJournalProfileId ??
+            loadLocalUserProfile()?.activeSajuProfileId ??
+            null,
+          activeViewProfileId:
+            loadLocalUserProfile()?.activeViewProfileId ?? null,
+          experienceMode: localMode ?? DEFAULT_EXPERIENCE_MODE,
+          onboardingCompletedAt: localOnboarding,
+          createdAt: now,
+          updatedAt: now,
+          schemaVersion: DIARY_SCHEMA_VERSION,
+        };
+        saveLocalUserProfile(profile);
+        return {
+          experienceMode: profile.experienceMode,
+          onboardingCompletedAt: localOnboarding,
+          profile,
+        };
+      }
+
       clearLocalExperienceState();
       const now = new Date().toISOString();
       profile = {

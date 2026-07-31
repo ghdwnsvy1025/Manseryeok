@@ -99,14 +99,17 @@ export default function HomePage() {
         </div>
       );
     }
-    // 온보딩 미완료만 설정으로 — 로딩 중이어도 로컬에 프로필/온보딩이 있으면 홈 진입
-    if (!loading && (!state || state.kind === "new_user")) {
+    // 온보딩 미완료만 설정으로 — 사주 프로필이 있으면 홈
+    if (
+      !loading &&
+      (!state || (state.kind === "new_user" && !state.hasSajuProfile))
+    ) {
       return <SajuProfileSetup onCompleted={() => void refresh()} />;
     }
     if (loading && !state) {
       return <p className="ui-hint p-4">불러오는 중...</p>;
     }
-    if (state?.kind === "new_user") {
+    if (state?.kind === "new_user" && !state.hasSajuProfile) {
       return <SajuProfileSetup onCompleted={() => void refresh()} />;
     }
     return withCelebration(<HomeG />);
@@ -133,7 +136,7 @@ export default function HomePage() {
     );
   }
 
-  if (!state || state.kind === "new_user") {
+  if (!state || (state.kind === "new_user" && !state.hasSajuProfile)) {
     return <SajuProfileSetup onCompleted={() => void refresh()} />;
   }
 

@@ -1,11 +1,18 @@
 import { calculateSaju } from "@/lib/saju/calculator";
 import type { SajuInput, SajuResult } from "@/lib/saju/types";
-import { completeOnboarding } from "@/lib/app/experienceMode";
+import {
+  completeOnboarding,
+  markOnboardingCompletedLocal,
+  saveExperienceModeLocal,
+} from "@/lib/app/experienceMode";
+import { DEFAULT_EXPERIENCE_MODE } from "@/lib/product/modes";
 import type { ExperienceMode, SajuProfile } from "@/lib/diary/types";
 import {
   buildSajuProfileFromResult,
+  ensureLocalUserProfile,
   loadLocalSajuProfiles,
   notifySajuProfileChanged,
+  saveLocalUserProfile,
   saveSajuProfile,
 } from "@/lib/diary/profileStorage";
 import { loadSajuSettings, saveSajuSettings } from "@/lib/diary/sajuSettings";
@@ -53,6 +60,19 @@ export async function registerSajuProfileFromResult(
 
   if (makePrimary) {
     persistBirthSettings(result);
+    // saveSajuProfile의 user_profiles upsert보다 먼저 로컬 온보딩을 세워
+    // 원격 행이 빈 onboarding으로 생겨 홈이 막히는 일을 막는다.
+    const mode = opts?.experienceMode ?? DEFAULT_EXPERIENCE_MODE;
+    const at = new Date().toISOString();
+    markOnboardingCompletedLocal(at);
+    saveExperienceModeLocal(mode);
+    const local = ensureLocalUserProfile();
+    saveLocalUserProfile({
+      ...local,
+      experienceMode: mode,
+      onboardingCompletedAt: at,
+      updatedAt: at,
+    });
   }
 
   const built = buildSajuProfileFromResult(result, {

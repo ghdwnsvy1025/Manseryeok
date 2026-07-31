@@ -85,6 +85,16 @@ describe("computeUserAppState", () => {
 
     expect(
       computeUserAppState({
+        experienceMode: null,
+        onboardingCompletedAt: null,
+        sajuProfile: profile,
+        entries: [],
+        todayDate: "2024-06-01",
+      }).kind
+    ).toBe("profile_without_diary");
+
+    expect(
+      computeUserAppState({
         experienceMode: "balanced",
         onboardingCompletedAt: "2024-01-01T00:00:00.000Z",
         sajuProfile: profile,

@@ -43,7 +43,9 @@ export function computeUserAppState(input: UserAppStateInput): UserAppState {
   const hasSajuProfile = Boolean(input.sajuProfile);
   const hasAnyDiary = totalEntryDays > 0;
   const hasTodayEntry = Boolean(todayEntry);
-  const onboardingCompleted = Boolean(input.onboardingCompletedAt);
+  // 사주 프로필이 있으면 온보딩 완료로 본다 (플래그만 비어 홈에 못 가는 경우 방지)
+  const onboardingCompleted =
+    Boolean(input.onboardingCompletedAt) || hasSajuProfile;
 
   let kind: UserAppStateKind;
   if (!onboardingCompleted) {

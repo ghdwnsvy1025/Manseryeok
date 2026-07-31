@@ -511,6 +511,8 @@ export async function saveSajuProfile(profile: SajuProfile): Promise<SajuProfile
       active_saju_profile_id: remote.id,
       active_journal_profile_id: remote.id,
       active_view_profile_id: viewId,
+      experience_mode: local?.experienceMode ?? null,
+      onboarding_completed_at: local?.onboardingCompletedAt ?? null,
       schema_version: DIARY_SCHEMA_VERSION,
       updated_at: remote.updatedAt,
     });
