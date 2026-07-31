@@ -15,21 +15,20 @@ import { autoMigrateLocalJournalToAccount } from "@/lib/auth/autoMigrateLocalJou
 
 type Props = {
   onGuest: () => void;
-  /** 계정 설정에서 로그아웃 후 등 */
   title?: string;
   subtitle?: string;
-  /** OAuth/링크 성공 후 돌아갈 경로 */
   authNextPath?: string;
 };
 
 const GOOGLE_BENEFITS = [
   "확인 메일·비밀번호 없이 3초 만에 시작",
-  "지금까지의 기록이 그대로 Google 계정에 이어져요",
+  "같은 기기에서 쓰던 기록이 Google 계정으로 이어져요",
   "폰을 바꿔도 일기·운세·패턴이 그대로",
 ] as const;
 
 /**
- * 시작/로그아웃 공통 — 익명(비로그인) + Google linkIdentity
+ * 시작/로그아웃 공통 — 게스트 + Google
+ * Anonymous 서버 설정이 없어도 게스트·Google OAuth는 동작.
  */
 export default function WelcomeAuthGate({
   onGuest,
@@ -43,15 +42,8 @@ export default function WelcomeAuthGate({
   const startAsGuest = async () => {
     setLoading(true);
     setMessage("");
-    const result = await ensureAnonymousSession();
-    if (!result.ok && getSupabaseBrowserClient()) {
-      setMessage(
-        result.error ??
-          "익명으로 시작하지 못했어요. Supabase에서 Anonymous 로그인을 켜 주세요."
-      );
-      setLoading(false);
-      return;
-    }
+    // Anonymous 꺼져 있어도 로컬 게스트로 진입
+    await ensureAnonymousSession();
     void autoMigrateLocalJournalToAccount();
     setLoading(false);
     onGuest();
@@ -70,13 +62,8 @@ export default function WelcomeAuthGate({
     setMessage("");
     captureEvent(ANALYTICS_EVENTS.authGoogleClicked);
 
-    // 익명이 없으면 먼저 만들어 user_id를 확보한 뒤 link
-    const anon = await ensureAnonymousSession();
-    if (!anon.ok && !anon.user) {
-      setLoading(false);
-      setMessage(anon.error ?? "세션을 만들지 못했어요.");
-      return;
-    }
+    // 익명 가능하면 만들어 linkIdentity, 안 되면 그냥 OAuth
+    await ensureAnonymousSession();
 
     stashAuthNextPath(authNextPath);
     const redirectTo = getAuthCallbackUrl();
@@ -86,7 +73,6 @@ export default function WelcomeAuthGate({
       setMessage(result.error ?? "Google 연결에 실패했어요.");
       return;
     }
-    // OAuth 리다이렉트 중 — 로딩 유지
   };
 
   return (
@@ -133,7 +119,7 @@ export default function WelcomeAuthGate({
           className="text-[11px] font-bold text-center leading-snug"
           style={{ color: "var(--px-text2)" }}
         >
-          익명으로 시작 · Google로 바꾸면 기록이 그대로 이어져요
+          바로 시작 · Google로 바꾸면 기록이 이어져요
         </p>
 
         <div

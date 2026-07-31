@@ -126,14 +126,10 @@ export default function DiaryLoginPage() {
         try {
           disableGuestMode();
           await syncLocalSajuProfileToAccount();
-          const migrated = await autoMigrateLocalJournalToAccount();
-          if (migrated.uploaded > 0) {
-            setMessage(`이 기기 기록 ${migrated.uploaded}건을 계정에 이어 담았어요.`);
-          }
-          // linkIdentity 성공 시 user_id 동일 — 선택 UI 없이 바로 홈
+          // 선택 UI 없이 로컬 → 계정 자동 이관 후 홈
+          await autoMigrateLocalJournalToAccount();
           goHomeOrNext();
         } catch {
-          setMessage("로그인은 완료됐지만 기록을 확인하지 못했어요.");
           goHomeOrNext();
         } finally {
           setLoading(false);
@@ -217,7 +213,7 @@ export default function DiaryLoginPage() {
                 </p>
               )}
               <p className="text-[11px] font-bold" style={{ color: "var(--px-text2)" }}>
-                비로그인(익명)에서 Google로 바꾸면 기록이 같은 계정으로 이어집니다.
+                Google로 로그인하면 이 기기 기록이 계정에 자동으로 이어집니다.
               </p>
             </div>
             <button
