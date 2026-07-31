@@ -40,7 +40,7 @@ export const BURST_CONFIG = {
     heart: { min: 12, max: 16 },
     mood: { min: 10, max: 14 },
     ordinal: { min: 8, max: 12 },
-    xp: { min: 10, max: 16 },
+    xp: { min: 5, max: 9 },
   } as const,
   /** 하트 비율 — 행복도는 이전처럼 하트 비중을 유지 */
   heartRatio: 0.55,
@@ -74,8 +74,8 @@ export const BURST_PALETTE = {
     무덤덤: "#aeb4ba",
   } as Record<string, string>,
   ordinal: ["#8fa09c", "#a0aca8", "#849690"],
-  /** 레벨 XP — 노랑→연두 */
-  xp: ["#f5d76e", "#d9e35a", "#a3e635", "#c8e86a"],
+  /** 레벨 XP — 달빛·별빛 톤 */
+  xp: ["#b8c4dc", "#9aafd0", "#d4c6a8", "#a8b8d0"],
   accentFallback: "#9aa8a4",
 } as const;
 

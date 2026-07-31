@@ -23,9 +23,9 @@ import {
   computeRecordStreak,
   happinessByGanji,
 } from "@/lib/journal/statsInsight";
+import { buildWeekTopicSummary } from "@/lib/journal/topics/weekTopics";
 import TrendOverlayChart from "@/components/stats/TrendOverlayChart";
 import StatsSummaryStrip from "@/components/stats/StatsSummaryStrip";
-import StatsMissionChip from "@/components/stats/StatsMissionChip";
 import StatsReflectCta from "@/components/stats/StatsReflectCta";
 import JournalRecordCalendar from "@/components/stats/JournalRecordCalendar";
 import CharacterHappinessHeatmap from "@/components/stats/CharacterHappinessHeatmap";
@@ -71,6 +71,24 @@ function monthLabel(year: number, month: number): string {
   return `${year}년 ${month}월`;
 }
 
+/** 해당 날짜가 속한 주의 월요일 (KST) */
+function mondayOf(iso: string): string {
+  const d = new Date(`${iso}T12:00:00+09:00`);
+  const day = d.getDay(); // 0=일
+  const diff = day === 0 ? -6 : 1 - day;
+  d.setDate(d.getDate() + diff);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const dayNum = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${dayNum}`;
+}
+
+function weekLabel(from: string, to: string): string {
+  const a = `${Number(from.slice(5, 7))}.${Number(from.slice(8, 10))}`;
+  const b = `${Number(to.slice(5, 7))}.${Number(to.slice(8, 10))}`;
+  return `${a}–${b}`;
+}
+
 const LINE_COLORS = [
   "#fbbf24",
   "#60a5fa",
@@ -84,8 +102,7 @@ const LINE_COLORS = [
 ];
 
 /**
- * 기록 탭 — 홈(대시보드)과 역할 분리
- * 요약 → 추이 → 캘린더 → 사주 패턴 → 도감
+ * 기록 탭 — 요약 → 추이 → 캘린더 → 사주 패턴 → 도감
  */
 export default function StatsPage() {
   const today = todayDateString();
@@ -94,6 +111,8 @@ export default function StatsPage() {
   const [enabledCodes, setEnabledCodes] = useState<CategoryCode[]>([]);
   const [viewYear, setViewYear] = useState(() => Number(today.slice(0, 4)));
   const [viewMonth, setViewMonth] = useState(() => Number(today.slice(5, 7)));
+  const [trendSpan, setTrendSpan] = useState<"week" | "month">("month");
+  const [weekStart, setWeekStart] = useState(() => mondayOf(today));
   const [selected, setSelected] = useState<CategoryCode[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -147,6 +166,16 @@ export default function StatsPage() {
     [journalEntries, today]
   );
 
+  const weekTopics = useMemo(
+    () =>
+      buildWeekTopicSummary(journalEntries, {
+        asOf: today,
+        windowDays: 7,
+        topN: 5,
+      }),
+    [journalEntries, today]
+  );
+
   const streak = useMemo(
     () => computeRecordStreak(journalEntries, today),
     [journalEntries, today]
@@ -191,24 +220,33 @@ export default function StatsPage() {
     [viewYear, viewMonth]
   );
 
-  const prevMonthBounds = useMemo(() => {
+  const weekTo = useMemo(() => shiftDate(weekStart, 6), [weekStart]);
+
+  const trendFrom = trendSpan === "week" ? weekStart : monthFrom;
+  const trendTo = trendSpan === "week" ? weekTo : monthTo;
+
+  const prevTrendBounds = useMemo(() => {
+    if (trendSpan === "week") {
+      const from = shiftDate(weekStart, -7);
+      return { from, to: shiftDate(from, 6) };
+    }
     const d = new Date(viewYear, viewMonth - 2, 1);
     return monthBounds(d.getFullYear(), d.getMonth() + 1);
-  }, [viewYear, viewMonth]);
+  }, [trendSpan, weekStart, viewYear, viewMonth]);
 
   const rangeDates = useMemo(() => {
     const out: string[] = [];
-    let cursor = monthFrom;
-    while (cursor <= monthTo) {
+    let cursor = trendFrom;
+    while (cursor <= trendTo) {
       out.push(cursor);
       cursor = shiftDate(cursor, 1);
     }
     return out;
-  }, [monthFrom, monthTo]);
+  }, [trendFrom, trendTo]);
 
   const happinessPoints = useMemo(
-    () => happinessSeries(journalEntries, monthFrom, monthTo),
-    [journalEntries, monthFrom, monthTo]
+    () => happinessSeries(journalEntries, trendFrom, trendTo),
+    [journalEntries, trendFrom, trendTo]
   );
 
   const overlays = useMemo(
@@ -217,9 +255,9 @@ export default function StatsPage() {
         code,
         name: getCategoryByCode(code)?.name ?? code,
         color: LINE_COLORS[i % LINE_COLORS.length]!,
-        points: categorySeries(journalEntries, code, monthFrom, monthTo),
+        points: categorySeries(journalEntries, code, trendFrom, trendTo),
       })),
-    [selected, journalEntries, monthFrom, monthTo]
+    [selected, journalEntries, trendFrom, trendTo]
   );
 
   const rangeAvg = useMemo(() => {
@@ -228,47 +266,44 @@ export default function StatsPage() {
     return Math.round((sum / happinessPoints.length) * 10) / 10;
   }, [happinessPoints]);
 
-  const prevMonthAvg = useMemo(
+  const prevRangeAvg = useMemo(
     () =>
       averageHappinessInRange(
         journalEntries,
-        prevMonthBounds.from,
-        prevMonthBounds.to
+        prevTrendBounds.from,
+        prevTrendBounds.to
       ),
-    [journalEntries, prevMonthBounds]
+    [journalEntries, prevTrendBounds]
   );
 
-  /** 월 비교 — 문장과 증감 숫자를 나눠 증감에만 색을 준다 */
-  const monthCompare = useMemo<{ text: string; delta: number | null }>(() => {
-    if (rangeAvg == null && prevMonthAvg == null) {
-      return { text: "기록이 쌓이면 지난달과 비교할 수 있어요", delta: null };
-    }
-    if (rangeAvg == null) {
-      return { text: "이달 기록이 아직 없어요", delta: null };
-    }
-    if (prevMonthAvg == null) {
-      return { text: "지난달 기록이 없어 비교는 다음 달부터", delta: null };
-    }
-    const delta = Math.round((rangeAvg - prevMonthAvg) * 10) / 10;
-    if (Math.abs(delta) < 0.3) {
-      return { text: "지난달과 비슷해요", delta: null };
-    }
-    return { text: "지난달보다", delta };
-  }, [rangeAvg, prevMonthAvg]);
+  const periodCompare = useMemo<{ delta: number | null }>(() => {
+    if (rangeAvg == null || prevRangeAvg == null) return { delta: null };
+    const delta = Math.round((rangeAvg - prevRangeAvg) * 10) / 10;
+    if (Math.abs(delta) < 0.3) return { delta: null };
+    return { delta };
+  }, [rangeAvg, prevRangeAvg]);
 
   const reflectCta = useMemo(
     () =>
       buildReflectWriteCta(journalEntries, today, {
         viewMonthAvg: rangeAvg,
-        prevMonthAvg,
+        prevMonthAvg: prevRangeAvg,
       }),
-    [journalEntries, today, rangeAvg, prevMonthAvg]
+    [journalEntries, today, rangeAvg, prevRangeAvg]
   );
 
   const shiftViewMonth = (delta: number) => {
     const next = new Date(viewYear, viewMonth - 1 + delta, 1);
     setViewYear(next.getFullYear());
     setViewMonth(next.getMonth() + 1);
+  };
+
+  const shiftTrend = (dir: -1 | 1) => {
+    if (trendSpan === "week") {
+      setWeekStart((w) => shiftDate(w, dir * 7));
+      return;
+    }
+    shiftViewMonth(dir);
   };
 
   const setViewMonthAbsolute = (year: number, month: number) => {
@@ -282,13 +317,13 @@ export default function StatsPage() {
     );
   };
 
+  const trendPeriodLabel =
+    trendSpan === "week"
+      ? weekLabel(weekStart, weekTo)
+      : monthLabel(viewYear, viewMonth);
+
   return (
     <div className="stats-page">
-      <header className="space-y-0.5">
-        <h1 className="ui-page-title">■ 기록</h1>
-        <p className="ui-hint">숫자로 보고, 간지로 모읍니다</p>
-      </header>
-
       {loading ? (
         <p className="ui-hint">불러오는 중…</p>
       ) : (
@@ -298,15 +333,54 @@ export default function StatsPage() {
             monthRecordedDays={monthRecordedDays}
             streakDays={streak.current}
             recordedToday={streak.recordedToday}
+            weekTopics={weekTopics}
           />
 
-          <StatsMissionChip mission={mission} />
+          <section className="stats-section">
+            <div className="stats-emphasize-head">
+              <p className="stats-emphasize-title">행복도 추이</p>
+              <p className="tabular-nums shrink-0">
+                <span
+                  className="text-lg font-black"
+                  style={
+                    rangeAvg != null
+                      ? { color: happinessTone(rangeAvg) }
+                      : { color: "var(--px-text2)" }
+                  }
+                >
+                  {rangeAvg != null ? rangeAvg.toFixed(1) : "-"}
+                </span>
+                {rangeAvg != null ? (
+                  <span className="stats-metric-unit">/10</span>
+                ) : null}
+              </p>
+            </div>
 
-          <div className="stats-section">
+            <div className="flex gap-1.5">
+              {(
+                [
+                  ["week", "주"],
+                  ["month", "월"],
+                ] as const
+              ).map(([id, label]) => (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => {
+                    setTrendSpan(id);
+                    if (id === "week") setWeekStart(mondayOf(today));
+                  }}
+                  className={`stats-chip flex-1 text-center${trendSpan === id ? " is-on" : ""}`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
             <div className="flex items-center justify-between gap-2">
               <button
                 type="button"
-                onClick={() => shiftViewMonth(-1)}
+                onClick={() => shiftTrend(-1)}
                 className="px-2.5 py-1.5 text-xs font-bold border-2"
                 style={{
                   borderColor: "var(--px-border)",
@@ -318,13 +392,13 @@ export default function StatsPage() {
               </button>
               <p
                 className="text-base font-black tabular-nums"
-                style={{ color: "var(--px-text-on-panel)" }}
+                style={{ color: "var(--px-accent)" }}
               >
-                {monthLabel(viewYear, viewMonth)}
+                {trendPeriodLabel}
               </p>
               <button
                 type="button"
-                onClick={() => shiftViewMonth(1)}
+                onClick={() => shiftTrend(1)}
                 className="px-2.5 py-1.5 text-xs font-bold border-2"
                 style={{
                   borderColor: "var(--px-border)",
@@ -335,45 +409,17 @@ export default function StatsPage() {
                 ›
               </button>
             </div>
-            <p className="stats-insight">
-              {monthCompare.text}
-              {monthCompare.delta != null ? (
-                <span
-                  className="ml-1 tabular-nums"
-                  style={{ color: deltaTone(monthCompare.delta) }}
-                >
-                  {monthCompare.delta > 0
-                    ? `+${monthCompare.delta.toFixed(1)}`
-                    : monthCompare.delta.toFixed(1)}
-                </span>
-              ) : null}
-            </p>
-          </div>
 
-          <section className="stats-section">
-            <div className="stats-section-head">
-              <p className="ui-section-title">행복도 추이</p>
-              <p className="tabular-nums shrink-0">
-                <span
-                  className="stats-metric !text-lg"
-                  style={
-                    rangeAvg != null
-                      ? { color: happinessTone(rangeAvg) }
-                      : undefined
-                  }
-                >
-                  {rangeAvg != null ? rangeAvg.toFixed(1) : "-"}
+            {periodCompare.delta != null ? (
+              <p className="stats-label tabular-nums px-0.5">
+                {trendSpan === "week" ? "지난주 대비" : "지난달 대비"}{" "}
+                <span style={{ color: deltaTone(periodCompare.delta) }}>
+                  {periodCompare.delta > 0
+                    ? `+${periodCompare.delta.toFixed(1)}`
+                    : periodCompare.delta.toFixed(1)}
                 </span>
-                {rangeAvg != null ? (
-                  <span className="stats-metric-unit">/10</span>
-                ) : null}
-                {happinessPoints.length > 0 ? (
-                  <span className="stats-label ml-1.5">
-                    {happinessPoints.length}일
-                  </span>
-                ) : null}
               </p>
-            </div>
+            ) : null}
 
             <div className="stats-panel space-y-2">
               <TrendOverlayChart
@@ -386,7 +432,7 @@ export default function StatsPage() {
                 style={{ borderTop: "1px solid var(--px-border)" }}
               >
                 <span
-                  className="inline-flex items-center gap-1 text-[11px] font-extrabold"
+                  className="inline-flex items-center gap-1 text-xs font-extrabold"
                   style={{ color: "var(--px-text)" }}
                 >
                   <span
@@ -399,8 +445,8 @@ export default function StatsPage() {
                 {overlays.map((o) => (
                   <span
                     key={o.code}
-                    className="inline-flex items-center gap-1 text-[11px] font-bold"
-                    style={{ color: "var(--px-text2)" }}
+                    className="inline-flex items-center gap-1 text-xs font-bold"
+                    style={{ color: o.color }}
                   >
                     <span
                       className="inline-block w-4 h-0.5"
@@ -415,60 +461,53 @@ export default function StatsPage() {
               </div>
             </div>
 
-            {selected.length >= 4 ? (
-              <div
-                className="px-2.5 py-2 border-2 flex items-center justify-between gap-2"
-                role="status"
-                style={{
-                  borderColor: "#fbbf24",
-                  background:
-                    "color-mix(in srgb, #fbbf24 12%, var(--px-bg3))",
-                }}
-              >
-                <p className="stats-status-warn">
-                  겹침 {selected.length}개 · 비교할 항목만 남기세요
-                </p>
-                <button
-                  type="button"
-                  onClick={() => setSelected([])}
-                  className="stats-link shrink-0"
-                >
-                  모두 끄기
-                </button>
-              </div>
-            ) : (
-              <p className="stats-label">겹쳐 볼 항목</p>
-            )}
-            <div className="flex flex-wrap gap-1.5">
-              {(enabledCodes.length > 0
-                ? enabledCodes
-                : CATEGORY_CATALOG.map((c) => c.code)
-              ).map((code) => {
-                const on = selected.includes(code);
-                const colorIdx = selected.indexOf(code);
-                const color =
-                  on && colorIdx >= 0
-                    ? LINE_COLORS[colorIdx % LINE_COLORS.length]
-                    : undefined;
-                return (
+            <div className="stats-category-panel" aria-label="카테고리 메뉴">
+              <div className="flex items-center justify-between gap-2">
+                <p className="stats-category-title">카테고리 메뉴</p>
+                {selected.length >= 4 ? (
                   <button
-                    key={code}
                     type="button"
-                    onClick={() => toggle(code)}
-                    className={`stats-chip${on ? " is-on" : ""}`}
-                    style={
-                      on && color
-                        ? ({
-                            ["--chip-accent" as string]: color,
-                          } as CSSProperties)
-                        : undefined
-                    }
-                    aria-pressed={on}
+                    onClick={() => setSelected([])}
+                    className="stats-link shrink-0 text-xs"
                   >
-                    {getCategoryByCode(code)?.name ?? code}
+                    모두 끄기
                   </button>
-                );
-              })}
+                ) : null}
+              </div>
+              {selected.length >= 4 && (
+                <p className="stats-status-warn">2~3개만 켜 보세요</p>
+              )}
+              <div className="flex flex-wrap gap-2">
+                {(enabledCodes.length > 0
+                  ? enabledCodes
+                  : CATEGORY_CATALOG.map((c) => c.code)
+                ).map((code) => {
+                  const on = selected.includes(code);
+                  const colorIdx = selected.indexOf(code);
+                  const color =
+                    on && colorIdx >= 0
+                      ? LINE_COLORS[colorIdx % LINE_COLORS.length]
+                      : undefined;
+                  return (
+                    <button
+                      key={code}
+                      type="button"
+                      onClick={() => toggle(code)}
+                      className={`stats-chip-cat${on ? " is-on" : ""}`}
+                      style={
+                        on && color
+                          ? ({
+                              ["--chip-accent" as string]: color,
+                            } as CSSProperties)
+                          : undefined
+                      }
+                      aria-pressed={on}
+                    >
+                      {getCategoryByCode(code)?.name ?? code}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </section>
 
@@ -478,6 +517,7 @@ export default function StatsPage() {
             weeklyReport={weeklyReport}
             year={viewYear}
             month={viewMonth}
+            showMonthNav={trendSpan === "week"}
             onMonthChange={setViewMonthAbsolute}
           />
 

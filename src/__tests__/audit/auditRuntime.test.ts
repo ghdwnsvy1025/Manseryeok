@@ -214,7 +214,7 @@ describe("AUDIT fortune engine", () => {
     expect(low.filter((d, i) => d.score !== high[i]!.score).length).toBeGreaterThan(0);
   });
 
-  test("skipLlm still fills all 5 domains", async () => {
+  test("skipLlm still fills all 6 domains", async () => {
     const ctx = buildDailyInsightContext({
       eventDate: DATE,
       entries: PRIOR_7D,
@@ -223,9 +223,12 @@ describe("AUDIT fortune engine", () => {
     });
     const res = await generateTodayFortuneV2(ctx, { skipLlm: true });
     const all = [res.overall, ...res.domains];
-    expect(all).toHaveLength(5);
+    expect(all).toHaveLength(6);
+    expect(res.presentation.dailyTheme.length).toBeGreaterThan(0);
     for (const d of all) {
       expect(d.headline.length).toBeGreaterThan(0);
+      expect(d.interpretation.length).toBeGreaterThan(0);
+      expect(d.flow).toBeTruthy();
       expect(d.score).toBeGreaterThanOrEqual(0);
       expect(d.score).toBeLessThanOrEqual(1);
     }

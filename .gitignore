@@ -26,3 +26,5 @@ scripts/.tmp/
 e2e/.auth/
 e2e/results.json
 # E2E flag file written for next dev (also matched by .env*.local)
+.vercel
+.env*

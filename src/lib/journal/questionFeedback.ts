@@ -1,6 +1,7 @@
 /**
  * 오늘의 질문 피드백 — 적합도 + 작성 유도 학습용
  */
+import { sajuHypothesisWeightFromDays } from "@/lib/journal/insight/recordReflectGate";
 
 export const QUESTION_FEEDBACK_EVENT_TYPES = [
   "shown",
@@ -32,10 +33,10 @@ export const QUESTION_FIT_LEVELS: Array<{
 }> = [
   {
     level: "good",
-    label: "잘 맞아요",
+    label: "도움이 됐어요",
     eventType: "fit_good",
     rating: 5,
-    ack: "잘 맞아요 — 다음 질문에 반영할게요.",
+    ack: "도움이 됐다니 다행이에요 — 다음 질문에 반영할게요.",
   },
   {
     level: "neutral",
@@ -46,10 +47,10 @@ export const QUESTION_FIT_LEVELS: Array<{
   },
   {
     level: "bad",
-    label: "안 맞아요",
+    label: "별로예요",
     eventType: "fit_bad",
     rating: 1,
-    ack: "안 맞아요 — 다음 질문에 참고할게요.",
+    ack: "별로였군요 — 다음 질문에 참고할게요.",
   },
 ];
 
@@ -154,11 +155,9 @@ export function hasLocalFitFeedback(
 }
 
 /**
- * 기록이 쌓일수록 사주 가설 가중치 감소 (1 → 0.2)
- * — 마스터 프롬프트: 개인 데이터 비중 상승
+ * 기록이 쌓일수록 사주 가설 가중치 감소
+ * — 일수 게이트(recordReflectGate)와 동일 구간
  */
 export function sajuHypothesisWeight(priorUniqueDays: number): number {
-  if (priorUniqueDays <= 0) return 1;
-  if (priorUniqueDays >= 60) return 0.2;
-  return Math.round((1 - (priorUniqueDays / 60) * 0.8) * 1000) / 1000;
+  return sajuHypothesisWeightFromDays(priorUniqueDays);
 }

@@ -6,10 +6,10 @@
  */
 import type { JournalEntry } from "@/lib/journal/types";
 import {
-  computeBlendWeights,
   PERSONALIZATION_MATURITY_LEVEL,
   type DataMaturityTier,
-} from "@/lib/journal/insight/dynamicWeights";
+} from "./insight/dynamicWeights";
+import { resolveGatedBlend } from "./insight/recordReflectGate";
 import {
   progressFromTotalXp,
   totalJournalXp,
@@ -32,6 +32,8 @@ export type PersonalizationStage = {
   level: number;
   totalXp: number;
   maturityLevel: number;
+  dayPhaseLabel?: string;
+  priorUniqueDays?: number;
 };
 
 /** 전체 칭호 트랙 (참고용) */
@@ -79,15 +81,17 @@ export function growthTitleForLevel(level: number): {
 
 export function personalizationFromXp(
   totalXp: number,
-  onboardingCompleted?: boolean
+  onboardingCompleted?: boolean,
+  priorUniqueDays = 0
 ): PersonalizationStage {
   const xp = Math.max(0, Math.floor(totalXp || 0));
-  const w = computeBlendWeights({
+  const w = resolveGatedBlend({
     totalXp: xp,
     onboardingCompleted,
+    priorUniqueDays,
   });
   const progress = progressFromTotalXp(xp);
-  const personal = Math.round((w.recent + w.keyword) * 100);
+  const personal = Math.round(w.journalShare * 100);
   const title = growthTitleForLevel(progress.level);
 
   return {
@@ -102,6 +106,8 @@ export function personalizationFromXp(
     level: progress.level,
     totalXp: xp,
     maturityLevel: PERSONALIZATION_MATURITY_LEVEL,
+    dayPhaseLabel: w.dayPhaseLabel,
+    priorUniqueDays: w.priorUniqueDays,
   };
 }
 
@@ -109,5 +115,10 @@ export function personalizationFromEntries(
   entries: JournalEntry[],
   onboardingCompleted?: boolean
 ): PersonalizationStage {
-  return personalizationFromXp(totalJournalXp(entries), onboardingCompleted);
+  const days = new Set(entries.map((e) => e.entryDate)).size;
+  return personalizationFromXp(
+    totalJournalXp(entries),
+    onboardingCompleted,
+    days
+  );
 }

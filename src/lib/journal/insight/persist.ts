@@ -5,6 +5,16 @@
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { DailyInsightContext, FortuneDomainResult } from "./types";
+import {
+  confidenceLabelFromScore,
+  flowFromScore,
+  reasonTagsFromCodes,
+  syncDomainCopyFields,
+} from "@/lib/journal/fortune/labels";
+import {
+  FORTUNE_DOMAIN_TITLES,
+  normalizeFortuneDomainCode,
+} from "@/lib/journal/fortune/domains";
 
 export type LoadedInsightContext = {
   id: string;
@@ -169,6 +179,8 @@ export type PersistedFortune = {
   overallSummary: string;
   sections: FortuneDomainResult[];
   scoringVersion: string | null;
+  /** 사주 프로필 지문 (생일·일주). prompt_version 컬럼에 저장 */
+  profileFingerprint: string | null;
 };
 
 export async function loadPersistedFortune(
@@ -180,7 +192,7 @@ export async function loadPersistedFortune(
   const { data: fortune, error } = await sb
     .from("daily_fortunes")
     .select(
-      "id, context_id, overall_headline, overall_summary, scoring_version"
+      "id, context_id, overall_headline, overall_summary, scoring_version, prompt_version"
     )
     .eq("user_id", userId)
     .eq("saju_profile_id", sajuProfileId)
@@ -200,21 +212,36 @@ export async function loadPersistedFortune(
     overallHeadline: String(fortune.overall_headline ?? ""),
     overallSummary: String(fortune.overall_summary ?? ""),
     scoringVersion: (fortune.scoring_version as string | null) ?? null,
-    sections: (sections ?? []).map((s) => ({
-      domain: s.domain_code as FortuneDomainResult["domain"],
-      title: String(s.domain_code),
-      tone: "balanced" as const,
-      score: Number(s.score ?? 0.5),
-      confidence: Number(s.confidence ?? 0.5),
-      headline: String(s.headline ?? ""),
-      summary: String(s.summary ?? ""),
-      opportunity: String(s.opportunity ?? ""),
-      caution: String(s.caution ?? ""),
-      action: String(s.action ?? ""),
-      evidenceCodes: Array.isArray(s.evidence_json)
-        ? (s.evidence_json as string[])
-        : [],
-    })),
+    profileFingerprint: (fortune.prompt_version as string | null) ?? null,
+    sections: ((sections ?? [])
+      .map((s) => {
+        const domain = normalizeFortuneDomainCode(String(s.domain_code ?? ""));
+        if (!domain) return null;
+        const score = Number(s.score ?? 0.5);
+        const confidence = Number(s.confidence ?? 0.5);
+        const text = String(s.summary ?? "");
+        const evidenceCodes = Array.isArray(s.evidence_json)
+          ? (s.evidence_json as string[])
+          : [];
+        return syncDomainCopyFields({
+          domain,
+          title: FORTUNE_DOMAIN_TITLES[domain],
+          tone: "balanced" as const,
+          flow: flowFromScore(score),
+          score,
+          confidence,
+          confidenceLabel: confidenceLabelFromScore(confidence),
+          headline: String(s.headline ?? ""),
+          interpretation: text,
+          summary: text,
+          opportunity: String(s.opportunity ?? ""),
+          caution: String(s.caution ?? ""),
+          action: String(s.action ?? ""),
+          evidenceCodes,
+          reasonTags: reasonTagsFromCodes(evidenceCodes),
+        }) as FortuneDomainResult;
+      })
+      .filter((s): s is FortuneDomainResult => s != null)),
   };
 }
 
@@ -232,6 +259,8 @@ export async function persistFortune(
     overall: FortuneDomainResult;
     domains: FortuneDomainResult[];
     scoringVersion: string;
+    /** 사주 생일·일주 지문 — 바뀌면 캐시 교체 */
+    profileFingerprint?: string | null;
     modelVersion?: string | null;
     dataCutoffAt: string;
   }
@@ -242,11 +271,16 @@ export async function persistFortune(
     opts.eventDate,
     opts.sajuProfileId
   );
-  if (existing && existing.scoringVersion === opts.scoringVersion) {
+  const fp = opts.profileFingerprint ?? null;
+  const sameEngine =
+    existing &&
+    existing.scoringVersion === opts.scoringVersion &&
+    (existing.profileFingerprint ?? null) === fp;
+  if (sameEngine) {
     return existing.id;
   }
 
-  // 엔진 버전 변경 → 기존 행 삭제 후 재삽입
+  // 엔진 버전·사주 지문 변경 → 기존 행 삭제 후 재삽입
   if (existing?.id) {
     await sb.from("daily_fortune_sections").delete().eq("daily_fortune_id", existing.id);
     await sb.from("daily_fortunes").delete().eq("id", existing.id);
@@ -264,6 +298,7 @@ export async function persistFortune(
       overall_summary: opts.overall.summary,
       overall_confidence: opts.overall.confidence,
       scoring_version: opts.scoringVersion,
+      prompt_version: fp,
       model_version: opts.modelVersion ?? null,
       data_cutoff_at: opts.dataCutoffAt,
       generated_at: new Date().toISOString(),

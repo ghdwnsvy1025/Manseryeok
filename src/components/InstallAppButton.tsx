@@ -21,11 +21,15 @@ function isStandalone(): boolean {
   );
 }
 
+/**
+ * PWA 설치 — beforeinstallprompt가 없어도 안내 카드는 항상 표시.
+ */
 export default function InstallAppButton() {
-  const [promptEvent, setPromptEvent] = useState<InstallPromptEvent | null>(null);
-  const [showIosGuide, setShowIosGuide] = useState(false);
+  const [promptEvent, setPromptEvent] = useState<InstallPromptEvent | null>(
+    null
+  );
+  const [showGuide, setShowGuide] = useState(false);
   const [installed, setInstalled] = useState(false);
-  /** SSR/첫 페인트는 false — isIos()를 렌더에서 호출하면 hydration 깨짐 */
   const [ios, setIos] = useState(false);
 
   useEffect(() => {
@@ -51,46 +55,63 @@ export default function InstallAppButton() {
 
   if (installed) {
     return (
-      <p className="ui-hint" role="status">
-        이 기기에 앱으로 설치되어 있어요.
+      <p
+        className="text-sm font-bold py-1"
+        style={{ color: "var(--px-text2)" }}
+        role="status"
+      >
+        홈 화면 앱 · 설치됨
       </p>
     );
   }
 
   const canPrompt = Boolean(promptEvent);
-  if (!canPrompt && !ios) return null;
 
   return (
-    <div
-      className="p-3 border space-y-2"
-      style={{ borderColor: "var(--px-border)", background: "var(--px-bg2)" }}
-    >
-      <p className="text-xs font-bold" style={{ color: "var(--px-accent)" }}>
-        홈 화면에서 앱처럼 사용하기
-      </p>
+    <div className="space-y-2">
       <button
         type="button"
-        className="w-full px-3 py-2 text-xs font-bold border-2"
+        className="w-full px-3 py-3.5 text-base font-black border-2"
         style={{
           borderColor: "var(--px-accent)",
           color: "var(--px-accent)",
-          background: "var(--px-bg3)",
+          background: "var(--px-bg2)",
         }}
         onClick={async () => {
           if (promptEvent) {
             await promptEvent.prompt();
             await promptEvent.userChoice;
             setPromptEvent(null);
-          } else {
-            setShowIosGuide((prev) => !prev);
+            return;
           }
+          setShowGuide((prev) => !prev);
         }}
       >
-        앱으로 설치하기
+        {canPrompt
+          ? "홈 화면에 앱 추가"
+          : showGuide
+            ? "안내 접기"
+            : "홈 화면에 앱 추가"}
       </button>
-      {showIosGuide && (
-        <p className="ui-hint">
-          iPhone Safari에서 공유 버튼을 누른 뒤 ‘홈 화면에 추가’를 선택하세요.
+      {(showGuide || (ios && showGuide)) && !canPrompt && (
+        <ol
+          className="text-sm font-bold list-decimal pl-4 space-y-1"
+          style={{ color: "var(--px-text2)" }}
+        >
+          {ios ? (
+            <>
+              <li>Safari 공유 → 홈 화면에 추가</li>
+            </>
+          ) : (
+            <>
+              <li>메뉴(⋮) → 앱 설치 / 홈 화면에 추가</li>
+            </>
+          )}
+        </ol>
+      )}
+      {ios && !canPrompt && !showGuide && (
+        <p className="text-xs font-bold" style={{ color: "var(--px-text2)" }}>
+          iPhone은 버튼을 눌러 설치 방법을 보세요.
         </p>
       )}
     </div>

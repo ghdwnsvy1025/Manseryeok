@@ -5,7 +5,6 @@ import Link from "next/link";
 import type { Element } from "@/lib/saju/constants";
 import {
   aggregateHappinessByCharacters,
-  describeCharacterHappiness,
   type CharacterHappiness,
 } from "@/lib/journal/statsInsight";
 import { deltaTone, happinessTone } from "@/lib/journal/statsTone";
@@ -21,7 +20,7 @@ const ELEM_COLORS: Record<Element, string> = {
 
 const UNLOCK_DAYS = 7;
 
-type Tab = "stem" | "branch" | "ganji";
+type Tab = "stem" | "branch";
 
 type Props = {
   entries: JournalEntry[];
@@ -34,9 +33,6 @@ function formatSignedDelta(delta: number): string {
   return rounded.toFixed(1);
 }
 
-/**
- * A+C: 점수=크게·밝은색 / 증감=둘째 줄 초록·빨강 글자 / 오행·점수색은 테두리만
- */
 function HappinessTile({
   row,
   compact,
@@ -55,7 +51,6 @@ function HappinessTile({
     : row.average != null
       ? happinessTone(row.average)
       : "var(--px-border2)";
-  /** 배경은 아주 옅게 — 점수·증감과 싸우지 않게 */
   const fillOpacity =
     insufficient || row.average == null
       ? 0.04
@@ -104,15 +99,15 @@ function HappinessTile({
           </span>
           {showDelta ? (
             <span
-              className="mt-1 text-[11px] font-extrabold tabular-nums leading-none"
+              className="mt-1 text-xs font-extrabold tabular-nums leading-none"
               style={{ color: deltaTone(delta, 0) }}
-              title={`평균 대비 ${formatSignedDelta(delta)}`}
+              aria-label={`평균 대비 ${formatSignedDelta(delta)}`}
             >
               {formatSignedDelta(delta)}
             </span>
           ) : (
             <span
-              className="mt-1 text-[11px] font-bold leading-none"
+              className="mt-1 text-xs font-bold leading-none"
               style={{ color: "var(--px-border2)" }}
             >
               ·
@@ -130,46 +125,56 @@ function HappinessTile({
   );
 }
 
-/** 천간·지지·간지별 행복도 — 기본 접힘, 한 줄 해석 우선 */
+/** 천간·지지별 행복도 — 해금 시 표 기본 펼침 */
 export default function CharacterHappinessHeatmap({
   entries,
   uniqueDays,
 }: Props) {
+  const early = uniqueDays < UNLOCK_DAYS;
   const [tab, setTab] = useState<Tab>("stem");
-  const [expanded, setExpanded] = useState(false);
   const data = useMemo(
     () => aggregateHappinessByCharacters(entries),
     [entries]
   );
 
-  const rows =
-    tab === "stem" ? data.stems : tab === "branch" ? data.branches : data.ganzhi;
-  const cols =
-    tab === "stem" ? "grid-cols-5" : tab === "branch" ? "grid-cols-4" : "grid-cols-4";
-
+  const rows = tab === "stem" ? data.stems : data.branches;
+  const cols = tab === "stem" ? "grid-cols-5" : "grid-cols-4";
   const hasAny = data.stems.some((r) => r.count > 0);
-  const insight = useMemo(() => describeCharacterHappiness(rows), [rows]);
-  const early = uniqueDays < UNLOCK_DAYS;
-  const headLabel = early
-    ? `${uniqueDays}/${UNLOCK_DAYS}일`
-    : `${uniqueDays}일 기록`;
+  const unlocked = !early && hasAny;
 
   return (
     <section className="stats-section" aria-label="나의 사주 패턴">
-      <div className="stats-section-head">
-        <p className="ui-section-title">사주 패턴</p>
-        <p className="stats-label tabular-nums">{headLabel}</p>
+      <div className="stats-emphasize-head">
+        <p className="stats-emphasize-title">사주 패턴</p>
+        {unlocked && data.overall != null ? (
+          <p className="tabular-nums shrink-0 text-right">
+            <span
+              className="text-lg font-black"
+              style={{ color: happinessTone(data.overall) }}
+            >
+              {data.overall.toFixed(1)}
+            </span>
+            <span className="stats-metric-unit">/10</span>
+          </p>
+        ) : (
+          <p
+            className="text-xs font-black tabular-nums"
+            style={{ color: "var(--px-text2)" }}
+          >
+            {uniqueDays}/{UNLOCK_DAYS}일
+          </p>
+        )}
       </div>
 
-      {!hasAny || early ? (
+      {!unlocked ? (
         <div className="stats-panel !shadow-none space-y-1.5">
           <p
             className="text-sm font-extrabold"
             style={{ color: "var(--px-text-on-panel)" }}
           >
             {uniqueDays === 0
-              ? "기록 0일 · 패턴 잠금"
-              : `${uniqueDays}일 기록 · ${UNLOCK_DAYS}일부터 해석`}
+              ? `${UNLOCK_DAYS}일부터`
+              : `${uniqueDays}/${UNLOCK_DAYS}일`}
           </p>
           <div className="stats-progress-track" aria-hidden>
             <div
@@ -184,41 +189,17 @@ export default function CharacterHappinessHeatmap({
           </div>
           {early && (
             <Link href="/journal" className="stats-link inline-block">
-              기록해서 채우기 →
+              기록하기 →
             </Link>
           )}
         </div>
       ) : (
-        <div className="space-y-0.5">
-          {insight.label ? (
-            <p className="stats-label">{insight.label}</p>
-          ) : null}
-          <p className="stats-insight">{insight.text}</p>
-        </div>
-      )}
-
-      <button
-        type="button"
-        onClick={() => setExpanded((v) => !v)}
-        className="w-full py-2 text-xs font-extrabold border-2"
-        style={{
-          borderColor: "var(--px-border2)",
-          color: "var(--px-text2)",
-          background: "var(--px-bg3)",
-        }}
-        aria-expanded={expanded}
-      >
-        {expanded ? "글자 표 접기" : "글자별 표 펼치기"}
-      </button>
-
-      {expanded && (
         <div className="stats-panel space-y-2 !shadow-none">
           <div className="flex gap-1.5">
             {(
               [
                 ["stem", "천간"],
                 ["branch", "지지"],
-                ["ganji", "간지"],
               ] as const
             ).map(([id, label]) => (
               <button
@@ -232,32 +213,11 @@ export default function CharacterHappinessHeatmap({
             ))}
           </div>
 
-          {tab === "ganji" && rows.length > 0 && (
-            <p className="stats-label">테두리 = 행복도 · 숫자색 = 증감</p>
-          )}
-          {(tab === "stem" || tab === "branch") && hasAny && (
-            <p className="stats-label">테두리 = 오행 · 초록/빨강 = 증감</p>
-          )}
-
-          {!hasAny ? (
-            <p className="stats-label py-4 text-center">데이터 없음</p>
-          ) : tab === "ganji" && rows.length === 0 ? (
-            <p className="stats-label py-4 text-center">수집 간지 없음</p>
-          ) : (
-            <div className={`grid gap-1.5 ${cols}`}>
-              {(tab === "ganji" ? rows.slice(0, 12) : rows).map((row) => (
-                <HappinessTile
-                  key={row.key}
-                  row={row}
-                  compact={tab !== "ganji"}
-                />
-              ))}
-            </div>
-          )}
-
-          {tab === "ganji" && rows.length > 12 && (
-            <p className="stats-label">상위 12개 · 전체는 도감</p>
-          )}
+          <div className={`grid gap-1.5 ${cols}`}>
+            {rows.map((row) => (
+              <HappinessTile key={row.key} row={row} compact />
+            ))}
+          </div>
         </div>
       )}
     </section>

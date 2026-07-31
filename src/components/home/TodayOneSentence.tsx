@@ -68,13 +68,20 @@ export default function TodayOneSentence(props: Props) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(props),
         });
+        if (cancelled) return;
+        if (res.status === 401) {
+          setStatus("error");
+          setMessage("로그인하면 오늘의 한 문장을 볼 수 있어요.");
+          setDetail("계정으로 로그인 후 이용해 주세요.");
+          setEvidence([]);
+          return;
+        }
         const data = (await res.json()) as {
           status?: Status;
           message?: string;
           detail?: string | null;
           theoryEvidence?: TheoryEvidence[];
         };
-        if (cancelled) return;
         const next = data.status ?? "error";
         const resolved = next === "loading" ? "error" : next;
         const msg = data.message ?? "알 수 없다";

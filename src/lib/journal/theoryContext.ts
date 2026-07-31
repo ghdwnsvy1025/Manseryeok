@@ -108,12 +108,17 @@ export function theoryUsageRules(
 
   if (kind === "fortune") {
     return `${base}
-운세 톤:
-- 종합(overall): 학습 이론 + 원국 특징 + 오늘 간지를 엮어, 사용자가 바로 이해할 수 있는 쉬운 말 3문장으로 summary에 넣으세요. headline은 한 줄 컨셉.
-- 나머지 영역: 그 테마에 맞는 원국 특징과 오늘 글자(일진)의 만남을 바탕으로 headline 1 + summary 1~2문장. opportunity/caution/action은 짧게.
-- 사용자에게 보이는 문장에는 십신·재성·인성·원국 등 전문용어를 쓰지 마세요. 쉬운 일상어만.
-- 교과서 문장 복붙 금지. natalDaySignals의 tensionPlain·keywords를 우선 재료로 쓰세요.
-- domain·tone·score·confidence는 바꾸지 마세요.`;
+운세(원국×운 분석 사실 → 문장화):
+- analysisFacts.compressed = 사람·오늘 잠금. 없는 합·충·십신·오행을 만들지 말 것.
+- categoryEvidence[domain] = 영역별 근거 2~4개만. natalSignatures·dayStructureBrief는 보강.
+- 각 domain은 domainHooks + categoryEvidence를 반영하고, 긍정 활용과 주의를 함께 쓴다.
+- digest/RAG는 짧은 참고. 길게 인용하지 말 것.
+- 모든 domain interpretation 3~5문장. 영역마다 다른 생활 장면.
+- mixRatio(일수 게이트)대로 기록 톤만 섞는다.
+- auxiliaryScores로 길흉을 정하지 않는다.
+- 사용자 문장에 십신·용신·합충·방합 용어 금지(내부 brief는 번역).
+- 건강: 진단 금지. healthFocus 부위 경향만.
+- 연애·재물·합격·승진 결과 확정 금지.`;
   }
   if (kind === "question") {
     return `${base}

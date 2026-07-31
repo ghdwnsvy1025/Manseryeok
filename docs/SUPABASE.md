@@ -51,12 +51,21 @@ Supabase Dashboard → **SQL Editor** → 아래 파일을 **순서대로** 실�
 19. [`021_journal_onboarding.sql`](../supabase/migrations/021_journal_onboarding.sql) — 온보딩 6문항 프로필 (콜드스타트 prior)
 20. [`022_journal_first_recorded_at.sql`](../supabase/migrations/022_journal_first_recorded_at.sql) — `first_recorded_at` (회상 신뢰도)
 21. [`023_question_feedback_fit_neutral.sql`](../supabase/migrations/023_question_feedback_fit_neutral.sql) — 적합도 3단계(`fit_neutral`) 허용
+22. [`024_seed_public_domain_quotes.sql`](../supabase/migrations/024_seed_public_domain_quotes.sql) — 퍼블릭 도메인 명언 시드 (부분)
+23. [`025_saju_profile_scoped_data.sql`](../supabase/migrations/025_saju_profile_scoped_data.sql) — journal/운세/명언/온보딩을 `saju_profile_id`로 스코프
+24. [`026_dual_active_saju_profiles.sql`](../supabase/migrations/026_dual_active_saju_profiles.sql) — 일기용·만세력 보기용 활성 프로필 분리 (`active_journal_profile_id` / `active_view_profile_id`)
 
 > **Gate B(021~023) 미적용 시 동작:** 저장은 없는 컬럼을 떼고 재시도하므로
 > 깨지지 않지만, 온보딩 저장·회상 신뢰도 필터·"그저 그래요" 피드백은
 > 조용히 무시됩니다. 적용 여부는 `node scripts/verify-gate-b-migrations.mjs`로 확인하세요.
 
-> **점검:** `node scripts/verify-journal-008.mjs` · `node scripts/verify-checkin-014.mjs` · `node scripts/verify-daily-insight-015.mjs` · `node scripts/verify-category-scores-scale.mjs` · `node scripts/seed-cicero-quote.mjs` · `node scripts/backfill-quote-embeddings.mjs` · `node scripts/verify-gate-b-migrations.mjs` · `node scripts/verify-gate-17-db.mjs`  
+> **025 미적용 시:** 프로필별 저장·유니크 제약이 없어 journal/daily insight persist가
+> 실패하거나 프로필 간 데이터가 섞일 수 있습니다.
+> `node scripts/verify-025-profile-scope.mjs` · `node scripts/verify-025-backfill.mjs`
+
+> **026:** 미적용이어도 앱은 `active_saju_profile_id`로 폴백합니다. 적용 후 일기/만세력 활성 프로필을 따로 둘 수 있습니다.
+
+> **점검:** `node scripts/verify-journal-008.mjs` · `node scripts/verify-checkin-014.mjs` · `node scripts/verify-daily-insight-015.mjs` · `node scripts/verify-category-scores-scale.mjs` · `node scripts/seed-cicero-quote.mjs` · `node scripts/seed-public-domain-quotes.mjs` · `node scripts/backfill-quote-embeddings.mjs` · `node scripts/verify-gate-b-migrations.mjs` · `node scripts/verify-025-profile-scope.mjs` · `node scripts/verify-gate-17-db.mjs`  
 > 상세는 `docs/MIGRATION_STRATEGY.md` · `docs/FORTUNE_QUOTE_SPEC.md`.
 
 > **명언 RAG:** `016` RPC(`match_quote_library`)는 `embedding is not null`인 행만 검색합니다.
@@ -77,10 +86,10 @@ Dashboard → **Authentication → Providers** → Email 활성화
 
 Dashboard → **Authentication → URL Configuration**:
 
-- Site URL: 배포 주소 (예: `https://example.com`)
+- Site URL: 배포 주소 (예: `https://saju-diary.vercel.app`)
 - Redirect URLs:
   - `http://localhost:3000/auth/callback`
-  - `https://example.com/auth/callback`
+  - `https://saju-diary.vercel.app/auth/callback`
 
 실제 개발 포트가 다르면 해당 localhost 주소도 추가하세요.
 

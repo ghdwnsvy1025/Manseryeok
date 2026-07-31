@@ -32,15 +32,18 @@ describe("content D combine", () => {
 });
 
 describe("question/quote templates", () => {
-  test("질문 템플릿이 B 키워드를 포함", () => {
+  test("질문 템플릿이 주제 하나를 포함", () => {
     const ctx = buildDailySajuContext("2026-07-23", null);
     const b = buildBTheme(ctx);
     const q = buildQuestionTemplate({
       b,
       focus: "relationship",
       contentScore: 2.5,
+      topKeywords: ["집중", "성장"],
     });
     expect(q.length).toBeGreaterThan(10);
+    expect(q).not.toMatch(/집중·성장|집중과 성장/);
+    expect(q).toMatch(/있었나요\?|어땠나요\?/);
   });
 
   test("명언 템플릿 — 유명인 인용 없음", () => {

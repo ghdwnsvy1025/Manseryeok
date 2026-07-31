@@ -44,6 +44,17 @@ export function markOnboardingCompletedLocal(at = new Date().toISOString()): voi
   localStorage.setItem(ONBOARDING_DONE_KEY, at);
 }
 
+/** 계정 전환 시 — 이전 계정의 온보딩/모드 로컬 캐시 제거 */
+export function clearLocalExperienceState(): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.removeItem(EXPERIENCE_MODE_KEY);
+    localStorage.removeItem(ONBOARDING_DONE_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
 export async function loadUserExperienceSettings(): Promise<{
   experienceMode: ExperienceMode | null;
   onboardingCompletedAt: string | null;
@@ -70,7 +81,19 @@ export async function loadUserExperienceSettings(): Promise<{
           id: data.id,
           locale: data.locale ?? "ko-KR",
           timezone: data.timezone ?? "Asia/Seoul",
-          activeSajuProfileId: data.active_saju_profile_id ?? null,
+          activeSajuProfileId:
+            data.active_journal_profile_id ??
+            data.active_saju_profile_id ??
+            null,
+          activeJournalProfileId:
+            data.active_journal_profile_id ??
+            data.active_saju_profile_id ??
+            null,
+          activeViewProfileId:
+            data.active_view_profile_id ??
+            data.active_journal_profile_id ??
+            data.active_saju_profile_id ??
+            null,
           experienceMode: mode,
           onboardingCompletedAt: data.onboarding_completed_at ?? null,
           createdAt: data.created_at,
@@ -80,11 +103,52 @@ export async function loadUserExperienceSettings(): Promise<{
         saveLocalUserProfile(profile);
         if (profile.experienceMode) {
           saveExperienceModeLocal(profile.experienceMode);
+        } else {
+          try {
+            localStorage.removeItem(EXPERIENCE_MODE_KEY);
+          } catch {
+            /* ignore */
+          }
         }
         if (profile.onboardingCompletedAt) {
           markOnboardingCompletedLocal(profile.onboardingCompletedAt);
+        } else {
+          try {
+            localStorage.removeItem(ONBOARDING_DONE_KEY);
+          } catch {
+            /* ignore */
+          }
         }
+        // 로그인 상태에서는 원격(또는 방금 동기화한 profile)만 신뢰 — 이전 계정 로컬 키로 폴백 금지
+        return {
+          experienceMode: profile.experienceMode ?? null,
+          onboardingCompletedAt: profile.onboardingCompletedAt ?? null,
+          profile,
+        };
       }
+
+      // 원격 user_profiles 없음 — 이전 계정 온보딩/모드를 물려받지 않음
+      clearLocalExperienceState();
+      const now = new Date().toISOString();
+      profile = {
+        id: user.id,
+        locale: "ko-KR",
+        timezone: "Asia/Seoul",
+        activeSajuProfileId: null,
+        activeJournalProfileId: null,
+        activeViewProfileId: null,
+        experienceMode: null,
+        onboardingCompletedAt: null,
+        createdAt: now,
+        updatedAt: now,
+        schemaVersion: DIARY_SCHEMA_VERSION,
+      };
+      saveLocalUserProfile(profile);
+      return {
+        experienceMode: null,
+        onboardingCompletedAt: null,
+        profile,
+      };
     }
   }
 
@@ -119,7 +183,14 @@ export async function saveExperienceMode(mode: ExperienceMode): Promise<void> {
     id: user.id,
     locale: next.locale ?? "ko-KR",
     timezone: next.timezone ?? "Asia/Seoul",
-    active_saju_profile_id: next.activeSajuProfileId ?? null,
+    active_saju_profile_id: next.activeJournalProfileId ?? next.activeSajuProfileId ?? null,
+    active_journal_profile_id:
+      next.activeJournalProfileId ?? next.activeSajuProfileId ?? null,
+    active_view_profile_id:
+      next.activeViewProfileId ??
+      next.activeJournalProfileId ??
+      next.activeSajuProfileId ??
+      null,
     experience_mode: resolved,
     onboarding_completed_at: next.onboardingCompletedAt ?? null,
     schema_version: DIARY_SCHEMA_VERSION,
@@ -156,7 +227,14 @@ export async function completeOnboarding(
     id: user.id,
     locale: next.locale ?? "ko-KR",
     timezone: next.timezone ?? "Asia/Seoul",
-    active_saju_profile_id: next.activeSajuProfileId ?? null,
+    active_saju_profile_id: next.activeJournalProfileId ?? next.activeSajuProfileId ?? null,
+    active_journal_profile_id:
+      next.activeJournalProfileId ?? next.activeSajuProfileId ?? null,
+    active_view_profile_id:
+      next.activeViewProfileId ??
+      next.activeJournalProfileId ??
+      next.activeSajuProfileId ??
+      null,
     experience_mode: resolved,
     onboarding_completed_at: at,
     schema_version: DIARY_SCHEMA_VERSION,

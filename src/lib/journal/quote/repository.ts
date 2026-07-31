@@ -142,26 +142,27 @@ export async function deactivateQuote(id: string): Promise<void> {
   if (error) throw new Error(error.message);
 }
 
-/** 내부 라이브러리 의미 검색 (실패 시 활성 목록 폴백) */
+/** 내부 라이브러리 의미 검색 + 고전 카탈로그 병합 */
 export async function retrieveQuoteCandidates(
   queryText: string,
   matchCount = 12
 ): Promise<QuoteLibraryItem[]> {
+  const poolLimit = Math.max(matchCount, 48);
+  let semantic: QuoteLibraryItem[] = [];
   try {
     const sb = getSupabaseServiceClient();
     const embedding = await embedText(queryText);
     const { data, error } = await sb.rpc("match_quote_library", {
       query_embedding: embedding,
-      match_count: matchCount,
+      match_count: poolLimit,
     });
     if (!error && data && Array.isArray(data) && data.length > 0) {
-      return data.map((r) => mapRow(r as Record<string, unknown>));
+      semantic = data.map((r) => mapRow(r as Record<string, unknown>));
     }
   } catch {
     /* fall through */
   }
 
-  // 임베딩/RPC 없으면 활성 검증 명언 목록
   const userSb = getSupabaseServerClient();
   const client = userSb ?? getSupabaseServiceClient();
   const { data, error } = await client
@@ -179,9 +180,23 @@ export async function retrieveQuoteCandidates(
       "permission_granted",
       "internally_written",
     ])
-    .limit(matchCount);
-  if (error || !data) return [];
-  return data.map((r) => mapRow(r as Record<string, unknown>));
+    .order("attribution_confidence", { ascending: false })
+    .limit(poolLimit);
+  if (error || !data) return semantic.slice(0, matchCount);
+
+  const catalog = data.map((r) => mapRow(r as Record<string, unknown>));
+  catalog.sort((a, b) => {
+    const pa = (a.sourceType ?? "").startsWith("verified_classic") ? 1 : 0;
+    const pb = (b.sourceType ?? "").startsWith("verified_classic") ? 1 : 0;
+    if (pb !== pa) return pb - pa;
+    return (b.attributionConfidence ?? 0) - (a.attributionConfidence ?? 0);
+  });
+
+  const byId = new Map<string, QuoteLibraryItem>();
+  for (const q of [...semantic, ...catalog]) {
+    if (!byId.has(q.id)) byId.set(q.id, q);
+  }
+  return [...byId.values()].slice(0, matchCount);
 }
 
 export async function loadRecentDeliveries(

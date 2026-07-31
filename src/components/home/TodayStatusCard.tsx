@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useState, type CSSProperties } from "react";
+import { useEffect, useLayoutEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { todayDateString } from "@/lib/diary/dayPillar";
 import type { HomeEStats } from "@/lib/journal/homeStats";
 import {
   formatOpenAiStatus,
-  shouldShowOpenAiStatus,
   type OpenAiCallStatus,
 } from "@/lib/journal/openaiStatus";
+import { useIsAdmin } from "@/hooks/useIsAdmin";
 import {
   describeRecentHappiness,
   STATUS_FOCUS_EMOJI,
@@ -20,6 +20,16 @@ import {
   saveRecentStatusCache,
 } from "@/lib/journal/recentStatusCache";
 import WaveText from "@/components/motion/WaveText";
+import WeekTopicsCard from "@/components/journal/WeekTopicsCard";
+import type { WeekTopicSummary } from "@/lib/journal/topics/weekTopics";
+import {
+  weekTopicSupportFingerprint,
+  type WeekTopicSupportItem,
+} from "@/lib/journal/topics/topicSupport";
+import {
+  loadWeekTopicSupportCache,
+  saveWeekTopicSupportCache,
+} from "@/lib/journal/topics/weekTopicSupportCache";
 
 function normalizeStatusPayload(
   data: RecentStatusPayload & { openAi?: OpenAiCallStatus }
@@ -40,6 +50,9 @@ function normalizeStatusPayload(
 
 type Props = {
   stats: HomeEStats;
+  weekTopics?: WeekTopicSummary | null;
+  /** 화제별 일기 발췌 — LLM 종합용 */
+  weekTopicSupportItems?: WeekTopicSupportItem[];
 };
 
 function TypewriterText({
@@ -186,17 +199,14 @@ function FocusChip({
         background: "var(--px-bg3)",
       }}
     >
-      <p className="text-xs font-semibold" style={{ color }}>
-        <span className="mr-1" aria-hidden>
-          {STATUS_FOCUS_EMOJI[tone]}
-        </span>
-        {item.label}
-      </p>
       <p
-        className="text-sm font-bold leading-snug truncate"
+        className="text-sm font-black leading-snug truncate"
         style={{ color: "var(--px-text-on-panel)" }}
         title={item.value}
       >
+        <span className="mr-1" aria-hidden>
+          {STATUS_FOCUS_EMOJI[tone]}
+        </span>
         {item.value}
       </p>
       {item.score != null && (
@@ -214,20 +224,65 @@ function FocusChip({
   );
 }
 
+function FocusToneRow({
+  title,
+  tone,
+  children,
+}: {
+  title: string;
+  tone: "good" | "watch";
+  children: ReactNode;
+}) {
+  const color = tone === "good" ? "#4ade80" : "#fbbf24";
+  return (
+    <div
+      className="space-y-2 pl-2.5"
+      style={{ borderLeft: `3px solid ${color}` }}
+    >
+      <p className="text-xs font-black tracking-wide" style={{ color }}>
+        <span className="mr-1" aria-hidden>
+          {STATUS_FOCUS_EMOJI[tone]}
+        </span>
+        {title}
+      </p>
+      <div className="grid grid-cols-2 gap-2.5">{children}</div>
+    </div>
+  );
+}
+
 /**
  * 홈 — 구조화된 "최근 나의 상태"
  * 점수·등급을 크게, 설명·조언은 밝고 덜 굵게
  * OpenAI는 당일·동일 통계 fingerprint일 때 localStorage 캐시로 재호출 생략
  */
-export default function TodayStatusCard({ stats }: Props) {
+export default function TodayStatusCard({
+  stats,
+  weekTopics,
+  weekTopicSupportItems = [],
+}: Props) {
+  const isAdmin = useIsAdmin();
   const [status, setStatus] = useState<RecentStatusPayload | null>(null);
   const [openAi, setOpenAi] = useState<OpenAiCallStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [cacheReady, setCacheReady] = useState(false);
+  const [topicLines, setTopicLines] = useState<Record<string, string>>({});
 
   const fingerprint = recentStatusFingerprint(stats);
   const cacheDate = todayDateString();
+  const hasTopics = Boolean(weekTopics && weekTopics.entryDays > 0);
+  const topicFp = weekTopicSupportFingerprint(weekTopicSupportItems);
 
+  const displayWeekTopics = (() => {
+    if (!weekTopics) return null;
+    if (Object.keys(topicLines).length === 0) return weekTopics;
+    return {
+      ...weekTopics,
+      topics: weekTopics.topics.map((t) => ({
+        ...t,
+        supportLine: topicLines[t.topicId] ?? t.supportLine,
+      })),
+    };
+  })();
   // 페인트 전에 캐시 히트면 로딩 문구 없이 바로 표시
   useLayoutEffect(() => {
     const cached = loadRecentStatusCache(cacheDate, fingerprint);
@@ -283,7 +338,63 @@ export default function TodayStatusCard({ stats }: Props) {
     };
   }, [cacheReady, cacheDate, fingerprint, stats]);
 
-  if (!loading && !status) return null;
+  // 화제별 일기 본문 종합 → 위로·조언 한 문장
+  useLayoutEffect(() => {
+    if (weekTopicSupportItems.length === 0) {
+      setTopicLines({});
+      return;
+    }
+    const cached = loadWeekTopicSupportCache(cacheDate, topicFp);
+    if (cached) {
+      setTopicLines(cached.lines);
+      return;
+    }
+    const fallback: Record<string, string> = {};
+    for (const it of weekTopicSupportItems) {
+      fallback[it.topicId] = it.fallbackLine;
+    }
+    setTopicLines(fallback);
+  }, [cacheDate, topicFp, weekTopicSupportItems]);
+
+  useEffect(() => {
+    if (weekTopicSupportItems.length === 0) return;
+    const cached = loadWeekTopicSupportCache(cacheDate, topicFp);
+    if (cached) return;
+
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch("/api/journal/week-topic-support", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            asOf: cacheDate,
+            topics: weekTopicSupportItems,
+          }),
+        });
+        if (!res.ok) return;
+        const data = (await res.json()) as {
+          lines?: Record<string, string>;
+          openAi?: OpenAiCallStatus;
+        };
+        if (cancelled || !data.lines) return;
+        setTopicLines(data.lines);
+        saveWeekTopicSupportCache(
+          cacheDate,
+          topicFp,
+          data.lines,
+          data.openAi ?? null
+        );
+      } catch {
+        /* 템플릿 폴백 유지 */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [cacheDate, topicFp, weekTopicSupportItems]);
+
+  if (!loading && !status && !hasTopics) return null;
 
   const hasFocus = Boolean(
     status?.coreGood ||
@@ -294,7 +405,9 @@ export default function TodayStatusCard({ stats }: Props) {
 
   return (
     <section className="space-y-2" aria-label="최근 나의 상태">
-      <WaveText className="ui-section-title">■ 최근 나의 상태</WaveText>
+      <div className="ui-emphasize-head">
+        <WaveText className="ui-emphasize-title">최근 나의 상태</WaveText>
+      </div>
       <div
         className="p-4 border-2 space-y-3.5"
         style={{
@@ -322,94 +435,63 @@ export default function TodayStatusCard({ stats }: Props) {
               />
             )}
 
-            {hasFocus && (
-              <div className="space-y-2.5">
-                {(status.coreGood || status.coreWatch) && (
-                  <div className="space-y-1.5">
-                    <p
-                      className="text-[11px] font-bold"
-                      style={{ color: "var(--px-text2)" }}
-                    >
-                      핵심 상태
-                    </p>
-                    <div className="grid grid-cols-2 gap-2.5">
-                      {status.coreGood ? (
-                        <FocusChip item={status.coreGood} tone="good" />
-                      ) : (
-                        <div
-                          className="p-3 border opacity-40"
-                          style={{ borderColor: "var(--px-border)" }}
-                        />
-                      )}
-                      {status.coreWatch ? (
-                        <FocusChip item={status.coreWatch} tone="watch" />
-                      ) : (
-                        <div
-                          className="p-3 border opacity-40"
-                          style={{ borderColor: "var(--px-border)" }}
-                        />
-                      )}
-                    </div>
-                  </div>
+            {(hasFocus || (displayWeekTopics && hasTopics)) && (
+              <div className="space-y-3">
+                {(status.coreGood || status.domainGood) && (
+                  <FocusToneRow title="힘이 되는 쪽" tone="good">
+                    {status.coreGood && (
+                      <FocusChip item={status.coreGood} tone="good" />
+                    )}
+                    {status.domainGood && (
+                      <FocusChip item={status.domainGood} tone="good" />
+                    )}
+                  </FocusToneRow>
                 )}
-                {(status.domainGood || status.domainWatch) && (
-                  <div className="space-y-1.5">
-                    <p
-                      className="text-[11px] font-bold"
-                      style={{ color: "var(--px-text2)" }}
-                    >
-                      선택 상태
-                    </p>
-                    <div className="grid grid-cols-2 gap-2.5">
-                      {status.domainGood ? (
-                        <FocusChip item={status.domainGood} tone="good" />
-                      ) : (
-                        <div
-                          className="p-3 border opacity-40"
-                          style={{ borderColor: "var(--px-border)" }}
-                        />
-                      )}
-                      {status.domainWatch ? (
-                        <FocusChip item={status.domainWatch} tone="watch" />
-                      ) : (
-                        <div
-                          className="p-3 border opacity-40"
-                          style={{ borderColor: "var(--px-border)" }}
-                        />
-                      )}
-                    </div>
-                  </div>
+                {(status.coreWatch || status.domainWatch) && (
+                  <FocusToneRow title="살피면 좋은 쪽" tone="watch">
+                    {status.coreWatch && (
+                      <FocusChip item={status.coreWatch} tone="watch" />
+                    )}
+                    {status.domainWatch && (
+                      <FocusChip item={status.domainWatch} tone="watch" />
+                    )}
+                  </FocusToneRow>
+                )}
+                {displayWeekTopics && hasTopics && (
+                  <WeekTopicsCard summary={displayWeekTopics} variant="focus" />
                 )}
               </div>
             )}
 
             {status.advice && (
-              <div className="space-y-1.5">
+              <div
+                className="space-y-1.5 px-3 py-3"
+                style={{
+                  borderLeft: "3px solid var(--px-accent)",
+                  background:
+                    "color-mix(in srgb, var(--px-accent) 10%, var(--px-bg3))",
+                }}
+              >
                 <p
-                  className="text-xs font-semibold tracking-wide"
+                  className="text-[11px] font-black tracking-wide"
                   style={{ color: "var(--px-accent)" }}
                 >
                   이렇게 해보면 좋아요
                 </p>
-                <div
-                  className="pl-3"
-                  style={{
-                    borderLeft: "3px solid var(--px-accent)",
-                  }}
+                <p
+                  className="text-sm font-bold leading-relaxed"
+                  style={{ color: "var(--px-text-on-panel)", lineHeight: 1.65 }}
                 >
-                  <p
-                    className="text-sm font-medium leading-relaxed"
-                    style={{ color: "var(--px-text-on-panel)", lineHeight: 1.65 }}
-                  >
-                    {status.advice}
-                  </p>
-                </div>
+                  {status.advice}
+                </p>
               </div>
             )}
           </>
+        ) : displayWeekTopics && hasTopics ? (
+          <WeekTopicsCard summary={displayWeekTopics} variant="focus" />
         ) : null}
 
-        {shouldShowOpenAiStatus() && openAi && (
+        {isAdmin && openAi && (
           <p className="text-xs" style={{ color: "var(--px-text2)" }}>
             {formatOpenAiStatus(openAi)}
           </p>

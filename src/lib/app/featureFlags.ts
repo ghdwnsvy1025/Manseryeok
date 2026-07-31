@@ -80,7 +80,8 @@ export const DEFAULT_FEATURE_FLAGS: FeatureFlags = {
   checkinV2Enabled: false,
   ragQuestionWordingEnabled: true,
   ridgeQuestionLiveEnabled: false,
-  dailyFortuneV2Enabled: false,
+  /** 운세 v2 — 개인화 해석 JSON (종합/직장/대인/연애/재물/건강) */
+  dailyFortuneV2Enabled: true,
   fortuneDetailsEnabled: true,
   verifiedQuoteEnabled: true,
   quoteRagEnabled: true,

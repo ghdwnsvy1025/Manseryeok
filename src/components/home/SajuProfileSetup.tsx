@@ -273,7 +273,7 @@ export default function SajuProfileSetup({ onCompleted }: Props) {
         className="w-full py-2 text-xs font-bold"
         style={{ color: "var(--px-text2)" }}
       >
-        나중에 하기
+        나중에 하기 — 운세·문장 품질이 낮아질 수 있어요
       </button>
     </div>
   );

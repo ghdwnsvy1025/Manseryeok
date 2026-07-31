@@ -6,6 +6,8 @@ import {
   buildTemplateRecentStatus,
   normalizeRecentStatus,
 } from "@/lib/journal/recentStatus";
+import { requireAuthUser } from "@/lib/api/requireAuth";
+import { checkLlmRateLimit } from "@/lib/api/rateLimit";
 
 export const runtime = "nodejs";
 
@@ -14,6 +16,11 @@ type Body = {
 };
 
 export async function POST(req: NextRequest) {
+  const auth = await requireAuthUser();
+  if (!auth.ok) return auth.response;
+  const limited = checkLlmRateLimit(auth.user.id);
+  if (!limited.ok) return limited.response;
+
   let body: unknown;
   try {
     body = await req.json();
@@ -49,13 +56,14 @@ export async function POST(req: NextRequest) {
             "진단·미래확정·의학조언 금지. 쉬운 한국어.",
             "JSON만:",
             '{ "headline": "최근 행복도를 직접 설명하는 한 줄(20자 내외, 흐름·리듬 같은 추상어 금지)",',
-            '  "coreGood": { "label": "핵심 · 좋아요", "value": "카테고리명", "score": 7.2 } | null,',
-            '  "coreWatch": { "label": "핵심 · 아쉬워요", "value": "카테고리명", "score": 4.1 } | null,',
-            '  "domainGood": { "label": "선택 · 좋아요", "value": "카테고리명", "score": 7.2 } | null,',
-            '  "domainWatch": { "label": "선택 · 아쉬워요", "value": "카테고리명", "score": 4.1 } | null,',
+            '  "coreGood": { "label": "기본", "value": "카테고리명", "score": 7.2 } | null,',
+            '  "coreWatch": { "label": "기본", "value": "카테고리명", "score": 4.1 } | null,',
+            '  "domainGood": { "label": "생활", "value": "카테고리명", "score": 7.2 } | null,',
+            '  "domainWatch": { "label": "생활", "value": "카테고리명", "score": 4.1 } | null,',
             '  "advice": "짧은 제안 한 문장" }',
             "stats의 core*/domain* 이름이 있으면 각 value에 그 이름을 우선 사용.",
-            "선택 영역 데이터가 없으면 domainGood/domainWatch는 null.",
+            "생활(선택) 영역 데이터가 없으면 domainGood/domainWatch는 null.",
+            "label은 반드시 기본(항상 기록하는 영역) 또는 생활(골라 기록하는 영역).",
           ].join(" "),
         },
         {

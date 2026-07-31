@@ -1,0 +1,23 @@
+{
+  "file": "western_classic_quotes_500_ko.json",
+  "record_count": 500,
+  "unique_ids": 500,
+  "unique_source_texts": 500,
+  "unique_korean_texts": 500,
+  "all_have_hangul": true,
+  "all_have_source_urls": true,
+  "all_have_locations": true,
+  "records_by_work": {
+    "명상록": 49,
+    "엥케이리디온": 51,
+    "베이컨 수상록": 100,
+    "에머슨 수상록": 100,
+    "월든·시민 불복종": 100,
+    "삶의 지혜에 관한 아포리즘": 100
+  },
+  "file_size_bytes": 806659,
+  "warnings": [
+    "Korean text is a semantic translation and should be professionally reviewed for publication.",
+    "Some historical excerpts contain outdated or objectionable assumptions; use context fields and editorial review."
+  ]
+}

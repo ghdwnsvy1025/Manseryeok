@@ -6,7 +6,6 @@ import type { SajuResult } from "@/lib/saju/types";
 import type { Element } from "@/lib/saju/constants";
 import { BRANCH_META, ELEMENT_LABELS, STEM_META } from "@/lib/saju/constants";
 import { getTenGod, getHiddenStemsByBranch, type HiddenStemByPillar, type HiddenStemWithTenGod, type StemHanja } from "@/lib/saju/hiddenStems";
-import ExpertInsightsForSaju from "@/components/saju/ExpertInsightsForSaju";
 import CoachmarkOverlay from "@/components/CoachmarkOverlay";
 import Link from "next/link";
 import {
@@ -146,7 +145,20 @@ const PILLAR_META: Record<PillarKey, { ko: string; hanja: string }> = {
 // 화면 왼쪽부터: 시주, 일주, 월주, 년주
 const DISPLAY_ORDER: PillarKey[] = ["hour", "day", "month", "year"];
 
-export default function SajuResult({ result }: { result: SajuResult }) {
+export default function SajuResult({
+  result,
+  showJournalCta = true,
+  profileName = null,
+  profilesHref = "/saju/profiles",
+}: {
+  result: SajuResult;
+  /** 내 프로필 만세력일 때만 「오늘 기록하기」 표시 */
+  showJournalCta?: boolean;
+  /** INPUT 바에 표시할 프로필 이름 */
+  profileName?: string | null;
+  /** 프로필 목록 링크 */
+  profilesHref?: string;
+}) {
   const { isMobile } = useViewMode();
   const charSize = isMobile ? "28px" : "40px";
   const labelSize = "12px";
@@ -585,24 +597,48 @@ export default function SajuResult({ result }: { result: SajuResult }) {
           animation: daeun-slot-pump 0.55s cubic-bezier(0.34, 1.56, 0.64, 1);
         }
       `}</style>
-      {/* ── 입력 요약 바 ── */}
+      {/* ── 프로필·생년월일 요약 바 ── */}
       <div
-        className={`py-2 text-xs font-bold flex flex-wrap gap-x-4 gap-y-1 ${isMobile ? "px-2" : "px-4"}`}
-        style={{ background: "var(--px-bg3)", color: "var(--px-text2)", borderBottom: "2px solid var(--px-border2)" }}
+        className={`flex items-center gap-2 ${isMobile ? "px-2.5 py-3" : "px-4 py-2.5"}`}
+        style={{
+          background: "var(--px-bg3)",
+          color: "var(--px-text2)",
+          borderBottom: "2px solid var(--px-border2)",
+        }}
       >
-        <span>
-          <span style={{ color: "var(--px-accent)" }}>INPUT ► </span>
-          {input.original.options.calendarType === "lunar"
-            ? `음력 ${input.original.year}년 ${input.original.options.isLeapMonth ? "윤" : ""}${input.original.month}월 ${input.original.day}일`
-            : `양력 ${input.original.year}년 ${input.original.month}월 ${input.original.day}일`}
-          {input.original.hour !== undefined &&
-            ` ${input.original.hour}:${input.original.minute ?? 0} KST`}
-        </span>
-        {input.lunarConversion && (
-          <span style={{ color: "#4ade80" }}>
-            ▶ 양력: {input.lunarConversion.outputSolar}
+        <div className="min-w-0 flex-1 flex flex-wrap gap-x-2.5 gap-y-0.5 items-baseline">
+          <span
+            className="font-bold"
+            style={{ fontSize: "14px", lineHeight: 1.45 }}
+          >
+            {profileName && (
+              <span
+                className="font-black"
+                style={{ color: "var(--px-accent)", fontSize: "16px" }}
+              >
+                {profileName}
+                <span style={{ color: "var(--px-text2)", fontWeight: 700 }}> · </span>
+              </span>
+            )}
+            {input.original.options.calendarType === "lunar"
+              ? `음력 ${input.original.year}년 ${input.original.options.isLeapMonth ? "윤" : ""}${input.original.month}월 ${input.original.day}일`
+              : `양력 ${input.original.year}년 ${input.original.month}월 ${input.original.day}일`}
+            {input.original.hour !== undefined &&
+              ` ${String(input.original.hour).padStart(2, "0")}:${String(input.original.minute ?? 0).padStart(2, "0")}`}
           </span>
-        )}
+          {input.lunarConversion && (
+            <span className="font-bold" style={{ color: "#4ade80", fontSize: "13px" }}>
+              양력 {input.lunarConversion.outputSolar}
+            </span>
+          )}
+        </div>
+        <Link
+          href={profilesHref}
+          className="shrink-0 font-black underline"
+          style={{ color: "var(--px-text2)", fontSize: isMobile ? "15px" : "14px" }}
+        >
+          목록
+        </Link>
       </div>
 
       <div
@@ -650,6 +686,10 @@ export default function SajuResult({ result }: { result: SajuResult }) {
           </>
         ) : exploreMode ? (
           "글자나 대운을 클릭하세요"
+        ) : selectedSewoonYear != null ? (
+          "오행 분포율을 확인하세요"
+        ) : selectedDaeunOrder != null ? (
+          "세운을 클릭하세요"
         ) : (
           "대운을 클릭하세요"
         )}
@@ -1587,21 +1627,20 @@ export default function SajuResult({ result }: { result: SajuResult }) {
         </div>
         </div>
 
-        <Link
-          href="/journal"
-          className="block text-center px-4 py-3 text-xs font-bold border-2"
-          style={{
-            background: "var(--px-accent)",
-            borderColor: "#000",
-            color: "#000",
-            boxShadow: "4px 4px 0 #000",
-          }}
-        >
-          오늘 기록하기 →
-        </Link>
-
-        {/* ── 기존 만세력 보존 + 별도 해석 레이어 ── */}
-        <ExpertInsightsForSaju result={result} />
+        {showJournalCta && (
+          <Link
+            href="/journal"
+            className="block text-center px-4 py-3 text-xs font-bold border-2"
+            style={{
+              background: "var(--px-accent)",
+              borderColor: "#000",
+              color: "#000",
+              boxShadow: "4px 4px 0 #000",
+            }}
+          >
+            오늘 기록하기 →
+          </Link>
+        )}
 
         {/* ── 경고 ── */}
         {debug.warnings.length > 0 && (

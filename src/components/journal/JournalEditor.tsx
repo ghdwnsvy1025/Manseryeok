@@ -22,7 +22,6 @@ import {
 import type { OpenAiCallStatus } from "@/lib/journal/openaiStatus";
 import { todayDateString } from "@/lib/diary/dayPillar";
 import {
-  loadLocalSajuProfile,
   loadPrimarySajuProfile,
 } from "@/lib/diary/profileStorage";
 import type { SajuProfile } from "@/lib/diary/types";
@@ -145,12 +144,12 @@ export default function JournalEditor({ initialDate }: Props) {
         if (cancelled) return;
         setAllEntries(list);
 
-        setSajuProfile(loadLocalSajuProfile());
+        setSajuProfile(null);
         try {
           const remote = await loadPrimarySajuProfile();
-          if (!cancelled && remote) setSajuProfile(remote);
+          if (!cancelled) setSajuProfile(remote);
         } catch {
-          /* keep local */
+          if (!cancelled) setSajuProfile(null);
         }
 
         if (enabled.length < 4) {

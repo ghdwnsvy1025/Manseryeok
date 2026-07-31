@@ -84,7 +84,7 @@ function CollectionTile({
 export default function StatsGanjiCollection({
   collection,
   collected,
-  patternCount,
+  patternCount: _patternCount,
   ganjiHappiness,
   mission,
   showMissionBanner = true,
@@ -99,31 +99,20 @@ export default function StatsGanjiCollection({
 
   return (
     <section className="stats-section" aria-label="간지 도감">
-      <div className="stats-section-head">
-        <p className="ui-section-title">간지 도감</p>
-        <p className="stats-label tabular-nums">
-          <span style={{ color: "var(--px-accent)", fontWeight: 900 }}>
-            {collected}
-          </span>
-          /60
-          {patternCount > 0 ? ` · 패턴 ${patternCount}` : ""}
+      <div className="stats-emphasize-head">
+        <p className="stats-emphasize-title">간지 도감</p>
+        <p className="text-sm font-black tabular-nums" style={{ color: "var(--px-accent)" }}>
+          {collected}
+          <span style={{ color: "var(--px-text2)", fontWeight: 700 }}>/60</span>
         </p>
       </div>
 
       <div className="stats-panel space-y-3 !shadow-none">
-        <div className="space-y-1.5">
-          <div className="flex items-center justify-between gap-2">
-            <p className="stats-label">수집률</p>
-            <p className="text-xs font-extrabold tabular-nums" style={{ color: "var(--px-accent)" }}>
-              {progress}%
-            </p>
-          </div>
-          <div className="stats-progress-track" aria-hidden>
-            <div
-              className="stats-progress-fill"
-              style={{ width: `${progress}%` }}
-            />
-          </div>
+        <div className="stats-progress-track" aria-hidden>
+          <div
+            className="stats-progress-fill"
+            style={{ width: `${progress}%` }}
+          />
         </div>
 
         {showMissionBanner && (
@@ -143,15 +132,9 @@ export default function StatsGanjiCollection({
         )}
 
         {collected === 0 ? (
-          <div className="space-y-1">
-            <p
-              className="text-sm font-extrabold"
-              style={{ color: "var(--px-accent)" }}
-            >
-              첫 간지: {mission.ganjiKo}
-            </p>
-            <p className="stats-label">오늘 기록하면 도감 1칸이 열려요</p>
-          </div>
+          <p className="text-sm font-extrabold" style={{ color: "var(--px-accent)" }}>
+            오늘 {mission.ganjiKo}
+          </p>
         ) : (
           !expanded &&
           unlockedPreview.length > 0 && (
@@ -178,7 +161,7 @@ export default function StatsGanjiCollection({
           }}
           aria-expanded={expanded}
         >
-          {expanded ? "60칸 접기" : `60칸 펼치기`}
+          {expanded ? "접기" : "60칸"}
         </button>
 
         {expanded && (
@@ -193,10 +176,6 @@ export default function StatsGanjiCollection({
           </div>
         )}
       </div>
-
-      <Link href="/diary/collection" className="stats-link">
-        도감 페이지 →
-      </Link>
     </section>
   );
 }

@@ -54,12 +54,105 @@ const LOCAL_SAJU_PROFILE_KEY = "manseryeok_saju_profile_v2";
 /** 전체 프로필 목록 */
 const LOCAL_SAJU_PROFILES_KEY = "manseryeok_saju_profiles_v2";
 const LOCAL_USER_PROFILE_KEY = "manseryeok_user_profile_v2";
+/** 만세력 보기용 프로필 id — 원격 컬럼 없어도 유지 */
+const LOCAL_VIEW_PROFILE_KEY = "manseryeok_active_view_profile_id_v1";
+/** 마지막으로 reconcile한 auth user id — 계정 전환 감지 */
+const LAST_AUTH_USER_KEY = "manseryeok_last_auth_user_id_v1";
 const CALCULATOR_VERSION = "0.1.0";
 export const SAJU_PROFILE_CHANGED_EVENT = "manseryeok:saju-profile-changed";
+/** 프로필 관리 화면을 목록으로 되돌림 (같은 라우트에서 메뉴 클릭 시) */
+export const PROFILES_LIST_EVENT = "manseryeok:profiles-list";
 
 export function notifySajuProfileChanged(): void {
   if (typeof window === "undefined") return;
   window.dispatchEvent(new Event(SAJU_PROFILE_CHANGED_EVENT));
+}
+
+/** 게스트(비로그인) 로컬 프로필을 현재 계정으로 옮겨도 되는지 */
+export function localProfilesSafeToMigrate(
+  profiles: Array<{ userId?: string | null }>,
+  userId: string
+): boolean {
+  if (profiles.length === 0) return true;
+  return profiles.every((p) => !p.userId || p.userId === userId);
+}
+
+/**
+ * 사주/유저 프로필 로컬 캐시 삭제.
+ * 계정 전환·로그아웃 시 이전 계정 데이터가 화면에 잠깐이라도 보이지 않게 한다.
+ */
+export function clearLocalAccountScopedState(opts?: {
+  notify?: boolean;
+}): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.removeItem(LOCAL_SAJU_PROFILE_KEY);
+    localStorage.removeItem(LOCAL_SAJU_PROFILES_KEY);
+    localStorage.removeItem(LOCAL_USER_PROFILE_KEY);
+    localStorage.removeItem(LOCAL_VIEW_PROFILE_KEY);
+  } catch {
+    /* ignore */
+  }
+  try {
+    // experienceMode 모듈과 순환 import 피하려고 키를 직접 지움
+    localStorage.removeItem("manseryeok_experience_mode");
+    localStorage.removeItem("manseryeok_onboarding_completed_at");
+  } catch {
+    /* ignore */
+  }
+  if (opts?.notify !== false) {
+    notifySajuProfileChanged();
+  }
+}
+
+/**
+ * auth user가 바뀌면 로컬 계정 스코프 상태를 비운다.
+ * 예외: 비로그인(게스트) → 첫 로그인, 그리고 로컬 프로필이 익명이면 이관용으로 유지.
+ */
+export function reconcileLocalStateWithAuthUser(userId: string | null): void {
+  if (typeof window === "undefined") return;
+  let prev: string | null = null;
+  try {
+    prev = localStorage.getItem(LAST_AUTH_USER_KEY);
+  } catch {
+    prev = null;
+  }
+  if (userId === prev) return;
+
+  const preserveGuest =
+    Boolean(userId) &&
+    !prev &&
+    localProfilesSafeToMigrate(loadLocalSajuProfiles(), userId!);
+
+  if (!preserveGuest) {
+    clearLocalAccountScopedState({ notify: true });
+  }
+
+  try {
+    if (userId) localStorage.setItem(LAST_AUTH_USER_KEY, userId);
+    else localStorage.removeItem(LAST_AUTH_USER_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
+export function getLocalViewProfileId(): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return localStorage.getItem(LOCAL_VIEW_PROFILE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export function setLocalViewProfileId(id: string | null): void {
+  if (typeof window === "undefined") return;
+  try {
+    if (id) localStorage.setItem(LOCAL_VIEW_PROFILE_KEY, id);
+    else localStorage.removeItem(LOCAL_VIEW_PROFILE_KEY);
+  } catch {
+    /* ignore */
+  }
 }
 
 function generateId(): string {
@@ -232,15 +325,31 @@ export function saveLocalUserProfile(profile: UserProfile): void {
 }
 
 export function ensureLocalUserProfile(
-  activeSajuProfileId?: string | null
+  activeSajuProfileId?: string | null,
+  opts?: {
+    journalId?: string | null;
+    viewId?: string | null;
+  }
 ): UserProfile {
   const existing = loadLocalUserProfile();
   const now = new Date().toISOString();
+  const journalId =
+    opts?.journalId ??
+    activeSajuProfileId ??
+    existing?.activeJournalProfileId ??
+    existing?.activeSajuProfileId ??
+    null;
+  const viewId =
+    opts?.viewId ??
+    existing?.activeViewProfileId ??
+    journalId;
+
   if (existing) {
-    const next = {
+    const next: UserProfile = {
       ...existing,
-      activeSajuProfileId:
-        activeSajuProfileId ?? existing.activeSajuProfileId ?? null,
+      activeSajuProfileId: journalId,
+      activeJournalProfileId: journalId,
+      activeViewProfileId: viewId,
       updatedAt: now,
       schemaVersion: DIARY_SCHEMA_VERSION,
     };
@@ -251,7 +360,9 @@ export function ensureLocalUserProfile(
     id: "local-anonymous",
     locale: "ko-KR",
     timezone: "Asia/Seoul",
-    activeSajuProfileId: activeSajuProfileId ?? null,
+    activeSajuProfileId: journalId,
+    activeJournalProfileId: journalId,
+    activeViewProfileId: viewId,
     experienceMode: null,
     onboardingCompletedAt: null,
     createdAt: now,
@@ -391,13 +502,21 @@ export async function saveSajuProfile(profile: SajuProfile): Promise<SajuProfile
   if (error) throw new Error(error.message);
 
   if (remote.isPrimary) {
+    const local = loadLocalUserProfile();
+    const viewId = local?.activeViewProfileId ?? remote.id;
     await supabase.from("user_profiles").upsert({
       id: user.id,
       locale: "ko-KR",
       timezone: remote.timezone,
       active_saju_profile_id: remote.id,
+      active_journal_profile_id: remote.id,
+      active_view_profile_id: viewId,
       schema_version: DIARY_SCHEMA_VERSION,
       updated_at: remote.updatedAt,
+    });
+    ensureLocalUserProfile(remote.id, {
+      journalId: remote.id,
+      viewId,
     });
   }
 
@@ -408,17 +527,22 @@ export async function saveSajuProfile(profile: SajuProfile): Promise<SajuProfile
 /**
  * 비로그인 상태에서 만든 로컬 사주 프로필을 첫 로그인 후 계정에 연결합니다.
  * 이미 계정에 primary 프로필이 있으면 원격 프로필을 우선하며 덮어쓰지 않습니다.
+ * 다른 계정의 로컬 캐시는 절대 업로드하지 않습니다.
  */
 export async function syncLocalSajuProfileToAccount(): Promise<SajuProfile | null> {
-  const localProfiles = loadLocalSajuProfiles();
-  const local = localProfiles.find((p) => p.isPrimary) ?? localProfiles[0] ?? null;
   const supabase = getSupabaseBrowserClient();
-  if (!local || !supabase) return local;
+  if (!supabase) {
+    return loadLocalSajuProfiles().find((p) => p.isPrimary) ?? loadLocalSajuProfiles()[0] ?? null;
+  }
 
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return local;
+  if (!user) {
+    return loadLocalSajuProfiles().find((p) => p.isPrimary) ?? loadLocalSajuProfiles()[0] ?? null;
+  }
+
+  reconcileLocalStateWithAuthUser(user.id);
 
   const { data: existing, error } = await supabase
     .from("saju_profiles")
@@ -443,7 +567,25 @@ export async function syncLocalSajuProfileToAccount(): Promise<SajuProfile | nul
     return remote;
   }
 
-  return saveSajuProfile({ ...local, userId: user.id, isPrimary: true });
+  const localProfiles = loadLocalSajuProfiles();
+  if (!localProfilesSafeToMigrate(localProfiles, user.id)) {
+    clearLocalAccountScopedState({ notify: true });
+    return null;
+  }
+
+  const local =
+    localProfiles.find((p) => p.isPrimary) ?? localProfiles[0] ?? null;
+  if (!local) return null;
+
+  // 익명 로컬 → 계정: 새 id로 올려 이전 계정 row와 PK 충돌을 피한다
+  const adoptId =
+    local.userId === user.id ? local.id : generateId();
+  return saveSajuProfile({
+    ...local,
+    id: adoptId,
+    userId: user.id,
+    isPrimary: true,
+  });
 }
 
 export async function loadAllSajuProfiles(): Promise<SajuProfile[]> {
@@ -453,6 +595,7 @@ export async function loadAllSajuProfiles(): Promise<SajuProfile[]> {
       data: { user },
     } = await supabase.auth.getUser();
     if (user) {
+      reconcileLocalStateWithAuthUser(user.id);
       const { data, error } = await supabase
         .from("saju_profiles")
         .select("*")
@@ -461,25 +604,281 @@ export async function loadAllSajuProfiles(): Promise<SajuProfile[]> {
       if (!error && data) {
         const profiles = data.map((row) => rowToProfile(row as SajuProfileRow));
         saveLocalSajuProfiles(profiles);
+        if (profiles.length === 0) {
+          setLocalViewProfileId(null);
+          const existing = loadLocalUserProfile();
+          if (existing) {
+            saveLocalUserProfile({
+              ...existing,
+              activeSajuProfileId: null,
+              activeJournalProfileId: null,
+              activeViewProfileId: null,
+              updatedAt: new Date().toISOString(),
+            });
+          }
+        } else {
+          await syncActiveIdsFromRemote(user.id);
+        }
         return profiles;
       }
+      // 로그인인데 조회 실패 시 — 타인 로컬 캐시를 보여주지 않음
+      const locals = loadLocalSajuProfiles().filter(
+        (p) => !p.userId || p.userId === user.id
+      );
+      return locals;
     }
   }
   return loadLocalSajuProfiles();
 }
 
-export async function loadPrimarySajuProfile(): Promise<SajuProfile | null> {
-  const profiles = await loadAllSajuProfiles();
+async function syncActiveIdsFromRemote(userId: string): Promise<void> {
+  const supabase = getSupabaseBrowserClient();
+  if (!supabase) return;
+  const full = await supabase
+    .from("user_profiles")
+    .select(
+      "active_saju_profile_id, active_journal_profile_id, active_view_profile_id"
+    )
+    .eq("id", userId)
+    .maybeSingle();
+  const row = (!full.error && full.data
+    ? full.data
+    : (
+        await supabase
+          .from("user_profiles")
+          .select("active_saju_profile_id")
+          .eq("id", userId)
+          .maybeSingle()
+      ).data) as {
+    active_saju_profile_id?: string | null;
+    active_journal_profile_id?: string | null;
+    active_view_profile_id?: string | null;
+  } | null;
+  if (!row) return;
+  const journal =
+    row.active_journal_profile_id ?? row.active_saju_profile_id ?? null;
+  const remoteView =
+    typeof row.active_view_profile_id === "string" && row.active_view_profile_id
+      ? row.active_view_profile_id
+      : null;
+  // 로컬 view가 있으면 우선 (클릭 직후·026 미적용·원격 지연 시 덮어쓰기 방지)
+  const localView = getLocalViewProfileId();
+  const view = localView ?? remoteView ?? journal;
+  if (!localView && remoteView) {
+    setLocalViewProfileId(remoteView);
+  }
+  ensureLocalUserProfile(journal, { journalId: journal, viewId: view });
+}
+
+function pickFromList(
+  profiles: SajuProfile[],
+  preferredId: string | null | undefined
+): SajuProfile | null {
   if (profiles.length === 0) return null;
+  if (preferredId) {
+    const hit = profiles.find((p) => p.id === preferredId);
+    if (hit) return hit;
+  }
   return profiles.find((p) => p.isPrimary) ?? profiles[0] ?? null;
 }
 
-/** 적용 중 프로필 바꾸기 */
-export async function setActiveSajuProfile(
+/** 일기·운세·명언에 쓰는 프로필 */
+export async function loadJournalSajuProfile(): Promise<SajuProfile | null> {
+  const profiles = await loadAllSajuProfiles();
+  const local = loadLocalUserProfile();
+  return pickFromList(
+    profiles,
+    local?.activeJournalProfileId ?? local?.activeSajuProfileId
+  );
+}
+
+/** 만세력(/saju)에 표시하는 프로필 */
+export async function loadViewSajuProfile(): Promise<SajuProfile | null> {
+  const profiles = await loadAllSajuProfiles();
+  const local = loadLocalUserProfile();
+  const preferred =
+    getLocalViewProfileId() ??
+    local?.activeViewProfileId ??
+    local?.activeJournalProfileId ??
+    local?.activeSajuProfileId;
+  return pickFromList(profiles, preferred);
+}
+
+/** @deprecated use loadJournalSajuProfile */
+export async function loadPrimarySajuProfile(): Promise<SajuProfile | null> {
+  return loadJournalSajuProfile();
+}
+
+async function upsertUserActiveIds(opts: {
+  journalId?: string | null;
+  viewId?: string | null;
+  timezone?: string;
+}): Promise<void> {
+  const now = new Date().toISOString();
+  const local = loadLocalUserProfile();
+  const journalId =
+    opts.journalId !== undefined
+      ? opts.journalId
+      : (local?.activeJournalProfileId ?? local?.activeSajuProfileId ?? null);
+  const viewId =
+    opts.viewId !== undefined
+      ? opts.viewId
+      : (local?.activeViewProfileId ?? journalId);
+
+  ensureLocalUserProfile(journalId, { journalId, viewId });
+  if (viewId) setLocalViewProfileId(viewId);
+
+  const supabase = getSupabaseBrowserClient();
+  if (!supabase) return;
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return;
+
+  const payload: Record<string, unknown> = {
+    id: user.id,
+    locale: "ko-KR",
+    timezone: opts.timezone ?? local?.timezone ?? "Asia/Seoul",
+    schema_version: DIARY_SCHEMA_VERSION,
+    updated_at: now,
+  };
+  if (journalId) {
+    payload.active_saju_profile_id = journalId;
+    payload.active_journal_profile_id = journalId;
+  }
+  if (viewId) {
+    payload.active_view_profile_id = viewId;
+  }
+
+  const { error } = await supabase.from("user_profiles").upsert(payload);
+  if (error && /active_journal_profile_id|active_view_profile_id/.test(error.message)) {
+    // 026 not applied — legacy columns only
+    await supabase.from("user_profiles").upsert({
+      id: user.id,
+      locale: "ko-KR",
+      timezone: opts.timezone ?? "Asia/Seoul",
+      active_saju_profile_id: journalId,
+      schema_version: DIARY_SCHEMA_VERSION,
+      updated_at: now,
+    });
+  }
+}
+
+/** 일기용 프로필로 지정 (is_primary + journal active)
+ *  현재는 ‘나’ 고정 — 이미 일기 프로필이 있으면 다른 id로 전환 불가.
+ */
+export async function setJournalSajuProfile(
   profileId: string
 ): Promise<SajuProfile | null> {
   const profiles = await loadAllSajuProfiles();
   const target = profiles.find((p) => p.id === profileId);
   if (!target) return null;
-  return saveSajuProfile({ ...target, isPrimary: true });
+
+  const local = loadLocalUserProfile();
+  const currentJournalId =
+    local?.activeJournalProfileId ??
+    local?.activeSajuProfileId ??
+    profiles.find((p) => p.isPrimary)?.id ??
+    null;
+
+  if (currentJournalId && currentJournalId !== profileId) {
+    throw new Error(
+      "지금은 내 프로필로만 일기를 쓸 수 있어요. (다른 프로필 일기는 나중에 열 수 있습니다)"
+    );
+  }
+
+  const saved = await saveSajuProfile({ ...target, isPrimary: true });
+  await upsertUserActiveIds({
+    journalId: saved.id,
+    timezone: saved.timezone,
+  });
+  return saved;
+}
+
+/** 만세력 보기용 프로필만 전환 (일기 스코프 유지) */
+export async function setViewSajuProfile(
+  profileId: string,
+  opts?: { notify?: boolean }
+): Promise<SajuProfile | null> {
+  // 원격 sync가 덮어쓰기 전에 로컬 view를 먼저 고정
+  setLocalViewProfileId(profileId);
+  const profiles = await loadAllSajuProfiles();
+  const target = profiles.find((p) => p.id === profileId);
+  if (!target) return null;
+  await upsertUserActiveIds({
+    viewId: target.id,
+    timezone: target.timezone,
+  });
+  if (opts?.notify !== false) {
+    notifySajuProfileChanged();
+  }
+  return target;
+}
+
+/** id로 프로필 조회 (현재 계정 원격 목록 기준) */
+export async function loadSajuProfileById(
+  profileId: string
+): Promise<SajuProfile | null> {
+  const profiles = await loadAllSajuProfiles();
+  return profiles.find((p) => p.id === profileId) ?? null;
+}
+
+/**
+ * 다른 사람 프로필 삭제 (일기용/내 프로필은 삭제 불가).
+ * view가 그 사람이면 내(journal) 프로필로 되돌림.
+ */
+export async function deleteSajuProfile(profileId: string): Promise<void> {
+  const profiles = await loadAllSajuProfiles();
+  const target = profiles.find((p) => p.id === profileId);
+  if (!target) throw new Error("프로필을 찾을 수 없어요.");
+
+  const local = loadLocalUserProfile();
+  const journalId =
+    local?.activeJournalProfileId ??
+    local?.activeSajuProfileId ??
+    profiles.find((p) => p.isPrimary)?.id ??
+    null;
+
+  if (
+    target.isPrimary ||
+    (journalId && target.id === journalId)
+  ) {
+    throw new Error("내 프로필은 삭제할 수 없어요.");
+  }
+
+  const next = profiles.filter((p) => p.id !== profileId);
+  saveLocalSajuProfiles(next);
+
+  const viewId = getLocalViewProfileId() ?? local?.activeViewProfileId;
+  if (viewId === profileId) {
+    setLocalViewProfileId(journalId);
+    await upsertUserActiveIds({
+      journalId,
+      viewId: journalId,
+    });
+  }
+
+  const supabase = getSupabaseBrowserClient();
+  if (supabase) {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (user) {
+      const { error } = await supabase
+        .from("saju_profiles")
+        .delete()
+        .eq("id", profileId)
+        .eq("user_id", user.id);
+      if (error) throw new Error(error.message);
+    }
+  }
+
+  notifySajuProfileChanged();
+}
+
+/** @deprecated use setJournalSajuProfile — also used to mean "activate for everything" historically */
+export async function setActiveSajuProfile(
+  profileId: string
+): Promise<SajuProfile | null> {
+  return setJournalSajuProfile(profileId);
 }

@@ -17,6 +17,16 @@ export const CONTENT_FEEDBACK_LABELS: Record<ContentFeedbackRating, string> = {
   not_for_me: "안 맞아요",
 };
 
+/** 질문·명언용 — 적합성보다 도움 여부 */
+export const CONTENT_FEEDBACK_HELP_LABELS: Record<
+  ContentFeedbackRating,
+  string
+> = {
+  loved: "도움이 됐어요",
+  ok: "그저 그래요",
+  not_for_me: "별로예요",
+};
+
 export type ContentFeedbackInput = {
   eventDate: string;
   contentType: string;

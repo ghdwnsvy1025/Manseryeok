@@ -3,9 +3,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   formatOpenAiStatus,
-  shouldShowOpenAiStatus,
   type OpenAiCallStatus,
 } from "@/lib/journal/openaiStatus";
+import { useIsAdmin } from "@/hooks/useIsAdmin";
 import { progressFromTotalXp } from "@/lib/product/personalizationLevel";
 import { formatFinalScore } from "@/lib/journal/finalScore";
 import { getCategoryByCode } from "@/lib/journal/categoryCatalog";
@@ -16,6 +16,7 @@ import ContentFeedbackButtons from "@/components/journal/ContentFeedbackButtons"
 import { submitContentFeedback } from "@/lib/journal/contentFeedback";
 import { trackContentExposure } from "@/lib/journal/exposure";
 import { burstFromElement, prefersReducedMotion } from "@/lib/ui/clickBurst";
+import { XP_GAUGE_FILL, XP_GAIN_COLOR } from "@/lib/ui/xpGauge";
 
 const QUOTE_LOADING_HINTS = [
   "문장을 고르는 중…",
@@ -23,33 +24,58 @@ const QUOTE_LOADING_HINTS = [
   "오늘의 한 줄을 준비하는 중…",
 ] as const;
 
-const XP_GAUGE_FILL =
-  "linear-gradient(90deg, #f5d76e 0%, #d4e34a 55%, #a3e635 100%)";
-
-const CELEBRATE_COLORS = [
-  "#c8a700",
-  "#f5d76e",
-  "#a3e635",
-  "#4ade80",
-  "#60a5fa",
-  "#f472b6",
-  "#fb923c",
-  "#e8e8f0",
+/** 벚꽃잎 팔레트 — 연분홍·살구·옅은 흰분홍 */
+const PETAL_COLORS = [
+  "#f6c6d4",
+  "#f2b6c8",
+  "#efd0da",
+  "#f8d4dc",
+  "#e8a8bc",
+  "#fce8ee",
 ];
 
-type Particle = {
+type Petal = {
   x: number;
   y: number;
   vx: number;
   vy: number;
-  w: number;
-  h: number;
+  /** 잎 크기 (px) */
+  size: number;
+  /** 현재 회전각 (rad) */
   rot: number;
+  /** 회전 속도 */
   spin: number;
+  /** 좌우 흔들림 위상 */
+  sway: number;
+  swayAmp: number;
+  swaySpeed: number;
   color: string;
   life: number;
   maxLife: number;
 };
+
+/** 벚꽃잎 한 장 — 하트에 가까운 두 잎 실 */
+function drawPetal(
+  ctx: CanvasRenderingContext2D,
+  size: number,
+  color: string
+) {
+  const s = size;
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.moveTo(0, s * 0.55);
+  ctx.bezierCurveTo(s * 0.55, s * 0.15, s * 0.45, -s * 0.55, 0, -s * 0.35);
+  ctx.bezierCurveTo(-s * 0.45, -s * 0.55, -s * 0.55, s * 0.15, 0, s * 0.55);
+  ctx.closePath();
+  ctx.fill();
+  // 가운데 옅은 결
+  ctx.strokeStyle = "rgba(255,255,255,0.35)";
+  ctx.lineWidth = Math.max(0.6, s * 0.06);
+  ctx.beginPath();
+  ctx.moveTo(0, s * 0.35);
+  ctx.quadraticCurveTo(s * 0.04, 0, 0, -s * 0.2);
+  ctx.stroke();
+}
 
 type Props = {
   entry: JournalEntry;
@@ -86,6 +112,7 @@ export default function JournalSaveCompleteModal({
   deliveryId,
   onClose,
 }: Props) {
+  const isAdmin = useIsAdmin();
   const [gauge, setGauge] = useState(0);
   const [xpFloatVisible, setXpFloatVisible] = useState(false);
   const [savedLocal, setSavedLocal] = useState(false);
@@ -112,7 +139,7 @@ export default function JournalSaveCompleteModal({
     entry.moodLabel ?? entry.moodLabels?.[0] ?? null;
   const tagChips = entry.tags.map((t) => getTagName(t.tagCode)).filter(Boolean);
 
-  // 저장 완료 축하 파티클 — 화면 중앙에서 방사형으로 터짐 (모바일 가시성)
+  // 저장 완료 — 벚꽃잎이 흩날림
   useEffect(() => {
     if (prefersReducedMotion()) return;
     const canvas = celebrateCanvasRef.current;
@@ -136,35 +163,40 @@ export default function JournalSaveCompleteModal({
     resize();
     window.addEventListener("resize", resize);
 
-    const particles: Particle[] = [];
-    const spawn = (n: number, speedScale = 1) => {
-      const cx = window.innerWidth / 2;
-      const cy = window.innerHeight * 0.42;
+    const petals: Petal[] = [];
+    const spawn = (n: number, nearCenter = false) => {
+      const W = window.innerWidth;
+      const H = window.innerHeight;
+      const isNarrow = W < 480;
       for (let i = 0; i < n; i++) {
-        const angle = (Math.PI * 2 * i) / n + (Math.random() - 0.5) * 0.35;
-        const speed = (140 + Math.random() * 220) * speedScale;
-        particles.push({
-          x: cx + (Math.random() - 0.5) * 16,
-          y: cy + (Math.random() - 0.5) * 16,
-          vx: Math.cos(angle) * speed,
-          vy: Math.sin(angle) * speed - 40,
-          w: 4 + Math.random() * 7,
-          h: 6 + Math.random() * 10,
+        // 팝업 바로 위~중간 높이에서 바로 흩날리도록
+        const y = nearCenter
+          ? H * (0.18 + Math.random() * 0.28)
+          : H * (0.08 + Math.random() * 0.22);
+        petals.push({
+          x: W * (0.12 + Math.random() * 0.76),
+          y,
+          vx: (Math.random() - 0.5) * (isNarrow ? 48 : 72),
+          vy: 8 + Math.random() * (isNarrow ? 36 : 52),
+          size: (isNarrow ? 5 : 6.5) + Math.random() * (isNarrow ? 4 : 5.5),
           rot: Math.random() * Math.PI * 2,
-          spin: (Math.random() - 0.5) * 8,
+          spin: (Math.random() - 0.5) * 3.2,
+          sway: Math.random() * Math.PI * 2,
+          swayAmp: 18 + Math.random() * 28,
+          swaySpeed: 1.8 + Math.random() * 2.0,
           color:
-            CELEBRATE_COLORS[
-              Math.floor(Math.random() * CELEBRATE_COLORS.length)
-            ]!,
+            PETAL_COLORS[Math.floor(Math.random() * PETAL_COLORS.length)]!,
           life: 0,
-          maxLife: 1.4 + Math.random() * 1.1,
+          maxLife: 3.2 + Math.random() * 2.2,
         });
       }
     };
 
-    spawn(56, 1);
-    const burst2 = window.setTimeout(() => spawn(28, 0.85), 220);
-    const burst3 = window.setTimeout(() => spawn(18, 0.7), 480);
+    const narrow = window.innerWidth < 480;
+    // 첫 파동은 화면 중상단에서 바로 터지듯
+    spawn(narrow ? 18 : 26, true);
+    const wave2 = window.setTimeout(() => spawn(narrow ? 8 : 12, false), 280);
+    const wave3 = window.setTimeout(() => spawn(narrow ? 5 : 8, true), 700);
 
     let last = performance.now();
     const tick = (now: number) => {
@@ -175,31 +207,31 @@ export default function JournalSaveCompleteModal({
       const H = window.innerHeight;
       ctx.clearRect(0, 0, W, H);
 
-      for (const p of particles) {
+      for (const p of petals) {
         if (p.life >= p.maxLife) continue;
         p.life += dt;
-        p.vy += 520 * dt;
-        p.vx *= 1 - 0.55 * dt;
-        p.vy *= 1 - 0.12 * dt;
-        p.x += p.vx * dt;
-        p.y += p.vy * dt;
+        p.sway += p.swaySpeed * dt;
         p.rot += p.spin * dt;
+        p.vy += 14 * dt;
+        p.vy = Math.min(p.vy, 110);
+        p.vx *= 1 - 0.22 * dt;
+        const swayX = Math.sin(p.sway) * p.swayAmp * dt;
+        p.x += p.vx * dt + swayX;
+        p.y += p.vy * dt;
+
         const t = p.life / p.maxLife;
-        const alpha =
-          t < 0.12 ? t / 0.12 : Math.max(0, 1 - (t - 0.12) / 0.88);
-        const scale = 1 - t * 0.35;
+        const fade =
+          t < 0.05 ? t / 0.05 : Math.max(0, 1 - (t - 0.45) / 0.55);
+        const alpha = fade * 0.82;
         if (alpha <= 0.02) continue;
+
+        const flip = 0.35 + 0.65 * Math.abs(Math.sin(p.sway * 0.7 + p.rot));
         ctx.save();
+        ctx.globalAlpha = alpha;
         ctx.translate(p.x, p.y);
         ctx.rotate(p.rot);
-        ctx.globalAlpha = alpha;
-        ctx.fillStyle = p.color;
-        ctx.fillRect(
-          (-p.w / 2) * scale,
-          (-p.h / 2) * scale,
-          p.w * scale,
-          p.h * scale
-        );
+        ctx.scale(flip, 1);
+        drawPetal(ctx, p.size, p.color);
         ctx.restore();
       }
 
@@ -210,8 +242,8 @@ export default function JournalSaveCompleteModal({
     return () => {
       running = false;
       cancelAnimationFrame(raf);
-      window.clearTimeout(burst2);
-      window.clearTimeout(burst3);
+      window.clearTimeout(wave2);
+      window.clearTimeout(wave3);
       window.removeEventListener("resize", resize);
     };
   }, []);
@@ -239,58 +271,36 @@ export default function JournalSaveCompleteModal({
     }
 
     setXpFloatVisible(true);
-    const xpStrength = Math.min(
-      5,
-      Math.max(1, Math.round(xp.gainedXp / 4))
-    );
-    const leveledBoost = xp.leveledUp ? 2 : 0;
+    // 밤 감성: XP 버스트는 한 번만, 약하게
+    const xpStrength = xp.leveledUp ? 2 : 1;
 
     const burstAtXp = window.setTimeout(() => {
       if (xpFloatRef.current) {
         burstFromElement(xpFloatRef.current, {
           variant: "xp",
-          value: xpStrength + leveledBoost,
-        });
-      }
-    }, 60);
-
-    const burstAtGauge = window.setTimeout(() => {
-      if (gaugeRef.current) {
-        burstFromElement(gaugeRef.current, {
-          variant: "xp",
           value: xpStrength,
         });
       }
-    }, 720);
+    }, 180);
 
-    const burstNearEnd = window.setTimeout(() => {
-      if (gaugeRef.current) {
-        burstFromElement(gaugeRef.current, {
-          variant: "xp",
-          value: Math.min(5, xpStrength + 1),
-        });
-      }
-    }, 1100);
-
-    const duration = 1200;
+    // 게이지 채움 — 천천히 (ease-out cubic)
+    const duration = 2600;
     const t0 = performance.now();
     let raf = 0;
     const tick = (t: number) => {
       const u = Math.min(1, (t - t0) / duration);
-      const e = u * u * u;
+      const e = 1 - Math.pow(1 - u, 3);
       setGauge(from + (to - from) * e);
       if (u < 1) raf = requestAnimationFrame(tick);
       else {
         setGauge(to);
-        window.setTimeout(() => setXpFloatVisible(false), 700);
+        window.setTimeout(() => setXpFloatVisible(false), 900);
       }
     };
     raf = requestAnimationFrame(tick);
     return () => {
       cancelAnimationFrame(raf);
       window.clearTimeout(burstAtXp);
-      window.clearTimeout(burstAtGauge);
-      window.clearTimeout(burstNearEnd);
     };
   }, [
     startProgress.progressRatio,
@@ -318,6 +328,15 @@ export default function JournalSaveCompleteModal({
       eventType: isVerified ? "quote_impression" : "sentence_impression",
       metadata: { surface: "save_modal" },
     });
+    void import("@/lib/analytics/posthog")
+      .then(({ ANALYTICS_EVENTS, captureEvent }) => {
+        captureEvent(ANALYTICS_EVENTS.quoteShown, {
+          verified: isVerified,
+        });
+      })
+      .catch(() => {
+        /* analytics optional */
+      });
   }, [quote, quoteLoading, entry.entryDate, contentType, deliveryId, isVerified]);
 
   const handleSave = () => {
@@ -348,11 +367,15 @@ export default function JournalSaveCompleteModal({
     }
   };
 
+  const attributionLine = isVerified
+    ? [authorName, workTitle].filter(Boolean).join(" · ") ||
+      sourceLabel ||
+      "고전 명언"
+    : sourceLabel ?? "앱이 오늘의 기록을 바탕으로 새로 쓴 문장입니다.";
+
   const handleShare = async () => {
     if (!quote) return;
-    const shareText = isVerified
-      ? `${quote}\n— ${[authorName, workTitle].filter(Boolean).join(" · ")}`
-      : `${quote}\n— ${sourceLabel ?? "오늘의 문장"}`;
+    const shareText = `${quote}\n— ${attributionLine}`;
     try {
       if (navigator.share) {
         await navigator.share({ text: shareText });
@@ -407,14 +430,19 @@ export default function JournalSaveCompleteModal({
           </div>
 
           <section
-            className="p-4 border-2 space-y-3 animate-[fadeIn_0.45s_ease]"
+            className={`p-4 border-2 space-y-3 relative overflow-hidden ${
+              showQuoteLoading ? "" : "save-quote-card"
+            }`}
             style={{
               borderColor: "var(--px-accent)",
               background: "var(--px-bg3)",
             }}
           >
+            {!showQuoteLoading && (
+              <span className="save-quote-shimmer" aria-hidden />
+            )}
             <p
-              className="text-xs font-black"
+              className="text-xs font-black relative"
               style={{ color: "var(--px-accent)" }}
             >
               {showQuoteLoading ? "오늘의 명언" : title}
@@ -451,22 +479,22 @@ export default function JournalSaveCompleteModal({
               </div>
             ) : (
               <>
-                <p
-                  className="text-[17px] font-bold leading-relaxed"
-                  style={{ color: "var(--px-text-on-panel)" }}
-                >
-                  {quote ??
-                    "오늘도 기록을 남겨 줘서 고마워요. 작은 한 줄이 내일의 단서가 됩니다."}
-                </p>
-                <p className="text-xs" style={{ color: "var(--px-text2)" }}>
-                  {isVerified
-                    ? [authorName, workTitle, sourceLabel]
-                        .filter(Boolean)
-                        .join(" · ")
-                    : sourceLabel ??
-                      "앱이 오늘의 기록을 바탕으로 새로 쓴 문장입니다."}
-                </p>
-                <div className="flex gap-2">
+                <blockquote className="save-quote-reveal relative m-0 space-y-2">
+                  <p
+                    className="text-[17px] font-bold leading-relaxed tracking-tight"
+                    style={{ color: "var(--px-text-on-panel)", lineHeight: 1.65 }}
+                  >
+                    {quote ??
+                      "오늘도 기록을 남겨 줘서 고마워요. 작은 한 줄이 내일의 단서가 됩니다."}
+                  </p>
+                  <p
+                    className="save-quote-attr text-[11px] font-medium"
+                    style={{ color: "var(--px-text2)" }}
+                  >
+                    — {attributionLine}
+                  </p>
+                </blockquote>
+                <div className="save-quote-actions flex gap-2 relative">
                   <button
                     type="button"
                     className="min-h-9 px-3 text-xs font-bold border-2"
@@ -515,6 +543,8 @@ export default function JournalSaveCompleteModal({
                 eventDate={entry.entryDate}
                 contentType={contentType ?? "app_original_sentence"}
                 contentId={deliveryId}
+                mode="help"
+                prompt="이 문장이 도움이 되었나요?"
               />
             </section>
           )}
@@ -546,7 +576,7 @@ export default function JournalSaveCompleteModal({
                   className={`text-base font-black tabular-nums ${
                     xpFloatVisible ? "save-xp-float" : ""
                   }`}
-                  style={{ color: "#c8e050" }}
+                  style={{ color: XP_GAIN_COLOR }}
                 >
                   +{xp.gainedXp} XP
                 </p>
@@ -608,77 +638,132 @@ export default function JournalSaveCompleteModal({
             )
           )}
 
-          <section className="space-y-2">
+          <section className="space-y-1.5">
             <button
               type="button"
-              className="w-full flex items-center justify-between text-xs font-bold"
+              className="w-full flex items-center justify-between gap-2 py-0.5"
               style={{ color: "var(--px-text2)" }}
               onClick={() => setShowDetail((v) => !v)}
               aria-expanded={showDetail}
             >
-              <span>오늘 상태 자세히 보기</span>
-              <span aria-hidden>{showDetail ? "▲" : "▼"}</span>
+              <span className="text-[11px] font-bold tracking-tight">
+                오늘 상태 자세히 보기
+              </span>
+              <span
+                className="text-[10px] tabular-nums opacity-80"
+                aria-hidden
+              >
+                {showDetail ? "접기 ▲" : "펼치기 ▼"}
+              </span>
             </button>
             {showDetail && (
-              <div className="space-y-2">
-                <div className="flex flex-wrap gap-1.5">
-                  {entry.overallSatisfaction != null && (
-                    <span
-                      className="px-2 py-1 text-[11px] font-bold border"
-                      style={{
-                        borderColor: "var(--px-border)",
-                        color: "var(--px-text)",
-                        background: "var(--px-bg3)",
-                      }}
-                    >
-                      행복도 {entry.overallSatisfaction}/10
-                    </span>
-                  )}
-                  {moodChip && (
-                    <span
-                      className="px-2 py-1 text-[11px] font-bold border"
-                      style={{
-                        borderColor: "var(--px-border)",
-                        color: "var(--px-text)",
-                        background: "var(--px-bg3)",
-                      }}
-                    >
-                      {moodChip}
-                    </span>
-                  )}
-                  {tagChips.map((name) => (
-                    <span
-                      key={name}
-                      className="px-2 py-1 text-[11px] font-bold border"
-                      style={{
-                        borderColor: "var(--px-border)",
-                        color: "var(--px-text)",
-                        background: "var(--px-bg3)",
-                      }}
-                    >
-                      {name}
-                    </span>
-                  ))}
+              <div
+                className="rounded-sm border px-2.5 py-2 space-y-2"
+                style={{
+                  borderColor: "var(--px-border)",
+                  background:
+                    "color-mix(in srgb, var(--px-bg3) 70%, var(--px-bg2))",
+                }}
+              >
+                {(entry.overallSatisfaction != null ||
+                  moodChip ||
+                  tagChips.length > 0) && (
+                  <div className="flex flex-wrap gap-1">
+                    {entry.overallSatisfaction != null && (
+                      <span
+                        className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold leading-none"
+                        style={{
+                          color: "var(--px-accent)",
+                          background:
+                            "color-mix(in srgb, var(--px-accent) 12%, transparent)",
+                        }}
+                      >
+                        <span className="opacity-70 font-medium">행복</span>
+                        {entry.overallSatisfaction}
+                        <span className="opacity-50">/10</span>
+                      </span>
+                    )}
+                    {moodChip && (
+                      <span
+                        className="px-1.5 py-0.5 text-[10px] font-bold leading-none"
+                        style={{
+                          color: "var(--px-text-on-panel)",
+                          background: "var(--px-bg2)",
+                        }}
+                      >
+                        {moodChip}
+                      </span>
+                    )}
+                    {tagChips.slice(0, 6).map((name) => (
+                      <span
+                        key={name}
+                        className="px-1.5 py-0.5 text-[10px] font-medium leading-none"
+                        style={{
+                          color: "var(--px-text2)",
+                          background: "var(--px-bg2)",
+                        }}
+                      >
+                        {name}
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                <div className="grid grid-cols-2 gap-x-3 gap-y-1.5">
+                  {entry.scores.slice(0, 6).map((s) => {
+                    const name =
+                      getCategoryByCode(s.categoryCode)?.name ?? s.categoryCode;
+                    const na = s.isNotApplicable;
+                    const val =
+                      !na && typeof s.finalScore === "number"
+                        ? Math.max(0, Math.min(10, s.finalScore))
+                        : null;
+                    const pct = val != null ? (val / 10) * 100 : 0;
+                    return (
+                      <div key={s.categoryCode} className="min-w-0 space-y-0.5">
+                        <div className="flex items-baseline justify-between gap-1">
+                          <span
+                            className="text-[10px] font-medium truncate"
+                            style={{ color: "var(--px-text2)" }}
+                            title={name}
+                          >
+                            {name}
+                          </span>
+                          <span
+                            className="text-[10px] font-bold tabular-nums shrink-0"
+                            style={{
+                              color: na
+                                ? "var(--px-text2)"
+                                : "var(--px-text-on-panel)",
+                            }}
+                          >
+                            {na ? "—" : `${formatFinalScore(s.finalScore)}`}
+                          </span>
+                        </div>
+                        <div
+                          className="h-[3px] w-full overflow-hidden"
+                          style={{ background: "var(--px-bg2)" }}
+                          aria-hidden
+                        >
+                          <div
+                            className="h-full"
+                            style={{
+                              width: `${pct}%`,
+                              background: na
+                                ? "transparent"
+                                : "color-mix(in srgb, var(--px-accent) 55%, #a3e635)",
+                            }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
-                <ul
-                  className="text-xs space-y-1"
-                  style={{ color: "var(--px-text2)" }}
-                >
-                  {entry.scores.slice(0, 6).map((s) => (
-                    <li key={s.categoryCode}>
-                      {getCategoryByCode(s.categoryCode)?.name ?? s.categoryCode}
-                      :{" "}
-                      {s.isNotApplicable
-                        ? "해당 없음"
-                        : `${formatFinalScore(s.finalScore)}/10`}
-                    </li>
-                  ))}
-                </ul>
               </div>
             )}
           </section>
 
-          {shouldShowOpenAiStatus() && (
+          {isAdmin && (
             <div
               className="text-[10px] space-y-0.5"
               style={{ color: "var(--px-text2)" }}

@@ -1,29 +1,26 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   formatOpenAiStatus,
-  shouldShowOpenAiStatus,
   type OpenAiCallStatus,
 } from "@/lib/journal/openaiStatus";
+import { useIsAdmin } from "@/hooks/useIsAdmin";
 import type { FortuneSection } from "@/lib/journal/todayFortune";
 import type {
   FortuneDomainCode,
   FortuneDomainResult,
+  FortunePresentationMeta,
 } from "@/lib/journal/insight/types";
 import type { CategoryCode, JournalEntry } from "@/lib/journal/types";
 import {
   isDailyFortuneV2Enabled,
-  isFortuneDetailsEnabled,
 } from "@/lib/app/featureFlags";
 import { trackContentExposure } from "@/lib/journal/exposure";
 import ContentFeedbackButtons from "@/components/journal/ContentFeedbackButtons";
-import { DOMAIN_KEYWORD_MAP } from "@/lib/journal/fortune/domains";
-import {
-  KEYWORD_CATALOG,
-  type KeywordCode,
-} from "@/lib/journal/keywords/catalog";
 import type { FortuneEvidence } from "@/lib/journal/fortune/evidence";
+import { sajuProfileFortuneFingerprint } from "@/lib/journal/fortune/profileFingerprint";
+import type { SajuProfile } from "@/lib/diary/types";
 
 type Props = {
   todayDate: string;
@@ -35,105 +32,449 @@ type Props = {
 const EMPTY_ENTRIES: JournalEntry[] = [];
 const EMPTY_CODES: CategoryCode[] = [];
 
-const LABEL_BY_CODE = Object.fromEntries(
-  KEYWORD_CATALOG.map((k) => [k.code, k.plainLabel])
-) as Record<KeywordCode, string>;
+const FORTUNE_LOADING_PHRASES = [
+  {
+    kind: "healing",
+    line: "서두르지 않아도 돼요. 오늘도 당신 페이스면 충분해요.",
+  },
+  {
+    kind: "philosophy",
+    line: "물이 돌을 뚫는 건 힘이 아니라, 멈추지 않는 부드러움이에요.",
+  },
+  {
+    kind: "quote",
+    line: "작은 불빛 하나만 있어도, 밤은 완전히 어둡지 않아요.",
+  },
+  {
+    kind: "healing",
+    line: "숨을 한 번 더 들이쉬어 보세요. 그걸로도 이미 잘하고 있어요.",
+  },
+  {
+    kind: "philosophy",
+    line: "길은 앞에 있는 게 아니라, 걷는 발밑에서 생겨요.",
+  },
+  {
+    kind: "quote",
+    line: "별은 낮에도 하늘에 있어요. 다만 보이지 않을 뿐이죠.",
+  },
+  {
+    kind: "healing",
+    line: "완벽하지 않은 하루도, 당신을 어디로든 데려다줘요.",
+  },
+  {
+    kind: "philosophy",
+    line: "마음이 흔들릴 때야말로, 진짜 방향을 고르는 순간이에요.",
+  },
+  {
+    kind: "quote",
+    line: "조용한 용기는, 소리 없이 내일을 열어줍니다.",
+  },
+  {
+    kind: "healing",
+    line: "오늘은 스스로를 다그치지 않아도 되는 날이에요.",
+  },
+] as const;
 
-const FORTUNE_LOADING_LINES = [
-  "오늘의 기운을 가만히 살피는 중…",
-  "하루의 결을 천천히 풀어내는 중…",
-  "마음 곁에 둘 말을 고르는 중…",
-  "별자리 대신, 오늘의 흐름을 읽는 중…",
-  "잠시만 — 오늘의 이야기를 모으고 있어요.",
-];
-
-function keywordLabelsForDomain(d: FortuneDomainResult): string[] {
-  const fromEvidence = (d.evidenceCodes ?? [])
-    .map((c) => LABEL_BY_CODE[c as KeywordCode])
-    .filter((x): x is string => Boolean(x));
-  if (fromEvidence.length >= 2) return fromEvidence.slice(0, 4);
-
-  const fallbackCodes =
-    DOMAIN_KEYWORD_MAP[d.domain as FortuneDomainCode] ?? [];
-  const padded = [
-    ...fromEvidence,
-    ...fallbackCodes
-      .map((c) => LABEL_BY_CODE[c])
-      .filter((label): label is string => Boolean(label))
-      .filter((label) => !fromEvidence.includes(label)),
-  ];
-  return padded.slice(0, 4);
-}
-
-/** 확신도를 숫자 대신 쉬운 말로 */
-function confidencePlain(confidence: number | null | undefined): string {
-  const c = confidence ?? 0;
-  if (c >= 0.7) return "꽤 확실해요";
-  if (c >= 0.45) return "참고해도 좋아요";
-  return "참고용";
-}
-
-function KeywordChips({ labels }: { labels: string[] }) {
-  if (labels.length === 0) return null;
-  return (
-    <div className="flex flex-wrap gap-1 mt-1" aria-label="키워드">
-      {labels.map((label, i) => (
-        <span
-          key={label}
-          className="text-[10px] font-bold border px-1.5 py-0.5 leading-none motion-chip-stagger"
-          style={{
-            color: "var(--px-accent)",
-            borderColor: "var(--px-border2)",
-            background: "var(--px-bg3)",
-            animationDelay: `${i * 55}ms`,
-          }}
-        >
-          {label}
-        </span>
-      ))}
-    </div>
-  );
+/** 0~1 점수를 1.0~10.0 기운 점수로 (표시용) */
+function fortuneScoreOutOf10(score: number | null | undefined): string | null {
+  if (typeof score !== "number" || !Number.isFinite(score)) return null;
+  const n = Math.round(Math.max(0, Math.min(1, score)) * 100) / 10;
+  return n.toFixed(1);
 }
 
 function FortuneLoadingHint() {
   const [idx, setIdx] = useState(0);
   useEffect(() => {
     const id = window.setInterval(() => {
-      setIdx((i) => (i + 1) % FORTUNE_LOADING_LINES.length);
-    }, 2800);
+      setIdx((i) => (i + 1) % FORTUNE_LOADING_PHRASES.length);
+    }, 6200);
     return () => window.clearInterval(id);
   }, []);
+  const phrase = FORTUNE_LOADING_PHRASES[idx]!;
   return (
     <div
-      className="pt-3 pb-1 flex items-start gap-2.5"
+      className="fortune-loading py-7 px-3 flex flex-col items-center text-center gap-5"
       aria-live="polite"
       aria-busy="true"
     >
-      <span
-        className="mt-0.5 inline-block w-4 h-4 shrink-0 border-2 rounded-full animate-spin"
-        style={{
-          borderColor: "var(--px-border2)",
-          borderTopColor: "var(--px-accent)",
-        }}
-        aria-hidden
-      />
-      <div className="min-w-0 space-y-0.5">
+      <div className="relative w-9 h-9" aria-hidden>
+        <span
+          className="absolute inset-0 rounded-full border-2 animate-spin"
+          style={{
+            borderColor: "color-mix(in srgb, var(--px-accent) 22%, transparent)",
+            borderTopColor: "var(--px-accent)",
+          }}
+        />
+      </div>
+      <div className="fortune-loading-stage max-w-[20rem] min-h-[4.5rem] flex items-center justify-center">
         <p
-          className="text-[11px] font-black tracking-wide"
+          key={`${idx}-${phrase.line.slice(0, 12)}`}
+          className="fortune-loading-phrase text-[14px] font-medium leading-[1.75] tracking-tight"
+          data-kind={phrase.kind}
+        >
+          {phrase.line}
+        </p>
+      </div>
+      <p
+        className="text-[11px] font-bold tracking-wide"
+        style={{ color: "var(--px-text2)", opacity: 0.85 }}
+      >
+        오늘의 결을 고르는 중…
+      </p>
+    </div>
+  );
+}
+
+function FortuneScoreChip({ score }: { score: number | null | undefined }) {
+  const label = fortuneScoreOutOf10(score);
+  if (!label) return null;
+  return (
+    <span
+      className="text-[14px] font-black tabular-nums px-2.5 py-1 border-2"
+      style={{
+        color: "var(--px-text-on-panel)",
+        borderColor: "var(--px-border2)",
+        background: "var(--px-bg3)",
+      }}
+      title="오늘 기운 (10점 만점, 참고용)"
+    >
+      {label}
+      <span className="font-bold opacity-60 text-[12px]">/10</span>
+    </span>
+  );
+}
+
+/** 흐름 라벨 색 — 원활=초록, 안정=노랑, 혼합=파랑, 관리=주황 */
+function flowTone(flow: string | null | undefined): {
+  color: string;
+  border: string;
+  bg: string;
+} {
+  switch (flow) {
+    case "원활":
+      return {
+        color: "#4ade80",
+        border: "#4ade8077",
+        bg: "color-mix(in srgb, #4ade80 14%, var(--px-bg3))",
+      };
+    case "안정":
+      return {
+        color: "#fbbf24",
+        border: "#fbbf2477",
+        bg: "color-mix(in srgb, #fbbf24 14%, var(--px-bg3))",
+      };
+    case "혼합":
+      return {
+        color: "#60a5fa",
+        border: "#60a5fa77",
+        bg: "color-mix(in srgb, #60a5fa 14%, var(--px-bg3))",
+      };
+    case "관리":
+      return {
+        color: "#fb923c",
+        border: "#fb923c77",
+        bg: "color-mix(in srgb, #fb923c 14%, var(--px-bg3))",
+      };
+    default:
+      return {
+        color: "var(--px-accent)",
+        border: "var(--px-accent)",
+        bg: "color-mix(in srgb, var(--px-accent) 12%, var(--px-bg3))",
+      };
+  }
+}
+
+function displayHeadline(headline: string): string | null {
+  const h = headline.trim();
+  if (!h) return null;
+  const compact = h.replace(/\s/g, "");
+  if (
+    /^(종합|종합운|오늘의흐름을살펴보기|오늘의운세|핵심|요약)$/.test(compact)
+  ) {
+    return null;
+  }
+  return h;
+}
+
+function FortuneActionBoxes({
+  action,
+  caution,
+}: {
+  action: string;
+  caution: string;
+}) {
+  return (
+    <div className="grid grid-cols-1 gap-2.5" aria-label="오늘 행동">
+      <div
+        className="p-3.5 border-2"
+        style={{
+          borderColor: "var(--px-accent)",
+          background:
+            "color-mix(in srgb, var(--px-accent) 12%, var(--px-bg3))",
+          boxShadow: "2px 2px 0 #000",
+        }}
+      >
+        <p
+          className="text-[12px] font-black mb-1.5 tracking-wide"
           style={{ color: "var(--px-accent)" }}
         >
-          불러오는 중
+          하기
         </p>
         <p
-          className="text-xs leading-relaxed font-bold"
+          className="text-[15px] font-bold leading-snug"
+          style={{ color: "var(--px-text-on-panel)" }}
+        >
+          {action}
+        </p>
+      </div>
+      <div
+        className="p-3.5 border-2"
+        style={{
+          borderColor: "var(--px-border2)",
+          background: "var(--px-bg3)",
+          boxShadow: "2px 2px 0 #000",
+        }}
+      >
+        <p
+          className="text-[12px] font-black mb-1.5 tracking-wide"
           style={{ color: "var(--px-text2)" }}
         >
-          {FORTUNE_LOADING_LINES[idx]}
+          줄이기
+        </p>
+        <p
+          className="text-[15px] font-medium leading-snug"
+          style={{ color: "var(--px-text2)" }}
+        >
+          {caution}
         </p>
       </div>
     </div>
   );
 }
+
+/** 설렘 유도 CTA — 클릭 전에 "오늘 어떨까?" 호기심을 만든다 */
+const FORTUNE_TEASE_LINES = [
+  {
+    title: "오늘, 어떤 하루가 올까요?",
+    sub: "문을 살짝 열면 오늘의 결이 보여요",
+  },
+  {
+    title: "두근두근, 오늘의 한 줄",
+    sub: "당신만을 위한 흐름이 기다리고 있어요",
+  },
+  {
+    title: "이 하루의 온도는 어떨까?",
+    sub: "눌러서 오늘의 기운을 만나보세요",
+  },
+  {
+    title: "준비된 오늘의 이야기",
+    sub: "가벼운 마음으로 펼쳐볼까요?",
+  },
+] as const;
+
+function FortuneTeaseButton({
+  onClick,
+  ready,
+}: {
+  onClick: () => void;
+  /** 이미 생성된 운세가 있으면 true */
+  ready?: boolean;
+}) {
+  const [idx, setIdx] = useState(0);
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      setIdx((i) => (i + 1) % FORTUNE_TEASE_LINES.length);
+    }, 6500);
+    return () => window.clearInterval(id);
+  }, []);
+  const line = FORTUNE_TEASE_LINES[idx]!;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="fortune-tease w-full py-5 px-3 flex flex-col items-center text-center gap-2"
+      aria-label={ready ? "오늘의 운세 펼치기" : "오늘의 운세 보기"}
+    >
+      <span className="fortune-tease-pulse" aria-hidden />
+      <p
+        key={line.title}
+        className="fortune-tease-title text-[1.05rem] font-black leading-snug tracking-tight"
+        style={{ color: "var(--px-accent)" }}
+      >
+        {line.title}
+      </p>
+      <p
+        key={line.sub}
+        className="fortune-tease-sub text-[12px] font-medium leading-relaxed max-w-[18rem]"
+        style={{ color: "var(--px-text2)" }}
+      >
+        {line.sub}
+      </p>
+      <span
+        className="mt-1 text-[11px] font-black tracking-wide fortune-tease-hint"
+        style={{ color: "var(--px-text-on-panel)" }}
+      >
+        {ready ? "살짝 펼쳐보기 ↓" : "두근거리는 하루 열기 ↓"}
+      </span>
+    </button>
+  );
+}
+
+/** 요약·영역 공통 읽기 구조 — 등장 시 순차 연출 */
+function FortuneReadingBlock({
+  sectionLabel,
+  flow,
+  score,
+  headline,
+  body,
+  action,
+  caution,
+  animateKey,
+}: {
+  sectionLabel: string;
+  flow?: string | null;
+  score?: number | null;
+  headline?: string | null;
+  body: string;
+  action: string;
+  caution: string;
+  animateKey?: string;
+}) {
+  const tone = flowTone(flow);
+  const lead = headline ? displayHeadline(headline) : null;
+  return (
+    <div
+      className="space-y-3.5 fortune-reading"
+      key={animateKey ?? sectionLabel}
+    >
+      <p
+        className="text-[1.35rem] font-black leading-[1.3] tracking-tight text-center fortune-reveal-title"
+        style={{ color: "var(--px-accent)", animationDelay: "80ms" }}
+      >
+        {sectionLabel}
+      </p>
+
+      <div
+        className="flex items-center justify-center gap-2.5 flex-wrap fortune-reveal"
+        style={{ animationDelay: "160ms" }}
+      >
+        {flow && (
+          <span
+            className="text-[14px] font-black px-2.5 py-1 border-2"
+            style={{
+              color: tone.color,
+              borderColor: tone.border,
+              background: tone.bg,
+            }}
+          >
+            {flow}
+          </span>
+        )}
+        <FortuneScoreChip score={score} />
+      </div>
+
+      {lead ? (
+        <p
+          className="text-[15px] font-bold leading-snug text-center fortune-reveal"
+          style={{
+            color: "var(--px-text-on-panel)",
+            animationDelay: "240ms",
+          }}
+        >
+          {lead}
+        </p>
+      ) : null}
+
+      <FortuneBody text={body} reveal />
+
+      <div className="fortune-reveal" style={{ animationDelay: "520ms" }}>
+        <FortuneActionBoxes action={action} caution={caution} />
+      </div>
+    </div>
+  );
+}
+
+/** 확신도를 숫자 대신 쉬운 말로 */
+function confidencePlain(
+  confidence: number | null | undefined,
+  label?: string | null
+): string {
+  if (label === "높음" || label === "보통" || label === "낮음") {
+    if (label === "높음") return "꽤 확실해요";
+    if (label === "보통") return "참고해도 좋아요";
+    return "참고용";
+  }
+  const c = confidence ?? 0;
+  if (c >= 0.7) return "꽤 확실해요";
+  if (c >= 0.45) return "참고해도 좋아요";
+  return "참고용";
+}
+
+function domainBodyText(d: FortuneDomainResult): string {
+  return d.interpretation || d.summary || "";
+}
+
+/** 긴 본문을 문장 단위로 나눠 읽기 리듬을 만든다 */
+function splitFortuneSentences(text: string): string[] {
+  const t = text.replace(/\s+/g, " ").trim();
+  if (!t) return [];
+  const byPeriod = t
+    .split(/(?<=[.!?。])\s+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (byPeriod.length >= 2) return byPeriod;
+  const byKorean = t
+    .split(/(?<=(?:다|요|죠|네|음))\s+(?=[가-힣A-Za-z0-9“"‘'])/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  return byKorean.length >= 2 ? byKorean : [t];
+}
+
+function FortuneBody({
+  text,
+  compact,
+  reveal,
+}: {
+  text: string;
+  compact?: boolean;
+  reveal?: boolean;
+}) {
+  const parts = splitFortuneSentences(text);
+  if (parts.length === 0) return null;
+  return (
+    <div className={`fortune-body ${compact ? "fortune-body--compact" : ""}`}>
+      {parts.map((p, i) => (
+        <p
+          key={`${i}-${p.slice(0, 12)}`}
+          className={reveal ? "fortune-reveal" : undefined}
+          style={
+            reveal
+              ? { animationDelay: `${280 + Math.min(i, 5) * 90}ms` }
+              : undefined
+          }
+        >
+          {p}
+        </p>
+      ))}
+    </div>
+  );
+}
+
+const DOMAIN_TAB_ORDER = [
+  "work",
+  "relationships",
+  "love",
+  "money",
+  "health",
+] as const;
+
+const DOMAIN_TAB_SHORT: Record<(typeof DOMAIN_TAB_ORDER)[number], string> = {
+  work: "직장",
+  relationships: "대인",
+  love: "연애",
+  money: "재물",
+  health: "건강",
+};
 
 type V2Payload = {
   version?: string;
@@ -141,12 +482,65 @@ type V2Payload = {
   domains?: FortuneDomainResult[];
   openAi?: OpenAiCallStatus;
   evidence?: FortuneEvidence | null;
+  presentation?: FortunePresentationMeta;
+  cached?: boolean;
   insight?: {
     primaryKeyword?: string | null;
     tensionKeyword?: string | null;
     overallConfidence?: number;
   };
 };
+
+function fortuneLocalKey(date: string, profileCacheKey: string) {
+  return `manseryeok:today-fortune-v2.5:${date}:${profileCacheKey}`;
+}
+
+function readLocalFortune(
+  date: string,
+  profileCacheKey: string
+): V2Payload | null {
+  try {
+    const raw = window.localStorage.getItem(
+      fortuneLocalKey(date, profileCacheKey)
+    );
+    if (!raw) return null;
+    const data = JSON.parse(raw) as V2Payload;
+    if (data.version !== "v2" || !data.overall) return null;
+    return data;
+  } catch {
+    return null;
+  }
+}
+
+function writeLocalFortune(
+  date: string,
+  profileCacheKey: string,
+  data: V2Payload
+) {
+  try {
+    window.localStorage.setItem(
+      fortuneLocalKey(date, profileCacheKey),
+      JSON.stringify({
+        version: "v2",
+        overall: data.overall,
+        domains: data.domains ?? [],
+        presentation: data.presentation ?? null,
+        evidence: data.evidence ?? null,
+        cached: true,
+      })
+    );
+  } catch {
+    /* ignore quota */
+  }
+}
+
+function clearLocalFortune(date: string, profileCacheKey: string) {
+  try {
+    window.localStorage.removeItem(fortuneLocalKey(date, profileCacheKey));
+  } catch {
+    /* ignore */
+  }
+}
 
 /** 0~1 값을 가로 막대로 표시 */
 function MeterBar({
@@ -221,12 +615,22 @@ function FortuneEvidencePanel({ evidence }: { evidence: FortuneEvidence }) {
         style={{ borderColor: "var(--px-accent)", background: "var(--px-bg2)" }}
       >
         <span className="text-sm font-black" style={{ color: "var(--px-accent)" }}>
-          지금 운세 = 내 기록 {Math.round(evidence.weights.recent * 100 + evidence.weights.keyword * 100)}%
+          지금 운세 = 내 기록 반영{" "}
+          {Math.round(
+            evidence.weights.recent * 100 + evidence.weights.keyword * 100
+          )}
+          %
         </span>
         <span className="text-sm font-black" style={{ color: "var(--px-text2)" }}>
           + 사주 {Math.round(evidence.weights.natal * 100)}%
         </span>
       </div>
+      <p className="text-[10px] leading-relaxed text-center" style={{ color: "var(--px-text2)" }}>
+        {evidence.dayPhaseLabel} · 기록 {evidence.priorUniqueDays}일
+        {evidence.journalShareCap < 1
+          ? ` · 일수 상한 ${Math.round(evidence.journalShareCap * 100)}%`
+          : ""}
+      </p>
 
       <div className="space-y-1.5">
         <div className="flex items-baseline justify-between gap-2">
@@ -243,9 +647,8 @@ function FortuneEvidencePanel({ evidence }: { evidence: FortuneEvidence }) {
         <MeterBar value={evidence.maturity} />
         <p className="text-[10px] leading-relaxed" style={{ color: "var(--px-text2)" }}>
           Lv{evidence.level} · XP {evidence.effectiveXp}
-          {evidence.onboardingCompleted ? " (온보딩 보정 포함)" : ""}
-          . 레벨이 오를수록 개인 데이터 비중이 커지고 사주 비중은 줄어듭니다.
-          (맞춤도 상한: Lv{evidence.maturityLevel})
+          {evidence.onboardingCompleted ? " (온보딩 보정 포함)" : ""}.{" "}
+          {evidence.guideKo}
         </p>
       </div>
 
@@ -334,28 +737,127 @@ export default function TodayFortunePanel({
   entries = EMPTY_ENTRIES,
   enabledCodes = EMPTY_CODES,
 }: Props) {
+  const isAdmin = useIsAdmin();
   const v2 = isDailyFortuneV2Enabled();
-  const detailsEnabled = isFortuneDetailsEnabled();
   const [open, setOpen] = useState(false);
-  const [expandedDomain, setExpandedDomain] = useState<string | null>(null);
+  const [panelOpen, setPanelOpen] = useState(false);
   const [sections, setSections] = useState<FortuneSection[]>([]);
   const [overall, setOverall] = useState<FortuneDomainResult | null>(null);
   const [domains, setDomains] = useState<FortuneDomainResult[]>([]);
+  const [presentation, setPresentation] =
+    useState<FortunePresentationMeta | null>(null);
   const [openAi, setOpenAi] = useState<OpenAiCallStatus | null>(null);
   const [evidence, setEvidence] = useState<FortuneEvidence | null>(null);
   const [showEvidence, setShowEvidence] = useState(false);
   const [loading, setLoading] = useState(false);
   const [loaded, setLoaded] = useState(false);
-  const [previewLoaded, setPreviewLoaded] = useState(false);
-  const entriesKey = `${entries.length}:${entries[0]?.id ?? ""}:${entries[entries.length - 1]?.id ?? ""}`;
-  const codesKey = enabledCodes.join(",");
+  const [hydrating, setHydrating] = useState(v2);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const profile = (sajuProfile ?? null) as SajuProfile | null;
+  const profileId =
+    profile && typeof profile === "object" && profile.id
+      ? String(profile.id)
+      : "none";
+  const profileFp = sajuProfileFortuneFingerprint(profile);
+  /** 생일·일주가 바뀌면 캐시 키도 바뀜 */
+  const profileCacheKey = `${profileId}:${profileFp}`;
 
+  const entriesRef = useRef(entries);
+  const codesRef = useRef(enabledCodes);
+  const profileRef = useRef(sajuProfile);
+  const analyseGenRef = useRef(0);
+  entriesRef.current = entries;
+  codesRef.current = enabledCodes;
+  profileRef.current = sajuProfile;
+
+  const applyPayload = (
+    data: V2Payload,
+    opts?: { impress?: boolean; persistLocal?: boolean; openPanel?: boolean }
+  ) => {
+    if (data.version !== "v2" || !data.overall) return false;
+    setOverall(data.overall);
+    setDomains(data.domains ?? []);
+    setPresentation(data.presentation ?? null);
+    setOpenAi(data.openAi ?? null);
+    setEvidence(data.evidence ?? null);
+    setLoaded(true);
+    setOpen(false);
+    setPanelOpen(opts?.openPanel === true);
+    if (opts?.persistLocal) {
+      writeLocalFortune(todayDate, profileCacheKey, data);
+    }
+    if (opts?.impress) {
+      void trackContentExposure({
+        eventDate: todayDate,
+        contentType: "daily_fortune",
+        contentId: "overall",
+        eventType: "fortune_summary_impression",
+      });
+    }
+    return true;
+  };
+
+  /**
+   * 날짜·사주 프로필이 바뀌면 초기화 후 당일 캐시 복원.
+   * 한 번 본 운세는 그날 내내 유지.
+   */
   useEffect(() => {
-    if (!v2 || previewLoaded) return;
-    let cancelled = false;
-    const timer = window.setTimeout(() => {
-      if (!cancelled) setPreviewLoaded(true);
-    }, 20000);
+    if (!v2) return;
+    const gen = ++analyseGenRef.current;
+    setLoadError(null);
+    setOverall(null);
+    setDomains([]);
+    setPresentation(null);
+    setOpenAi(null);
+    setEvidence(null);
+    setShowEvidence(false);
+    setLoaded(false);
+    setLoading(false);
+    setOpen(false);
+    setPanelOpen(false);
+    setHydrating(true);
+
+    const local = readLocalFortune(todayDate, profileCacheKey);
+    if (local && applyPayload(local)) {
+      setHydrating(false);
+      // 서버 캐시로 조용히 동기화 (실패해도 로컬 유지)
+      void (async () => {
+        try {
+          const res = await fetch("/api/journal/today-fortune", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              todayDate,
+              sajuProfile: profileRef.current,
+              entries: entriesRef.current.slice(-60),
+              enabledCodes: codesRef.current,
+              cacheOnly: true,
+            }),
+          });
+          if (gen !== analyseGenRef.current || !res.ok) return;
+          const data = (await res.json()) as V2Payload & { cached?: boolean };
+          if (gen !== analyseGenRef.current) return;
+          if (data.cached && data.overall) {
+            applyPayload(data, { persistLocal: true });
+            return;
+          }
+          // 점수/문장 엔진이 바뀌어 서버 캐시가 무효면 로컬도 버리고 다시 생성
+          if (data.cached === false) {
+            clearLocalFortune(todayDate, profileCacheKey);
+            setOverall(null);
+            setDomains([]);
+            setPresentation(null);
+            setEvidence(null);
+            setLoaded(false);
+            setOpen(false);
+          }
+        } catch {
+          /* keep local */
+        }
+      })();
+      return;
+    }
+
     void (async () => {
       try {
         const res = await fetch("/api/journal/today-fortune", {
@@ -363,39 +865,109 @@ export default function TodayFortunePanel({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             todayDate,
-            sajuProfile,
-            entries: entries.slice(-60),
-            enabledCodes,
-            skipLlm: true,
+            sajuProfile: profileRef.current,
+            entries: entriesRef.current.slice(-60),
+            enabledCodes: codesRef.current,
+            cacheOnly: true,
           }),
         });
-        const data = (await res.json()) as V2Payload;
-        if (cancelled) return;
-        if (data.version === "v2" && data.overall) {
-          setOverall(data.overall);
-          setDomains(data.domains ?? []);
-          setOpenAi(data.openAi ?? null);
-          setEvidence(data.evidence ?? null);
-          setLoaded(true);
-          void trackContentExposure({
-            eventDate: todayDate,
-            contentType: "daily_fortune",
-            contentId: "overall",
-            eventType: "fortune_summary_impression",
-          });
+        if (gen !== analyseGenRef.current) return;
+        if (!res.ok) {
+          setHydrating(false);
+          return;
         }
-        setPreviewLoaded(true);
+        const data = (await res.json()) as V2Payload & { error?: string };
+        if (gen !== analyseGenRef.current) return;
+        if (data.cached && applyPayload(data, { persistLocal: true })) {
+          setHydrating(false);
+          return;
+        }
       } catch {
-        if (!cancelled) setPreviewLoaded(true);
+        /* idle CTA */
       } finally {
-        window.clearTimeout(timer);
+        if (gen === analyseGenRef.current) setHydrating(false);
       }
     })();
-    return () => {
-      cancelled = true;
-      window.clearTimeout(timer);
-    };
-  }, [v2, previewLoaded, todayDate, sajuProfile, entries, enabledCodes, entriesKey, codesKey]);
+  }, [v2, todayDate, profileCacheKey]);
+
+  const startAnalysis = () => {
+    if (!v2 || loading || loaded || hydrating) return;
+    const gen = ++analyseGenRef.current;
+    setLoadError(null);
+    setOverall(null);
+    setDomains([]);
+    setPresentation(null);
+    setLoaded(false);
+    setLoading(true);
+    setOpen(true);
+
+    void (async () => {
+      try {
+        const { ANALYTICS_EVENTS, captureEvent } = await import(
+          "@/lib/analytics/posthog"
+        );
+        captureEvent(ANALYTICS_EVENTS.fortuneOpened);
+      } catch {
+        /* analytics optional */
+      }
+      try {
+        const res = await fetch("/api/journal/today-fortune", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            todayDate,
+            sajuProfile: profileRef.current,
+            entries: entriesRef.current.slice(-60),
+            enabledCodes: codesRef.current,
+            skipLlm: false,
+          }),
+        });
+        if (gen !== analyseGenRef.current) return;
+
+        let data: V2Payload & { error?: string } = {};
+        try {
+          data = (await res.json()) as V2Payload & { error?: string };
+        } catch {
+          if (gen === analyseGenRef.current) {
+            setLoadError(
+              `운세 응답을 읽지 못했어요 (${res.status}). 잠시 후 다시 시도해주세요.`
+            );
+          }
+          return;
+        }
+        if (gen !== analyseGenRef.current) return;
+        if (
+          !res.ok ||
+          !applyPayload(data, {
+            impress: true,
+            persistLocal: true,
+            openPanel: true,
+          })
+        ) {
+          const authHint =
+            res.status === 401 || data.error?.includes("로그인")
+              ? " 로그인 상태를 확인한 뒤 다시 눌러주세요."
+              : "";
+          setLoadError(
+            (data.error ||
+              `오늘의 운세를 불러오지 못했어요 (${res.status}).`) + authHint
+          );
+        }
+      } catch (err) {
+        if (gen === analyseGenRef.current) {
+          const detail =
+            err instanceof Error ? err.message : "알 수 없는 오류";
+          setLoadError(
+            detail.includes("fetch")
+              ? "서버 연결이 끊겼어요. 개발 서버가 켜져 있는지 확인해주세요."
+              : `운세를 불러오지 못했어요: ${detail}`
+          );
+        }
+      } finally {
+        if (gen === analyseGenRef.current) setLoading(false);
+      }
+    })();
+  };
 
   useEffect(() => {
     if (v2 || !open || loaded) return;
@@ -434,32 +1006,24 @@ export default function TodayFortunePanel({
   }, [v2, open, loaded, todayDate, sajuProfile]);
 
   if (v2) {
+    const idle = !hydrating && !loading && !loaded && !loadError && !overall;
     return (
       <section className="space-y-2" aria-label="오늘의 운세">
-        <div className="flex items-baseline justify-between gap-2">
-          <p className="ui-section-title">■ 오늘의 운세</p>
-          <button
-            type="button"
-            className="text-xs font-bold underline shrink-0"
-            style={{ color: "var(--px-text2)" }}
-            onClick={() => {
-              setOpen((v) => {
-                const next = !v;
-                if (next) {
-                  void trackContentExposure({
-                    eventDate: todayDate,
-                    contentType: "daily_fortune",
-                    contentId: "detail",
-                    eventType: "fortune_detail_opened",
-                  });
-                }
-                return next;
-              });
-            }}
-            aria-expanded={open}
-          >
-            {open ? "접기" : "펼치기"}
-          </button>
+        <div className="ui-emphasize-head">
+          <p className="ui-emphasize-title">오늘의 운세</p>
+          {overall && (
+            <button
+              type="button"
+              className="text-xs font-bold underline shrink-0"
+              style={{ color: "var(--px-text2)" }}
+              onClick={() => {
+                setPanelOpen((v) => !v);
+              }}
+              aria-expanded={panelOpen}
+            >
+              {panelOpen ? "접기" : "펼치기"}
+            </button>
+          )}
         </div>
 
         <div
@@ -470,155 +1034,171 @@ export default function TodayFortunePanel({
             boxShadow: "2px 2px 0 #000",
           }}
         >
-          {!overall && <FortuneLoadingHint />}
-          {overall && (
-            <div className="space-y-1">
-              <p className="text-xs font-semibold" style={{ color: "var(--px-accent)" }}>
-                {overall.title}
+          {hydrating && !overall && (
+            <p
+              className="text-[11px] font-bold text-center py-2"
+              style={{ color: "var(--px-text2)" }}
+            >
+              오늘 운세를 확인하는 중…
+            </p>
+          )}
+
+          {idle && (
+            <FortuneTeaseButton onClick={startAnalysis} />
+          )}
+
+          {loading && !overall && <FortuneLoadingHint />}
+
+          {loadError && !overall && (
+            <div className="space-y-3 py-2 text-center">
+              <p
+                className="text-xs font-bold leading-relaxed"
+                style={{ color: "#f87171" }}
+              >
+                {loadError}
               </p>
-              <p className="text-sm font-bold leading-snug" style={{ color: "var(--px-text)" }}>
-                {overall.headline}
-              </p>
-              {!open && (
-                <p className="text-[11px] leading-snug" style={{ color: "var(--px-text2)" }}>
-                  펼치면 설명과 테마 한 줄을 볼 수 있어요
-                </p>
-              )}
+              <button
+                type="button"
+                onClick={startAnalysis}
+                className="text-xs font-black underline"
+                style={{ color: "var(--px-accent)" }}
+              >
+                다시 시도
+              </button>
             </div>
           )}
 
-          <div className="motion-expand" data-open={open ? "true" : "false"}>
-            <div className="motion-expand-inner">
-              {open && overall && (
-                <div className="space-y-2">
-                  <KeywordChips labels={keywordLabelsForDomain(overall)} />
-                  <p className="text-xs leading-relaxed" style={{ color: "var(--px-text2)" }}>
-                    {overall.summary}
-                  </p>
+          {overall && !panelOpen && (
+            <FortuneTeaseButton
+              ready
+              onClick={() => {
+                setPanelOpen(true);
+                void trackContentExposure({
+                  eventDate: todayDate,
+                  contentType: "daily_fortune",
+                  contentId: "detail",
+                  eventType: "fortune_detail_opened",
+                });
+              }}
+            />
+          )}
 
-                  {evidence && (
-                    <div className="pt-0.5">
-                      <button
-                        type="button"
-                        className="text-[11px] font-black underline"
-                        style={{ color: "var(--px-accent)" }}
-                        onClick={() => {
-                          setShowEvidence(true);
-                          void trackContentExposure({
-                            eventDate: todayDate,
-                            contentType: "daily_fortune",
-                            contentId: "evidence",
-                            eventType: "fortune_evidence_opened",
-                          });
+          {overall && panelOpen && (
+            <div className="fortune-readable space-y-4">
+              <FortuneReadingBlock
+                sectionLabel="오늘의 핵심"
+                flow={overall.flow}
+                score={overall.score}
+                headline={overall.headline}
+                body={domainBodyText(overall)}
+                action={presentation?.todayFocus || overall.action}
+                caution={presentation?.todayAvoid || overall.caution}
+                animateKey={`core-${overall.headline}`}
+              />
+
+              {presentation?.signatureEcho && (
+                <p
+                  className="text-[13px] leading-relaxed pl-2.5"
+                  style={{
+                    color: "var(--px-accent)",
+                    borderLeft: "2px solid var(--px-accent)",
+                    opacity: 0.95,
+                  }}
+                >
+                  {presentation.signatureEcho}
+                </p>
+              )}
+
+              {/* 영역별 메뉴 — 당분간 잠금 (나중에 열 예정) */}
+              <div
+                className="pt-2 space-y-2 border-t"
+                style={{ borderColor: "var(--px-border)" }}
+                aria-label="영역별 운세 (잠금)"
+              >
+                <p
+                  className="text-[11px] font-bold text-center"
+                  style={{ color: "var(--px-text2)" }}
+                >
+                  영역별로 더 보기 · 곧 열려요
+                </p>
+                <div className="grid grid-cols-5 gap-1 opacity-55 pointer-events-none select-none">
+                  {DOMAIN_TAB_ORDER.map((code) => (
+                    <span
+                      key={code}
+                      className="relative py-2.5 text-[12px] font-black border-2 text-center"
+                      style={{
+                        color: "var(--px-text2)",
+                        background: "var(--px-bg3)",
+                        borderColor: "var(--px-border)",
+                      }}
+                    >
+                      {DOMAIN_TAB_SHORT[code]}
+                      <span
+                        className="absolute -top-1 -right-1 text-[9px] leading-none px-1 border"
+                        style={{
+                          color: "var(--px-text2)",
+                          background: "var(--px-bg2)",
+                          borderColor: "var(--px-border)",
                         }}
-                        aria-expanded={showEvidence}
+                        aria-hidden
                       >
-                        근거 보기 ▼
-                      </button>
-                    </div>
-                  )}
-
-                  {detailsEnabled &&
-                    domains.map((d) => {
-                      const expanded = expandedDomain === d.domain;
-                      const labels = keywordLabelsForDomain(d);
-                      return (
-                        <div
-                          key={d.domain}
-                          className="border-t pt-2"
-                          style={{ borderColor: "var(--px-border)" }}
-                        >
-                          <button
-                            type="button"
-                            className="w-full flex items-start justify-between gap-2 text-left"
-                            onClick={() => {
-                              const next = expanded ? null : d.domain;
-                              setExpandedDomain(next);
-                              if (next) {
-                                void trackContentExposure({
-                                  eventDate: todayDate,
-                                  contentType: "daily_fortune",
-                                  contentId: d.domain,
-                                  eventType: "fortune_domain_opened",
-                                });
-                              }
-                            }}
-                            aria-expanded={expanded}
-                          >
-                            <span className="min-w-0 space-y-0.5">
-                              <span
-                                className="block text-[11px] font-black"
-                                style={{ color: "var(--px-accent)" }}
-                              >
-                                {d.title}
-                              </span>
-                              <span
-                                className="block text-xs font-bold leading-snug"
-                                style={{ color: "var(--px-text)" }}
-                              >
-                                {d.headline}
-                              </span>
-                            </span>
-                            <span
-                              className="text-[10px] shrink-0 pt-0.5"
-                              style={{ color: "var(--px-text2)" }}
-                            >
-                              {expanded ? "접기" : "더보기"}
-                            </span>
-                          </button>
-                          {expanded && (
-                            <div className="mt-1.5 space-y-1">
-                              <KeywordChips labels={labels} />
-                              <p
-                                className="text-[11px] font-semibold"
-                                style={{ color: "var(--px-text2)" }}
-                              >
-                                {confidencePlain(d.confidence)}
-                              </p>
-                              <p
-                                className="text-xs leading-relaxed"
-                                style={{ color: "var(--px-text2)" }}
-                              >
-                                {d.summary}
-                              </p>
-                              <p className="text-[11px]" style={{ color: "var(--px-text)" }}>
-                                기회 · {d.opportunity}
-                              </p>
-                              <p className="text-[11px]" style={{ color: "var(--px-text)" }}>
-                                주의 · {d.caution}
-                              </p>
-                              <p
-                                className="text-[11px] font-bold"
-                                style={{ color: "var(--px-accent)" }}
-                              >
-                                오늘 · {d.action}
-                              </p>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-
-                  <div className="pt-2 space-y-2">
-                    <p className="text-[10px]" style={{ color: "var(--px-text2)" }}>
-                      이 내용이 잘 맞나요?
-                    </p>
-                    <ContentFeedbackButtons
-                      eventDate={todayDate}
-                      contentType="daily_fortune"
-                      contentId="overall"
-                    />
-                  </div>
-
-                  {shouldShowOpenAiStatus() && openAi && (
-                    <p className="text-[10px] pt-1" style={{ color: "var(--px-text2)" }}>
-                      {formatOpenAiStatus(openAi)}
-                    </p>
-                  )}
+                        잠금
+                      </span>
+                    </span>
+                  ))}
                 </div>
+              </div>
+
+              <div
+                className="pt-1 border-t"
+                style={{ borderColor: "var(--px-border)" }}
+              >
+                <ContentFeedbackButtons
+                  eventDate={todayDate}
+                  contentType="daily_fortune"
+                  contentId="overall"
+                  mode="match"
+                  prompt="이 문장이 오늘과 맞았나요?"
+                />
+                {presentation?.notice && (
+                  <p
+                    className="mt-1 text-[11px] leading-relaxed"
+                    style={{ color: "var(--px-text2)", opacity: 0.85 }}
+                  >
+                    {presentation.notice}
+                  </p>
+                )}
+                {isAdmin && openAi && (
+                  <p
+                    className="text-[10px]"
+                    style={{ color: "var(--px-text2)" }}
+                  >
+                    {formatOpenAiStatus(openAi)}
+                  </p>
+                )}
+              </div>
+
+              {evidence && (
+                <button
+                  type="button"
+                  className="block w-full text-center text-[11px] font-medium underline"
+                  style={{ color: "var(--px-text2)", opacity: 0.8 }}
+                  onClick={() => {
+                    setShowEvidence(true);
+                    void trackContentExposure({
+                      eventDate: todayDate,
+                      contentType: "daily_fortune",
+                      contentId: "evidence",
+                      eventType: "fortune_evidence_opened",
+                    });
+                  }}
+                  aria-expanded={showEvidence}
+                >
+                  근거 보기
+                </button>
               )}
             </div>
-          </div>
+          )}
         </div>
 
         {showEvidence && evidence && (
@@ -640,7 +1220,10 @@ export default function TodayFortunePanel({
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex items-center justify-between gap-2">
-                <p className="text-sm font-black" style={{ color: "var(--px-accent)" }}>
+                <p
+                  className="text-sm font-black"
+                  style={{ color: "var(--px-accent)" }}
+                >
                   근거 보기
                 </p>
                 <button
@@ -662,8 +1245,8 @@ export default function TodayFortunePanel({
 
   return (
     <section className="space-y-2" aria-label="오늘의 운세">
-      <div className="flex items-baseline justify-between gap-2">
-        <p className="ui-section-title">■ 오늘의 운세</p>
+      <div className="ui-emphasize-head">
+        <p className="ui-emphasize-title">오늘의 운세</p>
         <button
           type="button"
           className="text-xs font-bold underline shrink-0"
@@ -689,19 +1272,31 @@ export default function TodayFortunePanel({
               {!loading &&
                 sections.map((s) => (
                   <div key={s.id} className="space-y-0.5">
-                    <p className="text-[11px] font-black" style={{ color: "var(--px-accent)" }}>
+                    <p
+                      className="text-[11px] font-black"
+                      style={{ color: "var(--px-accent)" }}
+                    >
                       {s.title}
                     </p>
-                    <p className="text-xs leading-relaxed" style={{ color: "var(--px-text)" }}>
+                    <p
+                      className="text-xs leading-relaxed"
+                      style={{ color: "var(--px-text)" }}
+                    >
                       {s.lines[0]}
                     </p>
-                    <p className="text-xs leading-relaxed" style={{ color: "var(--px-text2)" }}>
+                    <p
+                      className="text-xs leading-relaxed"
+                      style={{ color: "var(--px-text2)" }}
+                    >
                       {s.lines[1]}
                     </p>
                   </div>
                 ))}
-              {shouldShowOpenAiStatus() && openAi && (
-                <p className="text-[10px] pt-1" style={{ color: "var(--px-text2)" }}>
+              {isAdmin && openAi && (
+                <p
+                  className="text-[10px] pt-1"
+                  style={{ color: "var(--px-text2)" }}
+                >
                   {formatOpenAiStatus(openAi)}
                 </p>
               )}

@@ -22,6 +22,11 @@ import {
   isQuoteRagEnabled,
   isVerifiedQuoteEnabled,
 } from "@/lib/app/featureFlags";
+import { requireAuthUser } from "@/lib/api/requireAuth";
+import { checkLlmRateLimit } from "@/lib/api/rateLimit";
+import { totalJournalXp } from "@/lib/product/personalizationLevel";
+import { buildSajuWordingHints } from "@/lib/journal/sajuWordingHints";
+import { buildPillarQuoteHints } from "@/lib/journal/quote/pillarQuoteHints";
 
 export const runtime = "nodejs";
 
@@ -37,6 +42,11 @@ const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export async function POST(req: NextRequest) {
+  const auth = await requireAuthUser();
+  if (!auth.ok) return auth.response;
+  const limited = checkLlmRateLimit(auth.user.id);
+  if (!limited.ok) return limited.response;
+
   let body: unknown;
   try {
     body = await req.json();
@@ -108,19 +118,44 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  const pillarHints = buildPillarQuoteHints({
+    entries: merged,
+    todayDate: b.entry.entryDate,
+    enabledCodes: codes,
+    priorUniqueDays: insight.priorUniqueDays,
+  });
+
   if (isVerifiedQuoteEnabled() && isQuoteRagEnabled()) {
+    const moodBits = [
+      ...(b.entry.moodLabels ?? []),
+      b.entry.moodLabel,
+    ].filter(Boolean);
+    const lowCats = b.entry.scores
+      .filter(
+        (s) =>
+          !s.isNotApplicable &&
+          typeof s.finalScore === "number" &&
+          s.finalScore <= 4
+      )
+      .map((s) => s.categoryCode)
+      .slice(0, 3);
     const query = [
       insight.primaryKeyword,
       insight.tensionKeyword,
       overall?.headline,
       b.aiSummary?.slice(0, 120),
-      b.entry.moodLabels?.join(" "),
+      moodBits.join(" "),
+      lowCats.join(" "),
+      typeof b.entry.overallSatisfaction === "number"
+        ? `행복도${b.entry.overallSatisfaction}`
+        : null,
+      ...pillarHints.queryBits,
     ]
       .filter(Boolean)
       .join(" · ");
     quoteCandidates = await retrieveQuoteCandidates(
       query || theme.plainSummary,
-      12
+      36
     );
   }
 
@@ -185,6 +220,11 @@ export async function POST(req: NextRequest) {
     recentSentences,
     quoteCandidates,
     recentDeliveries,
+    priorUniqueDays: insight.priorUniqueDays,
+    totalXp: totalJournalXp(merged),
+    sajuHints: buildSajuWordingHints(b.entry.entryDate, b.sajuProfile ?? null),
+    pillarThemes: pillarHints.themes,
+    pillarMode: pillarHints.mode,
   });
 
   let deliveryId: string | null = null;

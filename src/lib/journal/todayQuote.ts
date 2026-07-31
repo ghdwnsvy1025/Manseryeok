@@ -4,6 +4,7 @@
  */
 import OpenAI from "openai";
 import { getTagName } from "./eventTagCatalog";
+import { getCategoryByCode } from "./categoryCatalog";
 import type { BTheme } from "./bTheme";
 import type { OpenAiCallStatus } from "./openaiStatus";
 import type { CategoryCode, JournalEntry } from "./types";
@@ -20,6 +21,7 @@ import {
 import { filterSafeQuotes, deriveHardDay } from "./quote/safetyFilter";
 import {
   selectBestQuote,
+  formatQuoteAttribution,
   type QuoteSelectContext,
   type QuoteDeliveryWindow,
 } from "./quote/select";
@@ -29,8 +31,13 @@ import {
   isQuoteRagEnabled,
   isVerifiedQuoteEnabled,
 } from "@/lib/app/featureFlags";
+import {
+  mixRatioPayload,
+  resolveGatedBlend,
+} from "@/lib/journal/insight/recordReflectGate";
+import type { SajuWordingHints } from "@/lib/journal/sajuWordingHints";
 
-export const SENTENCE_PROMPT_VERSION = "today-sentence-prompt-v2.0.0";
+export const SENTENCE_PROMPT_VERSION = "today-sentence-prompt-v2.1.0";
 
 export type TodayQuoteInput = {
   b: BTheme;
@@ -45,6 +52,18 @@ export type TodayQuoteInput = {
   recentSentences?: string[];
   quoteCandidates?: QuoteLibraryItem[];
   recentDeliveries?: QuoteDeliveryWindow[];
+  /** 유일 기록 일수 — 문장 혼합 비율 게이트 */
+  priorUniqueDays?: number;
+  totalXp?: number;
+  onboardingCompleted?: boolean;
+  /** 프로필 사주×오늘 — 사람·날짜가 갈라지게 */
+  sajuHints?: SajuWordingHints | null;
+  /**
+   * 오늘 천간·지지·간지 일기 통계 → 일상어 테마
+   * (글자 자체는 넣지 않음)
+   */
+  pillarThemes?: string[];
+  pillarMode?: "off" | "hint" | "apply";
   /** @deprecated use recentDeliveries */
   recentQuoteIds?: string[];
   /** @deprecated use recentDeliveries */
@@ -183,6 +202,14 @@ async function generateAppSentence(
     "일기 원문 복사 금지",
   ];
 
+  const mixRatio = mixRatioPayload(
+    resolveGatedBlend({
+      totalXp: input.totalXp ?? 0,
+      onboardingCompleted: input.onboardingCompleted,
+      priorUniqueDays: input.priorUniqueDays ?? 0,
+    })
+  );
+
   try {
     const client = new OpenAI({ apiKey });
     const attempt = async () => {
@@ -195,6 +222,9 @@ async function generateAppSentence(
             role: "system",
             content: `당신은 일기 앱의 '오늘의 문장' 작성자입니다.
 역할: 하루를 따뜻하게 닫는 짧은 문장. 조언·훈계 금지.
+sajuHints가 있으면 그 사람의 원국 결·오늘 분위기를 일상어로만 스며들게 하세요. 다른 사주에 그대로 옮겨도 되는 문장은 실패입니다.
+mixRatio대로 오늘 글자(사주)와 오늘 기록의 비중을 맞추세요.
+pillarInfluence가 off인 천간/지지/간지 통계는 쓰지 마세요.
 JSON만: { "sentence": "...", "tone": "...", "themes": ["..."] }`,
           },
           {
@@ -203,6 +233,8 @@ JSON만: { "sentence": "...", "tone": "...", "themes": ["..."] }`,
               primary_theme: input.primaryKeyword ?? input.b.keywords[0] ?? null,
               secondary_theme: input.tensionKeyword ?? null,
               fortune_theme: input.fortuneTheme ?? null,
+              ganjiKo: input.ganjiKo ?? null,
+              sajuHints: input.sajuHints ?? null,
               emotions: state.moods,
               state_summary: {
                 happiness: state.happiness,
@@ -214,6 +246,11 @@ JSON만: { "sentence": "...", "tone": "...", "themes": ["..."] }`,
               },
               event_tags: state.tags.map((t) => getTagName(t)),
               diary_features: (input.aiSummary ?? "").slice(0, 180),
+              pillar_themes:
+                input.pillarMode && input.pillarMode !== "off"
+                  ? input.pillarThemes ?? []
+                  : [],
+              mixRatio,
               tone,
               recent_sentences: (input.recentSentences ?? []).slice(0, 5),
               constraints,
@@ -312,6 +349,18 @@ export async function generateTodayQuote(
         eventDate: input.entry.entryDate,
       })),
     ];
+    const lowCategories = input.entry.scores
+      .filter(
+        (s) =>
+          !s.isNotApplicable &&
+          typeof s.finalScore === "number" &&
+          s.finalScore <= 4
+      )
+      .map(
+        (s) => getCategoryByCode(s.categoryCode)?.name ?? s.categoryCode
+      )
+      .slice(0, 4);
+
     const ctx: QuoteSelectContext = {
       primaryKeyword: input.primaryKeyword,
       tensionKeyword: input.tensionKeyword,
@@ -319,14 +368,22 @@ export async function generateTodayQuote(
       moods: state.moods,
       tags: state.tags,
       hardDay: state.hardDay,
+      happiness: state.happiness,
+      lowCategories,
+      diaryHint: (input.aiSummary ?? "").slice(0, 160) || null,
       asOfDate: input.entry.entryDate,
       recentDeliveries: legacyDeliveries,
+      pillarThemes: input.pillarThemes ?? [],
+      pillarMode: input.pillarMode ?? "off",
     };
     const best = selectBestQuote(safe, ctx);
     if (best) {
       const q = best.quote;
-      const sourceLabel = [q.authorName, q.workTitle].filter(Boolean).join(" · ") ||
-        "검증된 명언";
+      const sourceLabel = formatQuoteAttribution({
+        authorName: q.authorName,
+        workTitle: q.workTitle,
+        fallback: "고전 명언",
+      });
       return {
         quote: q.quoteTextKo,
         sentence: q.quoteTextKo,

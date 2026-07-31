@@ -10,7 +10,7 @@ type Props = {
 
 const WEEKDAY_KO = ["월", "화", "수", "목", "금", "토", "일"] as const;
 
-/** 주간 리포트 — 요일 스트립 + 하이라이트 + 공유 */
+/** 주간 리포트 — 숫자·요일만 한눈에 */
 export default function WeeklyReportCard({ report }: Props) {
   const [shared, setShared] = useState<"idle" | "done" | "failed">("idle");
 
@@ -28,103 +28,74 @@ export default function WeeklyReportCard({ report }: Props) {
     }
   };
 
-  const highlights = [
-    report.bestDay
-      ? {
-          label: "좋았던 날",
-          value: `${report.bestDay.date.slice(5).replace("-", ".")} · ${report.bestDay.value.toFixed(1)}`,
-          color: happinessTone(report.bestDay.value),
-        }
-      : null,
-    report.bestCategory
-      ? {
-          label: "잘 지킨 것",
-          value: `${report.bestCategory.name} ${report.bestCategory.average.toFixed(1)}`,
-          color: undefined,
-        }
-      : null,
-    report.worstCategory
-      ? {
-          label: "아쉬운 것",
-          value: `${report.worstCategory.name} ${report.worstCategory.average.toFixed(1)}`,
-          color: undefined,
-        }
-      : null,
-    report.newGanji.length > 0
-      ? {
-          label: "새 간지",
-          value: report.newGanji.join(", "),
-          color: "var(--px-accent)",
-        }
-      : null,
-  ].filter((h): h is NonNullable<typeof h> => h != null);
-
   return (
     <div
       className="p-3 border-2 space-y-3"
       style={{
-        borderColor: "var(--px-border2)",
+        borderColor: "var(--px-accent)",
         background: "var(--px-bg3)",
+        boxShadow: "3px 3px 0 #4a3a00",
       }}
     >
-      <div className="flex items-baseline justify-between gap-2">
+      <div className="flex items-center justify-between gap-2">
         <div className="min-w-0">
-          <p className="stats-label">주간 리포트</p>
+          <p className="stats-emphasize-title !text-[15px]">주간 리포트</p>
           <p
-            className="text-sm font-extrabold tabular-nums"
-            style={{ color: "var(--px-text)" }}
+            className="text-xs font-bold tabular-nums mt-0.5"
+            style={{ color: "var(--px-text2)" }}
           >
             {report.rangeLabel}
           </p>
         </div>
-        <p className="tabular-nums shrink-0 text-right">
-          <span
-            className="stats-metric !text-lg"
-            style={
-              report.avg != null
-                ? { color: happinessTone(report.avg) }
-                : undefined
-            }
+        <div className="text-right shrink-0">
+          <p
+            className="text-2xl font-black tabular-nums leading-none"
+            style={{
+              color:
+                report.avg != null
+                  ? happinessTone(report.avg)
+                  : "var(--px-text2)",
+            }}
           >
             {report.avg != null ? report.avg.toFixed(1) : "-"}
-          </span>
-          {report.avg != null ? (
-            <span className="stats-metric-unit">/10</span>
-          ) : null}
-          {report.deltaFromPrevWeek != null ? (
-            <span
-              className="ml-1.5 text-[11px] font-extrabold"
-              style={{ color: deltaTone(report.deltaFromPrevWeek) }}
-            >
-              {report.deltaFromPrevWeek > 0
-                ? `+${report.deltaFromPrevWeek.toFixed(1)}`
-                : report.deltaFromPrevWeek.toFixed(1)}
-            </span>
-          ) : null}
-        </p>
+          </p>
+          <p className="text-[11px] font-bold mt-1" style={{ color: "var(--px-text2)" }}>
+            {report.recordedDays}/{report.totalDays}일
+            {report.deltaFromPrevWeek != null ? (
+              <span
+                className="ml-1.5 tabular-nums"
+                style={{ color: deltaTone(report.deltaFromPrevWeek) }}
+              >
+                {report.deltaFromPrevWeek > 0
+                  ? `+${report.deltaFromPrevWeek.toFixed(1)}`
+                  : report.deltaFromPrevWeek.toFixed(1)}
+              </span>
+            ) : null}
+          </p>
+        </div>
       </div>
 
       <div className="grid grid-cols-7 gap-1">
         {report.days.map((day, i) => (
-          <div key={day.date} className="space-y-1 text-center">
-            <p className="stats-label">{WEEKDAY_KO[i % 7]}</p>
+          <div key={day.date} className="text-center space-y-1">
+            <p
+              className="text-[10px] font-black"
+              style={{ color: "var(--px-text2)" }}
+            >
+              {WEEKDAY_KO[i % 7]}
+            </p>
             <div
-              className="h-9 border flex items-center justify-center"
+              className="h-10 border-2 flex items-center justify-center"
               style={{
                 borderColor: "var(--px-border)",
                 background:
                   day.value != null
-                    ? `color-mix(in srgb, ${happinessTone(day.value)} 22%, var(--px-bg2))`
+                    ? `color-mix(in srgb, ${happinessTone(day.value)} 25%, var(--px-bg2))`
                     : "var(--px-bg2)",
               }}
-              title={
-                day.value != null
-                  ? `${day.date} · ${day.value.toFixed(1)}점`
-                  : `${day.date} · 미기록`
-              }
             >
               <span
-                className="text-xs font-black tabular-nums"
+                className="text-sm font-black tabular-nums"
                 style={{
                   color:
                     day.value != null
@@ -139,61 +110,68 @@ export default function WeeklyReportCard({ report }: Props) {
         ))}
       </div>
 
-      <p className="stats-label tabular-nums">
-        기록 {report.recordedDays}/{report.totalDays}일
-      </p>
-
-      {highlights.length > 0 && (
-        <dl className="space-y-1">
-          {highlights.map((h) => (
-            <div key={h.label} className="flex items-baseline justify-between gap-3">
-              <dt className="stats-label">{h.label}</dt>
-              <dd
-                className="text-xs font-extrabold tabular-nums text-right"
-                style={{ color: h.color ?? "var(--px-text-on-panel)" }}
+      {(report.bestDay || report.bestCategory || report.worstCategory) && (
+        <div
+          className="grid gap-1.5 pt-1"
+          style={{ borderTop: "1px solid var(--px-border)" }}
+        >
+          {report.bestDay && (
+            <div className="flex justify-between gap-2 text-sm font-bold">
+              <span style={{ color: "var(--px-text2)" }}>최고</span>
+              <span
+                className="tabular-nums"
+                style={{ color: happinessTone(report.bestDay.value) }}
               >
-                {h.value}
-              </dd>
+                {report.bestDay.date.slice(5).replace("-", ".")} ·{" "}
+                {report.bestDay.value.toFixed(1)}
+              </span>
             </div>
-          ))}
-        </dl>
-      )}
-
-      {report.recordedDays === 0 && (
-        <p className="stats-label">하루만 남겨도 리포트가 채워집니다</p>
+          )}
+          {report.bestCategory && (
+            <div className="flex justify-between gap-2 text-sm font-bold">
+              <span style={{ color: "var(--px-text2)" }}>잘한 것</span>
+              <span style={{ color: "var(--px-text-on-panel)" }}>
+                {report.bestCategory.name} {report.bestCategory.average.toFixed(1)}
+              </span>
+            </div>
+          )}
+          {report.worstCategory && (
+            <div className="flex justify-between gap-2 text-sm font-bold">
+              <span style={{ color: "var(--px-text2)" }}>아쉬운 것</span>
+              <span style={{ color: "var(--px-text-on-panel)" }}>
+                {report.worstCategory.name}{" "}
+                {report.worstCategory.average.toFixed(1)}
+              </span>
+            </div>
+          )}
+          {report.newGanji.length > 0 && (
+            <div className="flex justify-between gap-2 text-sm font-bold">
+              <span style={{ color: "var(--px-text2)" }}>새 간지</span>
+              <span style={{ color: "var(--px-accent)" }}>
+                {report.newGanji.join(" ")}
+              </span>
+            </div>
+          )}
+        </div>
       )}
 
       {report.recordedDays > 0 && (
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => void share()}
-            className="px-3 py-1.5 text-xs font-extrabold border-2"
-            style={{
-              borderColor: "var(--px-border2)",
-              color: "var(--px-text-on-panel)",
-              background: "var(--px-bg2)",
-            }}
-          >
-            리포트 공유
-          </button>
-          {shared === "done" && (
-            <span
-              className="text-[11px] font-extrabold"
-              style={{ color: "#4ade80" }}
-            >
-              복사했어요
-            </span>
-          )}
-          {shared === "failed" && (
-            <span
-              className="text-[11px] font-extrabold"
-              style={{ color: "#f87171" }}
-            >
-              공유 실패
-            </span>
-          )}
-        </div>
+        <button
+          type="button"
+          onClick={() => void share()}
+          className="w-full py-2.5 text-sm font-black border-2"
+          style={{
+            borderColor: "var(--px-border)",
+            color: "var(--px-text-on-panel)",
+            background: "var(--px-bg2)",
+          }}
+        >
+          {shared === "done"
+            ? "복사됨"
+            : shared === "failed"
+              ? "공유 실패"
+              : "공유"}
+        </button>
       )}
     </div>
   );

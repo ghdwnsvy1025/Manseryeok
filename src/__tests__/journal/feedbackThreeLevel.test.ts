@@ -29,9 +29,9 @@ describe("three-level question fit feedback", () => {
       "bad",
     ]);
     expect(QUESTION_FIT_LEVELS.map((l) => l.label)).toEqual([
-      "잘 맞아요",
+      "도움이 됐어요",
       "그저 그래요",
-      "안 맞아요",
+      "별로예요",
     ]);
     const ratings = QUESTION_FIT_LEVELS.map((l) => l.rating);
     expect(new Set(ratings).size).toBe(3);

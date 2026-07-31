@@ -20,9 +20,10 @@ astrology_profiles, astrology_snapshots, astrology_feature_vectors,
 personalization_models, personalization_model_metrics, personalization_predictions
 ```
 
-3. 미적용 마이그레이션이 있으면 **001→010 순서**로 SQL Editor에서 적용  
+3. 미적용 마이그레이션이 있으면 **001→025 순서**로 SQL Editor에서 적용  
    - 이미 적용된 환경은 재실행 안전(IF NOT EXISTS / upsert seed)
    - **파괴적 rollback SQL 자동 실행 금지**
+   - 친구 필수: `024`(명언 시드) · `025`(사주 프로필 스코프) — `docs/SUPABASE.md` 참고
 
 ## 3. 앱 배포
 

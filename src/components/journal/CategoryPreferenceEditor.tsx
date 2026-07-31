@@ -28,15 +28,12 @@ export default function CategoryPreferenceEditor({
   const count = selected.length;
   const hint = useMemo(() => {
     if (count < MIN_ENABLED_CATEGORIES) {
-      return `최소 ${MIN_ENABLED_CATEGORIES}개 선택 (현재 ${count})`;
+      return `최소 ${MIN_ENABLED_CATEGORIES}개`;
     }
     if (count > MAX_ENABLED_CATEGORIES) {
-      return `최대 ${MAX_ENABLED_CATEGORIES}개까지`;
+      return `최대 ${MAX_ENABLED_CATEGORIES}개`;
     }
-    if (count === RECOMMENDED_ENABLED_CATEGORIES) {
-      return `권장 ${RECOMMENDED_ENABLED_CATEGORIES}개와 같아요`;
-    }
-    return `권장 ${RECOMMENDED_ENABLED_CATEGORIES}개 · 현재 ${count}개`;
+    return `${count}개 선택`;
   }, [count]);
 
   const toggle = (code: CategoryCode) => {
@@ -46,7 +43,7 @@ export default function CategoryPreferenceEditor({
         return prev.filter((c) => c !== code);
       }
       if (prev.length >= MAX_ENABLED_CATEGORIES) {
-        setError(`최대 ${MAX_ENABLED_CATEGORIES}개까지 선택할 수 있어요.`);
+        setError(`최대 ${MAX_ENABLED_CATEGORIES}개까지`);
         return prev;
       }
       return [...prev, code];
@@ -81,66 +78,87 @@ export default function CategoryPreferenceEditor({
     }
   };
 
+  const orderedSelected = selected
+    .map((code) => CATEGORY_CATALOG.find((c) => c.code === code))
+    .filter(Boolean);
+
   return (
-    <div className="space-y-3">
-      <p className="ui-hint">{hint}</p>
-      <ul className="space-y-2">
-        {CATEGORY_CATALOG.map((cat) => {
-          const on = selected.includes(cat.code);
-          const order = selected.indexOf(cat.code);
-          return (
-            <li
-              key={cat.code}
-              className="p-3 border-2 space-y-1"
-              style={{
-                borderColor: on ? "var(--px-accent)" : "var(--px-border)",
-                background: "var(--px-bg2)",
-              }}
-            >
-              <label className="flex items-start gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={on}
-                  onChange={() => toggle(cat.code)}
-                  className="mt-1"
-                  aria-label={`${cat.name} 선택`}
-                />
-                <span className="flex-1">
-                  <span className="text-sm font-black block" style={{ color: "var(--px-accent)" }}>
+    <div className="space-y-4">
+      <div className="stats-category-panel">
+        <div className="flex items-center justify-between gap-2">
+          <p className="stats-category-title">카테고리</p>
+          <p className="stats-label">{hint}</p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {CATEGORY_CATALOG.map((cat) => {
+            const on = selected.includes(cat.code);
+            return (
+              <button
+                key={cat.code}
+                type="button"
+                onClick={() => toggle(cat.code)}
+                className={`stats-chip-cat${on ? " is-on" : ""}`}
+                aria-pressed={on}
+              >
+                {cat.name}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {orderedSelected.length > 0 && (
+        <div className="space-y-2">
+          <p className="stats-label">순서</p>
+          <ul className="space-y-1.5">
+            {orderedSelected.map((cat, order) => {
+              if (!cat) return null;
+              return (
+                <li
+                  key={cat.code}
+                  className="flex items-center gap-2 px-3 py-2 border-2"
+                  style={{
+                    borderColor: "var(--px-border)",
+                    background: "var(--px-bg2)",
+                  }}
+                >
+                  <span
+                    className="text-sm font-black tabular-nums w-5"
+                    style={{ color: "var(--px-accent)" }}
+                  >
+                    {order + 1}
+                  </span>
+                  <span
+                    className="flex-1 text-sm font-bold truncate"
+                    style={{ color: "var(--px-text-on-panel)" }}
+                  >
                     {cat.name}
                   </span>
-                  <span className="text-xs block" style={{ color: "var(--px-text2)" }}>
-                    {cat.question}
-                  </span>
-                </span>
-              </label>
-              {on && (
-                <div className="flex gap-2 pl-6">
                   <button
                     type="button"
-                    className="text-[11px] font-bold underline"
+                    className="text-xs font-bold underline"
                     style={{ color: "var(--px-text2)" }}
                     onClick={() => move(cat.code, -1)}
                     disabled={order <= 0}
                   >
-                    위로
+                    ↑
                   </button>
                   <button
                     type="button"
-                    className="text-[11px] font-bold underline"
+                    className="text-xs font-bold underline"
                     style={{ color: "var(--px-text2)" }}
                     onClick={() => move(cat.code, 1)}
-                    disabled={order === selected.length - 1}
+                    disabled={order === orderedSelected.length - 1}
                   >
-                    아래로
+                    ↓
                   </button>
-                  <span className="ui-hint">순서 {order + 1}</span>
-                </div>
-              )}
-            </li>
-          );
-        })}
-      </ul>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+
       {error && (
         <p className="text-xs font-bold" style={{ color: "#f87171" }} role="alert">
           {error}
@@ -148,7 +166,7 @@ export default function CategoryPreferenceEditor({
       )}
       <button
         type="button"
-        className="ui-primary-btn w-full py-3 text-sm"
+        className="ui-primary-btn w-full py-3.5 text-base font-black"
         onClick={() => void handleSave()}
         disabled={saving}
       >
