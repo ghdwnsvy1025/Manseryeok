@@ -209,8 +209,8 @@ function LevelProgressCard({
 
       <p className="text-[10px] leading-relaxed" style={{ color: "var(--px-text2)" }}>
         {progress.isMax
-          ? "기록이 충분히 쌓여 해석이 가장 깊게 맞춰져요."
-          : "매일 쓰고, 수치·감정·본문을 자세히 적을수록 레벨이 오르고 해석도 더 정확해져요."}
+          ? "최고 레벨이에요. 쌓인 기록만큼 운세가 가장 깊게 맞춰져요."
+          : "레벨이 높아질수록 운세가 더 정확해져요. 기록을 남길수록 레벨이 올라가요."}
       </p>
     </div>
   );

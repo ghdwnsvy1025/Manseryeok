@@ -70,7 +70,18 @@ describe("recentStatus structured payload", () => {
     expect(s.good?.value).toBe("에너지·활력");
     expect(s.watch?.value).toBe("마음의 여유");
     expect(s.advice.length).toBeGreaterThan(0);
+    expect(s.advice).toMatch(/마음의 여유|수면·회복/);
     expect(s.message).toContain(s.headline);
+  });
+
+  test("약한 영역이 없으면 행복도 구간 조언", () => {
+    const s = buildTemplateRecentStatus(
+      emptyStats({
+        avg7: 7,
+        uniqueDays: 10,
+      })
+    );
+    expect(s.advice).toMatch(/습관|루틴|무리/);
   });
 
   test("선택 데이터가 없으면 domain 필드는 null", () => {

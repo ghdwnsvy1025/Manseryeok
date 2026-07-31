@@ -60,10 +60,11 @@ export async function POST(req: NextRequest) {
             '  "coreWatch": { "label": "기본", "value": "카테고리명", "score": 4.1 } | null,',
             '  "domainGood": { "label": "생활", "value": "카테고리명", "score": 7.2 } | null,',
             '  "domainWatch": { "label": "생활", "value": "카테고리명", "score": 4.1 } | null,',
-            '  "advice": "짧은 제안 한 문장" }',
+            '  "advice": "coreWatch 또는 domainWatch 이름을 넣어, 오늘 할 수 있는 짧은 제안 한 문장" }',
             "stats의 core*/domain* 이름이 있으면 각 value에 그 이름을 우선 사용.",
             "생활(선택) 영역 데이터가 없으면 domainGood/domainWatch는 null.",
             "label은 반드시 기본(항상 기록하는 영역) 또는 생활(골라 기록하는 영역).",
+            "advice는 같은 문장을 반복하지 말고, 약한 영역(coreWatch/domainWatch)을 반영하세요.",
           ].join(" "),
         },
         {

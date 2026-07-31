@@ -82,8 +82,8 @@ export default function HomeEBlock({ stats }: Props) {
           style={{ color: "var(--px-text2)" }}
         >
           {personalization.fitComplete
-            ? "맞춤 완료 · 이제 기록 습관을 키워요"
-            : "기록할수록 운세가 나에게 더 맞춰져요"}
+            ? "맞춤 완료 · 레벨이 오를수록 운세가 더 정확해져요"
+            : "레벨이 높아질수록 운세가 더 정확해져요"}
         </p>
       </div>
     </section>

@@ -147,12 +147,13 @@ export function buildTemplateRecentStatus(stats: HomeEStats): RecentStatusPayloa
   } else if (stats.avg7 != null) {
     const band = describeRecentHappiness(stats.avg7);
     headline = `최근 행복도는 '${band.label}' 수준이에요 · ${stats.avg7}/10`;
-    advice =
-      stats.avg7 >= 6.5
-        ? "무리하지 않는 선에서 지금의 좋은 습관을 이어가 보세요."
-        : stats.avg7 < 5
-          ? "오늘은 해야 할 일을 하나만 고르고 나머지는 미뤄도 됩니다."
-          : "작은 루틴 하나만 지키면 균형이 잡히기 쉬워요.";
+    advice = pickTemplateAdvice({
+      avg7: stats.avg7,
+      coreWatch: coreWatch?.value ?? null,
+      domainWatch: domainWatch?.value ?? null,
+      coreGood: coreGood?.value ?? null,
+      uniqueDays: stats.uniqueDays,
+    });
   } else {
     headline = "기록이 쌓이는 중이에요";
     advice = "며칠만 더 남기면 패턴이 또렷해집니다.";
@@ -166,6 +167,44 @@ export function buildTemplateRecentStatus(stats: HomeEStats): RecentStatusPayloa
     domainWatch,
     advice,
   });
+}
+
+/** 행복도 구간 + 약한 영역에 맞춰 조언이 달라지게 */
+export function pickTemplateAdvice(input: {
+  avg7: number;
+  coreWatch: string | null;
+  domainWatch: string | null;
+  coreGood: string | null;
+  uniqueDays: number;
+}): string {
+  const watch = input.domainWatch ?? input.coreWatch;
+  const good = input.coreGood;
+
+  if (watch) {
+    if (input.avg7 < 5) {
+      return `${watch} 쪽을 조금 덜어내고, 오늘은 할 일을 하나만 골라 보세요.`;
+    }
+    if (input.avg7 >= 6.5) {
+      return `좋은 흐름을 지키되, ${watch}만 살짝 점검해 두면 균형이 더 좋아요어요.`;
+    }
+    return `${watch}에 5분만 더 관심을 주면 오늘이 한결 편해질 거예요.`;
+  }
+
+  if (good && input.avg7 >= 6.5) {
+    return `${good}의 좋은 리듬을 무리 없이 이어가 보세요.`;
+  }
+
+  if (input.uniqueDays < 5) {
+    return "기록이 조금만 더 쌓이면 조언도 더 구체적으로 바뀌어요.";
+  }
+
+  if (input.avg7 >= 6.5) {
+    return "무리하지 않는 선에서 지금의 좋은 습관을 이어가 보세요.";
+  }
+  if (input.avg7 < 5) {
+    return "오늘은 해야 할 일을 하나만 고르고 나머지는 미뤄도 됩니다.";
+  }
+  return "작은 루틴 하나만 지키면 균형이 잡히기 쉬워요.";
 }
 
 type LooseFocus = {
