@@ -2,6 +2,10 @@
 
 import { useState } from "react";
 import { enableGuestMode, disableGuestMode } from "@/lib/auth/guestMode";
+import {
+  getAuthCallbackUrl,
+  stashAuthNextPath,
+} from "@/lib/auth/redirectOrigin";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { ANALYTICS_EVENTS, captureEvent } from "@/lib/analytics/posthog";
 
@@ -10,10 +14,6 @@ type Props = {
 };
 
 type EmailMode = "login" | "signup";
-
-function callbackUrl(next: string): string {
-  return `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`;
-}
 
 export default function WelcomeAuthGate({ onGuest }: Props) {
   const [emailMode, setEmailMode] = useState<EmailMode>("signup");
@@ -36,16 +36,20 @@ export default function WelcomeAuthGate({ onGuest }: Props) {
     setLoading(true);
     setMessage("");
     captureEvent(ANALYTICS_EVENTS.authGoogleClicked);
+    stashAuthNextPath("/diary/login?oauth=success");
+    const redirectTo = getAuthCallbackUrl();
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: callbackUrl("/diary/login?oauth=success"),
+        redirectTo,
         queryParams: { hl: "ko" },
       },
     });
     if (error) {
       setLoading(false);
-      setMessage("Google 로그인을 시작하지 못했습니다.");
+      setMessage(
+        `Google 로그인을 시작하지 못했습니다. (돌아갈 주소: ${redirectTo})`
+      );
     }
   };
 
@@ -67,11 +71,12 @@ export default function WelcomeAuthGate({ onGuest }: Props) {
         mode: emailMode,
       });
       if (emailMode === "signup") {
+        stashAuthNextPath("/diary/login?email=confirmed");
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
           options: {
-            emailRedirectTo: callbackUrl("/diary/login?email=confirmed"),
+            emailRedirectTo: getAuthCallbackUrl(),
           },
         });
         if (error) throw error;

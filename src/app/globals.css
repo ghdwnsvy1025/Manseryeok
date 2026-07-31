@@ -140,6 +140,48 @@ textarea {
   height: 14px;
 }
 
+/* 사주 폼 선택: 라디오 대신 티켓형 세그먼트 (선택=밝은 지면+어두운 글자) */
+.saju-choice-track {
+  display: flex;
+  width: 100%;
+  max-width: 20rem;
+  border: 2px solid #000;
+  background: #0c0c14;
+  box-shadow: 3px 3px 0 #000;
+  overflow: hidden;
+}
+.saju-choice-chip {
+  flex: 1;
+  margin: 0;
+  padding: 0.55rem 0.7rem;
+  font-size: 0.8125rem;
+  font-weight: 800;
+  font-family: inherit;
+  line-height: 1.2;
+  border: none;
+  border-right: 2px solid #000;
+  background: transparent;
+  color: #7a7a96;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.saju-choice-chip:last-child {
+  border-right: none;
+}
+.saju-choice-chip:hover:not(.is-on) {
+  color: #c4c4d8;
+  background: color-mix(in srgb, #fff 4%, transparent);
+}
+.saju-choice-chip.is-on {
+  background: #efe6c6;
+  color: #1a1208;
+}
+.saju-choice-chip:focus-visible {
+  outline: 2px solid #efe6c6;
+  outline-offset: -2px;
+  z-index: 1;
+}
+
 /* ── Pixel Select ── */
 .px-select {
   appearance: none;

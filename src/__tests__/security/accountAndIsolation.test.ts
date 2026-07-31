@@ -30,6 +30,7 @@ describe("account deletion cascade contract", () => {
     expect(ACCOUNT_CASCADE_TABLES).toContain("astrology_snapshots");
     expect(ACCOUNT_CASCADE_TABLES).toContain("question_feedback_events");
     expect(ACCOUNT_CASCADE_TABLES).toContain("journal_onboarding_profiles");
+    expect(ACCOUNT_CASCADE_TABLES).toContain("beta_feedback");
   });
 
   test("leftover rows fail the probe summary", () => {

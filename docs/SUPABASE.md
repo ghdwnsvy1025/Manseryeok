@@ -86,12 +86,22 @@ Dashboard → **Authentication → Providers** → Email 활성화
 
 Dashboard → **Authentication → URL Configuration**:
 
-- Site URL: 배포 주소 (예: `https://saju-diary.vercel.app`)
-- Redirect URLs:
+- Site URL: 배포 주소 (예: `https://saju-diary-fm.vercel.app`)
+  - 로컬만 잠깐 쓸 때는 Site URL을 `http://localhost:3001`로 바꿔도 됨 (끝나면 배포 주소로 되돌리기)
+- Redirect URLs (쿼리 없는 **정확한** 콜백을 꼭 넣기 — 안 맞으면 Site URL=Vercel로 떨어짐):
   - `http://localhost:3000/auth/callback`
-  - `https://saju-diary.vercel.app/auth/callback`
+  - `http://localhost:3001/auth/callback`
+  - `http://localhost:3001/**`
+  - `https://saju-diary-fm.vercel.app/auth/callback`
+  - `https://saju-diary-fm.vercel.app/**`
 
-실제 개발 포트가 다르면 해당 localhost 주소도 추가하세요.
+로컬 `.env.local`에 포트를 고정할 수 있습니다:
+
+```
+NEXT_PUBLIC_AUTH_REDIRECT_ORIGIN=http://localhost:3001
+```
+
+환경 변수 변경 후 **dev 서버를 재시작**하세요.
 
 ## 5. Google 로그인
 

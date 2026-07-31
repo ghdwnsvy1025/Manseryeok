@@ -16,6 +16,7 @@ export const ANALYTICS_EVENTS = {
   fortuneOpened: "fortune_opened",
   questionShown: "question_shown",
   quoteShown: "quote_shown",
+  feedbackSubmitted: "feedback_submitted",
 } as const;
 
 export type AnalyticsEvent =

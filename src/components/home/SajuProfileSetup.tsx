@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { CalendarType, SajuInput } from "@/lib/saju/types";
 import type { Gender } from "@/lib/saju/daeun";
 import { completeOnboarding } from "@/lib/app/experienceMode";
@@ -10,6 +10,48 @@ type Props = {
   onCompleted: () => void;
 };
 
+const LOCATION_PRESETS = [
+  { id: "seoul", name: "대한민국, 서울", longitude: 126.98, latitude: 37.57 },
+  { id: "busan", name: "대한민국, 부산", longitude: 129.08, latitude: 35.18 },
+  { id: "daegu", name: "대한민국, 대구", longitude: 128.6, latitude: 35.87 },
+  { id: "incheon", name: "대한민국, 인천", longitude: 126.71, latitude: 37.46 },
+  { id: "gwangju", name: "대한민국, 광주", longitude: 126.85, latitude: 35.16 },
+  { id: "daejeon", name: "대한민국, 대전", longitude: 127.38, latitude: 36.35 },
+  { id: "ulsan", name: "대한민국, 울산", longitude: 129.31, latitude: 35.54 },
+  { id: "jeju", name: "대한민국, 제주", longitude: 126.53, latitude: 33.5 },
+] as const;
+
+function digitsOnly(value: string, max: number): string {
+  return value.replace(/\D/g, "").slice(0, max);
+}
+
+function isValidYear(raw: string): boolean {
+  if (raw.length !== 4) return false;
+  const n = Number(raw);
+  return n >= 1900 && n <= 2100;
+}
+
+function isCompleteMonth(raw: string): boolean {
+  if (!raw) return false;
+  const n = Number(raw);
+  if (n < 1 || n > 12) return false;
+  return raw.length === 2 || (raw.length === 1 && n >= 2 && n <= 9);
+}
+
+function isCompleteDay(raw: string): boolean {
+  if (!raw) return false;
+  const n = Number(raw);
+  if (n < 1 || n > 31) return false;
+  return raw.length === 2 || (raw.length === 1 && n >= 4 && n <= 9);
+}
+
+function isCompleteHour(raw: string): boolean {
+  if (!raw) return false;
+  const n = Number(raw);
+  if (n < 0 || n > 23) return false;
+  return raw.length === 2 || (raw.length === 1 && n >= 3 && n <= 9);
+}
+
 export default function SajuProfileSetup({ onCompleted }: Props) {
   const [year, setYear] = useState("");
   const [month, setMonth] = useState("");
@@ -17,12 +59,21 @@ export default function SajuProfileSetup({ onCompleted }: Props) {
   const [hour, setHour] = useState("");
   const [minute, setMinute] = useState("");
   const [displayName, setDisplayName] = useState("");
-  const [noTime, setNoTime] = useState(true);
+  const [noTime, setNoTime] = useState(false);
   const [gender, setGender] = useState<Gender>("male");
   const [calendarType, setCalendarType] = useState<CalendarType>("solar");
   const [isLeapMonth, setIsLeapMonth] = useState(false);
+  const [locationId, setLocationId] = useState<(typeof LOCATION_PRESETS)[number]["id"]>("seoul");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const monthRef = useRef<HTMLInputElement>(null);
+  const dayRef = useRef<HTMLInputElement>(null);
+  const hourRef = useRef<HTMLInputElement>(null);
+  const minuteRef = useRef<HTMLInputElement>(null);
+
+  const location =
+    LOCATION_PRESETS.find((p) => p.id === locationId) ?? LOCATION_PRESETS[0];
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -31,12 +82,27 @@ export default function SajuProfileSetup({ onCompleted }: Props) {
       setError("이름을 입력해 주세요.");
       return;
     }
+    const y = Number(year);
+    const m = Number(month);
+    const d = Number(day);
+    if (!isValidYear(year) || m < 1 || m > 12 || d < 1 || d > 31) {
+      setError("생년월일을 확인해 주세요.");
+      return;
+    }
+    if (!noTime) {
+      const h = Number(hour);
+      const min = Number(minute || "0");
+      if (hour === "" || h < 0 || h > 23 || min < 0 || min > 59) {
+        setError("출생 시간을 확인해 주세요.");
+        return;
+      }
+    }
     setSaving(true);
     try {
       const input: SajuInput = {
-        year: Number(year),
-        month: Number(month),
-        day: Number(day),
+        year: y,
+        month: m,
+        day: d,
         hour: noTime ? undefined : Number(hour),
         minute: noTime ? undefined : Number(minute || "0"),
         gender,
@@ -47,9 +113,9 @@ export default function SajuProfileSetup({ onCompleted }: Props) {
           dayChangeRule: "midnight",
           timeCorrection: "trueSolarTime",
           location: {
-            name: "대한민국, 서울",
-            longitude: 126.98,
-            latitude: 37.57,
+            name: location.name,
+            longitude: location.longitude,
+            latitude: location.latitude,
           },
         },
       };
@@ -94,6 +160,7 @@ export default function SajuProfileSetup({ onCompleted }: Props) {
         className="p-4 border-2 space-y-4"
         style={{ background: "var(--px-bg2)", borderColor: "var(--px-accent)" }}
       >
+        {/* 1. 이름 */}
         <label className="flex flex-col gap-1">
           <span className="text-xs font-bold" style={{ color: "var(--px-text2)" }}>
             이름
@@ -110,37 +177,28 @@ export default function SajuProfileSetup({ onCompleted }: Props) {
           />
         </label>
 
-        <div className="flex gap-2">
-          {(["solar", "lunar"] as CalendarType[]).map((type) => (
-            <button
-              key={type}
-              type="button"
-              onClick={() => setCalendarType(type)}
-              className="flex-1 py-2 text-xs font-bold border-2"
-              style={{
-                borderColor:
-                  calendarType === type ? "var(--px-accent)" : "var(--px-border)",
-                color:
-                  calendarType === type ? "var(--px-accent)" : "var(--px-text2)",
-                background: "var(--px-bg3)",
-              }}
-            >
-              {type === "solar" ? "양력" : "음력"}
-            </button>
-          ))}
+        {/* 2. 성별 */}
+        <div className="space-y-1">
+          <span className="text-xs font-bold" style={{ color: "var(--px-text2)" }}>
+            성별
+          </span>
+          <div className="saju-choice-track" role="radiogroup" aria-label="성별">
+            {(["male", "female"] as Gender[]).map((g) => (
+              <button
+                key={g}
+                type="button"
+                role="radio"
+                aria-checked={gender === g}
+                className={`saju-choice-chip${gender === g ? " is-on" : ""}`}
+                onClick={() => setGender(g)}
+              >
+                {g === "male" ? "남성" : "여성"}
+              </button>
+            ))}
+          </div>
         </div>
 
-        {calendarType === "lunar" && (
-          <label className="flex items-center gap-2 text-xs font-bold cursor-pointer">
-            <input
-              type="checkbox"
-              checked={isLeapMonth}
-              onChange={(e) => setIsLeapMonth(e.target.checked)}
-            />
-            윤달
-          </label>
-        )}
-
+        {/* 3. 생년월일 */}
         <div className="flex gap-2 items-end">
           <label className="flex flex-col gap-1 flex-1">
             <span className="text-xs font-bold" style={{ color: "var(--px-text2)" }}>
@@ -153,7 +211,15 @@ export default function SajuProfileSetup({ onCompleted }: Props) {
               maxLength={4}
               placeholder="1990"
               value={year}
-              onChange={(e) => setYear(e.target.value.replace(/\D/g, "").slice(0, 4))}
+              onChange={(e) => {
+                const next = digitsOnly(e.target.value, 4);
+                setYear(next);
+                if (isValidYear(next)) {
+                  setMonth("");
+                  setDay("");
+                  requestAnimationFrame(() => monthRef.current?.focus());
+                }
+              }}
               className="px-input px-3 py-2.5 text-sm w-full"
             />
           </label>
@@ -162,13 +228,22 @@ export default function SajuProfileSetup({ onCompleted }: Props) {
               월
             </span>
             <input
+              ref={monthRef}
               type="text"
               inputMode="numeric"
               required
               maxLength={2}
               placeholder="1"
               value={month}
-              onChange={(e) => setMonth(e.target.value.replace(/\D/g, "").slice(0, 2))}
+              onChange={(e) => {
+                const next = digitsOnly(e.target.value, 2);
+                if (next && Number(next) > 12) return;
+                setMonth(next);
+                if (isCompleteMonth(next)) {
+                  setDay("");
+                  requestAnimationFrame(() => dayRef.current?.focus());
+                }
+              }}
               className="px-input px-3 py-2.5 text-sm w-full"
             />
           </label>
@@ -177,35 +252,76 @@ export default function SajuProfileSetup({ onCompleted }: Props) {
               일
             </span>
             <input
+              ref={dayRef}
               type="text"
               inputMode="numeric"
               required
               maxLength={2}
               placeholder="1"
               value={day}
-              onChange={(e) => setDay(e.target.value.replace(/\D/g, "").slice(0, 2))}
+              onChange={(e) => {
+                const next = digitsOnly(e.target.value, 2);
+                if (next && Number(next) > 31) return;
+                setDay(next);
+                if (isCompleteDay(next) && !noTime) {
+                  setHour("");
+                  setMinute("");
+                  requestAnimationFrame(() => hourRef.current?.focus());
+                }
+              }}
               className="px-input px-3 py-2.5 text-sm w-full"
             />
           </label>
         </div>
 
-        <div className="flex gap-2">
-          {(["male", "female"] as Gender[]).map((g) => (
-            <button
-              key={g}
-              type="button"
-              onClick={() => setGender(g)}
-              className="flex-1 py-2 text-xs font-bold border-2"
-              style={{
-                borderColor: gender === g ? "var(--px-accent)" : "var(--px-border)",
-                color: gender === g ? "var(--px-accent)" : "var(--px-text2)",
-                background: "var(--px-bg3)",
-              }}
-            >
-              {g === "male" ? "남성" : "여성"}
-            </button>
-          ))}
-        </div>
+        {/* 4. 시·분 */}
+        {!noTime && (
+          <div className="flex gap-2 items-end">
+            <label className="flex flex-col gap-1 w-20">
+              <span className="text-xs font-bold" style={{ color: "var(--px-text2)" }}>
+                시
+              </span>
+              <input
+                ref={hourRef}
+                type="text"
+                inputMode="numeric"
+                required
+                maxLength={2}
+                placeholder="12"
+                value={hour}
+                onChange={(e) => {
+                  const next = digitsOnly(e.target.value, 2);
+                  if (next && Number(next) > 23) return;
+                  setHour(next);
+                  if (isCompleteHour(next)) {
+                    setMinute("");
+                    requestAnimationFrame(() => minuteRef.current?.focus());
+                  }
+                }}
+                className="px-input px-3 py-2.5 text-sm w-full"
+              />
+            </label>
+            <label className="flex flex-col gap-1 w-20">
+              <span className="text-xs font-bold" style={{ color: "var(--px-text2)" }}>
+                분
+              </span>
+              <input
+                ref={minuteRef}
+                type="text"
+                inputMode="numeric"
+                maxLength={2}
+                placeholder="0"
+                value={minute}
+                onChange={(e) => {
+                  const next = digitsOnly(e.target.value, 2);
+                  if (next && Number(next) > 59) return;
+                  setMinute(next);
+                }}
+                className="px-input px-3 py-2.5 text-sm w-full"
+              />
+            </label>
+          </div>
+        )}
 
         <label className="flex items-center gap-2 text-xs font-bold cursor-pointer">
           <input
@@ -216,39 +332,63 @@ export default function SajuProfileSetup({ onCompleted }: Props) {
           출생 시간 모름
         </label>
 
-        {!noTime && (
-          <div className="flex gap-2 items-end">
-            <label className="flex flex-col gap-1 w-20">
-              <span className="text-xs font-bold" style={{ color: "var(--px-text2)" }}>
-                시
-              </span>
-              <input
-                type="text"
-                inputMode="numeric"
-                required={!noTime}
-                maxLength={2}
-                placeholder="12"
-                value={hour}
-                onChange={(e) => setHour(e.target.value.replace(/\D/g, "").slice(0, 2))}
-                className="px-input px-3 py-2.5 text-sm w-full"
-              />
-            </label>
-            <label className="flex flex-col gap-1 w-20">
-              <span className="text-xs font-bold" style={{ color: "var(--px-text2)" }}>
-                분
-              </span>
-              <input
-                type="text"
-                inputMode="numeric"
-                maxLength={2}
-                placeholder="0"
-                value={minute}
-                onChange={(e) => setMinute(e.target.value.replace(/\D/g, "").slice(0, 2))}
-                className="px-input px-3 py-2.5 text-sm w-full"
-              />
-            </label>
+        {/* 5. 달력 종류 */}
+        <div className="space-y-1">
+          <span className="text-xs font-bold" style={{ color: "var(--px-text2)" }}>
+            달력 종류
+          </span>
+          <div className="saju-choice-track" role="radiogroup" aria-label="달력 종류">
+            {(["solar", "lunar"] as CalendarType[]).map((type) => (
+              <button
+                key={type}
+                type="button"
+                role="radio"
+                aria-checked={calendarType === type}
+                className={`saju-choice-chip${calendarType === type ? " is-on" : ""}`}
+                onClick={() => setCalendarType(type)}
+              >
+                {type === "solar" ? "양력" : "음력"}
+              </button>
+            ))}
           </div>
-        )}
+          {calendarType === "lunar" && (
+            <button
+              type="button"
+              aria-pressed={isLeapMonth}
+              onClick={() => setIsLeapMonth((v) => !v)}
+              className={`saju-choice-chip mt-2${isLeapMonth ? " is-on" : ""}`}
+              style={{
+                display: "inline-block",
+                width: "auto",
+                border: "2px solid #000",
+                boxShadow: "2px 2px 0 #000",
+                borderRight: "2px solid #000",
+              }}
+            >
+              {isLeapMonth ? "윤달 적용 중" : "윤달 아님"}
+            </button>
+          )}
+        </div>
+
+        {/* 6. 출생지역 */}
+        <label className="flex flex-col gap-1">
+          <span className="text-xs font-bold" style={{ color: "var(--px-text2)" }}>
+            출생지역
+          </span>
+          <select
+            value={locationId}
+            onChange={(e) =>
+              setLocationId(e.target.value as (typeof LOCATION_PRESETS)[number]["id"])
+            }
+            className="px-input px-3 py-2.5 text-sm w-full"
+          >
+            {LOCATION_PRESETS.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+        </label>
 
         {error && (
           <p className="text-xs font-bold" style={{ color: "#f87171" }} role="alert">
@@ -256,13 +396,14 @@ export default function SajuProfileSetup({ onCompleted }: Props) {
           </p>
         )}
 
+        {/* 7. 저장하기 */}
         <button
           type="submit"
           disabled={saving}
           className="ui-primary-btn w-full py-4 text-base"
           style={{ boxShadow: "4px 4px 0 #000" }}
         >
-          {saving ? "저장 중..." : "프로필 만들고 시작"}
+          {saving ? "저장 중..." : "저장하기"}
         </button>
       </form>
 

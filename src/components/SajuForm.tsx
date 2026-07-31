@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { SajuInput, SajuOptions, CalendarType, DayChangeRule, TimeCorrection } from "@/lib/saju/types";
 import type { Gender } from "@/lib/saju/daeun";
 import { getBirthPrefillForForm } from "@/lib/diary/sajuSettings";
@@ -172,6 +172,32 @@ export default function SajuForm({
     () => seedProfile?.latitude ?? 37.57
   );
   const [fieldHint, setFieldHint] = useState<string | null>(null);
+  const monthRef = useRef<HTMLInputElement>(null);
+  const dayRef = useRef<HTMLInputElement>(null);
+  const hourRef = useRef<HTMLInputElement>(null);
+  const minuteRef = useRef<HTMLInputElement>(null);
+
+  const isCompleteMonth = (raw: string) => {
+    if (!raw) return false;
+    const n = Number(raw);
+    if (n < 1 || n > 12) return false;
+    return raw.length === 2 || (raw.length === 1 && n >= 2 && n <= 9);
+  };
+
+  const isCompleteDay = (raw: string, yearStr: string, monthStr: string) => {
+    if (!raw) return false;
+    const n = Number(raw);
+    const maxDay = getMaxDayInMonth(yearStr, monthStr);
+    if (n < 1 || n > maxDay) return false;
+    return raw.length === 2 || (raw.length === 1 && n >= 4 && n <= 9);
+  };
+
+  const isCompleteHour = (raw: string) => {
+    if (!raw) return false;
+    const n = Number(raw);
+    if (n < 0 || n > 23) return false;
+    return raw.length === 2 || (raw.length === 1 && n >= 3 && n <= 9);
+  };
 
   const handleDigitChange = (
     field: DigitField,
@@ -222,6 +248,14 @@ export default function SajuForm({
         setFieldHint(`일은 1~${maxDay}까지 입력할 수 있습니다.`);
         return;
       }
+      setter(digits);
+      setFieldHint(null);
+      if (isCompleteDay(digits, yearCtx, monthCtx) && !noTime) {
+        setHour("");
+        setMinute("");
+        requestAnimationFrame(() => hourRef.current?.focus());
+      }
+      return;
     }
 
     if (field === "hour") {
@@ -230,6 +264,13 @@ export default function SajuForm({
         setFieldHint("시는 0~23까지 입력할 수 있습니다.");
         return;
       }
+      setter(digits);
+      setFieldHint(null);
+      if (isCompleteHour(digits)) {
+        setMinute("");
+        requestAnimationFrame(() => minuteRef.current?.focus());
+      }
+      return;
     }
 
     if (field === "minute") {
@@ -259,9 +300,18 @@ export default function SajuForm({
     if (clamped.value !== day) {
       setDay(clamped.value);
       setFieldHint(clamped.hint);
-      return;
+    } else {
+      setFieldHint(null);
     }
-    setFieldHint(null);
+    // 4자리 연도 입력 완료 시 월로 이동 (기존 월 값 비움)
+    if (nextYear.length === 4) {
+      const y = Number(nextYear);
+      if (y >= 1900 && y <= 2100) {
+        setMonth("");
+        setDay("");
+        requestAnimationFrame(() => monthRef.current?.focus());
+      }
+    }
   };
 
   const handleMonthChange = (raw: string) => {
@@ -288,13 +338,11 @@ export default function SajuForm({
     }
 
     setMonth(nextMonth);
-    const clamped = clampDayForMonth(day, year, nextMonth);
-    if (clamped.value !== day) {
-      setDay(clamped.value);
-      setFieldHint(clamped.hint ?? hint);
-      return;
-    }
     setFieldHint(hint);
+    if (isCompleteMonth(nextMonth)) {
+      setDay("");
+      requestAnimationFrame(() => dayRef.current?.focus());
+    }
   };
 
   const handleLocationPresetChange = (presetId: (typeof LOCATION_PRESETS)[number]["id"]) => {
@@ -341,6 +389,7 @@ export default function SajuForm({
       className={`px-card space-y-5 ${isMobile ? "p-3.5 space-y-5" : "p-5"}`}
       style={{ borderColor: "var(--px-border2)" }}
     >
+      {/* 1. 이름 */}
       {showNameField && (
         <div>
           <p className="mb-2" style={SECTION_STYLE}>
@@ -365,7 +414,29 @@ export default function SajuForm({
         </div>
       )}
 
-      {/* ── 생년월일 ── */}
+      {/* 2. 성별 */}
+      <div>
+        <p className="mb-2" style={SECTION_STYLE}>■ 성별</p>
+        <div className="saju-choice-track" role="radiogroup" aria-label="성별">
+          {([
+            ["male", "남자"],
+            ["female", "여자"],
+          ] as [Gender, string][]).map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              role="radio"
+              aria-checked={gender === value}
+              className={`saju-choice-chip${gender === value ? " is-on" : ""}`}
+              onClick={() => setGender(value)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* 3. 생년월일 */}
       <div>
         <p className="mb-2" style={SECTION_STYLE}>■ 생년월일</p>
         <div className="flex flex-wrap gap-2 items-end">
@@ -383,6 +454,7 @@ export default function SajuForm({
           <div className="flex flex-col gap-1">
             <label style={LABEL_STYLE}>월</label>
             <input
+              ref={monthRef}
               type="text"
               inputMode="numeric"
               value={month}
@@ -394,6 +466,7 @@ export default function SajuForm({
           <div className="flex flex-col gap-1">
             <label style={LABEL_STYLE}>일</label>
             <input
+              ref={dayRef}
               type="text"
               inputMode="numeric"
               value={day}
@@ -410,107 +483,92 @@ export default function SajuForm({
         )}
       </div>
 
-      {/* ── 달력 종류 ── */}
-      <div>
-        <p className="mb-2" style={SECTION_STYLE}>■ 달력 종류</p>
-        <div className="flex gap-4 flex-wrap">
-          {(["solar", "lunar"] as CalendarType[]).map((type) => (
-            <label key={type} className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="radio"
-                name="calendarType"
-                value={type}
-                checked={calendarType === type}
-                onChange={() => setCalendarType(type)}
-                className="px-radio"
-              />
-              <span className="text-sm" style={{ color: "var(--px-text)" }}>
-                {type === "solar" ? "양력" : "음력"}
-              </span>
-            </label>
-          ))}
-          {calendarType === "lunar" && (
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={isLeapMonth}
-                onChange={(e) => setIsLeapMonth(e.target.checked)}
-                className="px-radio"
-              />
-              <span className="text-sm" style={{ color: "var(--px-text)" }}>윤달</span>
-            </label>
-          )}
-        </div>
-      </div>
-
-      {/* ── 성별 ── */}
-      <div>
-        <p className="mb-2" style={SECTION_STYLE}>■ 성별 (대운 방향 계산)</p>
-        <div className="flex gap-4 flex-wrap">
-          {([
-            ["male", "남자"],
-            ["female", "여자"],
-          ] as [Gender, string][]).map(([value, label]) => (
-            <label key={value} className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="radio"
-                name="gender"
-                value={value}
-                checked={gender === value}
-                onChange={() => setGender(value)}
-                className="px-radio"
-              />
-              <span className="text-sm" style={{ color: "var(--px-text)" }}>
-                {label}
-              </span>
-            </label>
-          ))}
-        </div>
-      </div>
-
-      {/* ── 출생 시각 ── */}
+      {/* 4. 시·분 */}
       <div>
         <p className="mb-2" style={SECTION_STYLE}>■ 출생 시각 (KST)</p>
-        <div className="flex flex-wrap gap-2 items-end">
-          <div className="flex flex-col gap-1">
-            <label style={LABEL_STYLE}>시 (0-23)</label>
-            <input
-              type="text"
-              inputMode="numeric"
-              value={hour}
-              onChange={(e) => handleDigitChange("hour", e.target.value, setHour)}
-              disabled={noTime}
-              required={!noTime}
-              className="px-input px-3 py-2 text-sm w-20 disabled:opacity-40"
-            />
+        {!noTime && (
+          <div className="flex flex-wrap gap-2 items-end">
+            <div className="flex flex-col gap-1">
+              <label style={LABEL_STYLE}>시 (0-23)</label>
+              <input
+                ref={hourRef}
+                type="text"
+                inputMode="numeric"
+                value={hour}
+                onChange={(e) => handleDigitChange("hour", e.target.value, setHour)}
+                required
+                className="px-input px-3 py-2 text-sm w-20"
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label style={LABEL_STYLE}>분 (0-59)</label>
+              <input
+                ref={minuteRef}
+                type="text"
+                inputMode="numeric"
+                value={minute}
+                onChange={(e) => handleDigitChange("minute", e.target.value, setMinute)}
+                required
+                className="px-input px-3 py-2 text-sm w-20"
+              />
+            </div>
           </div>
-          <div className="flex flex-col gap-1">
-            <label style={LABEL_STYLE}>분 (0-59)</label>
-            <input
-              type="text"
-              inputMode="numeric"
-              value={minute}
-              onChange={(e) => handleDigitChange("minute", e.target.value, setMinute)}
-              disabled={noTime}
-              required={!noTime}
-              className="px-input px-3 py-2 text-sm w-20 disabled:opacity-40"
-            />
-          </div>
-          <label className="flex items-center gap-2 cursor-pointer pb-0.5">
-            <input
-              type="checkbox"
-              checked={noTime}
-              onChange={(e) => setNoTime(e.target.checked)}
-              className="px-radio"
-            />
-            <span className="text-sm" style={{ color: "var(--px-text2)" }}>
-              시간 모름 (시주 생략)
-            </span>
-          </label>
-        </div>
+        )}
+        <button
+          type="button"
+          aria-pressed={noTime}
+          onClick={() => setNoTime((v) => !v)}
+          className={`saju-choice-chip mt-2${noTime ? " is-on" : ""}`}
+          style={{
+            display: "inline-block",
+            width: "auto",
+            maxWidth: "100%",
+            border: "2px solid #000",
+            boxShadow: "2px 2px 0 #000",
+            borderRight: "2px solid #000",
+          }}
+        >
+          {noTime ? "출생 시간 모름 · 적용 중" : "출생 시간 모름"}
+        </button>
       </div>
 
-      {/* ── 출생 지역 ── */}
+      {/* 5. 달력 종류 */}
+      <div>
+        <p className="mb-2" style={SECTION_STYLE}>■ 달력 종류</p>
+        <div className="saju-choice-track" role="radiogroup" aria-label="달력 종류">
+          {(["solar", "lunar"] as CalendarType[]).map((type) => (
+            <button
+              key={type}
+              type="button"
+              role="radio"
+              aria-checked={calendarType === type}
+              className={`saju-choice-chip${calendarType === type ? " is-on" : ""}`}
+              onClick={() => setCalendarType(type)}
+            >
+              {type === "solar" ? "양력" : "음력"}
+            </button>
+          ))}
+        </div>
+        {calendarType === "lunar" && (
+          <button
+            type="button"
+            aria-pressed={isLeapMonth}
+            onClick={() => setIsLeapMonth((v) => !v)}
+            className={`saju-choice-chip mt-2${isLeapMonth ? " is-on" : ""}`}
+            style={{
+              display: "inline-block",
+              width: "auto",
+              border: "2px solid #000",
+              boxShadow: "2px 2px 0 #000",
+              borderRight: "2px solid #000",
+            }}
+          >
+            {isLeapMonth ? "윤달 적용 중" : "윤달 아님"}
+          </button>
+        )}
+      </div>
+
+      {/* 6. 출생 지역 */}
       <div>
         <p className="mb-2" style={SECTION_STYLE}>■ 출생 지역</p>
         <div className="flex flex-wrap gap-2 items-end">
@@ -555,22 +613,26 @@ export default function SajuForm({
               <p className="mb-2 text-xs font-bold" style={{ color: "var(--px-text2)" }}>
                 ◆ 일주 변경 기준
               </p>
-              <div className="flex flex-col gap-2">
+              <div className="saju-choice-track" role="radiogroup" aria-label="일주 변경 기준" style={{ maxWidth: "100%", flexDirection: "column" }}>
                 {([
                   ["midnight", "자정(00:00) — 일반"],
                   ["ziHour",   "야자시 (23:00부터 다음날)"],
-                ] as [DayChangeRule, string][]).map(([val, label]) => (
-                  <label key={val} className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="dayChangeRule"
-                      value={val}
-                      checked={dayChangeRule === val}
-                      onChange={() => setDayChangeRule(val)}
-                      className="px-radio"
-                    />
-                    <span className="text-sm" style={{ color: "var(--px-text)" }}>{label}</span>
-                  </label>
+                ] as [DayChangeRule, string][]).map(([val, label], idx, arr) => (
+                  <button
+                    key={val}
+                    type="button"
+                    role="radio"
+                    aria-checked={dayChangeRule === val}
+                    className={`saju-choice-chip${dayChangeRule === val ? " is-on" : ""}`}
+                    style={{
+                      borderRight: "none",
+                      borderBottom: idx < arr.length - 1 ? "2px solid #000" : "none",
+                      textAlign: "left",
+                    }}
+                    onClick={() => setDayChangeRule(val)}
+                  >
+                    {label}
+                  </button>
                 ))}
               </div>
             </div>
@@ -580,23 +642,27 @@ export default function SajuForm({
               <p className="mb-2 text-xs font-bold" style={{ color: "var(--px-text2)" }}>
                 ◆ 시간 보정
               </p>
-              <div className="flex flex-col gap-2">
+              <div className="saju-choice-track" role="radiogroup" aria-label="시간 보정" style={{ maxWidth: "100%", flexDirection: "column" }}>
                 {([
                   ["none",               "없음 (병원 기록 KST 기준)"],
                   ["localMeanSolarTime", "평균태양시 (LMT)"],
                   ["trueSolarTime",      "진태양시 (균시차 포함)"],
-                ] as [TimeCorrection, string][]).map(([val, label]) => (
-                  <label key={val} className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="timeCorrection"
-                      value={val}
-                      checked={timeCorrection === val}
-                      onChange={() => setTimeCorrection(val)}
-                      className="px-radio"
-                    />
-                    <span className="text-sm" style={{ color: "var(--px-text)" }}>{label}</span>
-                  </label>
+                ] as [TimeCorrection, string][]).map(([val, label], idx, arr) => (
+                  <button
+                    key={val}
+                    type="button"
+                    role="radio"
+                    aria-checked={timeCorrection === val}
+                    className={`saju-choice-chip${timeCorrection === val ? " is-on" : ""}`}
+                    style={{
+                      borderRight: "none",
+                      borderBottom: idx < arr.length - 1 ? "2px solid #000" : "none",
+                      textAlign: "left",
+                    }}
+                    onClick={() => setTimeCorrection(val)}
+                  >
+                    {label}
+                  </button>
                 ))}
               </div>
             </div>

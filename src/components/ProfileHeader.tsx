@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import HeaderProgressBadge from "@/components/HeaderProgressBadge";
+import BetaFeedbackModal from "@/components/feedback/BetaFeedbackModal";
 import {
   loadJournalSajuProfile,
   profileDisplayName,
@@ -27,6 +28,7 @@ export default function ProfileHeader() {
   const menuRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
   const [profile, setProfile] = useState<SajuProfile | null>(null);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
 
   const showBack = pathname !== "/";
 
@@ -157,6 +159,18 @@ export default function ProfileHeader() {
             >
               내 사주
             </button>
+            <button
+              type="button"
+              onClick={() => {
+                closeMenu();
+                setFeedbackOpen(true);
+              }}
+              className="block w-full px-3 py-2.5 text-center text-sm font-bold border"
+              style={menuLinkStyle}
+              role="menuitem"
+            >
+              의견 보내기
+            </button>
             <Link
               href="/diary/login"
               onClick={closeMenu}
@@ -199,6 +213,11 @@ export default function ProfileHeader() {
           뒤로
         </button>
       )}
+
+      <BetaFeedbackModal
+        open={feedbackOpen}
+        onClose={() => setFeedbackOpen(false)}
+      />
     </header>
   );
 }

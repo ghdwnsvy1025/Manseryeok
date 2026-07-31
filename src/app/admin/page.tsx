@@ -8,6 +8,7 @@ import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import AdminQuotesPanel from "@/components/admin/AdminQuotesPanel";
 import AdminInsightDebugPanel from "@/components/admin/AdminInsightDebugPanel";
 import AdminJournalMonthSeedPanel from "@/components/admin/AdminJournalMonthSeedPanel";
+import AdminBetaFeedbackPanel from "@/components/admin/AdminBetaFeedbackPanel";
 
 type DocRow = {
   id: string;
@@ -469,6 +470,8 @@ export default function AdminPage() {
           </ul>
         )}
       </div>
+
+      <AdminBetaFeedbackPanel />
 
       <div
         className="p-4 border-2 space-y-3"

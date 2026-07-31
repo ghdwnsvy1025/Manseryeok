@@ -16,6 +16,7 @@ export const ACCOUNT_CASCADE_TABLES = [
   "daily_quote_deliveries",
   "content_exposure_events",
   "content_feedback",
+  "beta_feedback",
   "astrology_profiles",
   "astrology_snapshots",
   "astrology_feature_vectors",

@@ -14,6 +14,11 @@ import {
   reconcileLocalStateWithAuthUser,
 } from "@/lib/diary/profileStorage";
 import { disableGuestMode, enableGuestMode } from "@/lib/auth/guestMode";
+import {
+  getAuthCallbackUrl,
+  stashAuthNextPath,
+  takeAuthNextPath,
+} from "@/lib/auth/redirectOrigin";
 import type { DiaryEntry } from "@/lib/diary/types";
 import type { DiaryStorage } from "@/lib/diary/storage";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
@@ -71,7 +76,8 @@ export default function DiaryLoginPage() {
   const nextPathRef = useRef<string | null>(null);
 
   const goHomeOrNext = useCallback(() => {
-    window.location.href = nextPathRef.current ?? "/";
+    const stashed = takeAuthNextPath(nextPathRef.current ?? "/");
+    window.location.href = stashed;
   }, []);
 
   const prepareImportPrompt = async (): Promise<boolean> => {
@@ -168,12 +174,11 @@ export default function DiaryLoginPage() {
         captureEvent(ANALYTICS_EVENTS.authGoogleClicked);
       })
       .catch(() => undefined);
-    const next = encodeURIComponent(
-      nextPathRef.current
-        ? `/diary/login?oauth=success&next=${encodeURIComponent(nextPathRef.current)}`
-        : "/diary/login?oauth=success"
-    );
-    const redirectTo = `${window.location.origin}/auth/callback?next=${next}`;
+    const nextPath = nextPathRef.current
+      ? `/diary/login?oauth=success&next=${encodeURIComponent(nextPathRef.current)}`
+      : "/diary/login?oauth=success";
+    stashAuthNextPath(nextPath);
+    const redirectTo = getAuthCallbackUrl();
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
@@ -182,7 +187,7 @@ export default function DiaryLoginPage() {
       },
     });
     if (error) {
-      setMessage(error.message);
+      setMessage(`${error.message} (돌아갈 주소: ${redirectTo})`);
       setLoading(false);
     }
   };
@@ -201,16 +206,15 @@ export default function DiaryLoginPage() {
 
     try {
       if (mode === "signup") {
-        const next = encodeURIComponent(
-          nextPathRef.current
-            ? `/diary/login?email=confirmed&next=${encodeURIComponent(nextPathRef.current)}`
-            : "/diary/login?email=confirmed"
-        );
+        const nextPath = nextPathRef.current
+          ? `/diary/login?email=confirmed&next=${encodeURIComponent(nextPathRef.current)}`
+          : "/diary/login?email=confirmed";
+        stashAuthNextPath(nextPath);
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
           options: {
-            emailRedirectTo: `${window.location.origin}/auth/callback?next=${next}`,
+            emailRedirectTo: getAuthCallbackUrl(),
           },
         });
         if (error) throw error;

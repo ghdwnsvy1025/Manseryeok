@@ -97,6 +97,7 @@ export function clearLocalAccountScopedState(opts?: {
     // experienceMode 모듈과 순환 import 피하려고 키를 직접 지움
     localStorage.removeItem("manseryeok_experience_mode");
     localStorage.removeItem("manseryeok_onboarding_completed_at");
+    localStorage.removeItem("manseryeok_first_visit_welcome_v1");
   } catch {
     /* ignore */
   }
@@ -597,7 +598,8 @@ export async function loadAllSajuProfiles(): Promise<SajuProfile[]> {
       data: { user },
     } = await supabase.auth.getUser();
     if (user) {
-      reconcileLocalStateWithAuthUser(user.id);
+      // 계정 전환 정리는 ClientShell reconcile에만 맡긴다.
+      // 여기서 다시 clear 하면 방금 만든 프로필이 홈 게이트에서 안 보이는 레이스가 난다.
       const { data, error } = await supabase
         .from("saju_profiles")
         .select("*")

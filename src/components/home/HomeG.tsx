@@ -172,11 +172,16 @@ export default function HomeG() {
 
   useEffect(() => {
     let cancelled = false;
-    const timeout = window.setTimeout(() => {
-      if (!cancelled) setLoading(false);
-    }, 5000);
 
     const load = async (opts?: { soft?: boolean }) => {
+      const soft = Boolean(opts?.soft);
+      if (!soft) {
+        setLoading(true);
+      }
+      const timeout = window.setTimeout(() => {
+        if (!cancelled && !soft) setLoading(false);
+      }, 2000);
+
       try {
         const storage = await getJournalStorage();
         const [list, prefs] = await Promise.all([
@@ -186,7 +191,7 @@ export default function HomeG() {
         if (cancelled) return;
         setEntries(list);
         setEnabledCodes(getEnabledCodesOrdered(prefs));
-        if (!opts?.soft) {
+        if (!soft) {
           try {
             const remote = await loadPrimarySajuProfile();
             if (!cancelled) setProfile(remote);
@@ -198,7 +203,7 @@ export default function HomeG() {
         /* show shell even if storage fails */
       } finally {
         window.clearTimeout(timeout);
-        if (!cancelled) setLoading(false);
+        if (!cancelled && !soft) setLoading(false);
       }
     };
 
@@ -212,7 +217,6 @@ export default function HomeG() {
 
     return () => {
       cancelled = true;
-      window.clearTimeout(timeout);
       window.removeEventListener(JOURNAL_PROGRESS_CHANGED_EVENT, onProgress);
       window.removeEventListener("focus", onProgress);
     };

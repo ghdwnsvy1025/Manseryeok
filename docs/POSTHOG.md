@@ -33,5 +33,6 @@ Vercel에 넣은 뒤 **Redeploy** 해야 클라이언트에 반영됩니다.
 | `fortune_opened` | 운세 열기 |
 | `question_shown` | 오늘의 질문 |
 | `quote_shown` | 저장 후 명언/문장 |
+| `feedback_submitted` | 베타 의견 보내기 (category·path만) |
 
 키가 없으면 분석만 꺼지고 앱은 그대로 동작합니다.

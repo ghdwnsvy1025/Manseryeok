@@ -4,7 +4,8 @@ import { NextResponse } from "next/server";
 
 function safeNext(value: string | null): string {
   if (!value || !value.startsWith("/") || value.startsWith("//")) {
-    return "/diary/login";
+    // 쿼리 없는 callback URL 허용을 위해 기본 도착지
+    return "/diary/login?oauth=success";
   }
   return value;
 }
