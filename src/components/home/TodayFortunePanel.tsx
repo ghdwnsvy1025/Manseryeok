@@ -20,6 +20,7 @@ import OpenAiOriginHint from "@/components/journal/OpenAiOriginHint";
 import type { FortuneEvidence } from "@/lib/journal/fortune/evidence";
 import { sajuProfileFortuneFingerprint } from "@/lib/journal/fortune/profileFingerprint";
 import type { SajuProfile } from "@/lib/diary/types";
+import EmotionalLoadingHint from "@/components/ui/EmotionalLoadingHint";
 
 type Props = {
   todayDate: string;
@@ -31,49 +32,6 @@ type Props = {
 const EMPTY_ENTRIES: JournalEntry[] = [];
 const EMPTY_CODES: CategoryCode[] = [];
 
-const FORTUNE_LOADING_PHRASES = [
-  {
-    kind: "healing",
-    line: "서두르지 않아도 돼요. 오늘도 당신 페이스면 충분해요.",
-  },
-  {
-    kind: "philosophy",
-    line: "물이 돌을 뚫는 건 힘이 아니라, 멈추지 않는 부드러움이에요.",
-  },
-  {
-    kind: "quote",
-    line: "작은 불빛 하나만 있어도, 밤은 완전히 어둡지 않아요.",
-  },
-  {
-    kind: "healing",
-    line: "숨을 한 번 더 들이쉬어 보세요. 그걸로도 이미 잘하고 있어요.",
-  },
-  {
-    kind: "philosophy",
-    line: "길은 앞에 있는 게 아니라, 걷는 발밑에서 생겨요.",
-  },
-  {
-    kind: "quote",
-    line: "별은 낮에도 하늘에 있어요. 다만 보이지 않을 뿐이죠.",
-  },
-  {
-    kind: "healing",
-    line: "완벽하지 않은 하루도, 당신을 어디로든 데려다줘요.",
-  },
-  {
-    kind: "philosophy",
-    line: "마음이 흔들릴 때야말로, 진짜 방향을 고르는 순간이에요.",
-  },
-  {
-    kind: "quote",
-    line: "조용한 용기는, 소리 없이 내일을 열어줍니다.",
-  },
-  {
-    kind: "healing",
-    line: "오늘은 스스로를 다그치지 않아도 되는 날이에요.",
-  },
-] as const;
-
 /** 0~1 점수를 1.0~10.0 기운 점수로 (표시용) */
 function fortuneScoreOutOf10(score: number | null | undefined): string | null {
   if (typeof score !== "number" || !Number.isFinite(score)) return null;
@@ -82,46 +40,7 @@ function fortuneScoreOutOf10(score: number | null | undefined): string | null {
 }
 
 function FortuneLoadingHint() {
-  const [idx, setIdx] = useState(0);
-  useEffect(() => {
-    const id = window.setInterval(() => {
-      setIdx((i) => (i + 1) % FORTUNE_LOADING_PHRASES.length);
-    }, 6200);
-    return () => window.clearInterval(id);
-  }, []);
-  const phrase = FORTUNE_LOADING_PHRASES[idx]!;
-  return (
-    <div
-      className="fortune-loading py-7 px-3 flex flex-col items-center text-center gap-5"
-      aria-live="polite"
-      aria-busy="true"
-    >
-      <div className="relative w-9 h-9" aria-hidden>
-        <span
-          className="absolute inset-0 rounded-full border-2 animate-spin"
-          style={{
-            borderColor: "color-mix(in srgb, var(--px-accent) 22%, transparent)",
-            borderTopColor: "var(--px-accent)",
-          }}
-        />
-      </div>
-      <div className="fortune-loading-stage max-w-[20rem] min-h-[4.5rem] flex items-center justify-center">
-        <p
-          key={`${idx}-${phrase.line.slice(0, 12)}`}
-          className="fortune-loading-phrase text-[14px] font-medium leading-[1.75] tracking-tight"
-          data-kind={phrase.kind}
-        >
-          {phrase.line}
-        </p>
-      </div>
-      <p
-        className="text-[11px] font-bold tracking-wide"
-        style={{ color: "var(--px-text2)", opacity: 0.85 }}
-      >
-        오늘의 결을 고르는 중…
-      </p>
-    </div>
-  );
+  return <EmotionalLoadingHint status="오늘의 결을 고르는 중…" />;
 }
 
 function FortuneScoreChip({ score }: { score: number | null | undefined }) {

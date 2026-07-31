@@ -17,6 +17,7 @@ import { sajuProfileFortuneFingerprint } from "@/lib/journal/fortune/profileFing
 import type { SajuProfile } from "@/lib/diary/types";
 import type { FortuneQuestionContext } from "@/lib/journal/weekThemeSummary";
 import OpenAiOriginHint from "@/components/journal/OpenAiOriginHint";
+import EmotionalLoadingHint from "@/components/ui/EmotionalLoadingHint";
 
 type KeywordRow = {
   code?: string;
@@ -92,29 +93,6 @@ const QUESTION_TEASE_LINES = [
   {
     title: "밤에 꺼내 보는 질문",
     sub: "판단 없이, 오늘을 가만히 들여다볼 때",
-  },
-] as const;
-
-const QUESTION_LOADING_PHRASES = [
-  {
-    kind: "healing",
-    line: "서두를 필요 없어요. 하루를 천천히 모아보는 중이에요.",
-  },
-  {
-    kind: "philosophy",
-    line: "질문은 답을 재촉하지 않아요. 마음을 열어줄 뿐이죠.",
-  },
-  {
-    kind: "quote",
-    line: "고요한 밤일수록, 작은 질문이 더 멀리 들려요.",
-  },
-  {
-    kind: "healing",
-    line: "완벽히 정리하지 않아도 돼요. 느낌만 건져도 충분해요.",
-  },
-  {
-    kind: "philosophy",
-    line: "돌아보는 일은, 지나간 날을 붙잡는 게 아니라 나를 찾는 일이에요.",
   },
 ] as const;
 
@@ -249,67 +227,12 @@ function QuestionTeaseButton({
 }
 
 function QuestionLoadingHint({ compact = false }: { compact?: boolean }) {
-  const [idx, setIdx] = useState(0);
-  useEffect(() => {
-    if (compact) return;
-    const id = window.setInterval(() => {
-      setIdx((i) => (i + 1) % QUESTION_LOADING_PHRASES.length);
-    }, 6000);
-    return () => window.clearInterval(id);
-  }, [compact]);
-
-  if (compact) {
-    return (
-      <div
-        className="px-3 py-2.5 flex items-center justify-center gap-2.5 min-h-[4.75rem]"
-        aria-live="polite"
-        aria-busy="true"
-      >
-        <div className="relative w-5 h-5 shrink-0" aria-hidden>
-          <span
-            className="absolute inset-0 rounded-full border-2 animate-spin"
-            style={{
-              borderColor: "color-mix(in srgb, var(--px-accent) 22%, transparent)",
-              borderTopColor: "var(--px-accent)",
-            }}
-          />
-        </div>
-        <p
-          className="text-[12px] font-bold leading-snug"
-          style={{ color: "var(--px-text2)" }}
-        >
-          질문을 고르는 중…
-        </p>
-      </div>
-    );
-  }
-
-  const phrase = QUESTION_LOADING_PHRASES[idx]!;
   return (
-    <div
-      className="fortune-loading py-6 px-3 flex flex-col items-center text-center gap-4"
-      aria-live="polite"
-      aria-busy="true"
-    >
-      <div className="relative w-8 h-8" aria-hidden>
-        <span
-          className="absolute inset-0 rounded-full border-2 animate-spin"
-          style={{
-            borderColor: "color-mix(in srgb, var(--px-accent) 22%, transparent)",
-            borderTopColor: "var(--px-accent)",
-          }}
-        />
-      </div>
-      <div className="fortune-loading-stage max-w-[20rem] min-h-[3.5rem] flex items-center justify-center">
-        <p
-          key={`${idx}-${phrase.line.slice(0, 10)}`}
-          className="fortune-loading-phrase text-[13px] font-medium leading-[1.75]"
-          data-kind={phrase.kind}
-        >
-          {phrase.line}
-        </p>
-      </div>
-    </div>
+    <EmotionalLoadingHint
+      compact={compact}
+      status="질문을 고르는 중…"
+      intervalMs={6000}
+    />
   );
 }
 

@@ -45,8 +45,13 @@ export async function GET(request: Request) {
 
   const { error } = await supabase.auth.exchangeCodeForSession(code);
   if (error) {
+    // identity already linked 등 — 세션은 유지한 채 에러 쿼리로 안내
+    const already =
+      /already.*(linked|registered|exists)/i.test(error.message) ||
+      /identity.*another user/i.test(error.message);
+    const code = already ? "identity_already_exists" : "exchange_failed";
     return NextResponse.redirect(
-      new URL("/diary/login?authError=exchange_failed", url.origin)
+      new URL(`/diary/login?authError=${code}`, url.origin)
     );
   }
 

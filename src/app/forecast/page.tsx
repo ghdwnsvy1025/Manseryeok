@@ -5,6 +5,7 @@ import Link from "next/link";
 import HomeDashboard from "@/components/home/HomeDashboard";
 import { useUserAppState } from "@/hooks/useUserAppState";
 import { isGuestMode } from "@/lib/auth/guestMode";
+import { isAnonymousUser } from "@/lib/auth/anonymousSession";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 
 export default function ForecastPage() {
@@ -20,7 +21,8 @@ export default function ForecastPage() {
       return;
     }
     void supabase.auth.getUser().then(({ data }) => {
-      setAllowed(Boolean(data.user) || isGuestMode());
+      const user = data.user;
+      setAllowed(Boolean(user) || isGuestMode() || isAnonymousUser(user));
       setAuthReady(true);
     });
   }, []);

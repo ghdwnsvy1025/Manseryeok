@@ -9,6 +9,8 @@ import type { NatalReadingResult } from "@/lib/saju/reading/natalReadingTypes";
 import { formatOpenAiStatus } from "@/lib/journal/openaiStatus";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
 
+import EmotionalLoadingHint from "@/components/ui/EmotionalLoadingHint";
+
 type Props = {
   profile: SajuProfile;
 };
@@ -32,12 +34,6 @@ const NATAL_TEASE_LINES = [
     title: "한 줄로 만나는 나의 사주",
     sub: "눌러서 종합 풀이를 펼쳐보세요",
   },
-] as const;
-
-const NATAL_LOADING_PHRASES = [
-  { kind: "read", line: "원국의 글자를 천천히 읽고 있어요…" },
-  { kind: "weave", line: "대운과 맞춰 결을 고르는 중…" },
-  { kind: "write", line: "종합 문장을 다듬고 있어요…" },
 ] as const;
 
 function LockedRow({ title }: { title: string }) {
@@ -107,46 +103,7 @@ function NatalTeaseButton({
 }
 
 function NatalLoadingHint() {
-  const [idx, setIdx] = useState(0);
-  useEffect(() => {
-    const id = window.setInterval(() => {
-      setIdx((i) => (i + 1) % NATAL_LOADING_PHRASES.length);
-    }, 6200);
-    return () => window.clearInterval(id);
-  }, []);
-  const phrase = NATAL_LOADING_PHRASES[idx]!;
-  return (
-    <div
-      className="fortune-loading py-7 px-3 flex flex-col items-center text-center gap-5"
-      aria-live="polite"
-      aria-busy="true"
-    >
-      <div className="relative w-9 h-9" aria-hidden>
-        <span
-          className="absolute inset-0 rounded-full border-2 animate-spin"
-          style={{
-            borderColor: "color-mix(in srgb, var(--px-accent) 22%, transparent)",
-            borderTopColor: "var(--px-accent)",
-          }}
-        />
-      </div>
-      <div className="fortune-loading-stage max-w-[20rem] min-h-[4.5rem] flex items-center justify-center">
-        <p
-          key={`${idx}-${phrase.line.slice(0, 12)}`}
-          className="fortune-loading-phrase text-[14px] font-medium leading-[1.75] tracking-tight"
-          data-kind={phrase.kind}
-        >
-          {phrase.line}
-        </p>
-      </div>
-      <p
-        className="text-[11px] font-bold tracking-wide"
-        style={{ color: "var(--px-text2)", opacity: 0.85 }}
-      >
-        종합풀이를 고르는 중…
-      </p>
-    </div>
-  );
+  return <EmotionalLoadingHint status="종합풀이를 고르는 중…" />;
 }
 
 export default function SajuNatalReadingPanel({ profile }: Props) {

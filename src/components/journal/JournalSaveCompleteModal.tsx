@@ -16,12 +16,7 @@ import { submitContentFeedback } from "@/lib/journal/contentFeedback";
 import { trackContentExposure } from "@/lib/journal/exposure";
 import { burstFromElement, prefersReducedMotion } from "@/lib/ui/clickBurst";
 import { XP_GAUGE_FILL, XP_GAIN_COLOR } from "@/lib/ui/xpGauge";
-
-const QUOTE_LOADING_HINTS = [
-  "문장을 고르는 중…",
-  "기록에 맞춰 다듬는 중…",
-  "오늘의 한 줄을 준비하는 중…",
-] as const;
+import EmotionalLoadingHint from "@/components/ui/EmotionalLoadingHint";
 
 /** 벚꽃잎 팔레트 — 연분홍·살구·옅은 흰분홍 */
 const PETAL_COLORS = [
@@ -116,7 +111,6 @@ export default function JournalSaveCompleteModal({
   const [savedLocal, setSavedLocal] = useState(false);
   const [sharedLocal, setSharedLocal] = useState(false);
   const [showDetail, setShowDetail] = useState(false);
-  const [loadingHintIdx, setLoadingHintIdx] = useState(0);
   const closeRef = useRef<HTMLButtonElement>(null);
   const gaugeRef = useRef<HTMLDivElement>(null);
   const xpFloatRef = useRef<HTMLParagraphElement>(null);
@@ -245,17 +239,6 @@ export default function JournalSaveCompleteModal({
       window.removeEventListener("resize", resize);
     };
   }, []);
-
-  useEffect(() => {
-    if (!showQuoteLoading) {
-      setLoadingHintIdx(0);
-      return;
-    }
-    const id = window.setInterval(() => {
-      setLoadingHintIdx((i) => (i + 1) % QUOTE_LOADING_HINTS.length);
-    }, 1600);
-    return () => window.clearInterval(id);
-  }, [showQuoteLoading]);
 
   useEffect(() => {
     const from = startProgress.progressRatio;
@@ -447,34 +430,7 @@ export default function JournalSaveCompleteModal({
             </p>
 
             {showQuoteLoading ? (
-              <div
-                className="space-y-3"
-                aria-busy="true"
-                aria-live="polite"
-                aria-label="오늘의 명언을 준비하는 중"
-              >
-                <div className="space-y-2">
-                  <div className="save-quote-skel h-3.5 w-[92%]" />
-                  <div className="save-quote-skel h-3.5 w-[78%]" />
-                  <div className="save-quote-skel h-3.5 w-[64%]" />
-                </div>
-                <p
-                  className="text-xs font-bold flex items-center gap-1.5"
-                  style={{ color: "var(--px-text2)" }}
-                >
-                  <span
-                    className="inline-block w-3 h-3 border-2 rounded-full animate-spin shrink-0"
-                    style={{
-                      borderColor: "var(--px-border)",
-                      borderTopColor: "var(--px-accent)",
-                    }}
-                    aria-hidden
-                  />
-                  <span key={loadingHintIdx} className="save-quote-hint">
-                    {QUOTE_LOADING_HINTS[loadingHintIdx]}
-                  </span>
-                </p>
-              </div>
+              <EmotionalLoadingHint status="오늘의 한 줄을 고르는 중…" intervalMs={4500} />
             ) : (
               <>
                 <blockquote className="save-quote-reveal relative m-0 space-y-2">

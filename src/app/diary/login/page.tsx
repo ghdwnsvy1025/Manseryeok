@@ -2,50 +2,23 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import InstallAppButton from "@/components/InstallAppButton";
-import LocalImportPanel from "@/components/diary/LocalImportPanel";
-import LocalJournalImportPanel from "@/components/diary/LocalJournalImportPanel";
-import { getIndexedDbStorage } from "@/lib/diary/indexedDbStorage";
-import {
-  getDiaryStorage,
-  resetDiaryStorageCache,
-} from "@/lib/diary/getStorage";
 import {
   syncLocalSajuProfileToAccount,
   clearLocalAccountScopedState,
   reconcileLocalStateWithAuthUser,
-  loadPrimarySajuProfile,
 } from "@/lib/diary/profileStorage";
-import { disableGuestMode } from "@/lib/auth/guestMode";
-import { takeAuthNextPath } from "@/lib/auth/redirectOrigin";
-import type { DiaryEntry } from "@/lib/diary/types";
-import type { DiaryStorage } from "@/lib/diary/storage";
-import type { JournalEntry } from "@/lib/journal/types";
-import type { JournalStorage } from "@/lib/journal/storage";
-import { listAllLocalJournalEntries } from "@/lib/journal/indexedDbStorage";
 import {
-  getJournalStorage,
-  resetJournalStorageCache,
-} from "@/lib/journal/getStorage";
+  ensureAnonymousSession,
+  isAnonymousUser,
+} from "@/lib/auth/anonymousSession";
+import { autoMigrateLocalJournalToAccount } from "@/lib/auth/autoMigrateLocalJournal";
+import { disableGuestMode, enableGuestMode } from "@/lib/auth/guestMode";
+import { takeAuthNextPath } from "@/lib/auth/redirectOrigin";
+import { resetDiaryStorageCache } from "@/lib/diary/getStorage";
+import { resetJournalStorageCache } from "@/lib/journal/getStorage";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import WelcomeAuthGate from "@/components/auth/WelcomeAuthGate";
 import { useRouter } from "next/navigation";
-
-type JournalImportReady = {
-  kind: "journal";
-  localEntries: JournalEntry[];
-  remoteEntries: JournalEntry[];
-  remoteStorage: JournalStorage;
-  remoteSajuProfileId: string;
-};
-
-type DiaryImportReady = {
-  kind: "diary";
-  localEntries: DiaryEntry[];
-  remoteEntries: DiaryEntry[];
-  remoteStorage: DiaryStorage;
-};
-
-type ImportReady = JournalImportReady | DiaryImportReady;
 
 function Section({
   title,
@@ -83,70 +56,17 @@ export default function DiaryLoginPage() {
   const router = useRouter();
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
-  const [importReady, setImportReady] = useState<ImportReady | null>(null);
   const [currentEmail, setCurrentEmail] = useState<string | null>(null);
   const [authProvider, setAuthProvider] = useState<string | null>(null);
+  const [isAnonymous, setIsAnonymous] = useState(false);
   const [authReady, setAuthReady] = useState(false);
   const [showLoginForm, setShowLoginForm] = useState(false);
-  const [hasLocalBackup, setHasLocalBackup] = useState(false);
   const oauthHandled = useRef(false);
   const nextPathRef = useRef<string | null>(null);
 
   const goHomeOrNext = useCallback(() => {
     const stashed = takeAuthNextPath(nextPathRef.current ?? "/");
     window.location.href = stashed;
-  }, []);
-
-  const prepareImportPrompt = async (): Promise<boolean> => {
-    resetDiaryStorageCache();
-    resetJournalStorageCache();
-    // 로컬 일기 스냅샷을 프로필 동기화 전에 확보 (프로필 id가 바뀌어도 IDB 원본 유지)
-    const localJournal = await listAllLocalJournalEntries();
-    const localDiary = await getIndexedDbStorage().list();
-    setHasLocalBackup(localJournal.length > 0 || localDiary.length > 0);
-
-    await syncLocalSajuProfileToAccount();
-    const primary = await loadPrimarySajuProfile();
-    const remoteProfileId = primary?.id ?? null;
-
-    if (localJournal.length > 0 && remoteProfileId) {
-      const remoteStorage = await getJournalStorage();
-      const remoteEntries = await remoteStorage.list();
-      setImportReady({
-        kind: "journal",
-        localEntries: localJournal,
-        remoteEntries,
-        remoteStorage,
-        remoteSajuProfileId: remoteProfileId,
-      });
-      return true;
-    }
-
-    if (localDiary.length > 0) {
-      const remoteStorage = await getDiaryStorage();
-      const remoteEntries = await remoteStorage.list();
-      setImportReady({
-        kind: "diary",
-        localEntries: localDiary,
-        remoteEntries,
-        remoteStorage,
-      });
-      return true;
-    }
-
-    return false;
-  };
-
-  const refreshLocalBackupFlag = useCallback(async () => {
-    try {
-      const [journal, diary] = await Promise.all([
-        listAllLocalJournalEntries(),
-        getIndexedDbStorage().list(),
-      ]);
-      setHasLocalBackup(journal.length > 0 || diary.length > 0);
-    } catch {
-      setHasLocalBackup(false);
-    }
   }, []);
 
   useEffect(() => {
@@ -163,13 +83,23 @@ export default function DiaryLoginPage() {
     void (async () => {
       const { data } = await supabase.auth.getUser();
       if (data.user) {
-        disableGuestMode();
-        setCurrentEmail(data.user.email ?? "소셜 계정");
-        setAuthProvider(String(data.user.app_metadata?.provider ?? "email"));
-        await refreshLocalBackupFlag();
+        const anon = isAnonymousUser(data.user);
+        setIsAnonymous(anon);
+        if (anon) {
+          enableGuestMode();
+          setCurrentEmail(null);
+          setAuthProvider("anonymous");
+          setShowLoginForm(true);
+        } else {
+          disableGuestMode();
+          setCurrentEmail(data.user.email ?? "소셜 계정");
+          setAuthProvider(String(data.user.app_metadata?.provider ?? "google"));
+          setShowLoginForm(false);
+        }
       } else {
         setCurrentEmail(null);
         setAuthProvider(null);
+        setIsAnonymous(false);
         setShowLoginForm(true);
       }
       setAuthReady(true);
@@ -181,6 +111,8 @@ export default function DiaryLoginPage() {
         missing_code: "로그인 인증 코드가 없습니다. 다시 시도해주세요.",
         not_configured: "로그인 서버가 설정되지 않았습니다.",
         exchange_failed: "로그인 세션을 만들지 못했습니다. 다시 시도해주세요.",
+        identity_already_exists:
+          "이미 가입된 Google 계정이에요. 익명 기록은 그대로 두고, 그 Google 계정으로는 따로 로그인해야 해요.",
       };
       setMessage(messages[authError] ?? "소셜 로그인에 실패했습니다.");
       setShowLoginForm(true);
@@ -190,18 +122,23 @@ export default function DiaryLoginPage() {
     ) {
       oauthHandled.current = true;
       setLoading(true);
-      void prepareImportPrompt()
-        .then((needsImport) => {
-          if (!needsImport) {
-            goHomeOrNext();
-            return;
+      void (async () => {
+        try {
+          disableGuestMode();
+          await syncLocalSajuProfileToAccount();
+          const migrated = await autoMigrateLocalJournalToAccount();
+          if (migrated.uploaded > 0) {
+            setMessage(`이 기기 기록 ${migrated.uploaded}건을 계정에 이어 담았어요.`);
           }
-          setMessage("이 기기 기록을 계정에 합칠까요? 선택하거나 건너뛸 수 있어요.");
-        })
-        .catch(() => {
-          setMessage("로그인은 완료됐지만 로컬 기록을 확인하지 못했습니다.");
-        })
-        .finally(() => setLoading(false));
+          // linkIdentity 성공 시 user_id 동일 — 선택 UI 없이 바로 홈
+          goHomeOrNext();
+        } catch {
+          setMessage("로그인은 완료됐지만 기록을 확인하지 못했어요.");
+          goHomeOrNext();
+        } finally {
+          setLoading(false);
+        }
+      })();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -220,9 +157,8 @@ export default function DiaryLoginPage() {
       resetJournalStorageCache();
       setCurrentEmail(null);
       setAuthProvider(null);
+      setIsAnonymous(false);
       setShowLoginForm(true);
-      setImportReady(null);
-      await refreshLocalBackupFlag();
     } catch (err) {
       setMessage(err instanceof Error ? err.message : "로그아웃에 실패했습니다.");
     } finally {
@@ -231,54 +167,17 @@ export default function DiaryLoginPage() {
   };
 
   const handleSwitchAccount = async () => {
-    const supabase = getSupabaseBrowserClient();
-    if (!supabase) return;
-    setLoading(true);
-    setMessage("");
-    try {
-      await supabase.auth.signOut();
-      disableGuestMode();
-      reconcileLocalStateWithAuthUser(null);
-      clearLocalAccountScopedState({ notify: true });
-      resetDiaryStorageCache();
-      resetJournalStorageCache();
-      setCurrentEmail(null);
-      setAuthProvider(null);
-      setShowLoginForm(true);
-      setImportReady(null);
-      await refreshLocalBackupFlag();
-    } catch (err) {
-      setMessage(err instanceof Error ? err.message : "전환에 실패했습니다.");
-    } finally {
-      setLoading(false);
-    }
+    await handleLogout();
   };
 
-  const startManualImport = async () => {
-    setLoading(true);
-    setMessage("");
-    try {
-      const needsImport = await prepareImportPrompt();
-      if (!needsImport) {
-        setMessage("가져올 로컬 기록이 없어요.");
-      } else {
-        setMessage("이 기기 기록을 계정에 합칠까요? 선택하거나 건너뛸 수 있어요.");
-      }
-    } catch {
-      setMessage("로컬 기록을 확인하지 못했어요.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loggedIn = Boolean(currentEmail);
+  const loggedInGoogle = Boolean(currentEmail) && !isAnonymous;
 
   if (!authReady) {
     return <p className="ui-hint p-4">불러오는 중…</p>;
   }
 
-  const showAuthGate = !importReady && (!loggedIn || showLoginForm);
-  const showAccountPanel = !importReady && loggedIn && !showLoginForm;
+  const showAuthGate = !loggedInGoogle || showLoginForm;
+  const showAccountPanel = loggedInGoogle && !showLoginForm;
 
   return (
     <div className="max-w-md mx-auto space-y-4 pb-8">
@@ -291,27 +190,6 @@ export default function DiaryLoginPage() {
             계정 및 설정
           </h2>
         </header>
-      )}
-
-      {importReady?.kind === "journal" && (
-        <LocalJournalImportPanel
-          localEntries={importReady.localEntries}
-          remoteEntries={importReady.remoteEntries}
-          remoteStorage={importReady.remoteStorage}
-          remoteSajuProfileId={importReady.remoteSajuProfileId}
-          onSkip={goHomeOrNext}
-          onComplete={goHomeOrNext}
-        />
-      )}
-
-      {importReady?.kind === "diary" && (
-        <LocalImportPanel
-          localEntries={importReady.localEntries}
-          remoteEntries={importReady.remoteEntries}
-          remoteStorage={importReady.remoteStorage}
-          onSkip={goHomeOrNext}
-          onComplete={goHomeOrNext}
-        />
       )}
 
       {showAccountPanel && (
@@ -338,23 +216,10 @@ export default function DiaryLoginPage() {
                   {currentEmail}
                 </p>
               )}
+              <p className="text-[11px] font-bold" style={{ color: "var(--px-text2)" }}>
+                비로그인(익명)에서 Google로 바꾸면 기록이 같은 계정으로 이어집니다.
+              </p>
             </div>
-            {hasLocalBackup && (
-              <button
-                type="button"
-                disabled={loading}
-                onClick={() => void startManualImport()}
-                className="w-full px-4 py-3.5 text-base font-black border-2"
-                style={{
-                  borderColor: "var(--px-accent)",
-                  background: "var(--px-bg2)",
-                  color: "var(--px-text-on-panel)",
-                  boxShadow: "3px 3px 0 #000",
-                }}
-              >
-                이 기기 기록 가져오기
-              </button>
-            )}
             <button
               type="button"
               disabled={loading}
@@ -388,7 +253,9 @@ export default function DiaryLoginPage() {
               ? `/diary/login?oauth=success&next=${encodeURIComponent(nextPathRef.current)}`
               : "/diary/login?oauth=success"
           }
-          onGuest={() => {
+          onGuest={async () => {
+            await ensureAnonymousSession();
+            void autoMigrateLocalJournalToAccount();
             router.push("/");
           }}
         />

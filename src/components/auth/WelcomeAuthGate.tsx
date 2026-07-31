@@ -1,40 +1,61 @@
 "use client";
 
 import { useState } from "react";
-import { enableGuestMode, disableGuestMode } from "@/lib/auth/guestMode";
+import {
+  ensureAnonymousSession,
+  startGoogleAuth,
+} from "@/lib/auth/anonymousSession";
 import {
   getAuthCallbackUrl,
   stashAuthNextPath,
 } from "@/lib/auth/redirectOrigin";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { ANALYTICS_EVENTS, captureEvent } from "@/lib/analytics/posthog";
+import { autoMigrateLocalJournalToAccount } from "@/lib/auth/autoMigrateLocalJournal";
 
 type Props = {
   onGuest: () => void;
   /** 계정 설정에서 로그아웃 후 등 */
   title?: string;
   subtitle?: string;
-  /** OAuth 성공 후 돌아갈 경로 */
+  /** OAuth/링크 성공 후 돌아갈 경로 */
   authNextPath?: string;
 };
 
 const GOOGLE_BENEFITS = [
   "확인 메일·비밀번호 없이 3초 만에 시작",
+  "지금까지의 기록이 그대로 Google 계정에 이어져요",
   "폰을 바꿔도 일기·운세·패턴이 그대로",
-  "이 기기만의 기록이 사라질 걱정 없이 백업",
 ] as const;
 
 /**
- * 시작/로그아웃 공통 — Google + 비로그인만 (이메일 없음)
+ * 시작/로그아웃 공통 — 익명(비로그인) + Google linkIdentity
  */
 export default function WelcomeAuthGate({
   onGuest,
   title = "시작하기",
-  subtitle = "먼저 둘러보고, 마음에 들면 Google로 저장하세요.",
+  subtitle = "먼저 둘러보고, 마음에 들면 Google로 이어서 저장하세요.",
   authNextPath = "/diary/login?oauth=success",
 }: Props) {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
+
+  const startAsGuest = async () => {
+    setLoading(true);
+    setMessage("");
+    const result = await ensureAnonymousSession();
+    if (!result.ok && getSupabaseBrowserClient()) {
+      setMessage(
+        result.error ??
+          "익명으로 시작하지 못했어요. Supabase에서 Anonymous 로그인을 켜 주세요."
+      );
+      setLoading(false);
+      return;
+    }
+    void autoMigrateLocalJournalToAccount();
+    setLoading(false);
+    onGuest();
+  };
 
   const startGoogle = async () => {
     const supabase = getSupabaseBrowserClient();
@@ -45,25 +66,27 @@ export default function WelcomeAuthGate({
       return;
     }
 
-    disableGuestMode();
     setLoading(true);
     setMessage("");
     captureEvent(ANALYTICS_EVENTS.authGoogleClicked);
+
+    // 익명이 없으면 먼저 만들어 user_id를 확보한 뒤 link
+    const anon = await ensureAnonymousSession();
+    if (!anon.ok && !anon.user) {
+      setLoading(false);
+      setMessage(anon.error ?? "세션을 만들지 못했어요.");
+      return;
+    }
+
     stashAuthNextPath(authNextPath);
     const redirectTo = getAuthCallbackUrl();
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo,
-        queryParams: { hl: "ko" },
-      },
-    });
-    if (error) {
+    const result = await startGoogleAuth({ redirectTo });
+    if (!result.ok) {
       setLoading(false);
-      setMessage(
-        `Google 로그인을 시작하지 못했습니다. (돌아갈 주소: ${redirectTo})`
-      );
+      setMessage(result.error ?? "Google 연결에 실패했어요.");
+      return;
     }
+    // OAuth 리다이렉트 중 — 로딩 유지
   };
 
   return (
@@ -95,10 +118,7 @@ export default function WelcomeAuthGate({
         <button
           type="button"
           disabled={loading}
-          onClick={() => {
-            enableGuestMode();
-            onGuest();
-          }}
+          onClick={() => void startAsGuest()}
           className="w-full px-4 py-4 text-base font-black border-2"
           style={{
             background: "var(--px-bg2)",
@@ -107,13 +127,13 @@ export default function WelcomeAuthGate({
             boxShadow: "3px 3px 0 #000",
           }}
         >
-          로그인 없이 바로 써보기
+          {loading ? "준비 중…" : "로그인 없이 바로 써보기"}
         </button>
         <p
           className="text-[11px] font-bold text-center leading-snug"
           style={{ color: "var(--px-text2)" }}
         >
-          베타 테스트용 · 기록은 이 기기에만 남아요
+          익명으로 시작 · Google로 바꾸면 기록이 그대로 이어져요
         </p>
 
         <div
@@ -134,7 +154,7 @@ export default function WelcomeAuthGate({
             boxShadow: "4px 4px 0 #000",
           }}
         >
-          {loading ? "연결 중…" : "Google로 시작하기"}
+          {loading ? "연결 중…" : "Google로 이어가기"}
         </button>
 
         <ul className="space-y-1.5 pt-0.5" aria-label="Google 로그인 장점">
