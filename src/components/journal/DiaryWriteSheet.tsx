@@ -53,7 +53,6 @@ export default function DiaryWriteSheet({
   const [step, setStep] = useState<SheetStep>("write");
   const [questionMeta, setQuestionMeta] = useState<QuestionMeta | null>(null);
   const [fitBusy, setFitBusy] = useState(false);
-  const [fitAck, setFitAck] = useState<string | null>(null);
 
   const handleQuestionReady = useCallback((meta: QuestionMeta) => {
     setQuestionMeta(meta);
@@ -61,7 +60,6 @@ export default function DiaryWriteSheet({
 
   const finishClose = useCallback(() => {
     setStep("write");
-    setFitAck(null);
     setFitBusy(false);
     onClose();
   }, [onClose]);
@@ -72,60 +70,47 @@ export default function DiaryWriteSheet({
       return;
     }
     setStep("feedback");
-    setFitAck(null);
   }, [date, questionMeta, finishClose]);
 
-  const sendFit = async (level: FitLevel) => {
-    if (!questionMeta?.question || fitBusy || fitAck) return;
+  const sendFit = (level: FitLevel) => {
+    if (!questionMeta?.question || fitBusy) return;
     const option = QUESTION_FIT_LEVELS.find((l) => l.level === level);
     if (!option) return;
     setFitBusy(true);
-    setFitAck(option.ack);
-    try {
-      await reportQuestionFeedback({
-        questionDate: date,
-        eventType: option.eventType,
-        questionText: questionMeta.question,
-        rating: option.rating,
-        payload: {
-          keywords:
-            questionMeta.keywordCodes.length > 0
-              ? questionMeta.keywordCodes
-              : questionMeta.keywords,
-        },
-      });
-    } finally {
-      setFitBusy(false);
-      window.setTimeout(() => finishClose(), 700);
-    }
+    const meta = questionMeta;
+    finishClose();
+    void reportQuestionFeedback({
+      questionDate: date,
+      eventType: option.eventType,
+      questionText: meta.question,
+      rating: option.rating,
+      payload: {
+        keywords:
+          meta.keywordCodes.length > 0 ? meta.keywordCodes : meta.keywords,
+      },
+    });
   };
 
-  const skipFit = async () => {
-    if (!questionMeta?.question || fitBusy || fitAck) return;
+  const skipFit = () => {
+    if (!questionMeta?.question || fitBusy) return;
     setFitBusy(true);
-    try {
-      await reportQuestionFeedback({
-        questionDate: date,
-        eventType: "skipped",
-        questionText: questionMeta.question,
-        payload: {
-          keywords:
-            questionMeta.keywordCodes.length > 0
-              ? questionMeta.keywordCodes
-              : questionMeta.keywords,
-        },
-      });
-    } finally {
-      setFitBusy(false);
-      finishClose();
-    }
+    const meta = questionMeta;
+    finishClose();
+    void reportQuestionFeedback({
+      questionDate: date,
+      eventType: "skipped",
+      questionText: meta.question,
+      payload: {
+        keywords:
+          meta.keywordCodes.length > 0 ? meta.keywordCodes : meta.keywords,
+      },
+    });
   };
 
   useEffect(() => {
     if (!open) {
       startedRef.current = false;
       setStep("write");
-      setFitAck(null);
       setFitBusy(false);
       setQuestionMeta(null);
       return;
@@ -297,44 +282,33 @@ export default function DiaryWriteSheet({
                 {questionMeta.question}
               </p>
             )}
-            {fitAck ? (
-              <p
-                className="text-[12px] font-bold text-center leading-relaxed"
-                style={{ color: "var(--px-text2)" }}
-              >
-                {fitAck}
-              </p>
-            ) : (
-              <div className="flex flex-wrap items-center justify-center gap-2">
-                {QUESTION_FIT_LEVELS.map((option) => (
-                  <button
-                    key={option.level}
-                    type="button"
-                    disabled={fitBusy}
-                    onClick={() => void sendFit(option.level)}
-                    className="px-2.5 py-2 text-[11px] font-black border-2 disabled:opacity-50"
-                    style={{
-                      borderColor: "var(--px-border2)",
-                      color: "var(--px-text-on-panel)",
-                      background: "var(--px-bg3)",
-                    }}
-                  >
-                    {option.label}
-                  </button>
-                ))}
-              </div>
-            )}
-            {!fitAck && (
-              <button
-                type="button"
-                disabled={fitBusy}
-                onClick={() => void skipFit()}
-                className="block w-full text-center text-[11px] font-bold underline disabled:opacity-50"
-                style={{ color: "var(--px-text2)" }}
-              >
-                건너뛰기
-              </button>
-            )}
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              {QUESTION_FIT_LEVELS.map((option) => (
+                <button
+                  key={option.level}
+                  type="button"
+                  disabled={fitBusy}
+                  onClick={() => sendFit(option.level)}
+                  className="px-2.5 py-2 text-[11px] font-black border-2 disabled:opacity-50"
+                  style={{
+                    borderColor: "var(--px-border2)",
+                    color: "var(--px-text-on-panel)",
+                    background: "var(--px-bg3)",
+                  }}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              disabled={fitBusy}
+              onClick={skipFit}
+              className="block w-full text-center text-[11px] font-bold underline disabled:opacity-50"
+              style={{ color: "var(--px-text2)" }}
+            >
+              건너뛰기
+            </button>
           </div>
         </div>
       )}

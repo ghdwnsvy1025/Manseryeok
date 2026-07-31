@@ -248,14 +248,42 @@ function QuestionTeaseButton({
   );
 }
 
-function QuestionLoadingHint() {
+function QuestionLoadingHint({ compact = false }: { compact?: boolean }) {
   const [idx, setIdx] = useState(0);
   useEffect(() => {
+    if (compact) return;
     const id = window.setInterval(() => {
       setIdx((i) => (i + 1) % QUESTION_LOADING_PHRASES.length);
     }, 6000);
     return () => window.clearInterval(id);
-  }, []);
+  }, [compact]);
+
+  if (compact) {
+    return (
+      <div
+        className="px-3 py-2.5 flex items-center justify-center gap-2.5 min-h-[4.75rem]"
+        aria-live="polite"
+        aria-busy="true"
+      >
+        <div className="relative w-5 h-5 shrink-0" aria-hidden>
+          <span
+            className="absolute inset-0 rounded-full border-2 animate-spin"
+            style={{
+              borderColor: "color-mix(in srgb, var(--px-accent) 22%, transparent)",
+              borderTopColor: "var(--px-accent)",
+            }}
+          />
+        </div>
+        <p
+          className="text-[12px] font-bold leading-snug"
+          style={{ color: "var(--px-text2)" }}
+        >
+          질문을 고르는 중…
+        </p>
+      </div>
+    );
+  }
+
   const phrase = QUESTION_LOADING_PHRASES[idx]!;
   return (
     <div
@@ -617,7 +645,7 @@ export default function TodayQuestionCard({
               }
         }
       >
-        <QuestionLoadingHint />
+        <QuestionLoadingHint compact={isSheet} />
       </div>
     );
   }
@@ -641,9 +669,10 @@ export default function TodayQuestionCard({
   }
 
   // 시트: 질문 문장만 (피드백·힌트는 완료 직후 시트로)
+  // 로딩 칸과 같은 최소 높이로 점프를 막는다.
   if (isSheet && question) {
     return (
-      <section className="px-3 py-2.5 space-y-1.5 fortune-readable">
+      <section className="px-3 py-2.5 space-y-1.5 fortune-readable min-h-[4.75rem] flex flex-col justify-center">
         <p
           className="text-[11px] font-black tracking-wider text-center"
           style={{ color: "var(--px-accent)" }}
