@@ -1,6 +1,9 @@
 import { describe, expect, test } from "@jest/globals";
 import { pickActiveSajuProfileId } from "@/lib/diary/activeSajuProfile";
-import { localProfilesSafeToMigrate } from "@/lib/diary/profileStorage";
+import {
+  isGuestOwnedProfiles,
+  localProfilesSafeToMigrate,
+} from "@/lib/diary/profileStorage";
 import { MemoryJournalStorage } from "@/lib/journal/indexedDbStorage";
 
 describe("per-profile journal isolation", () => {
@@ -33,6 +36,12 @@ describe("per-profile journal isolation", () => {
         "user-b"
       )
     ).toBe(false);
+  });
+
+  test("isGuestOwnedProfiles treats only null userId as guest", () => {
+    expect(isGuestOwnedProfiles([])).toBe(true);
+    expect(isGuestOwnedProfiles([{ userId: null }])).toBe(true);
+    expect(isGuestOwnedProfiles([{ userId: "g" }])).toBe(false);
   });
 
   test("MemoryJournalStorage keeps same-date entries per profile", async () => {

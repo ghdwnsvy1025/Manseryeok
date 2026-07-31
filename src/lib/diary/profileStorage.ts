@@ -1,5 +1,6 @@
 import type { SajuInput, SajuResult } from "@/lib/saju/types";
 import type { Gender } from "@/lib/saju/daeun";
+import { isGuestMode } from "@/lib/auth/guestMode";
 import {
   DIARY_SCHEMA_VERSION,
   type SajuProfile,
@@ -56,6 +57,11 @@ const LOCAL_SAJU_PROFILES_KEY = "manseryeok_saju_profiles_v2";
 const LOCAL_USER_PROFILE_KEY = "manseryeok_user_profile_v2";
 /** 만세력 보기용 프로필 id — 원격 컬럼 없어도 유지 */
 const LOCAL_VIEW_PROFILE_KEY = "manseryeok_active_view_profile_id_v1";
+/** 비로그인 전용 스냅샷 (구글 계정 캐시와 분리) */
+const GUEST_SAJU_PROFILE_KEY = "manseryeok_guest_saju_profile_v2";
+const GUEST_SAJU_PROFILES_KEY = "manseryeok_guest_saju_profiles_v2";
+const GUEST_USER_PROFILE_KEY = "manseryeok_guest_user_profile_v2";
+const GUEST_VIEW_PROFILE_KEY = "manseryeok_guest_view_profile_id_v1";
 /** 마지막으로 reconcile한 auth user id — 계정 전환 감지 */
 const LAST_AUTH_USER_KEY = "manseryeok_last_auth_user_id_v1";
 const CALCULATOR_VERSION = "0.1.0";
@@ -77,9 +83,106 @@ export function localProfilesSafeToMigrate(
   return profiles.every((p) => !p.userId || p.userId === userId);
 }
 
+/** 계정(userId)에 묶이지 않은 로컬 = 비로그인 소유 */
+export function isGuestOwnedProfiles(
+  profiles: Array<{ userId?: string | null }>
+): boolean {
+  if (profiles.length === 0) return true;
+  return profiles.every((p) => !p.userId);
+}
+
+function readGuestStashProfiles(): SajuProfile[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(GUEST_SAJU_PROFILES_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as SajuProfile[];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
 /**
- * 사주/유저 프로필 로컬 캐시 삭제.
- * 계정 전환·로그아웃 시 이전 계정 데이터가 화면에 잠깐이라도 보이지 않게 한다.
+ * 활성 워크스페이스 → 비로그인 스냅샷 저장.
+ * 구글 로그인 전에 호출해 비로그인 사주/일기가 계정 캐시에 덮이지 않게 한다.
+ */
+export function stashGuestWorkspaceIfNeeded(): void {
+  if (typeof window === "undefined") return;
+  const active = loadLocalSajuProfiles();
+  if (active.length === 0) return;
+  if (!isGuestOwnedProfiles(active) && !isGuestMode()) return;
+
+  try {
+    localStorage.setItem(GUEST_SAJU_PROFILES_KEY, JSON.stringify(active));
+    const primary =
+      active.find((p) => p.isPrimary) ?? active[0] ?? null;
+    if (primary) {
+      localStorage.setItem(GUEST_SAJU_PROFILE_KEY, JSON.stringify(primary));
+    }
+    const userRaw = localStorage.getItem(LOCAL_USER_PROFILE_KEY);
+    if (userRaw) localStorage.setItem(GUEST_USER_PROFILE_KEY, userRaw);
+    const viewId = localStorage.getItem(LOCAL_VIEW_PROFILE_KEY);
+    if (viewId) localStorage.setItem(GUEST_VIEW_PROFILE_KEY, viewId);
+    else localStorage.removeItem(GUEST_VIEW_PROFILE_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
+/** 비로그인 중 저장할 때마다 스냅샷 갱신 */
+export function persistGuestWorkspaceFromActive(): void {
+  if (typeof window === "undefined") return;
+  if (!isGuestMode()) return;
+  const active = loadLocalSajuProfiles();
+  if (!isGuestOwnedProfiles(active)) return;
+  stashGuestWorkspaceIfNeeded();
+}
+
+/**
+ * 비로그인 워크스페이스 활성화.
+ * - 스냅샷이 있으면 복원
+ * - 없고 활성 캐시가 계정 소유면 비움 (구글 프로필이 비로그인에 남지 않음)
+ * - 활성가 게스트 소유면 그대로 두고 스냅샷으로 저장
+ */
+export function activateGuestWorkspace(): void {
+  if (typeof window === "undefined") return;
+  const stashed = readGuestStashProfiles();
+  if (stashed.length > 0) {
+    try {
+      localStorage.setItem(GUEST_SAJU_PROFILES_KEY, JSON.stringify(stashed));
+      saveLocalSajuProfiles(
+        stashed.map((p) => ({ ...p, userId: null }))
+      );
+      const userRaw = localStorage.getItem(GUEST_USER_PROFILE_KEY);
+      if (userRaw) {
+        localStorage.setItem(LOCAL_USER_PROFILE_KEY, userRaw);
+      } else {
+        localStorage.removeItem(LOCAL_USER_PROFILE_KEY);
+      }
+      const viewId = localStorage.getItem(GUEST_VIEW_PROFILE_KEY);
+      if (viewId) localStorage.setItem(LOCAL_VIEW_PROFILE_KEY, viewId);
+      else localStorage.removeItem(LOCAL_VIEW_PROFILE_KEY);
+    } catch {
+      /* ignore */
+    }
+    notifySajuProfileChanged();
+    return;
+  }
+
+  const active = loadLocalSajuProfiles();
+  if (active.length > 0 && isGuestOwnedProfiles(active)) {
+    stashGuestWorkspaceIfNeeded();
+    return;
+  }
+
+  // 구글 등 계정 캐시만 남아 있으면 비로그인 화면에서 쓰지 않음
+  clearLocalAccountScopedState({ notify: true });
+}
+
+/**
+ * 사주/유저 프로필 로컬 캐시 삭제 (활성 워크스페이스만).
+ * 비로그인 스냅샷은 유지한다.
  */
 export function clearLocalAccountScopedState(opts?: {
   notify?: boolean;
@@ -108,10 +211,9 @@ export function clearLocalAccountScopedState(opts?: {
 
 /**
  * auth user가 바뀌면 로컬 계정 스코프 상태를 정리한다.
- * - 로그아웃(→ null): 기기 로컬 프로필·일기 유지 (비로그인 재진입)
- * - 익명/게스트: 로컬 유지 (비로그인 재진입 시 새 익명 id가 나와도 유지)
- * - 게스트 → 첫 로그인: 로컬 유지 후 이관
- * - 다른(실제) 계정으로 전환: 이관 불가면 이전 캐시 삭제
+ * - 로그아웃(→ null): 비로그인 스냅샷 복원
+ * - 구글 로그인: 비로그인 스냅샷 보존 후 계정 캐시 사용
+ * - 다른(실제) 계정으로 전환: 이관 불가면 활성 캐시만 삭제
  */
 export function reconcileLocalStateWithAuthUser(
   userId: string | null,
@@ -126,19 +228,20 @@ export function reconcileLocalStateWithAuthUser(
   }
   if (userId === prev) return;
 
-  // 로그아웃: 로컬 데이터는 지우지 않음
+  // 로그아웃 → 비로그인 워크스페이스로 전환
   if (!userId) {
     try {
       localStorage.removeItem(LAST_AUTH_USER_KEY);
     } catch {
       /* ignore */
     }
+    activateGuestWorkspace();
     return;
   }
 
-  // 익명/게스트는 기기 로컬이 소스 — 절대 비우지 않음
+  // 실제 계정 로그인: 비로그인 데이터 먼저 스냅샷
   if (!opts?.isAnonymous) {
-    // 다른 로그인 사용자로 바뀔 때, 로컬이 그 계정 것이 아니면 비움
+    stashGuestWorkspaceIfNeeded();
     if (prev && prev !== userId) {
       if (!localProfilesSafeToMigrate(loadLocalSajuProfiles(), userId)) {
         clearLocalAccountScopedState({ notify: true });
@@ -303,6 +406,7 @@ export function saveLocalSajuProfiles(profiles: SajuProfile[]): void {
   } else {
     localStorage.removeItem(LOCAL_SAJU_PROFILE_KEY);
   }
+  persistGuestWorkspaceFromActive();
 }
 
 function upsertLocalProfileList(profile: SajuProfile): SajuProfile[] {
@@ -565,6 +669,9 @@ export async function syncLocalSajuProfileToAccount(): Promise<SajuProfile | nul
     (user as { is_anonymous?: boolean }).is_anonymous ||
       user.app_metadata?.provider === "anonymous"
   );
+  if (!anon) {
+    stashGuestWorkspaceIfNeeded();
+  }
   reconcileLocalStateWithAuthUser(user.id, { isAnonymous: anon });
 
   const { data: existing, error } = await supabase
