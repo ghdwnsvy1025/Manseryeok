@@ -58,6 +58,15 @@ export async function registerSajuProfileFromResult(
   const makePrimary = opts?.makePrimary ?? existing.length === 0;
   const label = opts?.label?.trim() || "이름 없음";
 
+  // 수정 전 버전을 쌓지 않음 — 적용 중 프로필이 있으면 덮어쓴다
+  if (makePrimary) {
+    const primary =
+      existing.find((p) => p.isPrimary) ?? existing[0] ?? null;
+    if (primary) {
+      return updateSajuProfileFromResult(primary, result, { label });
+    }
+  }
+
   if (makePrimary) {
     persistBirthSettings(result);
     // saveSajuProfile의 user_profiles upsert보다 먼저 로컬 온보딩을 세워

@@ -29,8 +29,6 @@ export default function ProfileHeader() {
   const [open, setOpen] = useState(false);
   const [profile, setProfile] = useState<SajuProfile | null>(null);
 
-  const showBack = pathname !== "/";
-
   const refresh = useCallback(async () => {
     try {
       setProfile(await loadJournalSajuProfile());
@@ -78,15 +76,6 @@ export default function ProfileHeader() {
   }, [open]);
 
   const closeMenu = () => setOpen(false);
-
-  const goBack = () => {
-    if (typeof window !== "undefined" && window.history.length > 1) {
-      router.back();
-      return;
-    }
-    router.push("/");
-  };
-
   const name = profile ? profileDisplayName(profile) : null;
 
   return (
@@ -169,7 +158,10 @@ export default function ProfileHeader() {
             >
               의견 보내기
             </button>
-            <p className="text-[10px] font-bold px-1 -mt-1" style={{ color: "var(--px-text2)" }}>
+            <p
+              className="text-[10px] font-bold px-1 -mt-1"
+              style={{ color: "var(--px-text2)" }}
+            >
               버그·어색한 문장·아이디어
             </p>
             <Link
@@ -186,10 +178,16 @@ export default function ProfileHeader() {
       </div>
 
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-black" style={{ color: "var(--px-accent)" }}>
+        <p
+          className="truncate text-sm font-black"
+          style={{ color: "var(--px-accent)" }}
+        >
           {profile ? `${name}` : "사주 프로필 없음"}
           {profile && (
-            <span className="font-bold ml-2" style={{ color: "var(--px-text2)" }}>
+            <span
+              className="font-bold ml-2"
+              style={{ color: "var(--px-text2)" }}
+            >
               {birthDateLabel(profile)}
             </span>
           )}
@@ -199,20 +197,13 @@ export default function ProfileHeader() {
       <HeaderProgressBadge />
 
       {!profile && (
-        <Link href="/saju" className="text-xs font-bold underline shrink-0" style={{ color: "var(--px-accent)" }}>
+        <Link
+          href="/saju"
+          className="text-xs font-bold underline shrink-0"
+          style={{ color: "var(--px-accent)" }}
+        >
           등록
         </Link>
-      )}
-
-      {showBack && (
-        <button
-          type="button"
-          onClick={goBack}
-          className="shrink-0 text-xs font-bold underline"
-          style={{ color: "var(--px-text2)" }}
-        >
-          뒤로
-        </button>
       )}
     </header>
   );

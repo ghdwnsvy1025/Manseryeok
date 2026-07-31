@@ -40,7 +40,8 @@ function HappinessTile({
   row: CharacterHappiness;
   compact?: boolean;
 }) {
-  const insufficient = row.count < 2;
+  /** 0회만 비움 — 1회여도 그날 행복도가 곧 평균 */
+  const insufficient = row.count < 1;
   const borderColor = row.element
     ? ELEM_COLORS[row.element]
     : row.average != null

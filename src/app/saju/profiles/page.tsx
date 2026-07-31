@@ -26,6 +26,9 @@ function birthDateLabel(profile: SajuProfile): string {
   return profile.birthDate.replaceAll("-", ".");
 }
 
+/**
+ * 프로필은 1개만 유지. 예전에 쌓인 추가 프로필은 정리한다.
+ */
 export default function SajuProfilesPage() {
   const router = useRouter();
   const { isMobile } = useViewMode();
@@ -33,17 +36,15 @@ export default function SajuProfilesPage() {
   const [journalId, setJournalId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<SajuProfile | null>(null);
+  const [registering, setRegistering] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [deleting, setDeleting] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     setError(null);
     try {
-      const list = await loadAllSajuProfiles();
-      setProfiles(list);
+      let list = await loadAllSajuProfiles();
       const local = loadLocalUserProfile();
       const j =
         local?.activeJournalProfileId ??
@@ -51,6 +52,21 @@ export default function SajuProfilesPage() {
         list.find((p) => p.isPrimary)?.id ??
         list[0]?.id ??
         null;
+
+      // 수정 전·추가 버전 정리: 일기용 1개만 남김
+      if (j && list.length > 1) {
+        const extras = list.filter((p) => p.id !== j);
+        for (const extra of extras) {
+          try {
+            await deleteSajuProfile(extra.id);
+          } catch {
+            /* ignore one-off */
+          }
+        }
+        list = await loadAllSajuProfiles();
+      }
+
+      setProfiles(list);
       setJournalId(j);
     } catch (err) {
       setError(
@@ -65,8 +81,8 @@ export default function SajuProfilesPage() {
     void refresh();
     const onChange = () => void refresh();
     const toList = () => {
-      setAdding(false);
       setEditing(null);
+      setRegistering(false);
       setError(null);
     };
     window.addEventListener(SAJU_PROFILE_CHANGED_EVENT, onChange);
@@ -78,11 +94,7 @@ export default function SajuProfilesPage() {
   }, [refresh]);
 
   const me = useMemo(
-    () => profiles.find((p) => p.id === journalId) ?? null,
-    [profiles, journalId]
-  );
-  const others = useMemo(
-    () => profiles.filter((p) => p.id !== journalId),
+    () => profiles.find((p) => p.id === journalId) ?? profiles[0] ?? null,
     [profiles, journalId]
   );
 
@@ -95,7 +107,7 @@ export default function SajuProfilesPage() {
     setBusyId(null);
   };
 
-  const handleAdd = async (
+  const handleRegister = async (
     input: SajuInput,
     meta: { label?: string }
   ) => {
@@ -105,13 +117,13 @@ export default function SajuProfilesPage() {
       const res = calculateSaju(input);
       await registerSajuProfileFromResult(res, {
         label: meta.label,
-        makePrimary: profiles.length === 0,
+        makePrimary: true,
       });
-      setAdding(false);
+      setRegistering(false);
       await refresh();
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "프로필을 추가하지 못했어요."
+        err instanceof Error ? err.message : "프로필을 등록하지 못했어요."
       );
     } finally {
       setSaving(false);
@@ -139,41 +151,11 @@ export default function SajuProfilesPage() {
     }
   };
 
-  const canDeleteEditing =
-    Boolean(editing) &&
-    editing!.id !== journalId &&
-    !editing!.isPrimary;
-
-  const handleDelete = async () => {
-    if (!editing || !canDeleteEditing) return;
-    const name = profileDisplayName(editing);
-    if (
-      !window.confirm(
-        `「${name}」 프로필을 삭제할까요?\n삭제하면 되돌릴 수 없어요.`
-      )
-    ) {
-      return;
-    }
-    setDeleting(true);
-    setError(null);
-    try {
-      await deleteSajuProfile(editing.id);
-      setEditing(null);
-      await refresh();
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "프로필을 삭제하지 못했어요."
-      );
-    } finally {
-      setDeleting(false);
-    }
-  };
-
   if (loading) {
     return <p className="ui-hint p-4 text-center">불러오는 중...</p>;
   }
 
-  if (adding || editing) {
+  if (registering || editing) {
     const isEdit = Boolean(editing);
     return (
       <div className={`space-y-6 ${isMobile ? "space-y-5" : ""}`}>
@@ -187,52 +169,42 @@ export default function SajuProfilesPage() {
               boxShadow: "4px 4px 0 #4a3a00",
             }}
           >
-            {isEdit ? "★ 수정하기 ★" : "★ 프로필 추가 ★"}
+            {isEdit ? "★ 수정하기 ★" : "★ 프로필 등록 ★"}
           </div>
           {isEdit && (
-            <p className="mt-2 text-sm font-black" style={{ color: "var(--px-accent)" }}>
+            <p
+              className="mt-2 text-sm font-black"
+              style={{ color: "var(--px-accent)" }}
+            >
               {profileDisplayName(editing!)}
             </p>
           )}
         </div>
 
         <SajuForm
-          key={editing?.id ?? "add"}
+          key={editing?.id ?? "register"}
           onCalculate={(input, meta) =>
-            void (isEdit ? handleEdit(input, meta) : handleAdd(input, meta))
+            void (isEdit ? handleEdit(input, meta) : handleRegister(input, meta))
           }
-          isLoading={saving || deleting}
+          isLoading={saving}
           prefillBirth={false}
           seedProfile={editing}
           submitLabel={isEdit ? "저장하기" : undefined}
         />
 
         {error && (
-          <p className="text-sm font-bold text-center" style={{ color: "#f87171" }}>
+          <p
+            className="text-sm font-bold text-center"
+            style={{ color: "#f87171" }}
+          >
             {error}
           </p>
-        )}
-
-        {canDeleteEditing && (
-          <button
-            type="button"
-            disabled={saving || deleting}
-            onClick={() => void handleDelete()}
-            className="w-full py-3 text-sm font-black border-2"
-            style={{
-              borderColor: "#f87171",
-              color: "#f87171",
-              background: "var(--px-bg2)",
-            }}
-          >
-            {deleting ? "삭제 중…" : "프로필 삭제"}
-          </button>
         )}
 
         <button
           type="button"
           onClick={() => {
-            setAdding(false);
+            setRegistering(false);
             setEditing(null);
           }}
           className="w-full py-2 text-xs font-bold underline"
@@ -261,12 +233,15 @@ export default function SajuProfilesPage() {
       </div>
 
       {error && (
-        <p className="text-sm font-bold text-center" style={{ color: "#f87171" }}>
+        <p
+          className="text-sm font-bold text-center"
+          style={{ color: "#f87171" }}
+        >
           {error}
         </p>
       )}
 
-      {me && (
+      {me ? (
         <div
           className="border-2 overflow-hidden"
           style={{
@@ -318,100 +293,18 @@ export default function SajuProfilesPage() {
             수정하기
           </button>
         </div>
-      )}
-
-      {others.length > 0 && (
-        <div className="space-y-2">
-          <p
-            className={`font-black tracking-wide px-0.5 ${isMobile ? "text-[11px]" : "text-[10px]"}`}
-            style={{ color: "var(--px-text2)", letterSpacing: "0.06em" }}
+      ) : (
+        <div className="space-y-3 text-center">
+          <p className="ui-hint">아직 프로필이 없어요. 나를 먼저 등록해 주세요.</p>
+          <button
+            type="button"
+            onClick={() => setRegistering(true)}
+            className="ui-primary-btn px-4 py-3 text-sm font-black"
           >
-            다른 사람
-          </p>
-          <div className="grid gap-2">
-            {others.map((profile) => {
-              const busy = busyId === profile.id;
-              return (
-                <div
-                  key={profile.id}
-                  className="flex items-stretch border-2"
-                  style={{
-                    borderColor: "var(--px-border)",
-                    background: "var(--px-bg2)",
-                    boxShadow: "2px 2px 0 #000",
-                  }}
-                >
-                  <button
-                    type="button"
-                    disabled={busy}
-                    onClick={() => openManseryeok(profile)}
-                    className="min-w-0 flex-1 flex items-center gap-3 px-3 py-3 text-left disabled:opacity-70"
-                  >
-                    <span
-                      className="shrink-0 w-9 h-9 flex items-center justify-center text-[15px] font-black border"
-                      style={{
-                        borderColor: "var(--px-border)",
-                        color: "var(--px-accent)",
-                        background: "var(--px-bg3)",
-                      }}
-                      aria-hidden
-                    >
-                      {profileDisplayName(profile).slice(0, 1)}
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <p
-                        className={`font-black truncate leading-tight ${isMobile ? "text-[16px]" : "text-[15px]"}`}
-                        style={{ color: "var(--px-text-on-panel)" }}
-                      >
-                        {profileDisplayName(profile)}
-                      </p>
-                      <p
-                        className={`font-bold truncate mt-0.5 ${isMobile ? "text-[14px]" : "text-[13px]"}`}
-                        style={{ color: "var(--px-text2)" }}
-                      >
-                        {birthDateLabel(profile)}
-                      </p>
-                    </div>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setEditing(profile)}
-                    className="shrink-0 px-3.5 self-stretch flex items-center text-[13px] font-black border-l-2"
-                    style={{
-                      borderColor: "var(--px-border)",
-                      color: "var(--px-text2)",
-                      background: "var(--px-bg3)",
-                    }}
-                  >
-                    수정
-                  </button>
-                </div>
-              );
-            })}
-          </div>
+            프로필 등록
+          </button>
         </div>
       )}
-
-      {!me && profiles.length === 0 && (
-        <p className="ui-hint text-center">아직 프로필이 없어요. 나를 먼저 등록해 주세요.</p>
-      )}
-
-      <div className="flex justify-center pt-1">
-        <button
-          type="button"
-          onClick={() => setAdding(true)}
-          className="w-12 h-12 flex items-center justify-center border-2 text-2xl font-black leading-none"
-          style={{
-            borderColor: "var(--px-accent)",
-            background: "var(--px-bg3)",
-            color: "var(--px-accent)",
-            boxShadow: "3px 3px 0 #4a3a00",
-          }}
-          aria-label={profiles.length === 0 ? "내 프로필 등록" : "다른 사람 추가"}
-        >
-          +
-        </button>
-      </div>
     </div>
   );
 }
