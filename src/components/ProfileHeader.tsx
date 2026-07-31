@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import HeaderProgressBadge from "@/components/HeaderProgressBadge";
-import BetaFeedbackModal from "@/components/feedback/BetaFeedbackModal";
+import { openBetaFeedback } from "@/components/feedback/BetaFeedbackHost";
 import {
   loadJournalSajuProfile,
   profileDisplayName,
@@ -28,7 +28,6 @@ export default function ProfileHeader() {
   const menuRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
   const [profile, setProfile] = useState<SajuProfile | null>(null);
-  const [feedbackOpen, setFeedbackOpen] = useState(false);
 
   const showBack = pathname !== "/";
 
@@ -163,14 +162,16 @@ export default function ProfileHeader() {
               type="button"
               onClick={() => {
                 closeMenu();
-                setFeedbackOpen(true);
+                openBetaFeedback();
               }}
-              className="block w-full px-3 py-2.5 text-center text-sm font-bold border"
-              style={menuLinkStyle}
+              className="ui-primary-btn block w-full px-3 py-3 text-center text-sm font-black"
               role="menuitem"
             >
               의견 보내기
             </button>
+            <p className="text-[10px] font-bold px-1 -mt-1" style={{ color: "var(--px-text2)" }}>
+              버그·어색한 문장·아이디어
+            </p>
             <Link
               href="/diary/login"
               onClick={closeMenu}
@@ -213,11 +214,6 @@ export default function ProfileHeader() {
           뒤로
         </button>
       )}
-
-      <BetaFeedbackModal
-        open={feedbackOpen}
-        onClose={() => setFeedbackOpen(false)}
-      />
     </header>
   );
 }

@@ -33,6 +33,7 @@ import { scheduleAstrologySnapshotAfterJournalSave } from "@/lib/astrology/sched
 import { schedulePersonalizationTrainAfterJournalSave } from "@/lib/personalization/scheduleAfterJournal";
 import type { JournalSaveResult } from "@/lib/journal/storage";
 import type { HappinessScore } from "@/lib/journal/happinessScale";
+import { autosizeTextarea } from "@/lib/ui/autosizeTextarea";
 import {
   CHECKIN_TAG_GROUPS,
   CORE_STATE_CODES,
@@ -163,6 +164,7 @@ export default function CheckInEditor({ initialDate }: Props) {
   const [content, setContent] = useState("");
   /** 자유 일기 시작(diary_started)은 날짜당 한 번만 발화한다. */
   const diaryStartedRef = useRef<string | null>(null);
+  const diaryTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const [happiness, setHappiness] = useState<HappinessScore | null>(null);
   const [moods, setMoods] = useState<string[]>([]);
   const [mainEvent, setMainEvent] = useState("");
@@ -534,6 +536,10 @@ export default function CheckInEditor({ initialDate }: Props) {
     if (!isSavedFormComplete(snap)) return;
     applyDayFromListRef.current(date, allEntriesRef.current);
   }, [date]);
+
+  useLayoutEffect(() => {
+    autosizeTextarea(diaryTextareaRef.current, { minPx: 160, maxPx: 480 });
+  }, [content, date]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1164,7 +1170,12 @@ export default function CheckInEditor({ initialDate }: Props) {
         void runBackgroundAi(result.entry.id, list);
       }
     } catch (e) {
-      setMessage(e instanceof Error ? e.message : "저장에 실패했어요.");
+      const raw = e instanceof Error ? e.message : "저장에 실패했어요.";
+      const friendlier =
+        /foreign key|event_tag|journal_entry_tags/i.test(raw)
+          ? "「특별한 일 없음」 등 일부 태그를 아직 서버에 반영하지 못했어요. 잠시 후 다시 시도해 주세요."
+          : raw;
+      setMessage(friendlier);
       setStatus("idle");
     }
   };
@@ -1290,6 +1301,7 @@ export default function CheckInEditor({ initialDate }: Props) {
         />
         <div className="relative">
           <textarea
+            ref={diaryTextareaRef}
             value={content}
             onChange={(e) => {
               const next = e.target.value;
@@ -1302,16 +1314,21 @@ export default function CheckInEditor({ initialDate }: Props) {
                 });
               }
               setContent(next);
+              autosizeTextarea(e.target, { minPx: 160, maxPx: 480 });
             }}
-            rows={4}
+            onFocus={(e) =>
+              autosizeTextarea(e.target, { minPx: 160, maxPx: 480 })
+            }
+            rows={6}
             placeholder="예) 오늘은 회의가 길었지만, 끝나고 산책하니 좀 풀렸다."
-            className="w-full px-3 py-2 border-2 text-sm resize-none"
+            className="w-full px-3 py-3 border-2 text-sm resize-none leading-relaxed"
             style={{
               background: "var(--px-bg3)",
               borderColor: content.trim()
                 ? "var(--px-accent)"
                 : "var(--px-border)",
               color: "var(--px-text-on-panel)",
+              minHeight: 160,
             }}
             aria-label="오늘 한 줄"
           />

@@ -10,7 +10,7 @@ URL: https://saju-diary.vercel.app
 2. **사주 프로필은 본인 1개만** 등록하면 됩니다.
 3. 하단 탭은 **홈 · 일기 · 기록**만 사용하세요.
 4. 오늘 일기를 한 번 저장해 보고, 홈의 운세·문장을 확인해 주세요.
-5. 버그·어색한 문장은 헤더 ☰ → **의견 보내기**로도 제보할 수 있어요.
+5. 버그·어색한 문장은 화면 오른쪽 아래 **의견** 버튼, 또는 헤더 ☰ → **의견 보내기**로 제보해 주세요.
 
 ## 알아 두실 것
 
@@ -21,6 +21,7 @@ URL: https://saju-diary.vercel.app
 
 - [x] Vercel Production: `NEXT_PUBLIC_FF_NEW_DIARY` 등 ON, `OPENAI_API_KEY` 있음, `NEXT_PUBLIC_E2E_CONSERVATIVE_FLAGS` 없음
 - [x] Supabase: migration **025** 적용 (`verify-025-profile-scope` / backfill OK)
+- [ ] Supabase: migration **028** (`beta_feedback`), **029** (`none_special`/`other` 태그) 적용
 - [x] 명언 `quote_library` ≈47행 + embedding 샘플 확인
 - [ ] Auth Redirect(수동): Site URL + **`https://saju-diary.vercel.app/auth/callback`**
   - `https://example.com/auth/callback`, 옛 `manseryeok-self…` 는 **삭제**

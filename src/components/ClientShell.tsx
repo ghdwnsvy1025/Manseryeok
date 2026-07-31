@@ -8,6 +8,7 @@ import ProgressCelebrationHost from "@/components/motion/ProgressCelebrationHost
 import ClickBurstHost from "@/components/motion/ClickBurstHost";
 import PostHogInit from "@/components/analytics/PostHogInit";
 import FirstVisitWelcome from "@/components/onboarding/FirstVisitWelcome";
+import BetaFeedbackHost from "@/components/feedback/BetaFeedbackHost";
 import { reconcileLocalStateWithAuthUser } from "@/lib/diary/profileStorage";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { resetDiaryStorageCache } from "@/lib/diary/getStorage";
@@ -97,6 +98,7 @@ export default function ClientShell({ children }: { children: React.ReactNode })
             <ProgressCelebrationHost />
             <ClickBurstHost />
             <FirstVisitWelcome />
+            <BetaFeedbackHost />
           </div>
         </div>
       </div>

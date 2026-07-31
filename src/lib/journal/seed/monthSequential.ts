@@ -30,8 +30,8 @@ import type { HappinessScore } from "@/lib/journal/happinessScale";
 export const MONTH_SEED_MARKER = "[admin_month_seed]";
 
 /**
- * supabase/migrations/008 에 실제로 insert 된 태그만.
- * 클라이언트 EVENT_TAG_CATALOG의 none_special/other 는 DB에 없어 FK 위반을 낸다.
+ * supabase/migrations/008(+029) 에 실제로 insert 된 태그만.
+ * none_special / other 는 029에서 카탈로그에 추가됨.
  */
 const DB_SEEDED_TAG_CODES = [
   "new_start",

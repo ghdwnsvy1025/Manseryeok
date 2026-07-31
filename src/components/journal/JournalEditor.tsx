@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { getJournalStorage } from "@/lib/journal/getStorage";
@@ -28,6 +28,7 @@ import type { SajuProfile } from "@/lib/diary/types";
 import { scheduleAstrologySnapshotAfterJournalSave } from "@/lib/astrology/scheduleAfterJournal";
 import { schedulePersonalizationTrainAfterJournalSave } from "@/lib/personalization/scheduleAfterJournal";
 import type { JournalSaveResult } from "@/lib/journal/storage";
+import { autosizeTextarea } from "@/lib/ui/autosizeTextarea";
 import TodayQuestionCard from "@/components/journal/TodayQuestionCard";
 import JournalSaveCompleteModal from "@/components/journal/JournalSaveCompleteModal";
 import ScoreSlider from "@/components/journal/ScoreSlider";
@@ -68,6 +69,7 @@ export default function JournalEditor({ initialDate }: Props) {
   const [entryScoreCodes, setEntryScoreCodes] = useState<CategoryCode[]>([]);
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
   const [content, setContent] = useState("");
+  const diaryTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const [overall, setOverall] = useState<JournalScore | null>(null);
   const [mood, setMood] = useState<string | null>(null);
   const [mainEvent, setMainEvent] = useState("");
@@ -123,6 +125,10 @@ export default function JournalEditor({ initialDate }: Props) {
     () => new Set(allEntries.map((e) => e.entryDate)).size,
     [allEntries]
   );
+
+  useLayoutEffect(() => {
+    autosizeTextarea(diaryTextareaRef.current, { minPx: 160, maxPx: 480 });
+  }, [content, date]);
 
   useEffect(() => {
     let cancelled = false;
@@ -726,15 +732,23 @@ export default function JournalEditor({ initialDate }: Props) {
       <section className="space-y-2">
         <p className="ui-section-title">자유 일기</p>
         <textarea
+          ref={diaryTextareaRef}
           value={content}
-          onChange={(e) => setContent(e.target.value)}
-          rows={5}
+          onChange={(e) => {
+            setContent(e.target.value);
+            autosizeTextarea(e.target, { minPx: 160, maxPx: 480 });
+          }}
+          onFocus={(e) =>
+            autosizeTextarea(e.target, { minPx: 160, maxPx: 480 })
+          }
+          rows={6}
           placeholder="오늘의 이야기를 남겨보세요. (저장 시 AI가 점수를 보조 추출합니다)"
-          className="w-full px-3 py-2 border-2 text-sm resize-none"
+          className="w-full px-3 py-3 border-2 text-sm resize-none leading-relaxed"
           style={{
             background: "var(--px-bg3)",
             borderColor: "var(--px-border)",
             color: "var(--px-text-on-panel)",
+            minHeight: 160,
           }}
         />
       </section>
