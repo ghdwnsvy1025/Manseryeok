@@ -1,6 +1,7 @@
 /**
- * OpenAI 호출 상태 (관리자 디버그용)
- * 일반 사용자 UI에는 노출하지 않음 — useIsAdmin()과 함께 사용.
+ * OpenAI 호출 상태
+ * - formatOpenAiStatus: 관리자 디버그용 (기술 용어)
+ * - formatOpenAiUserHint: 일반 사용자용 짧은 안내
  */
 
 export type OpenAiStatusKind =
@@ -43,4 +44,33 @@ export function formatOpenAiStatus(status: OpenAiCallStatus): string {
   }
   const reason = status.reason ? ` · ${status.reason}` : "";
   return `OpenAI 사용 실패 · 기본 알고리즘 적용${reason}`;
+}
+
+/** 일반 사용자에게 살짝 남기는 출처 안내 (브랜드·에러 코드 없음) */
+export function formatOpenAiUserHint(
+  status: OpenAiCallStatus,
+  surface: "content" | "scores" = "content"
+): string {
+  if (surface === "scores") {
+    if (status.kind === "used") return "점수 읽기에 AI 보조를 썼어요";
+    if (status.kind === "skipped") {
+      const d = status.detail ?? "";
+      if (d.includes("수정")) return "수정 저장이라 기존 점수 분석을 유지했어요";
+      return "점수는 입력값 기준으로 정리했어요";
+    }
+    return "점수는 입력값 기준으로 정리했어요";
+  }
+
+  if (status.kind === "used") return "AI로 오늘에 맞춰 다듬었어요";
+  if (status.kind === "skipped") {
+    const d = (status.detail ?? "").toLowerCase();
+    if (d.includes("cache") || d.includes("cached")) {
+      return "오늘 맞춰 둔 문장을 다시 보여 드려요";
+    }
+    if (d.includes("수정")) {
+      return "수정 저장이라 기존 분석을 유지했어요";
+    }
+    return "기본 문장으로 보여 드려요";
+  }
+  return "기본 문장으로 보여 드려요";
 }

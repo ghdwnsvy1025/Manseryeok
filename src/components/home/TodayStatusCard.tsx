@@ -4,10 +4,8 @@ import { useEffect, useLayoutEffect, useState, type CSSProperties, type ReactNod
 import { todayDateString } from "@/lib/diary/dayPillar";
 import type { HomeEStats } from "@/lib/journal/homeStats";
 import {
-  formatOpenAiStatus,
   type OpenAiCallStatus,
 } from "@/lib/journal/openaiStatus";
-import { useIsAdmin } from "@/hooks/useIsAdmin";
 import {
   describeRecentHappiness,
   STATUS_FOCUS_EMOJI,
@@ -19,6 +17,7 @@ import {
   recentStatusFingerprint,
   saveRecentStatusCache,
 } from "@/lib/journal/recentStatusCache";
+import OpenAiOriginHint from "@/components/journal/OpenAiOriginHint";
 import WaveText from "@/components/motion/WaveText";
 import WeekTopicsCard from "@/components/journal/WeekTopicsCard";
 import type { WeekTopicSummary } from "@/lib/journal/topics/weekTopics";
@@ -260,7 +259,6 @@ export default function TodayStatusCard({
   weekTopics,
   weekTopicSupportItems = [],
 }: Props) {
-  const isAdmin = useIsAdmin();
   const [status, setStatus] = useState<RecentStatusPayload | null>(null);
   const [openAi, setOpenAi] = useState<OpenAiCallStatus | null>(null);
   const [loading, setLoading] = useState(true);
@@ -491,11 +489,7 @@ export default function TodayStatusCard({
           <WeekTopicsCard summary={displayWeekTopics} variant="focus" />
         ) : null}
 
-        {isAdmin && openAi && (
-          <p className="text-xs" style={{ color: "var(--px-text2)" }}>
-            {formatOpenAiStatus(openAi)}
-          </p>
-        )}
+        <OpenAiOriginHint status={openAi} className="text-[10px] leading-relaxed" />
       </div>
     </section>
   );

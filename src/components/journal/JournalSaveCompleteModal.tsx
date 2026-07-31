@@ -2,10 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  formatOpenAiStatus,
   type OpenAiCallStatus,
 } from "@/lib/journal/openaiStatus";
-import { useIsAdmin } from "@/hooks/useIsAdmin";
 import { progressFromTotalXp } from "@/lib/product/personalizationLevel";
 import { formatFinalScore } from "@/lib/journal/finalScore";
 import { getCategoryByCode } from "@/lib/journal/categoryCatalog";
@@ -13,6 +11,7 @@ import { getTagName } from "@/lib/journal/eventTagCatalog";
 import type { JournalEntry } from "@/lib/journal/types";
 import type { JournalSaveResult } from "@/lib/journal/storage";
 import ContentFeedbackButtons from "@/components/journal/ContentFeedbackButtons";
+import OpenAiOriginHint from "@/components/journal/OpenAiOriginHint";
 import { submitContentFeedback } from "@/lib/journal/contentFeedback";
 import { trackContentExposure } from "@/lib/journal/exposure";
 import { burstFromElement, prefersReducedMotion } from "@/lib/ui/clickBurst";
@@ -112,7 +111,6 @@ export default function JournalSaveCompleteModal({
   deliveryId,
   onClose,
 }: Props) {
-  const isAdmin = useIsAdmin();
   const [gauge, setGauge] = useState(0);
   const [xpFloatVisible, setXpFloatVisible] = useState(false);
   const [savedLocal, setSavedLocal] = useState(false);
@@ -493,6 +491,10 @@ export default function JournalSaveCompleteModal({
                   >
                     — {attributionLine}
                   </p>
+                  <OpenAiOriginHint
+                    status={quoteOpenAi}
+                    className="text-[10px] leading-relaxed"
+                  />
                 </blockquote>
                 <div className="save-quote-actions flex gap-2 relative">
                   <button
@@ -763,18 +765,8 @@ export default function JournalSaveCompleteModal({
             )}
           </section>
 
-          {isAdmin && (
-            <div
-              className="text-[10px] space-y-0.5"
-              style={{ color: "var(--px-text2)" }}
-            >
-              {openAiExtract && (
-                <p>점수 추출: {formatOpenAiStatus(openAiExtract)}</p>
-              )}
-              {quoteOpenAi && (
-                <p>오늘의 문장: {formatOpenAiStatus(quoteOpenAi)}</p>
-              )}
-            </div>
+          {openAiExtract && (
+            <OpenAiOriginHint status={openAiExtract} surface="scores" />
           )}
         </div>
 

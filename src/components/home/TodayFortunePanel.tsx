@@ -2,10 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import {
-  formatOpenAiStatus,
   type OpenAiCallStatus,
 } from "@/lib/journal/openaiStatus";
-import { useIsAdmin } from "@/hooks/useIsAdmin";
 import type { FortuneSection } from "@/lib/journal/todayFortune";
 import type {
   FortuneDomainCode,
@@ -18,6 +16,7 @@ import {
 } from "@/lib/app/featureFlags";
 import { trackContentExposure } from "@/lib/journal/exposure";
 import ContentFeedbackButtons from "@/components/journal/ContentFeedbackButtons";
+import OpenAiOriginHint from "@/components/journal/OpenAiOriginHint";
 import type { FortuneEvidence } from "@/lib/journal/fortune/evidence";
 import { sajuProfileFortuneFingerprint } from "@/lib/journal/fortune/profileFingerprint";
 import type { SajuProfile } from "@/lib/diary/types";
@@ -737,7 +736,6 @@ export default function TodayFortunePanel({
   entries = EMPTY_ENTRIES,
   enabledCodes = EMPTY_CODES,
 }: Props) {
-  const isAdmin = useIsAdmin();
   const v2 = isDailyFortuneV2Enabled();
   const [open, setOpen] = useState(false);
   const [panelOpen, setPanelOpen] = useState(false);
@@ -1168,14 +1166,7 @@ export default function TodayFortunePanel({
                     {presentation.notice}
                   </p>
                 )}
-                {isAdmin && openAi && (
-                  <p
-                    className="text-[10px]"
-                    style={{ color: "var(--px-text2)" }}
-                  >
-                    {formatOpenAiStatus(openAi)}
-                  </p>
-                )}
+                <OpenAiOriginHint status={openAi} className="mt-1 text-[10px] leading-relaxed" />
               </div>
 
               {evidence && (
@@ -1292,14 +1283,7 @@ export default function TodayFortunePanel({
                     </p>
                   </div>
                 ))}
-              {isAdmin && openAi && (
-                <p
-                  className="text-[10px] pt-1"
-                  style={{ color: "var(--px-text2)" }}
-                >
-                  {formatOpenAiStatus(openAi)}
-                </p>
-              )}
+              <OpenAiOriginHint status={openAi} className="text-[10px] pt-1 leading-relaxed" />
             </div>
           )}
         </div>

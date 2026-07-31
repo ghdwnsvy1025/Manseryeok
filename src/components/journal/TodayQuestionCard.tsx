@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  formatOpenAiStatus,
   type OpenAiCallStatus,
 } from "@/lib/journal/openaiStatus";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
@@ -17,6 +16,7 @@ import { trackContentExposure } from "@/lib/journal/exposure";
 import { sajuProfileFortuneFingerprint } from "@/lib/journal/fortune/profileFingerprint";
 import type { SajuProfile } from "@/lib/diary/types";
 import type { FortuneQuestionContext } from "@/lib/journal/weekThemeSummary";
+import OpenAiOriginHint from "@/components/journal/OpenAiOriginHint";
 
 type KeywordRow = {
   code?: string;
@@ -689,11 +689,7 @@ export default function TodayQuestionCard({
         </div>
       )}
 
-      {isAdmin && openAi && (
-        <p className="text-[10px] text-center" style={{ color: "var(--px-text2)" }}>
-          {formatOpenAiStatus(openAi)}
-        </p>
-      )}
+      <OpenAiOriginHint status={openAi} className="text-[10px] text-center leading-relaxed" />
 
       {showDebug && debug && (
         <div className="pt-1 border-t" style={{ borderColor: "var(--px-border)" }}>
