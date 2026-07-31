@@ -13,13 +13,8 @@ type Props = {
   onGuest: () => void;
 };
 
-type EmailMode = "login" | "signup";
-
+/** 웰컴 게이트 — Google 전용 (이메일 가입은 확인 메일 이슈로 제외) */
 export default function WelcomeAuthGate({ onGuest }: Props) {
-  const [emailMode, setEmailMode] = useState<EmailMode>("signup");
-  const [showEmail, setShowEmail] = useState(false);
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
 
@@ -53,57 +48,6 @@ export default function WelcomeAuthGate({ onGuest }: Props) {
     }
   };
 
-  const submitEmail = async (event: React.FormEvent) => {
-    event.preventDefault();
-    const supabase = getSupabaseBrowserClient();
-    if (!supabase) {
-      setMessage(
-        "현재 로그인 서버가 설정되지 않았습니다. 비로그인으로 먼저 사용할 수 있어요."
-      );
-      return;
-    }
-
-    disableGuestMode();
-    setLoading(true);
-    setMessage("");
-    try {
-      captureEvent(ANALYTICS_EVENTS.authEmailSubmitted, {
-        mode: emailMode,
-      });
-      if (emailMode === "signup") {
-        stashAuthNextPath("/diary/login?email=confirmed");
-        const { data, error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            emailRedirectTo: getAuthCallbackUrl(),
-          },
-        });
-        if (error) throw error;
-        if (data.session) {
-          window.location.href = "/diary/login?oauth=success";
-          return;
-        }
-        setMessage(
-          "가입 확인 메일을 보냈어요. 메일의 링크를 누르면 가입이 완료됩니다."
-        );
-      } else {
-        const { error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-        if (error) throw error;
-        window.location.href = "/diary/login?oauth=success";
-      }
-    } catch (error) {
-      setMessage(
-        error instanceof Error ? error.message : "이메일 인증에 실패했습니다."
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
-
   return (
     <div className="max-w-md mx-auto space-y-4 pb-6">
       <section
@@ -121,12 +65,12 @@ export default function WelcomeAuthGate({ onGuest }: Props) {
           시작하기
         </h1>
         <p className="text-xs font-bold pt-1" style={{ color: "var(--px-text2)" }}>
-          Google 계정이 있으면 버튼 한 번이면 시작돼요. (가입 양식 없음)
+          Google 한 번이면 가입·로그인 끝. 확인 메일 없이 바로 시작해요.
         </p>
       </section>
 
       <section
-        className="p-4 border-2 space-y-2"
+        className="p-4 border-2 space-y-3"
         style={{ background: "var(--px-bg3)", borderColor: "var(--px-border)" }}
         aria-label="로그인 방법 선택"
       >
@@ -134,118 +78,22 @@ export default function WelcomeAuthGate({ onGuest }: Props) {
           type="button"
           disabled={loading}
           onClick={() => void startGoogle()}
-          className="w-full px-4 py-3 text-sm font-bold border-2"
-          style={{ background: "#fff", borderColor: "#111", color: "#111" }}
-        >
-          Google로 3초 만에 시작
-        </button>
-
-        <button
-          type="button"
-          disabled={loading}
-          onClick={() => setShowEmail((value) => !value)}
-          className="w-full px-4 py-3 text-sm font-bold border-2"
+          className="w-full px-4 py-4 text-base font-black border-2"
           style={{
-            background: "var(--px-bg2)",
-            borderColor: "var(--px-accent)",
-            color: "var(--px-accent)",
+            background: "var(--px-accent)",
+            borderColor: "#000",
+            color: "#111",
+            boxShadow: "4px 4px 0 #000",
           }}
-          aria-expanded={showEmail}
         >
-          이메일이 더 편해요
+          {loading ? "연결 중…" : "Google로 3초 만에 시작"}
         </button>
-
-        {showEmail && (
-          <form
-            onSubmit={submitEmail}
-            className="mt-2 p-3 border space-y-2"
-            style={{
-              borderColor: "var(--px-border)",
-              background: "var(--px-bg2)",
-            }}
-          >
-            <div className="grid grid-cols-2 gap-1">
-              <button
-                type="button"
-                onClick={() => setEmailMode("signup")}
-                className="px-2 py-2 text-xs font-bold border"
-                style={{
-                  borderColor:
-                    emailMode === "signup"
-                      ? "var(--px-accent)"
-                      : "var(--px-border)",
-                  color:
-                    emailMode === "signup"
-                      ? "var(--px-accent)"
-                      : "var(--px-text2)",
-                }}
-              >
-                가입
-              </button>
-              <button
-                type="button"
-                onClick={() => setEmailMode("login")}
-                className="px-2 py-2 text-xs font-bold border"
-                style={{
-                  borderColor:
-                    emailMode === "login"
-                      ? "var(--px-accent)"
-                      : "var(--px-border)",
-                  color:
-                    emailMode === "login"
-                      ? "var(--px-accent)"
-                      : "var(--px-text2)",
-                }}
-              >
-                로그인
-              </button>
-            </div>
-            <input
-              id="welcome-email"
-              type="email"
-              autoComplete="email"
-              required
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              placeholder="이메일"
-              className="w-full px-3 py-2 text-sm border-2"
-              style={{
-                background: "var(--px-bg3)",
-                borderColor: "var(--px-border)",
-                color: "var(--px-text)",
-              }}
-            />
-            <input
-              id="welcome-password"
-              type="password"
-              autoComplete={
-                emailMode === "signup" ? "new-password" : "current-password"
-              }
-              minLength={8}
-              required
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              placeholder="비밀번호 (8자 이상)"
-              className="w-full px-3 py-2 text-sm border-2"
-              style={{
-                background: "var(--px-bg3)",
-                borderColor: "var(--px-border)",
-                color: "var(--px-text)",
-              }}
-            />
-            <button
-              type="submit"
-              disabled={loading}
-              className="ui-primary-btn w-full py-3 text-sm"
-            >
-              {loading
-                ? "처리 중..."
-                : emailMode === "signup"
-                  ? "가입하기"
-                  : "로그인하기"}
-            </button>
-          </form>
-        )}
+        <p
+          className="text-[11px] font-bold text-center leading-snug"
+          style={{ color: "var(--px-text2)" }}
+        >
+          추천 · 가장 빠르고 안정적이에요
+        </p>
       </section>
 
       <button

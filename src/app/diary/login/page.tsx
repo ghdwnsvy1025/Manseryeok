@@ -62,9 +62,6 @@ function safeNextPath(raw: string | null): string | null {
 }
 
 export default function DiaryLoginPage() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [mode, setMode] = useState<"login" | "signup">("login");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [importReady, setImportReady] = useState<ImportReady | null>(null);
@@ -192,67 +189,6 @@ export default function DiaryLoginPage() {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const supabase = getSupabaseBrowserClient();
-    if (!supabase) {
-      setMessage("로그인 서버가 설정되지 않았습니다.");
-      return;
-    }
-
-    setLoading(true);
-    setMessage("");
-    disableGuestMode();
-
-    try {
-      if (mode === "signup") {
-        const nextPath = nextPathRef.current
-          ? `/diary/login?email=confirmed&next=${encodeURIComponent(nextPathRef.current)}`
-          : "/diary/login?email=confirmed";
-        stashAuthNextPath(nextPath);
-        const { data, error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            emailRedirectTo: getAuthCallbackUrl(),
-          },
-        });
-        if (error) throw error;
-        if (data.session) {
-          setCurrentEmail(data.user?.email ?? email);
-          setShowLoginForm(false);
-          const needsImport = await prepareImportPrompt();
-          if (!needsImport) {
-            goHomeOrNext();
-            return;
-          }
-          setMessage("이 기기 옛 기록을 계정에 합칠까요?");
-        } else {
-          setMessage("가입 메일을 보냈어요. 메일 확인 후 로그인해 주세요.");
-          setMode("login");
-        }
-      } else {
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-        if (error) throw error;
-        setCurrentEmail(data.user.email ?? email);
-        setShowLoginForm(false);
-        const needsImport = await prepareImportPrompt();
-        if (!needsImport) {
-          goHomeOrNext();
-          return;
-        }
-        setMessage("이 기기 옛 기록을 계정에 합칠까요?");
-      }
-    } catch (err) {
-      setMessage(err instanceof Error ? err.message : "처리에 실패했습니다.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleLogout = async () => {
     const supabase = getSupabaseBrowserClient();
     if (!supabase) return;
@@ -288,7 +224,6 @@ export default function DiaryLoginPage() {
       setCurrentEmail(null);
       setShowLoginForm(true);
       setImportReady(null);
-      setMode("login");
     } catch (err) {
       setMessage(err instanceof Error ? err.message : "전환에 실패했습니다.");
     } finally {
@@ -381,99 +316,26 @@ export default function DiaryLoginPage() {
             </div>
           ) : (
             <div className="space-y-3">
+              <p
+                className="text-[12px] font-bold leading-snug"
+                style={{ color: "var(--px-text2)" }}
+              >
+                Google로 시작하면 확인 메일 없이 바로 로그인돼요.
+              </p>
               <button
                 type="button"
                 onClick={() => void handleGoogleLogin()}
                 disabled={loading}
-                className="w-full px-4 py-3.5 text-base font-black border-2"
+                className="w-full px-4 py-4 text-base font-black border-2"
                 style={{
-                  background: "#fff",
-                  borderColor: "#111",
+                  background: "var(--px-accent)",
+                  borderColor: "#000",
                   color: "#111",
+                  boxShadow: "4px 4px 0 #000",
                 }}
               >
-                Google로 계속하기
+                {loading ? "연결 중…" : "Google로 계속하기"}
               </button>
-
-              <div className="flex items-center gap-2" aria-hidden="true">
-                <span
-                  className="h-px flex-1"
-                  style={{ background: "var(--px-border)" }}
-                />
-                <span className="text-xs font-bold" style={{ color: "var(--px-text2)" }}>
-                  또는
-                </span>
-                <span
-                  className="h-px flex-1"
-                  style={{ background: "var(--px-border)" }}
-                />
-              </div>
-
-              <form onSubmit={handleSubmit} className="space-y-3">
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="이메일"
-                  aria-label="이메일"
-                  required
-                  className="w-full px-3 py-3 text-base border-2"
-                  style={{
-                    background: "var(--px-bg2)",
-                    borderColor: "var(--px-border)",
-                    color: "var(--px-text)",
-                  }}
-                />
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="비밀번호"
-                  aria-label="비밀번호"
-                  required
-                  minLength={8}
-                  autoComplete={
-                    mode === "signup" ? "new-password" : "current-password"
-                  }
-                  className="w-full px-3 py-3 text-base border-2"
-                  style={{
-                    background: "var(--px-bg2)",
-                    borderColor: "var(--px-border)",
-                    color: "var(--px-text)",
-                  }}
-                />
-                <div className="flex gap-2">
-                  <button
-                    type="submit"
-                    disabled={loading}
-                    className="flex-1 px-4 py-3.5 text-base font-black border-2"
-                    style={{
-                      background: "var(--px-accent)",
-                      borderColor: "#000",
-                      color: "#000",
-                    }}
-                  >
-                    {loading
-                      ? "처리 중..."
-                      : mode === "login"
-                        ? "로그인"
-                        : "가입하기"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setMode(mode === "login" ? "signup" : "login")
-                    }
-                    className="px-4 py-3.5 text-sm font-bold border-2"
-                    style={{
-                      borderColor: "var(--px-border)",
-                      color: "var(--px-text2)",
-                    }}
-                  >
-                    {mode === "login" ? "가입" : "로그인"}
-                  </button>
-                </div>
-              </form>
 
               {!loggedIn && (
                 <button
