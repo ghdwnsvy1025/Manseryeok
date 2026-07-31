@@ -58,6 +58,12 @@ type Props = {
   sajuProfile: unknown | null;
   /** sheet: 전체화면 작성 팝업용 — 티즈 없이 바로 질문 로드·표시 */
   variant?: "default" | "sheet";
+  /** 질문이 준비되면 (시트에서 완료 후 피드백용) */
+  onQuestionReady?: (meta: {
+    question: string;
+    keywords: string[];
+    keywordCodes: string[];
+  }) => void;
 };
 
 type Phase = "idle" | "loading" | "ready";
@@ -285,6 +291,7 @@ export default function TodayQuestionCard({
   entries,
   sajuProfile,
   variant = "default",
+  onQuestionReady,
 }: Props) {
   const isSheet = variant === "sheet";
   const isAdmin = useIsAdmin();
@@ -312,6 +319,8 @@ export default function TodayQuestionCard({
   }>({ questionText: null, keywords: [] });
   const requestIdRef = useRef(0);
   const autoLoadStartedRef = useRef(false);
+  const onQuestionReadyRef = useRef(onQuestionReady);
+  onQuestionReadyRef.current = onQuestionReady;
 
   // 날짜가 바뀌면 캐시 복원(당일 유지) 또는 idle — 운세처럼 접힌 채 시작
   useEffect(() => {
@@ -358,6 +367,15 @@ export default function TodayQuestionCard({
     setDebug(null);
     contextRef.current = { questionText: null, keywords: [] };
   }, [todayDate, sajuProfile, isSheet]);
+
+  useEffect(() => {
+    if (phase !== "ready" || !question) return;
+    onQuestionReadyRef.current?.({
+      question,
+      keywords,
+      keywordCodes,
+    });
+  }, [phase, question, keywords, keywordCodes]);
 
   useEffect(() => {
     return () => {
@@ -622,54 +640,57 @@ export default function TodayQuestionCard({
     );
   }
 
-  return (
-    <section
-      className={`fortune-readable ${isSheet ? "px-3 py-2.5 space-y-2" : "px-3 py-3 border-2 space-y-2"}`}
-      style={
-        isSheet
-          ? {
-              background: "transparent",
-              border: "none",
-              boxShadow: "none",
-            }
-          : {
-              borderColor: "var(--px-border2)",
-              background: "var(--px-bg2)",
-              boxShadow: "2px 2px 0 #000",
-            }
-      }
-    >
-      {!isSheet ? (
-        <button
-          type="button"
-          className="w-full text-left"
-          onClick={() => setPanelOpen(false)}
-          aria-expanded={panelOpen}
-        >
-          <p
-            className="text-[11px] font-black tracking-wider text-center"
-            style={{ color: "var(--px-text2)" }}
-          >
-            오늘의 질문 · 접기 ↑
-          </p>
-          <p
-            className="mt-1 text-[1.2rem] font-black leading-[1.35] tracking-tight text-center fortune-reveal-title"
-            style={{ color: "var(--px-accent)", animationDelay: "60ms" }}
-          >
-            잠들기 전, 한 번만
-          </p>
-        </button>
-      ) : (
+  // 시트: 질문 문장만 (피드백·힌트는 완료 직후 시트로)
+  if (isSheet && question) {
+    return (
+      <section className="px-3 py-2.5 space-y-1.5 fortune-readable">
         <p
           className="text-[11px] font-black tracking-wider text-center"
           style={{ color: "var(--px-accent)" }}
         >
           오늘의 질문
         </p>
-      )}
+        <p
+          className="text-[14px] font-bold leading-relaxed text-center"
+          style={{ color: "var(--px-text-on-panel)", lineHeight: 1.55 }}
+        >
+          {question}
+        </p>
+      </section>
+    );
+  }
+
+  return (
+    <section
+      className="px-3 py-3 border-2 space-y-2 fortune-readable"
+      style={{
+        borderColor: "var(--px-border2)",
+        background: "var(--px-bg2)",
+        boxShadow: "2px 2px 0 #000",
+      }}
+    >
+      <button
+        type="button"
+        className="w-full text-left"
+        onClick={() => setPanelOpen(false)}
+        aria-expanded={panelOpen}
+      >
+        <p
+          className="text-[11px] font-black tracking-wider text-center"
+          style={{ color: "var(--px-text2)" }}
+        >
+          오늘의 질문 · 접기 ↑
+        </p>
+        <p
+          className="mt-1 text-[1.2rem] font-black leading-[1.35] tracking-tight text-center fortune-reveal-title"
+          style={{ color: "var(--px-accent)", animationDelay: "60ms" }}
+        >
+          잠들기 전, 한 번만
+        </p>
+      </button>
 
       <p
-        className={`font-bold leading-relaxed text-center fortune-reveal ${isSheet ? "text-[14px]" : "text-[15px]"}`}
+        className="text-[15px] font-bold leading-relaxed text-center fortune-reveal"
         style={{
           color: "var(--px-text-on-panel)",
           lineHeight: 1.55,
