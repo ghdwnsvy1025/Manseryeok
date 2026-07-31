@@ -1,10 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import {
-  ensureAnonymousSession,
-  startGoogleAuth,
-} from "@/lib/auth/anonymousSession";
+import { startGoogleAuth } from "@/lib/auth/anonymousSession";
 import { unlockEntry } from "@/lib/auth/entryGate";
 import {
   getAuthCallbackUrl,
@@ -12,7 +9,6 @@ import {
 } from "@/lib/auth/redirectOrigin";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { ANALYTICS_EVENTS, captureEvent } from "@/lib/analytics/posthog";
-import { autoMigrateLocalJournalToAccount } from "@/lib/auth/autoMigrateLocalJournal";
 import { enableGuestMode } from "@/lib/auth/guestMode";
 
 type Props = {
@@ -60,10 +56,10 @@ export default function WelcomeAuthGate({
   const startAsGuest = async () => {
     setLoading("guest");
     setMessage("");
-    await ensureAnonymousSession();
+    // 기기 로컬만 사용. 익명 세션을 새로 만들면 빈 원격 프로필이 로컬을 덮어
+    // 비로그인 재진입마다 사주/일기가 초기화되는 문제가 난다.
     enableGuestMode();
     unlockEntry();
-    void autoMigrateLocalJournalToAccount();
     setLoading(null);
     onGuest();
   };

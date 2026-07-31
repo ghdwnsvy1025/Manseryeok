@@ -109,10 +109,14 @@ export function clearLocalAccountScopedState(opts?: {
 /**
  * auth user가 바뀌면 로컬 계정 스코프 상태를 정리한다.
  * - 로그아웃(→ null): 기기 로컬 프로필·일기 유지 (비로그인 재진입)
+ * - 익명/게스트: 로컬 유지 (비로그인 재진입 시 새 익명 id가 나와도 유지)
  * - 게스트 → 첫 로그인: 로컬 유지 후 이관
- * - 다른 계정으로 전환: 이관 불가면 이전 캐시 삭제
+ * - 다른(실제) 계정으로 전환: 이관 불가면 이전 캐시 삭제
  */
-export function reconcileLocalStateWithAuthUser(userId: string | null): void {
+export function reconcileLocalStateWithAuthUser(
+  userId: string | null,
+  opts?: { isAnonymous?: boolean }
+): void {
   if (typeof window === "undefined") return;
   let prev: string | null = null;
   try {
@@ -132,10 +136,13 @@ export function reconcileLocalStateWithAuthUser(userId: string | null): void {
     return;
   }
 
-  // 다른 로그인 사용자로 바뀔 때, 로컬이 그 계정 것이 아니면 비움
-  if (prev && prev !== userId) {
-    if (!localProfilesSafeToMigrate(loadLocalSajuProfiles(), userId)) {
-      clearLocalAccountScopedState({ notify: true });
+  // 익명/게스트는 기기 로컬이 소스 — 절대 비우지 않음
+  if (!opts?.isAnonymous) {
+    // 다른 로그인 사용자로 바뀔 때, 로컬이 그 계정 것이 아니면 비움
+    if (prev && prev !== userId) {
+      if (!localProfilesSafeToMigrate(loadLocalSajuProfiles(), userId)) {
+        clearLocalAccountScopedState({ notify: true });
+      }
     }
   }
 
@@ -554,7 +561,11 @@ export async function syncLocalSajuProfileToAccount(): Promise<SajuProfile | nul
     return loadLocalSajuProfiles().find((p) => p.isPrimary) ?? loadLocalSajuProfiles()[0] ?? null;
   }
 
-  reconcileLocalStateWithAuthUser(user.id);
+  const anon = Boolean(
+    (user as { is_anonymous?: boolean }).is_anonymous ||
+      user.app_metadata?.provider === "anonymous"
+  );
+  reconcileLocalStateWithAuthUser(user.id, { isAnonymous: anon });
 
   const { data: existing, error } = await supabase
     .from("saju_profiles")
@@ -580,7 +591,8 @@ export async function syncLocalSajuProfileToAccount(): Promise<SajuProfile | nul
   }
 
   const localProfiles = loadLocalSajuProfiles();
-  if (!localProfilesSafeToMigrate(localProfiles, user.id)) {
+  // 익명 재진입: 이전 익명 userId가 찍혀 있어도 로컬을 유지·재연결
+  if (!anon && !localProfilesSafeToMigrate(localProfiles, user.id)) {
     clearLocalAccountScopedState({ notify: true });
     return null;
   }
@@ -607,6 +619,10 @@ export async function loadAllSajuProfiles(): Promise<SajuProfile[]> {
       data: { user },
     } = await supabase.auth.getUser();
     if (user) {
+      const anon = Boolean(
+        (user as { is_anonymous?: boolean }).is_anonymous ||
+          user.app_metadata?.provider === "anonymous"
+      );
       // 계정 전환 정리는 ClientShell reconcile에만 맡긴다.
       // 여기서 다시 clear 하면 방금 만든 프로필이 홈 게이트에서 안 보이는 레이스가 난다.
       const { data, error } = await supabase
@@ -615,6 +631,10 @@ export async function loadAllSajuProfiles(): Promise<SajuProfile[]> {
         .eq("user_id", user.id)
         .order("created_at", { ascending: true });
       if (!error && data) {
+        // 익명: 원격이 비어도 로컬 게스트 데이터를 덮어쓰지 않음
+        if (data.length === 0 && anon) {
+          return loadLocalSajuProfiles();
+        }
         const profiles = data.map((row) => rowToProfile(row as SajuProfileRow));
         saveLocalSajuProfiles(profiles);
         if (profiles.length === 0) {
@@ -635,6 +655,8 @@ export async function loadAllSajuProfiles(): Promise<SajuProfile[]> {
         return profiles;
       }
       // 로그인인데 조회 실패 시 — 타인 로컬 캐시를 보여주지 않음
+      // 익명/게스트는 기기 로컬 전체를 유지
+      if (anon) return loadLocalSajuProfiles();
       const locals = loadLocalSajuProfiles().filter(
         (p) => !p.userId || p.userId === user.id
       );

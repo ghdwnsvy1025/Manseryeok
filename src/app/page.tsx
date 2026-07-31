@@ -128,7 +128,7 @@ export default function HomePage() {
           (isGuestMode() || (user && isAnonymousUser(user)))
         ) {
           if (user && isAnonymousUser(user)) enableGuestMode();
-          void autoMigrateLocalJournalToAccount();
+          // 비로그인은 기기 로컬이 소스 — 원격 이관/덮어쓰기 하지 않음
           goAfterAuth();
           return;
         }

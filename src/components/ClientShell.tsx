@@ -56,10 +56,13 @@ export default function ClientShell({ children }: { children: React.ReactNode })
     const supabase = getSupabaseBrowserClient();
     let lastApplied: string | null | undefined = undefined;
 
-    const applyUser = (userId: string | null) => {
+    const applyUser = (
+      userId: string | null,
+      opts?: { isAnonymous?: boolean }
+    ) => {
       if (lastApplied === userId) return;
       lastApplied = userId;
-      reconcileLocalStateWithAuthUser(userId);
+      reconcileLocalStateWithAuthUser(userId, opts);
       resetDiaryStorageCache();
       resetJournalStorageCache();
       refreshUnlock();
@@ -80,7 +83,9 @@ export default function ClientShell({ children }: { children: React.ReactNode })
         } else {
           refreshUnlock();
         }
-        applyUser(user?.id ?? null);
+        applyUser(user?.id ?? null, {
+          isAnonymous: user ? isAnonymousUser(user) : false,
+        });
       })
       .catch(() => {
         applyUser(null);
@@ -94,7 +99,9 @@ export default function ClientShell({ children }: { children: React.ReactNode })
         setUnlocked(true);
         setShowChrome(!isShellChromeHidden());
       } else refreshUnlock();
-      applyUser(user?.id ?? null);
+      applyUser(user?.id ?? null, {
+        isAnonymous: user ? isAnonymousUser(user) : false,
+      });
     });
 
     const onStorage = () => refreshUnlock();
