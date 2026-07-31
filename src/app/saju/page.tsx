@@ -28,7 +28,11 @@ const SajuNatalReadingPanel = dynamic(
   {
     ssr: false,
     loading: () => (
-      <p className="ui-hint text-sm p-3 text-center">종합풀이 준비 중…</p>
+      <div
+        className="h-16 border-2"
+        style={{ borderColor: "var(--px-border)", background: "var(--px-bg2)" }}
+        aria-hidden
+      />
     ),
   }
 );

@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * /saju 원국 종합풀이 — 종합만 공개, 세부 섹션은 잠금
+ * /saju 원국 종합풀이 — 오늘의 운세처럼 한 칸 · 클릭 시 로딩 · 펼침
  */
 import { useCallback, useEffect, useState } from "react";
 import type { SajuProfile } from "@/lib/diary/types";
@@ -19,21 +19,132 @@ type ApiPayload = NatalReadingResult & {
   cached?: boolean;
 };
 
+const NATAL_TEASE_LINES = [
+  {
+    title: "내 사주, 어떤 결일까요?",
+    sub: "문을 열면 원국 종합이 보여요",
+  },
+  {
+    title: "원국이 들려주는 이야기",
+    sub: "당신만의 흐름을 짧게 읽어드려요",
+  },
+  {
+    title: "한 줄로 만나는 나의 사주",
+    sub: "눌러서 종합 풀이를 펼쳐보세요",
+  },
+] as const;
+
+const NATAL_LOADING_PHRASES = [
+  { kind: "read", line: "원국의 글자를 천천히 읽고 있어요…" },
+  { kind: "weave", line: "대운과 맞춰 결을 고르는 중…" },
+  { kind: "write", line: "종합 문장을 다듬고 있어요…" },
+] as const;
+
 function LockedRow({ title }: { title: string }) {
   return (
     <div
       className="border px-3 py-2.5 flex items-center justify-between gap-2 opacity-55"
       style={{ borderColor: "var(--px-border)", background: "var(--px-bg2)" }}
     >
-      <span
-        className="text-sm font-black"
-        style={{ color: "var(--px-text2)" }}
-      >
+      <span className="text-sm font-black" style={{ color: "var(--px-text2)" }}>
         {title}
       </span>
-      <span className="text-[10px] font-bold shrink-0" style={{ color: "var(--px-text2)" }}>
+      <span
+        className="text-[10px] font-bold shrink-0"
+        style={{ color: "var(--px-text2)" }}
+      >
         잠김
       </span>
+    </div>
+  );
+}
+
+function NatalTeaseButton({
+  onClick,
+  ready,
+}: {
+  onClick: () => void;
+  ready?: boolean;
+}) {
+  const [idx, setIdx] = useState(0);
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      setIdx((i) => (i + 1) % NATAL_TEASE_LINES.length);
+    }, 6500);
+    return () => window.clearInterval(id);
+  }, []);
+  const line = NATAL_TEASE_LINES[idx]!;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="fortune-tease w-full py-5 px-3 flex flex-col items-center text-center gap-2"
+      aria-label={ready ? "사주 종합풀이 펼치기" : "사주 종합풀이 보기"}
+    >
+      <span className="fortune-tease-pulse" aria-hidden />
+      <p
+        key={line.title}
+        className="fortune-tease-title text-[1.05rem] font-black leading-snug tracking-tight"
+        style={{ color: "var(--px-accent)" }}
+      >
+        {line.title}
+      </p>
+      <p
+        key={line.sub}
+        className="fortune-tease-sub text-[12px] font-medium leading-relaxed max-w-[18rem]"
+        style={{ color: "var(--px-text2)" }}
+      >
+        {line.sub}
+      </p>
+      <span
+        className="mt-1 text-[11px] font-black tracking-wide fortune-tease-hint"
+        style={{ color: "var(--px-text-on-panel)" }}
+      >
+        {ready ? "살짝 펼쳐보기 ↓" : "펼쳐서 종합 보기 ↓"}
+      </span>
+    </button>
+  );
+}
+
+function NatalLoadingHint() {
+  const [idx, setIdx] = useState(0);
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      setIdx((i) => (i + 1) % NATAL_LOADING_PHRASES.length);
+    }, 6200);
+    return () => window.clearInterval(id);
+  }, []);
+  const phrase = NATAL_LOADING_PHRASES[idx]!;
+  return (
+    <div
+      className="fortune-loading py-7 px-3 flex flex-col items-center text-center gap-5"
+      aria-live="polite"
+      aria-busy="true"
+    >
+      <div className="relative w-9 h-9" aria-hidden>
+        <span
+          className="absolute inset-0 rounded-full border-2 animate-spin"
+          style={{
+            borderColor: "color-mix(in srgb, var(--px-accent) 22%, transparent)",
+            borderTopColor: "var(--px-accent)",
+          }}
+        />
+      </div>
+      <div className="fortune-loading-stage max-w-[20rem] min-h-[4.5rem] flex items-center justify-center">
+        <p
+          key={`${idx}-${phrase.line.slice(0, 12)}`}
+          className="fortune-loading-phrase text-[14px] font-medium leading-[1.75] tracking-tight"
+          data-kind={phrase.kind}
+        >
+          {phrase.line}
+        </p>
+      </div>
+      <p
+        className="text-[11px] font-bold tracking-wide"
+        style={{ color: "var(--px-text2)", opacity: 0.85 }}
+      >
+        종합풀이를 고르는 중…
+      </p>
     </div>
   );
 }
@@ -42,8 +153,8 @@ export default function SajuNatalReadingPanel({ profile }: Props) {
   const isAdmin = useIsAdmin();
   const [data, setData] = useState<ApiPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [expanded, setExpanded] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [panelOpen, setPanelOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -81,9 +192,12 @@ export default function SajuNatalReadingPanel({ profile }: Props) {
     }
   }, [profile]);
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+  const openPanel = () => {
+    setPanelOpen(true);
+    if (!data && !loading) {
+      void load();
+    }
+  };
 
   const lockedTitles = data
     ? [
@@ -98,94 +212,79 @@ export default function SajuNatalReadingPanel({ profile }: Props) {
       ]
     : [];
 
+  const idle = !loading && !data && !error && !panelOpen;
+  const readyClosed = Boolean(data) && !panelOpen && !loading;
+
   return (
-    <section className="space-y-3" aria-label="원국 종합풀이">
+    <section className="space-y-2" aria-label="원국 종합풀이">
       <div className="ui-emphasize-head">
         <p className="ui-emphasize-title">사주 종합풀이</p>
-        <button
-          type="button"
-          className="text-[10px] font-black shrink-0 underline"
-          style={{ color: "var(--px-text2)" }}
-          onClick={() => setExpanded((v) => !v)}
-          disabled={loading && !data}
-        >
-          {expanded ? "접기" : "펼치기"}
-        </button>
+        {data && (
+          <button
+            type="button"
+            className="text-xs font-bold underline shrink-0"
+            style={{ color: "var(--px-text2)" }}
+            onClick={() => setPanelOpen((v) => !v)}
+            aria-expanded={panelOpen}
+          >
+            {panelOpen ? "접기" : "펼치기"}
+          </button>
+        )}
       </div>
 
       <div
-        className="p-3 border-2 space-y-3"
+        className="p-3 border-2 space-y-2"
         style={{
-          borderColor: "var(--px-accent)",
-          background: "var(--px-bg3)",
-          boxShadow: "3px 3px 0 #4a3a00",
+          borderColor: "var(--px-border)",
+          background: "var(--px-bg2)",
+          boxShadow: "2px 2px 0 #000",
         }}
       >
-        <p className="text-[10px] font-bold" style={{ color: "var(--px-text2)" }}>
-          원국·대운 중심 · 지금은 종합만 공개
-        </p>
+        {idle && <NatalTeaseButton onClick={openPanel} />}
 
-        {loading && (
-          <div
-            className="py-6 space-y-2 text-center"
-            role="status"
-            aria-live="polite"
-          >
+        {readyClosed && (
+          <NatalTeaseButton ready onClick={() => setPanelOpen(true)} />
+        )}
+
+        {loading && !data && <NatalLoadingHint />}
+
+        {error && !data && (
+          <div className="space-y-3 py-2 text-center">
             <p
-              className="text-sm font-black"
+              className="text-xs font-bold leading-relaxed"
+              style={{ color: "#f87171" }}
+            >
+              {error}
+              {error.includes("로그인") ? (
+                <span
+                  className="block text-[11px] mt-1"
+                  style={{ color: "var(--px-text2)" }}
+                >
+                  로그인 후 종합풀이를 볼 수 있어요.
+                </span>
+              ) : null}
+            </p>
+            <button
+              type="button"
+              onClick={() => void load()}
+              className="text-xs font-black underline"
               style={{ color: "var(--px-accent)" }}
             >
-              종합풀이를 만드는 중…
-            </p>
-            <p className="text-xs font-bold" style={{ color: "var(--px-text2)" }}>
-              원국을 읽고 있어요. 잠시만 기다려 주세요.
-            </p>
-            <div
-              className="mx-auto mt-2 h-1.5 w-40 overflow-hidden border relative"
-              style={{
-                borderColor: "var(--px-border)",
-                background: "var(--px-bg2)",
-              }}
-              aria-hidden
-            >
-              <div
-                className="absolute inset-y-0 left-0 w-1/2 animate-pulse"
-                style={{ background: "var(--px-accent)" }}
-              />
-            </div>
+              다시 시도
+            </button>
           </div>
         )}
 
-        {error && (
-          <p className="text-sm font-bold" style={{ color: "#f87171" }}>
-            {error}
-            {error.includes("로그인") ? (
-              <span
-                className="block text-xs mt-1 font-bold"
-                style={{ color: "var(--px-text2)" }}
-              >
-                로그인 후 종합풀이를 볼 수 있어요.
-              </span>
-            ) : null}
-          </p>
-        )}
-
-        {!loading && !error && data && !expanded && (
-          <p className="text-sm font-bold py-2" style={{ color: "var(--px-text2)" }}>
-            펼치면 종합 요약과 세부 영역을 볼 수 있어요
-          </p>
-        )}
-
-        {!loading && !error && data && expanded && (
-          <>
+        {data && panelOpen && (
+          <div className="space-y-3 fortune-readable">
             <p
-              className="text-base font-black leading-snug"
+              className="text-base font-black leading-snug text-center"
               style={{ color: "var(--px-accent)" }}
             >
               {data.headline}
             </p>
             <p
-              className="text-sm font-black"
+              className="text-sm font-black text-center"
               style={{ color: "var(--px-text-on-panel)" }}
             >
               {data.overview.oneLiner}
@@ -211,7 +310,7 @@ export default function SajuNatalReadingPanel({ profile }: Props) {
 
             <div className="space-y-2 pt-1">
               <p
-                className="text-[11px] font-bold"
+                className="text-[11px] font-bold text-center"
                 style={{ color: "var(--px-text2)" }}
               >
                 세부 풀이는 곧 열려요
@@ -228,7 +327,7 @@ export default function SajuNatalReadingPanel({ profile }: Props) {
                 {data.openAi ? ` · ${formatOpenAiStatus(data.openAi)}` : ""}
               </p>
             )}
-          </>
+          </div>
         )}
       </div>
     </section>

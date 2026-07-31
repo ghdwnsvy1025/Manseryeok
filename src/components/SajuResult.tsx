@@ -1561,42 +1561,109 @@ export default function SajuResult({
             })()}
           </div>
 
-          {/* ── 오행 분포 ── */}
+          {/* ── 오행 분포율 (강조 카드) ── */}
           <div
-            className={isMobile ? "px-2 pt-1" : "px-3 pt-1"}
-            style={{ borderTop: "1px solid var(--px-border)" }}
+            className={isMobile ? "px-2 pt-2 pb-1" : "px-3 pt-2 pb-1"}
           >
-            <div className="space-y-1.5">
-              {(Object.entries(elemPct) as [Element, number][]).map(([elem, pct]) => {
-                const c = ELEM[elem];
-                return (
-                  <div key={elem} className="flex items-center gap-2">
-                    <span
-                      className="text-xs font-black w-6 text-center"
-                      style={{ color: c.text }}
+            {(() => {
+              const ranked = (Object.entries(elemPct) as [Element, number][])
+                .slice()
+                .sort((a, b) => b[1] - a[1]);
+              const strongest = ranked[0];
+              const weakest = ranked[ranked.length - 1];
+              const strongLine =
+                strongest && weakest && strongest[0] !== weakest[0]
+                  ? `${ELEM_KO[strongest[0]]} ${strongest[1].toFixed(0)}% 강세 · ${ELEM_KO[weakest[0]]} ${weakest[1].toFixed(0)}% 약세`
+                  : strongest
+                    ? `${ELEM_KO[strongest[0]]} ${strongest[1].toFixed(0)}%`
+                    : null;
+              const strongKey = strongest?.[0] ?? null;
+
+              return (
+                <div
+                  className="p-3 border-2 space-y-2.5"
+                  style={{
+                    borderColor: "var(--px-accent)",
+                    background:
+                      "color-mix(in srgb, var(--px-accent) 10%, var(--px-bg2))",
+                    boxShadow: "3px 3px 0 #4a3a00",
+                  }}
+                  aria-label="오행 분포율"
+                >
+                  <div className="flex items-end justify-between gap-2">
+                    <p
+                      className="text-sm font-black"
+                      style={{ color: "var(--px-accent)" }}
                     >
-                      {ELEMENT_LABELS[elem]}
-                    </span>
-                    <span className="text-xs w-8" style={{ color: "var(--px-text2)" }}>
-                      {ELEM_KO[elem]}
-                    </span>
-                    <div className="flex-1 h-4 border" style={{ borderColor: "var(--px-border)", background: "var(--px-bg2)" }}>
-                      <div
-                        className="h-full transition-all"
-                        style={{
-                          width: `${pct}%`,
-                          background: c.text,
-                          boxShadow: `0 0 6px ${c.text}88`,
-                        }}
-                      />
-                    </div>
-                    <span className="text-xs font-bold w-12 text-right" style={{ color: c.text }}>
-                      {pct.toFixed(2)}%
-                    </span>
+                      오행 분포율
+                    </p>
+                    {strongLine && (
+                      <p
+                        className="text-[11px] font-bold text-right leading-snug"
+                        style={{ color: "var(--px-text-on-panel)" }}
+                      >
+                        {strongLine}
+                      </p>
+                    )}
                   </div>
-                );
-              })}
-            </div>
+                  <div className="space-y-2">
+                    {(Object.entries(elemPct) as [Element, number][]).map(
+                      ([elem, pct]) => {
+                        const c = ELEM[elem];
+                        const isStrong = elem === strongKey;
+                        return (
+                          <div key={elem} className="flex items-center gap-2">
+                            <span
+                              className={`font-black w-6 text-center ${isStrong ? "text-sm" : "text-xs"}`}
+                              style={{ color: c.text }}
+                            >
+                              {ELEMENT_LABELS[elem]}
+                            </span>
+                            <span
+                              className={`w-8 font-bold ${isStrong ? "text-sm" : "text-xs"}`}
+                              style={{
+                                color: isStrong
+                                  ? "var(--px-text-on-panel)"
+                                  : "var(--px-text2)",
+                              }}
+                            >
+                              {ELEM_KO[elem]}
+                            </span>
+                            <div
+                              className={`flex-1 border ${isStrong ? "h-5" : "h-4"}`}
+                              style={{
+                                borderColor: isStrong
+                                  ? c.text
+                                  : "var(--px-border)",
+                                background: "var(--px-bg2)",
+                              }}
+                            >
+                              <div
+                                className="h-full transition-all"
+                                style={{
+                                  width: `${pct}%`,
+                                  background: c.text,
+                                  boxShadow: isStrong
+                                    ? `0 0 8px ${c.text}aa`
+                                    : `0 0 6px ${c.text}66`,
+                                  opacity: isStrong ? 1 : 0.85,
+                                }}
+                              />
+                            </div>
+                            <span
+                              className={`font-black w-14 text-right tabular-nums ${isStrong ? "text-sm" : "text-xs"}`}
+                              style={{ color: c.text }}
+                            >
+                              {pct.toFixed(1)}%
+                            </span>
+                          </div>
+                        );
+                      }
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
           </div>
 
           <div
