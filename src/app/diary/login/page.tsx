@@ -200,6 +200,11 @@ export default function DiaryLoginPage() {
     disableGuestMode();
 
     try {
+      void import("@/lib/analytics/posthog")
+        .then(({ ANALYTICS_EVENTS, captureEvent }) => {
+          captureEvent(ANALYTICS_EVENTS.authEmailSubmitted, { mode });
+        })
+        .catch(() => undefined);
       if (mode === "signup") {
         const next = encodeURIComponent(
           nextPathRef.current

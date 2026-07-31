@@ -9,6 +9,7 @@ import {
   summarizeCascadeProbes,
   validateAccountDeleteConfirmation,
 } from "@/lib/account/deleteAccount";
+import { getPostHogServerClient } from "@/lib/analytics/posthog-server";
 
 export const runtime = "nodejs";
 
@@ -60,6 +61,16 @@ export async function POST(req: NextRequest) {
       { error: "계정 삭제에 실패했습니다." },
       { status: 500 }
     );
+  }
+
+  const posthog = getPostHogServerClient();
+  if (posthog) {
+    posthog.capture({
+      distinctId: user.id,
+      event: "account_deleted",
+      properties: { source: "api" },
+    });
+    await posthog.flush();
   }
 
   // cascade 잔존 점검 — count만, 원문 없음

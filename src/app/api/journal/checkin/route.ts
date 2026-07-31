@@ -10,6 +10,7 @@ import {
   type CoreStateCode,
 } from "@/lib/journal/checkin/catalog";
 import { MOOD_OPTIONS } from "@/lib/journal/types";
+import { getPostHogServerClient } from "@/lib/analytics/posthog-server";
 
 export const runtime = "nodejs";
 
@@ -81,6 +82,22 @@ export async function POST(req: NextRequest) {
       data: { user },
     } = await sb.auth.getUser();
     userId = user?.id ?? null;
+  }
+
+  if (userId) {
+    const posthog = getPostHogServerClient();
+    if (posthog) {
+      posthog.capture({
+        distinctId: userId,
+        event: "checkin_validated",
+        properties: {
+          mood_count: moods.length,
+          tag_count: tagCodes.length,
+          has_happiness: b.happiness != null,
+        },
+      });
+      await posthog.flush();
+    }
   }
 
   return Response.json({

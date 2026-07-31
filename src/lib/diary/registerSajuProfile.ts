@@ -133,6 +133,14 @@ export async function updateSajuProfileFromResult(
     /* local already written inside saveSajuProfile when possible */
   }
   notifySajuProfileChanged();
+  try {
+    const { captureEvent } = await import("@/lib/analytics/posthog");
+    captureEvent("saju_profile_updated", {
+      is_primary: existing.isPrimary,
+    });
+  } catch {
+    /* analytics optional */
+  }
   return profile;
 }
 
