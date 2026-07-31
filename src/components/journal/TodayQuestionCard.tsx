@@ -56,6 +56,8 @@ type Props = {
   enabledCodes: string[];
   entries: unknown[];
   sajuProfile: unknown | null;
+  /** sheet: 전체화면 작성 팝업용 — 티즈 없이 바로 질문 로드·표시 */
+  variant?: "default" | "sheet";
 };
 
 type Phase = "idle" | "loading" | "ready";
@@ -282,10 +284,12 @@ export default function TodayQuestionCard({
   enabledCodes,
   entries,
   sajuProfile,
+  variant = "default",
 }: Props) {
+  const isSheet = variant === "sheet";
   const isAdmin = useIsAdmin();
   const [phase, setPhase] = useState<Phase>("idle");
-  const [panelOpen, setPanelOpen] = useState(false);
+  const [panelOpen, setPanelOpen] = useState(isSheet);
   const [question, setQuestion] = useState<string | null>(null);
   const [openAi, setOpenAi] = useState<OpenAiCallStatus | null>(null);
   const [keywords, setKeywords] = useState<string[]>([]);
@@ -307,6 +311,7 @@ export default function TodayQuestionCard({
     keywords: string[];
   }>({ questionText: null, keywords: [] });
   const requestIdRef = useRef(0);
+  const autoLoadStartedRef = useRef(false);
 
   // 날짜가 바뀌면 캐시 복원(당일 유지) 또는 idle — 운세처럼 접힌 채 시작
   useEffect(() => {
@@ -315,10 +320,11 @@ export default function TodayQuestionCard({
     setSkipped(false);
     setFeedbackMsg("");
     setDebugOpen(false);
-    setPanelOpen(false);
+    setPanelOpen(isSheet);
     shownSent.current = false;
     answeredRef.current = false;
     dismissSentRef.current = false;
+    autoLoadStartedRef.current = false;
 
     const cached = readCachedQuestion(todayDate, sajuProfile);
     if (cached) {
@@ -351,10 +357,11 @@ export default function TodayQuestionCard({
     setKeywordCodes([]);
     setDebug(null);
     contextRef.current = { questionText: null, keywords: [] };
-  }, [todayDate, sajuProfile]);
+  }, [todayDate, sajuProfile, isSheet]);
 
   useEffect(() => {
     return () => {
+      if (isSheet) return;
       if (
         shownSent.current &&
         !answeredRef.current &&
@@ -370,7 +377,7 @@ export default function TodayQuestionCard({
         });
       }
     };
-  }, [todayDate]);
+  }, [todayDate, isSheet]);
 
   const loadQuestion = useCallback(async () => {
     if (phase === "loading") return;
@@ -563,20 +570,29 @@ export default function TodayQuestionCard({
     });
   };
 
+  // 시트 모드: 티즈 없이 자동 로드
+  useEffect(() => {
+    if (!isSheet) return;
+    if (phase !== "idle") return;
+    if (autoLoadStartedRef.current) return;
+    autoLoadStartedRef.current = true;
+    void loadQuestion();
+  }, [isSheet, phase, loadQuestion]);
+
   const showDebug = isAdmin;
 
-  if (phase === "idle") {
+  if (phase === "idle" && !isSheet) {
     return <QuestionTeaseButton onClick={() => void loadQuestion()} />;
   }
 
-  if (phase === "loading") {
+  if (phase === "idle" || phase === "loading") {
     return (
       <div
         className="border-2"
         style={{
           borderColor: "var(--px-border2)",
           background: "var(--px-bg2)",
-          boxShadow: "2px 2px 0 #000",
+          boxShadow: isSheet ? "none" : "2px 2px 0 #000",
         }}
       >
         <QuestionLoadingHint />
@@ -584,7 +600,7 @@ export default function TodayQuestionCard({
     );
   }
 
-  if (phase === "ready" && question && !panelOpen) {
+  if (phase === "ready" && question && !panelOpen && !isSheet) {
     return (
       <QuestionTeaseButton
         ready
@@ -604,38 +620,47 @@ export default function TodayQuestionCard({
 
   return (
     <section
-      className="px-4 py-4 border-2 space-y-3 fortune-readable"
+      className={`px-3 py-3 border-2 space-y-2 fortune-readable${isSheet ? " !shadow-none" : ""}`}
       style={{
         borderColor: "var(--px-border2)",
         background: "var(--px-bg2)",
-        boxShadow: "2px 2px 0 #000",
+        boxShadow: isSheet ? "none" : "2px 2px 0 #000",
       }}
     >
-      <button
-        type="button"
-        className="w-full text-left"
-        onClick={() => setPanelOpen(false)}
-        aria-expanded={panelOpen}
-      >
+      {!isSheet ? (
+        <button
+          type="button"
+          className="w-full text-left"
+          onClick={() => setPanelOpen(false)}
+          aria-expanded={panelOpen}
+        >
+          <p
+            className="text-[11px] font-black tracking-wider text-center"
+            style={{ color: "var(--px-text2)" }}
+          >
+            오늘의 질문 · 접기 ↑
+          </p>
+          <p
+            className="mt-1 text-[1.2rem] font-black leading-[1.35] tracking-tight text-center fortune-reveal-title"
+            style={{ color: "var(--px-accent)", animationDelay: "60ms" }}
+          >
+            잠들기 전, 한 번만
+          </p>
+        </button>
+      ) : (
         <p
           className="text-[11px] font-black tracking-wider text-center"
           style={{ color: "var(--px-text2)" }}
         >
-          오늘의 질문 · 접기 ↑
+          오늘의 질문
         </p>
-        <p
-          className="mt-1 text-[1.2rem] font-black leading-[1.35] tracking-tight text-center fortune-reveal-title"
-          style={{ color: "var(--px-accent)", animationDelay: "60ms" }}
-        >
-          잠들기 전, 한 번만
-        </p>
-      </button>
+      )}
 
       <p
-        className="text-[15px] font-bold leading-relaxed text-center fortune-reveal"
+        className={`font-bold leading-relaxed text-center fortune-reveal ${isSheet ? "text-[14px]" : "text-[15px]"}`}
         style={{
           color: "var(--px-text-on-panel)",
-          lineHeight: 1.65,
+          lineHeight: 1.55,
           animationDelay: "180ms",
         }}
       >

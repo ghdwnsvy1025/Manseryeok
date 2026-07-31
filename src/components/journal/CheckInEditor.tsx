@@ -33,7 +33,6 @@ import { scheduleAstrologySnapshotAfterJournalSave } from "@/lib/astrology/sched
 import { schedulePersonalizationTrainAfterJournalSave } from "@/lib/personalization/scheduleAfterJournal";
 import type { JournalSaveResult } from "@/lib/journal/storage";
 import type { HappinessScore } from "@/lib/journal/happinessScale";
-import { autosizeTextarea } from "@/lib/ui/autosizeTextarea";
 import {
   CHECKIN_TAG_GROUPS,
   CORE_STATE_CODES,
@@ -60,7 +59,7 @@ import {
 } from "@/lib/journal/checkin/mapToScores";
 import { validateCheckInSave } from "@/lib/journal/checkin/validation";
 import type { CoreStateUi, DomainStateUi } from "@/lib/journal/checkin/validation";
-import TodayQuestionCard from "@/components/journal/TodayQuestionCard";
+import DiaryWriteSheet from "@/components/journal/DiaryWriteSheet";
 import JournalSaveCompleteModal from "@/components/journal/JournalSaveCompleteModal";
 import HappinessSlider from "@/components/journal/HappinessSlider";
 import OrdinalPicker from "@/components/journal/OrdinalPicker";
@@ -164,7 +163,7 @@ export default function CheckInEditor({ initialDate }: Props) {
   const [content, setContent] = useState("");
   /** 자유 일기 시작(diary_started)은 날짜당 한 번만 발화한다. */
   const diaryStartedRef = useRef<string | null>(null);
-  const diaryTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const [writeSheetOpen, setWriteSheetOpen] = useState(false);
   const [happiness, setHappiness] = useState<HappinessScore | null>(null);
   const [moods, setMoods] = useState<string[]>([]);
   const [mainEvent, setMainEvent] = useState("");
@@ -537,10 +536,6 @@ export default function CheckInEditor({ initialDate }: Props) {
     applyDayFromListRef.current(date, allEntriesRef.current);
   }, [date]);
 
-  useLayoutEffect(() => {
-    autosizeTextarea(diaryTextareaRef.current, { minPx: 160, maxPx: 480 });
-  }, [content, date]);
-
   useEffect(() => {
     let cancelled = false;
     const dateChanged = loadedDateRef.current !== date;
@@ -550,6 +545,7 @@ export default function CheckInEditor({ initialDate }: Props) {
     prevReloadTokenRef.current = reloadToken;
 
     if (dateChanged) {
+      setWriteSheetOpen(false);
       setShowComplete(false);
       setSavedEntry(null);
       setSaveMeta(null);
@@ -1292,65 +1288,73 @@ export default function CheckInEditor({ initialDate }: Props) {
         </div>
       </header>
 
-      <section className="space-y-2" aria-label="오늘 남기기">
-        <TodayQuestionCard
-          todayDate={date}
-          enabledCodes={[...CORE_STATE_CODES]}
-          entries={allEntries}
-          sajuProfile={sajuProfile}
-        />
-        <div className="relative">
-          <textarea
-            ref={diaryTextareaRef}
-            value={content}
-            onChange={(e) => {
-              const next = e.target.value;
-              if (next.trim().length > 0 && diaryStartedRef.current !== date) {
-                diaryStartedRef.current = date;
-                void trackContentExposure({
-                  eventDate: date,
-                  contentType: "free_diary",
-                  eventType: "diary_started",
-                });
-              }
-              setContent(next);
-              autosizeTextarea(e.target, { minPx: 160, maxPx: 480 });
-            }}
-            onFocus={(e) =>
-              autosizeTextarea(e.target, { minPx: 160, maxPx: 480 })
-            }
-            rows={6}
-            placeholder="예) 오늘은 회의가 길었지만, 끝나고 산책하니 좀 풀렸다."
-            className="w-full px-3 py-3 border-2 text-sm resize-none leading-relaxed"
-            style={{
-              background: "var(--px-bg3)",
-              borderColor: content.trim()
-                ? "var(--px-accent)"
-                : "var(--px-border)",
-              color: "var(--px-text-on-panel)",
-              minHeight: 160,
-            }}
-            aria-label="오늘 한 줄"
-          />
-          {content.trim().length > 0 && (
+      <section className="space-y-2" aria-label="하루 정리글">
+        <button
+          type="button"
+          onClick={() => setWriteSheetOpen(true)}
+          className="w-full text-left px-3 py-3.5 border-2 space-y-1.5"
+          style={{
+            borderColor: content.trim() ? "var(--px-accent)" : "var(--px-border2)",
+            background: "var(--px-bg2)",
+            boxShadow: "3px 3px 0 #000",
+          }}
+        >
+          <div className="flex items-center justify-between gap-2">
             <p
-              className="ui-hint absolute bottom-2 right-2 tabular-nums pointer-events-none"
-              style={{ background: "var(--px-bg3)" }}
+              className="text-sm font-black"
+              style={{ color: "var(--px-accent)" }}
             >
-              {content.trim().length}자
+              {content.trim() ? "하루 정리글" : "하루 정리글 쓰기"}
+            </p>
+            <span
+              className="text-[11px] font-black shrink-0"
+              style={{ color: "var(--px-text2)" }}
+            >
+              {content.trim() ? "수정 ›" : "열기 ›"}
+            </span>
+          </div>
+          {content.trim() ? (
+            <p
+              className="text-[13px] font-bold leading-snug line-clamp-2"
+              style={{ color: "var(--px-text-on-panel)" }}
+            >
+              {content.trim()}
+            </p>
+          ) : (
+            <p className="text-[12px] font-bold leading-snug" style={{ color: "var(--px-text2)" }}>
+              오늘의 질문과 함께, 키보드에 가리지 않게 전체 화면에서 적어요.
             </p>
           )}
-        </div>
-        {content.trim().length === 0 ? (
-          <p className="ui-hint">
-            한 줄만 적어도 AI가 오늘 감정·점수를 읽어 운세와 문장에 반영해요.
-          </p>
-        ) : (
-          <p className="ui-hint">
-            고마워요. 남긴 글로 오늘의 문장과 운세가 더 잘 맞아요.
-          </p>
-        )}
+          {content.trim().length > 0 && (
+            <p className="ui-hint tabular-nums">{content.trim().length}자</p>
+          )}
+        </button>
+        <p className="ui-hint">
+          {content.trim().length === 0
+            ? "한 줄만 적어도 AI가 오늘 감정·점수를 읽어 운세와 문장에 반영해요."
+            : "고마워요. 남긴 글로 오늘의 문장과 운세가 더 잘 맞아요."}
+        </p>
       </section>
+
+      <DiaryWriteSheet
+        open={writeSheetOpen}
+        onClose={() => setWriteSheetOpen(false)}
+        date={date}
+        content={content}
+        onContentChange={setContent}
+        enabledCodes={[...CORE_STATE_CODES]}
+        entries={allEntries}
+        sajuProfile={sajuProfile}
+        onDiaryStarted={() => {
+          if (diaryStartedRef.current === date) return;
+          diaryStartedRef.current = date;
+          void trackContentExposure({
+            eventDate: date,
+            contentType: "free_diary",
+            eventType: "diary_started",
+          });
+        }}
+      />
 
       <section
         ref={happinessRef}
