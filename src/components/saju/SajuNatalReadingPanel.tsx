@@ -87,11 +87,6 @@ export default function SajuNatalReadingPanel({ profile }: Props) {
 
   const lockedTitles = data
     ? [
-        data.dayMaster.title,
-        data.pillars.year.title,
-        data.pillars.month.title,
-        data.pillars.day.title,
-        data.pillars.hour.title,
         data.domains.personality.title,
         data.domains.work.title,
         data.domains.relationships.title,
@@ -175,7 +170,13 @@ export default function SajuNatalReadingPanel({ profile }: Props) {
           </p>
         )}
 
-        {!loading && !error && data && (
+        {!loading && !error && data && !expanded && (
+          <p className="text-sm font-bold py-2" style={{ color: "var(--px-text2)" }}>
+            펼치면 종합 요약과 세부 영역을 볼 수 있어요
+          </p>
+        )}
+
+        {!loading && !error && data && expanded && (
           <>
             <p
               className="text-base font-black leading-snug"
@@ -208,19 +209,17 @@ export default function SajuNatalReadingPanel({ profile }: Props) {
               </p>
             </div>
 
-            {expanded && (
-              <div className="space-y-2 pt-1">
-                <p
-                  className="text-[11px] font-bold"
-                  style={{ color: "var(--px-text2)" }}
-                >
-                  세부 풀이는 곧 열려요
-                </p>
-                {lockedTitles.map((title) => (
-                  <LockedRow key={title} title={title} />
-                ))}
-              </div>
-            )}
+            <div className="space-y-2 pt-1">
+              <p
+                className="text-[11px] font-bold"
+                style={{ color: "var(--px-text2)" }}
+              >
+                세부 풀이는 곧 열려요
+              </p>
+              {lockedTitles.map((title) => (
+                <LockedRow key={title} title={title} />
+              ))}
+            </div>
 
             {isAdmin && (
               <p className="text-[10px]" style={{ color: "var(--px-text2)" }}>
