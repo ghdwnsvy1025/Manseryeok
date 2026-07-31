@@ -147,39 +147,19 @@ export default function JournalRecordCalendar({
         )}
 
         {emptyInMonth > 0 && nearestEmpty && (
-          <div
-            className="flex items-center justify-between gap-2 p-2.5 border-2"
-            style={{
-              borderColor: "var(--px-accent)",
-              background:
-                "color-mix(in srgb, var(--px-accent) 12%, var(--px-bg3))",
-            }}
-          >
-            <div className="min-w-0 space-y-0.5">
-              <p
-                className="text-[12px] font-black"
-                style={{ color: "var(--px-accent)" }}
-              >
-                빈 날 {emptyInMonth}개 · 탭해서 메우기
-              </p>
-              <p
-                className="text-[10px] font-bold leading-snug"
-                style={{ color: "var(--px-text2)" }}
-              >
-                메울수록 운세·패턴이 더 정확해져요
-              </p>
-            </div>
+          <div className="flex items-center justify-between gap-2 px-0.5">
+            <p
+              className="text-[11px] font-bold leading-snug"
+              style={{ color: "var(--px-text2)" }}
+            >
+              빈 날 {emptyInMonth}개 · 메우면 운세가 더 정확해져요
+            </p>
             <Link
               href={`/journal?date=${nearestEmpty}`}
-              className="shrink-0 px-2.5 py-1.5 text-[11px] font-black border-2"
-              style={{
-                borderColor: "#000",
-                background: "var(--px-accent)",
-                color: "#111",
-                boxShadow: "2px 2px 0 #000",
-              }}
+              className="shrink-0 text-[11px] font-bold underline"
+              style={{ color: "var(--px-accent)" }}
             >
-              가까운 빈 날
+              메우기
             </Link>
           </div>
         )}
@@ -201,34 +181,28 @@ export default function JournalRecordCalendar({
             const isFuture = cell.date > today;
             const isGap = !entry && !isFuture;
             const cellClass = `min-h-[52px] p-1 flex flex-col items-center justify-center gap-0.5 w-full ${
-              isToday || isGap ? "border-2" : "border"
+              isToday ? "border-2" : "border"
             }`;
             const cellStyle = {
               borderColor: isToday
                 ? "var(--px-accent)"
-                : isGap
-                  ? "var(--px-accent)"
-                  : entry
-                    ? "var(--px-border2)"
-                    : "var(--px-border)",
-              borderStyle: isGap ? ("dashed" as const) : ("solid" as const),
+                : entry
+                  ? "var(--px-border2)"
+                  : "var(--px-border)",
               background: entry
                 ? happiness != null
                   ? `color-mix(in srgb, ${happinessTone(happiness)} 16%, var(--px-bg3))`
                   : "color-mix(in srgb, var(--px-accent) 10%, var(--px-bg3))"
-                : isGap
-                  ? "color-mix(in srgb, var(--px-accent) 8%, var(--px-bg3))"
-                  : "var(--px-bg3)",
+                : "var(--px-bg3)",
               boxShadow: isToday ? "1px 1px 0 #000" : undefined,
-              opacity: isFuture ? 0.45 : 1,
+              opacity: isFuture ? 0.45 : isGap ? 0.85 : 1,
             };
             const cellInner = (
               <>
                 <span
                   className="text-[13px] font-extrabold leading-none tabular-nums"
                   style={{
-                    color:
-                      isToday || isGap ? "var(--px-accent)" : "var(--px-text)",
+                    color: isToday ? "var(--px-accent)" : "var(--px-text)",
                   }}
                 >
                   {cell.day}
@@ -253,19 +227,12 @@ export default function JournalRecordCalendar({
                       {ganji}
                     </span>
                   </>
-                ) : isGap ? (
-                  <span
-                    className="text-[9px] font-black leading-none"
-                    style={{ color: "var(--px-accent)" }}
-                  >
-                    메우기
-                  </span>
                 ) : (
                   <span
                     className="text-[10px] leading-none"
                     style={{ color: "var(--px-border2)" }}
                   >
-                    ·
+                    {isGap ? "·" : "·"}
                   </span>
                 )}
               </>

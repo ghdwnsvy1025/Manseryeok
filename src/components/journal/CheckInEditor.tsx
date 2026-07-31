@@ -1342,6 +1342,10 @@ export default function CheckInEditor({ initialDate }: Props) {
         date={date}
         content={content}
         onContentChange={setContent}
+        mood={moods[0] ?? null}
+        onMoodChange={(next) => {
+          setMoods(next ? [next] : []);
+        }}
         enabledCodes={[...CORE_STATE_CODES]}
         entries={allEntries}
         sajuProfile={sajuProfile}

@@ -10,6 +10,23 @@ import {
   type FitLevel,
 } from "@/lib/journal/questionFeedback";
 import { reportQuestionFeedback } from "@/lib/journal/reportQuestionFeedback";
+import { MOOD_OPTIONS } from "@/lib/journal/types";
+
+const SHEET_MOOD_EMOJIS: Record<(typeof MOOD_OPTIONS)[number], string> = {
+  기쁨: "😊",
+  뿌듯함: "😌",
+  설렘: "✨",
+  평온: "🌿",
+  무덤덤: "😑",
+  지침: "😮‍💨",
+  답답함: "😣",
+  짜증남: "😤",
+  불안: "😰",
+  분노: "😠",
+  슬픔: "😢",
+  우울함: "😔",
+  후회스러움: "😞",
+};
 
 type QuestionMeta = {
   question: string;
@@ -23,6 +40,9 @@ type Props = {
   date: string;
   content: string;
   onContentChange: (next: string) => void;
+  /** 시트에서 고른 대표 기분 (단일) */
+  mood: string | null;
+  onMoodChange: (mood: string | null) => void;
   enabledCodes: string[];
   entries: JournalEntry[];
   sajuProfile: SajuProfile | null;
@@ -42,6 +62,8 @@ export default function DiaryWriteSheet({
   date,
   content,
   onContentChange,
+  mood,
+  onMoodChange,
   enabledCodes,
   entries,
   sajuProfile,
@@ -222,6 +244,36 @@ export default function DiaryWriteSheet({
               >
                 완료
               </button>
+            </div>
+            <div
+              className="shrink-0 flex flex-wrap gap-1 px-0.5"
+              role="radiogroup"
+              aria-label="오늘 기분"
+            >
+              {MOOD_OPTIONS.map((m) => {
+                const on = mood === m;
+                return (
+                  <button
+                    key={m}
+                    type="button"
+                    role="radio"
+                    aria-checked={on}
+                    aria-label={m}
+                    title={m}
+                    onClick={() => onMoodChange(on ? null : m)}
+                    className="w-8 h-8 text-base leading-none border flex items-center justify-center"
+                    style={{
+                      borderColor: on ? "var(--px-accent)" : "var(--px-border)",
+                      background: on
+                        ? "color-mix(in srgb, var(--px-accent) 18%, var(--px-bg3))"
+                        : "var(--px-bg3)",
+                      boxShadow: on ? "1px 1px 0 #000" : "none",
+                    }}
+                  >
+                    {SHEET_MOOD_EMOJIS[m]}
+                  </button>
+                );
+              })}
             </div>
             <textarea
               id="diary-write-sheet-textarea"

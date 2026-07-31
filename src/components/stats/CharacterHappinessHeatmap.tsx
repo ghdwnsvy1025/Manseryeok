@@ -18,7 +18,7 @@ const ELEM_COLORS: Record<Element, string> = {
   water: "#60a5fa",
 };
 
-const UNLOCK_DAYS = 7;
+const UNLOCK_DAYS = 1;
 
 type Tab = "stem" | "branch";
 
@@ -161,7 +161,7 @@ export default function CharacterHappinessHeatmap({
             className="text-xs font-black tabular-nums"
             style={{ color: "var(--px-text2)" }}
           >
-            {uniqueDays}/{UNLOCK_DAYS}일
+            {uniqueDays === 0 ? "기록 필요" : `${uniqueDays}일`}
           </p>
         )}
       </div>
@@ -173,21 +173,10 @@ export default function CharacterHappinessHeatmap({
             style={{ color: "var(--px-text-on-panel)" }}
           >
             {uniqueDays === 0
-              ? `${UNLOCK_DAYS}일부터`
-              : `${uniqueDays}/${UNLOCK_DAYS}일`}
+              ? "기록을 남기면 천간·지지 패턴이 열려요"
+              : "패턴을 준비하는 중…"}
           </p>
-          <div className="stats-progress-track" aria-hidden>
-            <div
-              className="stats-progress-fill"
-              style={{
-                width: `${Math.min(
-                  100,
-                  Math.round((uniqueDays / UNLOCK_DAYS) * 100)
-                )}%`,
-              }}
-            />
-          </div>
-          {early && (
+          {uniqueDays === 0 && (
             <Link href="/journal" className="stats-link inline-block">
               기록하기 →
             </Link>

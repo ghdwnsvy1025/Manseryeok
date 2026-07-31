@@ -78,8 +78,8 @@ export default function HomeEBlock({ stats }: Props) {
           />
         </div>
         <p
-          className="text-[11px] leading-snug"
-          style={{ color: "var(--px-text2)" }}
+          className="text-[12px] font-bold leading-snug"
+          style={{ color: "var(--px-accent)" }}
         >
           {personalization.fitComplete
             ? "맞춤 완료 · 레벨이 오를수록 운세가 더 정확해져요"

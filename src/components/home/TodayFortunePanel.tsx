@@ -780,7 +780,10 @@ export default function TodayFortunePanel({
     setEvidence(data.evidence ?? null);
     setLoaded(true);
     setOpen(false);
-    setPanelOpen(opts?.openPanel === true);
+    // openPanel 미지정이면 펼침 상태 유지 (백그라운드 동기화 시 깜빡임 방지)
+    if (typeof opts?.openPanel === "boolean") {
+      setPanelOpen(opts.openPanel);
+    }
     if (opts?.persistLocal) {
       writeLocalFortune(todayDate, profileCacheKey, data);
     }
@@ -839,15 +842,29 @@ export default function TodayFortunePanel({
             applyPayload(data, { persistLocal: true });
             return;
           }
-          // 점수/문장 엔진이 바뀌어 서버 캐시가 무효면 로컬도 버리고 다시 생성
+          // 서버 캐시 무효: 화면은 유지한 채 조용히 재생성 (내용이 사라졌다 나타나는 깜빡임 방지)
           if (data.cached === false) {
             clearLocalFortune(todayDate, profileCacheKey);
-            setOverall(null);
-            setDomains([]);
-            setPresentation(null);
-            setEvidence(null);
-            setLoaded(false);
-            setOpen(false);
+            if (gen !== analyseGenRef.current) return;
+            try {
+              const regen = await fetch("/api/journal/today-fortune", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  todayDate,
+                  sajuProfile: profileRef.current,
+                  entries: entriesRef.current.slice(-60),
+                  enabledCodes: codesRef.current,
+                  skipLlm: false,
+                }),
+              });
+              if (gen !== analyseGenRef.current || !regen.ok) return;
+              const next = (await regen.json()) as V2Payload;
+              if (gen !== analyseGenRef.current) return;
+              applyPayload(next, { persistLocal: true });
+            } catch {
+              /* keep local UI */
+            }
           }
         } catch {
           /* keep local */
@@ -892,10 +909,7 @@ export default function TodayFortunePanel({
     if (!v2 || loading || loaded || hydrating) return;
     const gen = ++analyseGenRef.current;
     setLoadError(null);
-    setOverall(null);
-    setDomains([]);
-    setPresentation(null);
-    setLoaded(false);
+    // overall을 미리 비우지 않음 — 로딩 중 깜빡임 방지 (없을 때만 로딩 UI)
     setLoading(true);
     setOpen(true);
 
@@ -1046,6 +1060,14 @@ export default function TodayFortunePanel({
           )}
 
           {loading && !overall && <FortuneLoadingHint />}
+          {loading && overall && (
+            <p
+              className="text-[11px] font-bold text-center"
+              style={{ color: "var(--px-text2)" }}
+            >
+              문장을 다듬는 중…
+            </p>
+          )}
 
           {loadError && !overall && (
             <div className="space-y-3 py-2 text-center">
@@ -1091,7 +1113,7 @@ export default function TodayFortunePanel({
                 body={domainBodyText(overall)}
                 action={presentation?.todayFocus || overall.action}
                 caution={presentation?.todayAvoid || overall.caution}
-                animateKey={`core-${overall.headline}`}
+                animateKey="fortune-core"
               />
 
               {presentation?.signatureEcho && (
