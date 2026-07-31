@@ -7,7 +7,7 @@ import type { JournalEntry } from "@/lib/journal/types";
 import { TOPIC_LEXICON, type TopicDefinition } from "./lexicon";
 import {
   enrichTopicsWithSupport,
-  type WeekTopicInsight,
+  type TopicStateSnapshot,
 } from "./topicSupport";
 
 export type TopicMention = {
@@ -29,7 +29,7 @@ export type WeekTopicHit = {
   weight: number;
   /** withSupport일 때 채워짐 */
   supportLine?: string;
-  state?: WeekTopicInsight["state"];
+  state?: TopicStateSnapshot;
 };
 
 export type WeekTopicSummary = {
