@@ -6,6 +6,7 @@ import { ANALYTICS_EVENTS, captureEvent } from "@/lib/analytics/posthog";
 import {
   dismissInstallNudge,
   isInstallNudgeDismissed,
+  isKakaoTalkInApp,
   isStandaloneDisplay,
 } from "@/lib/pwa/installState";
 
@@ -19,13 +20,18 @@ type Props = {
  */
 export default function InstallAppNudge({ hasEntries }: Props) {
   const [visible, setVisible] = useState(false);
+  const [kakao, setKakao] = useState(false);
 
   useEffect(() => {
     if (!hasEntries) return;
     if (isStandaloneDisplay()) return;
     if (isInstallNudgeDismissed()) return;
+    setKakao(isKakaoTalkInApp());
     setVisible(true);
-    captureEvent(ANALYTICS_EVENTS.installPromptShown, { surface: "home_nudge" });
+    captureEvent(ANALYTICS_EVENTS.installPromptShown, {
+      surface: "home_nudge",
+      kakao: isKakaoTalkInApp(),
+    });
   }, [hasEntries]);
 
   if (!visible) return null;
@@ -44,13 +50,17 @@ export default function InstallAppNudge({ hasEntries }: Props) {
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 space-y-0.5">
           <p className="text-sm font-black" style={{ color: "var(--px-accent)" }}>
-            홈 화면에 두면 더 편해요
+            {kakao
+              ? "카톡이 아니라 홈 화면에 두면 편해요"
+              : "홈 화면에 두면 더 편해요"}
           </p>
           <p
             className="text-[11px] font-bold leading-snug"
             style={{ color: "var(--px-text2)" }}
           >
-            매일 운세·일기를 앱처럼 바로 열어보세요
+            {kakao
+              ? "카톡 안에서는 설치가 안 돼요. Safari·Chrome으로 연 뒤 추가하세요"
+              : "매일 운세·일기를 앱처럼 바로 열어보세요"}
           </p>
         </div>
         <button
