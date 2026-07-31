@@ -8,7 +8,6 @@ import {
   useRef,
   useState,
 } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { getJournalStorage } from "@/lib/journal/getStorage";
 import {
@@ -27,7 +26,6 @@ import type { OpenAiCallStatus } from "@/lib/journal/openaiStatus";
 import { todayDateString } from "@/lib/diary/dayPillar";
 import { addDaysToDateString } from "@/lib/forecast/tomorrowContext";
 import {
-  loadLocalSajuProfile,
   loadPrimarySajuProfile,
 } from "@/lib/diary/profileStorage";
 import type { SajuProfile } from "@/lib/diary/types";
@@ -337,7 +335,11 @@ export default function CheckInEditor({ initialDate }: Props) {
     setExistingId(form.entryId);
     setDraftHint("");
     setContent(form.content);
-    setShowOptional(Boolean(form.content?.trim()));
+    setShowOptional(
+      Boolean(form.content?.trim()) ||
+        Boolean(form.mainEvent?.trim()) ||
+        (form.tagCodes?.length ?? 0) > 0
+    );
     setHappiness(form.happiness);
     setMoods(form.moods.slice(0, MAX_MOODS));
     setMainEvent(form.mainEvent);
@@ -383,8 +385,12 @@ export default function CheckInEditor({ initialDate }: Props) {
         setExistingId(existing.id);
         setDraftHint("");
         setContent(existing.content);
-        // 자유 일기가 있으면 선택 섹션을 열어 바로 보이게
-        setShowOptional(Boolean(existing.content?.trim()));
+        // 일기·사건 메모·태그가 있으면 선택 섹션을 열어 바로 보이게
+        setShowOptional(
+          Boolean(existing.content?.trim()) ||
+            Boolean(existing.mainEventText?.trim()) ||
+            existing.tags.length > 0
+        );
         const h =
           existing.happinessScore != null
             ? (existing.happinessScore as HappinessScore)
@@ -589,13 +595,13 @@ export default function CheckInEditor({ initialDate }: Props) {
               .catch(() => null);
 
         if (!metaLoadedRef.current) {
-          setSajuProfile(loadLocalSajuProfile());
+          setSajuProfile(null);
           void loadPrimarySajuProfile()
             .then((remote) => {
-              if (!cancelled && remote) setSajuProfile(remote);
+              if (!cancelled) setSajuProfile(remote);
             })
             .catch(() => {
-              /* keep local */
+              if (!cancelled) setSajuProfile(null);
             });
         }
 
@@ -1084,6 +1090,17 @@ export default function CheckInEditor({ initialDate }: Props) {
       });
       setShowComplete(true);
       notifyJournalProgressChanged();
+      try {
+        const { ANALYTICS_EVENTS, captureEvent } = await import(
+          "@/lib/analytics/posthog"
+        );
+        captureEvent(ANALYTICS_EVENTS.journalSaved, {
+          was_first_save_of_day: result.xp.wasFirstSaveOfDay,
+          checkin_v2: true,
+        });
+      } catch {
+        /* analytics optional */
+      }
       notifyProgressCelebration({
         gainedXp: result.xp.gainedXp,
         leveledUp: result.xp.leveledUp,
@@ -1168,13 +1185,6 @@ export default function CheckInEditor({ initialDate }: Props) {
   return (
     <div className="space-y-4 pb-24">
       <header className="space-y-2">
-        <div className="flex items-baseline justify-between gap-2">
-          <div className="flex items-baseline gap-2">
-            <p className="ui-section-title">■ 오늘 상태 체크</p>
-            <span className="ui-hint">약 1분이면 충분해요</span>
-          </div>
-          {draftHint && <p className="ui-hint shrink-0">{draftHint}</p>}
-        </div>
         <div className="space-y-1.5" aria-label={`기록 날짜 ${date}`}>
           <div className="flex items-stretch gap-1.5">
             <button
@@ -1204,12 +1214,17 @@ export default function CheckInEditor({ initialDate }: Props) {
               aria-label="날짜 바꾸기"
               title="달력 열기"
             >
-              <p
-                className="text-[10px] font-bold leading-none"
-                style={{ color: "var(--px-text2)" }}
-              >
-                {isToday ? "오늘 기록" : "다른 날 기록"}
-              </p>
+              <div className="flex items-center justify-between gap-2">
+                <p
+                  className="text-[10px] font-bold leading-none"
+                  style={{ color: "var(--px-text2)" }}
+                >
+                  {isToday ? "오늘 기록" : "다른 날 기록"}
+                </p>
+                {draftHint && (
+                  <p className="ui-hint shrink-0 leading-none">{draftHint}</p>
+                )}
+              </div>
               <p
                 className="mt-1 text-base font-black tabular-nums leading-tight"
                 style={{ color: "var(--px-text-on-panel)" }}
@@ -1266,53 +1281,54 @@ export default function CheckInEditor({ initialDate }: Props) {
         </div>
       </header>
 
-      <TodayQuestionCard
-        todayDate={date}
-        enabledCodes={[...CORE_STATE_CODES]}
-        entries={allEntries}
-        sajuProfile={sajuProfile}
-      />
-
-      <section className="space-y-2">
-        <div className="flex items-baseline justify-between gap-2">
-          <p className="ui-section-title">■ 오늘의 기록</p>
+      <section className="space-y-2" aria-label="오늘 남기기">
+        <TodayQuestionCard
+          todayDate={date}
+          enabledCodes={[...CORE_STATE_CODES]}
+          entries={allEntries}
+          sajuProfile={sajuProfile}
+        />
+        <div className="relative">
+          <textarea
+            value={content}
+            onChange={(e) => {
+              const next = e.target.value;
+              if (next.trim().length > 0 && diaryStartedRef.current !== date) {
+                diaryStartedRef.current = date;
+                void trackContentExposure({
+                  eventDate: date,
+                  contentType: "free_diary",
+                  eventType: "diary_started",
+                });
+              }
+              setContent(next);
+            }}
+            rows={4}
+            placeholder="예) 오늘은 회의가 길었지만, 끝나고 산책하니 좀 풀렸다."
+            className="w-full px-3 py-2 border-2 text-sm resize-none"
+            style={{
+              background: "var(--px-bg3)",
+              borderColor: content.trim()
+                ? "var(--px-accent)"
+                : "var(--px-border)",
+              color: "var(--px-text-on-panel)",
+            }}
+            aria-label="오늘 한 줄"
+          />
           {content.trim().length > 0 && (
-            <p className="ui-hint shrink-0 tabular-nums">
+            <p
+              className="ui-hint absolute bottom-2 right-2 tabular-nums pointer-events-none"
+              style={{ background: "var(--px-bg3)" }}
+            >
               {content.trim().length}자
             </p>
           )}
         </div>
-        {content.trim().length === 0 && (
+        {content.trim().length === 0 ? (
           <p className="ui-hint">
             한 줄만 적어도 AI가 오늘 감정·점수를 읽어 운세와 문장에 반영해요.
           </p>
-        )}
-        <textarea
-          value={content}
-          onChange={(e) => {
-            const next = e.target.value;
-            if (next.trim().length > 0 && diaryStartedRef.current !== date) {
-              diaryStartedRef.current = date;
-              void trackContentExposure({
-                eventDate: date,
-                contentType: "free_diary",
-                eventType: "diary_started",
-              });
-            }
-            setContent(next);
-          }}
-          rows={4}
-          placeholder="예) 오늘은 회의가 길었지만, 끝나고 산책하니 좀 풀렸다."
-          className="w-full px-3 py-2 border-2 text-sm resize-none"
-          style={{
-            background: "var(--px-bg3)",
-            borderColor: content.trim()
-              ? "var(--px-accent)"
-              : "var(--px-border)",
-            color: "var(--px-text-on-panel)",
-          }}
-        />
-        {content.trim().length > 0 && (
+        ) : (
           <p className="ui-hint">
             고마워요. 남긴 글로 오늘의 문장과 운세가 더 잘 맞아요.
           </p>
@@ -1321,23 +1337,21 @@ export default function CheckInEditor({ initialDate }: Props) {
 
       <section
         ref={happinessRef}
-        className="space-y-3 p-3 border-2 scroll-mt-4"
-        style={{
-          borderColor:
-            fieldError?.scope === "happiness" ? "#ef4444" : HAPPINESS_PINK,
-          background: `color-mix(in srgb, ${HAPPINESS_PINK} 10%, var(--px-bg2))`,
-          boxShadow: `3px 3px 0 color-mix(in srgb, ${HAPPINESS_PINK} 45%, #000)`,
-        }}
+        className="space-y-3 scroll-mt-4"
       >
-        <div className="flex items-center gap-2">
-          <p
-            className="text-base font-black tracking-wide"
-            style={{ color: HAPPINESS_PINK }}
-          >
-            ■ 행복도 (0~10)
-          </p>
+        <div className="ui-emphasize-head">
+          <p className="ui-emphasize-title">행복도 (0~10)</p>
           {requiredBadge}
         </div>
+        <div
+          className="space-y-3 p-3 border-2"
+          style={{
+            borderColor:
+              fieldError?.scope === "happiness" ? "#ef4444" : HAPPINESS_PINK,
+            background: `color-mix(in srgb, ${HAPPINESS_PINK} 10%, var(--px-bg2))`,
+            boxShadow: `3px 3px 0 color-mix(in srgb, ${HAPPINESS_PINK} 45%, #000)`,
+          }}
+        >
         <HappinessSlider
           label="행복도"
           value={happiness}
@@ -1348,11 +1362,12 @@ export default function CheckInEditor({ initialDate }: Props) {
             {fieldError.message}
           </p>
         )}
+        </div>
       </section>
 
       <section className="space-y-2">
-        <div className="flex justify-between items-baseline gap-2">
-          <p className="ui-section-title">■ 기분</p>
+        <div className="ui-emphasize-head">
+          <p className="ui-emphasize-title">기분</p>
           <p className="ui-hint">
             {moods.length}/{MAX_MOODS}
           </p>
@@ -1393,8 +1408,8 @@ export default function CheckInEditor({ initialDate }: Props) {
       </section>
 
       <section className="space-y-3">
-        <div className="flex items-center gap-2">
-          <p className="ui-section-title">■ 핵심 상태</p>
+        <div className="ui-emphasize-head">
+          <p className="ui-emphasize-title">핵심 상태</p>
           {requiredBadge}
         </div>
         {CORE_STATE_CODES.map((code) => {
@@ -1689,13 +1704,6 @@ export default function CheckInEditor({ initialDate }: Props) {
           </p>
         )}
       </div>
-
-      <p className="text-[10px]" style={{ color: "var(--px-text2)" }}>
-        예전 입력 화면이 필요하면{" "}
-        <Link href="/journal?legacy=1" className="underline">
-          여기
-        </Link>
-      </p>
 
       {showComplete && savedEntry && saveMeta && (
         <JournalSaveCompleteModal

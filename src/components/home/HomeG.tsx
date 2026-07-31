@@ -9,12 +9,13 @@ import HomeEBlock from "@/components/home/HomeEBlock";
 import { getJournalStorage } from "@/lib/journal/getStorage";
 import { getEnabledCodesOrdered } from "@/lib/journal/preferences";
 import { buildHomeEStats } from "@/lib/journal/homeStats";
+import { buildWeekTopicSummary } from "@/lib/journal/topics/weekTopics";
+import { buildWeekTopicSupportItems } from "@/lib/journal/topics/topicSupport";
 import type { CategoryCode, JournalEntry } from "@/lib/journal/types";
 import { todayDateString } from "@/lib/diary/dayPillar";
 import { getPillarsForDate } from "@/lib/diary/dayPillar";
 import { getPillarTenGods } from "@/lib/diary/currentDaeun";
 import {
-  loadLocalSajuProfile,
   loadPrimarySajuProfile,
 } from "@/lib/diary/profileStorage";
 import type { SajuProfile } from "@/lib/diary/types";
@@ -35,7 +36,26 @@ const ELEM: Record<Element, { text: string; bg: string; border: string }> = {
   water: { text: "#60a5fa", bg: "#0a0f2e88", border: "#60a5fa77" },
 };
 
-const WEEK = ["일", "월", "화", "수", "목", "금", "토"];
+const WEEK = ["일", "월", "화", "수", "목", "금", "토"] as const;
+const WEEK_FULL = [
+  "일요일",
+  "월요일",
+  "화요일",
+  "수요일",
+  "목요일",
+  "금요일",
+  "토요일",
+] as const;
+/** 요일 악센트 — 주말만 살짝 구분 */
+const WEEK_ACCENT = [
+  "#f87171",
+  "var(--px-accent)",
+  "var(--px-accent)",
+  "var(--px-accent)",
+  "var(--px-accent)",
+  "var(--px-accent)",
+  "#60a5fa",
+] as const;
 
 function elemOf(hanja: string, kind: "stem" | "branch") {
   const meta = kind === "stem" ? STEM_META[hanja] : BRANCH_META[hanja];
@@ -167,12 +187,11 @@ export default function HomeG() {
         setEntries(list);
         setEnabledCodes(getEnabledCodesOrdered(prefs));
         if (!opts?.soft) {
-          setProfile(loadLocalSajuProfile());
           try {
             const remote = await loadPrimarySajuProfile();
-            if (!cancelled && remote) setProfile(remote);
+            if (!cancelled) setProfile(remote);
           } catch {
-            /* keep local */
+            if (!cancelled) setProfile(null);
           }
         }
       } catch {
@@ -200,10 +219,13 @@ export default function HomeG() {
   }, []);
 
   const dayPillar = useMemo(() => getPillarsForDate(today).dayPillar, [today]);
-  const weekday = useMemo(
-    () => WEEK[new Date(`${today}T12:00:00+09:00`).getDay()] ?? "",
+  const weekdayIndex = useMemo(
+    () => new Date(`${today}T12:00:00+09:00`).getDay(),
     [today]
   );
+  const weekday = WEEK[weekdayIndex] ?? "";
+  const weekdayFull = WEEK_FULL[weekdayIndex] ?? `${weekday}요일`;
+  const weekdayAccent = WEEK_ACCENT[weekdayIndex] ?? "var(--px-accent)";
   const stemColor = elemOf(dayPillar.stem.hanja, "stem");
   const branchColor = elemOf(dayPillar.branch.hanja, "branch");
 
@@ -221,6 +243,22 @@ export default function HomeG() {
     () => buildHomeEStats(entries, today, enabledCodes),
     [entries, today, enabledCodes]
   );
+
+  const weekTopics = useMemo(
+    () =>
+      buildWeekTopicSummary(entries, {
+        asOf: today,
+        windowDays: 7,
+        topN: 2,
+        withSupport: true,
+      }),
+    [entries, today]
+  );
+
+  const weekTopicSupportItems = useMemo(
+    () => buildWeekTopicSupportItems(weekTopics.topics, entries),
+    [weekTopics.topics, entries]
+  );
   const todayEntry = useMemo(
     () => entries.find((e) => e.entryDate === today) ?? null,
     [entries, today]
@@ -236,6 +274,20 @@ export default function HomeG() {
 
   return (
     <div className="home-readable space-y-4 pb-8">
+      {!profile && (
+        <Link
+          href="/saju/profiles"
+          className="block p-3 border-2 text-sm font-bold"
+          style={{
+            borderColor: "var(--px-accent)",
+            background: "color-mix(in srgb, var(--px-accent) 12%, var(--px-bg2))",
+            color: "var(--px-text-on-panel)",
+            boxShadow: "2px 2px 0 #000",
+          }}
+        >
+          사주 프로필을 등록하면 운세·오늘의 문장이 더 잘 맞아요 →
+        </Link>
+      )}
       <section
         className="border-2 overflow-hidden"
         style={{
@@ -246,37 +298,46 @@ export default function HomeG() {
         aria-label="오늘"
       >
         <div className="grid grid-cols-[1.2fr_0.9fr] items-stretch">
-          <div className="px-3.5 py-3 flex flex-col justify-center gap-1.5 min-w-0">
-            <WaveText
-              className="text-[10px] font-black tracking-wider"
-              style={{ color: "var(--px-text2)" }}
-            >
-              TODAY
-            </WaveText>
-            <div className="flex items-center gap-2">
+          <div className="px-3.5 py-3 flex flex-col justify-center gap-2 min-w-0">
+            <div className="flex items-baseline gap-2 flex-wrap">
               <WaveText
                 className="text-xl font-black tabular-nums leading-none"
                 style={{ color: "var(--px-text-on-panel)" }}
               >
                 {today.replaceAll("-", ".")}
               </WaveText>
-              <span
-                className="inline-flex items-center justify-center w-6 h-6 text-xs font-black border shrink-0"
-                style={{
-                  borderColor: "var(--px-border2)",
-                  background: "var(--px-bg3)",
-                  color: "var(--px-accent)",
-                }}
+              <WaveText
+                className="text-xl font-black leading-none"
+                style={{ color: weekdayAccent }}
               >
-                <WaveText>{weekday}</WaveText>
-              </span>
+                {weekdayFull}
+              </WaveText>
             </div>
-            <WaveText
-              className="text-lg font-black leading-none"
-              style={{ color: "var(--px-accent)" }}
+            <div
+              className="flex items-center gap-1 pt-0.5"
+              aria-label="이번 주 요일"
             >
-              {`${dayPillar.ganjiKo}일`}
-            </WaveText>
+              {WEEK.map((d, i) => {
+                const active = i === weekdayIndex;
+                return (
+                  <span
+                    key={d}
+                    className="flex-1 min-w-0 text-center text-[10px] font-black leading-none py-1 border"
+                    style={{
+                      color: active ? "#0b0b12" : "var(--px-text2)",
+                      background: active ? weekdayAccent : "transparent",
+                      borderColor: active
+                        ? weekdayAccent
+                        : "var(--px-border)",
+                      opacity: active ? 1 : 0.72,
+                    }}
+                    aria-current={active ? "date" : undefined}
+                  >
+                    {d}
+                  </span>
+                );
+              })}
+            </div>
           </div>
 
           <div
@@ -437,7 +498,11 @@ export default function HomeG() {
         <TodayRecordPrompt todayDate={today} entryDates={entryDates} />
       )}
 
-      <TodayStatusCard stats={eStats} />
+      <TodayStatusCard
+        stats={eStats}
+        weekTopics={weekTopics}
+        weekTopicSupportItems={weekTopicSupportItems}
+      />
 
       <HomeEBlock stats={eStats} />
 

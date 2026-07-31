@@ -110,30 +110,27 @@ export default function HomeHub({ state }: Props) {
         }}
         aria-label="오늘"
       >
-        <div className="px-3.5 py-3 flex flex-col justify-center gap-1.5 min-w-0">
-          <p
-            className="text-[10px] font-black tracking-wider"
-            style={{ color: "var(--px-text2)" }}
-          >
-            TODAY
-          </p>
-          <div className="flex items-center gap-2">
+        <div className="px-3.5 py-3 flex flex-col justify-center gap-2 min-w-0">
+          <div className="flex items-baseline gap-2 flex-wrap">
             <p
               className="text-xl font-black tabular-nums leading-none"
               style={{ color: "var(--px-text-on-panel)" }}
             >
               {state.todayDate.replaceAll("-", ".")}
             </p>
-            <span
-              className="inline-flex items-center justify-center w-6 h-6 text-xs font-black border shrink-0"
+            <p
+              className="text-xl font-black leading-none"
               style={{
-                borderColor: "var(--px-border2)",
-                background: "var(--px-bg3)",
-                color: "var(--px-accent)",
+                color:
+                  weekdayLabel === "일"
+                    ? "#f87171"
+                    : weekdayLabel === "토"
+                      ? "#60a5fa"
+                      : "var(--px-accent)",
               }}
             >
-              {weekdayLabel}
-            </span>
+              {weekdayLabel}요일
+            </p>
           </div>
         </div>
 
@@ -207,15 +204,15 @@ export default function HomeHub({ state }: Props) {
 
       <section className="grid grid-cols-2 gap-2" aria-label="바로가기">
         <QuickLink
-          href="/forecast"
-          title="예보"
-          hint="오늘·내일 흐름"
+          href="/journal"
+          title="일기"
+          hint="오늘 체크인"
           accent="var(--px-accent)"
         />
         <QuickLink
-          href="/analysis"
-          title="분석"
-          hint="일·주·월 해석"
+          href="/stats"
+          title="기록"
+          hint="추이·캘린더"
           accent="var(--signal-focus)"
         />
         <QuickLink
@@ -225,9 +222,9 @@ export default function HomeHub({ state }: Props) {
           accent="var(--signal-saju)"
         />
         <QuickLink
-          href="/diary/stats"
-          title="패턴"
-          hint="간지별 통계"
+          href="/journal/categories"
+          title="카테고리"
+          hint="일기 영역 설정"
           accent="var(--signal-emotion)"
         />
       </section>

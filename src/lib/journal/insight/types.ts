@@ -6,14 +6,20 @@ import type { KeywordScore } from "@/lib/journal/keywords/rank";
 import type { CategoryCode } from "@/lib/journal/types";
 import type { NatalDayInsight } from "@/lib/journal/fortune/natalDaySignal";
 
-export const INSIGHT_ENGINE_VERSION = "insight-v1.1.0";
+export const INSIGHT_ENGINE_VERSION = "insight-v1.2.0";
 
+/** 개인화 오늘의 운세 영역 (Phase A: love는 relationships와 점수 공유·문장 분리) */
 export type FortuneDomainCode =
   | "overall"
   | "work"
-  | "relationship"
-  | "finance"
+  | "relationships"
+  | "love"
+  | "money"
   | "health";
+
+export type FortuneFlow = "원활" | "안정" | "혼합" | "관리";
+export type FortuneConfidenceLabel = "높음" | "보통" | "낮음";
+export type FortuneDataQuality = "충분" | "일부 누락" | "부족" | "축적 부족" | "없음";
 
 export type DailyInsightContext = {
   eventDate: string;
@@ -55,13 +61,47 @@ export type DailyInsightContext = {
 export type FortuneDomainResult = {
   domain: FortuneDomainCode;
   title: string;
+  /** 내부 스코어 톤 (UI는 flow 우선) */
   tone: "supportive" | "balanced" | "caution";
+  flow: FortuneFlow;
   score: number;
   confidence: number;
+  confidenceLabel: FortuneConfidenceLabel;
   headline: string;
+  /** 개인화 해석 본문 */
+  interpretation: string;
+  /**
+   * DB·구 UI 호환 — interpretation과 동기화
+   * @deprecated interpretation 사용
+   */
   summary: string;
+  /** DB 컬럼 호환 (UI에서는 사용하지 않을 수 있음) */
   opportunity: string;
   caution: string;
   action: string;
+  reasonTags: string[];
+  /**
+   * @deprecated reasonTags 사용 — 키워드 코드
+   */
   evidenceCodes: string[];
+};
+
+export type FortuneDataQualityBlock = {
+  saju: FortuneDataQuality;
+  diary: FortuneDataQuality;
+  statistics: FortuneDataQuality;
+};
+
+export type FortunePresentationMeta = {
+  date: string;
+  timezone: string;
+  todayGanji: string | null;
+  dailyTheme: string;
+  todayFocus: string;
+  todayAvoid: string;
+  luckyRoutine: string;
+  /** 원국 특징 중 오늘 가장 울리는 한 줄 */
+  signatureEcho: string | null;
+  dataQuality: FortuneDataQualityBlock;
+  notice: string;
 };

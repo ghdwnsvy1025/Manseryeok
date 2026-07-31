@@ -5,7 +5,7 @@ import ExpertInsightPanel from "@/components/saju/ExpertInsightPanel";
 import { getDiaryStorage } from "@/lib/diary/getStorage";
 import { filterRealEntries } from "@/lib/diary/dataOrigin";
 import { todayDateString, getPillarsForDate } from "@/lib/diary/dayPillar";
-import { loadPrimarySajuProfile } from "@/lib/diary/profileStorage";
+import { loadViewSajuProfile } from "@/lib/diary/profileStorage";
 import { buildExpertInsights } from "@/lib/saju/interpretation";
 import { detectDayRelations } from "@/lib/saju/interpretation/relations";
 import { getTenGod } from "@/lib/saju/hiddenStems";
@@ -30,7 +30,7 @@ export default function ExpertInsightsForSaju({ result }: Props) {
       .then((storage) => storage.list())
       .then((list) => setEntries(filterRealEntries(list)))
       .catch(() => setEntries([]));
-    void loadPrimarySajuProfile().then(setProfile);
+    void loadViewSajuProfile().then(setProfile);
   }, []);
 
   const today = todayDateString();
@@ -126,7 +126,7 @@ export default function ExpertInsightsForSaju({ result }: Props) {
         <p className="ui-section-title">기존 만세력</p>
         <p className="ui-hint mt-1">
           위쪽의 원국·대운·세운·절기·십성·지장간·오행 정보는 기존 계산 결과 그대로입니다.
-          아래는 별도 해석 레이어입니다. 관리자가 등록한 사주 이론이 있으면 해설 문장에 반영됩니다.
+          아래는 별도 해석 레이어로, 학습된 사주 이론이 있으면 해설에 반영됩니다.
         </p>
       </div>
       <ExpertInsightPanel sections={sections} groundingFacts={groundingFacts} />

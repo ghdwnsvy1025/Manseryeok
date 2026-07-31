@@ -1,6 +1,8 @@
 /**
- * Resolve the active (primary) saju profile id for a user.
- * Prefer user_profiles.active_saju_profile_id, then is_primary, then oldest.
+ * Resolve active saju profile ids.
+ * Journal = diary/checkin/fortune scope; View = manseryeok display.
+ * Prefer active_journal_profile_id / active_view_profile_id, then legacy
+ * active_saju_profile_id, then is_primary, then oldest.
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -11,27 +13,25 @@ export function isSajuProfileId(value: unknown): value is string {
   return typeof value === "string" && UUID_RE.test(value);
 }
 
-export async function resolveActiveSajuProfileId(
+async function ownedProfileId(
+  sb: SupabaseClient,
+  userId: string,
+  candidate: unknown
+): Promise<string | null> {
+  if (!isSajuProfileId(candidate)) return null;
+  const { data: owned } = await sb
+    .from("saju_profiles")
+    .select("id")
+    .eq("id", candidate)
+    .eq("user_id", userId)
+    .maybeSingle();
+  return owned?.id ? String(owned.id) : null;
+}
+
+async function fallbackPrimaryOrOldest(
   sb: SupabaseClient,
   userId: string
 ): Promise<string | null> {
-  const { data: userProfile } = await sb
-    .from("user_profiles")
-    .select("active_saju_profile_id")
-    .eq("id", userId)
-    .maybeSingle();
-
-  const active = userProfile?.active_saju_profile_id;
-  if (isSajuProfileId(active)) {
-    const { data: owned } = await sb
-      .from("saju_profiles")
-      .select("id")
-      .eq("id", active)
-      .eq("user_id", userId)
-      .maybeSingle();
-    if (owned?.id) return String(owned.id);
-  }
-
   const { data: primary } = await sb
     .from("saju_profiles")
     .select("id")
@@ -50,7 +50,70 @@ export async function resolveActiveSajuProfileId(
   return oldest?.id ? String(oldest.id) : null;
 }
 
-/** Client-side: primary from already-loaded list / local cache */
+async function loadUserProfileRow(
+  sb: SupabaseClient,
+  userId: string
+): Promise<Record<string, unknown> | null> {
+  const full = await sb
+    .from("user_profiles")
+    .select(
+      "active_saju_profile_id, active_journal_profile_id, active_view_profile_id"
+    )
+    .eq("id", userId)
+    .maybeSingle();
+  if (!full.error && full.data) return full.data as Record<string, unknown>;
+
+  // Migration 026 not applied yet
+  const legacy = await sb
+    .from("user_profiles")
+    .select("active_saju_profile_id")
+    .eq("id", userId)
+    .maybeSingle();
+  if (!legacy.error && legacy.data) return legacy.data as Record<string, unknown>;
+  return null;
+}
+
+/** Journal-scoped active profile (API persist / RLS app filter). */
+export async function resolveActiveSajuProfileId(
+  sb: SupabaseClient,
+  userId: string
+): Promise<string | null> {
+  return resolveJournalSajuProfileId(sb, userId);
+}
+
+export async function resolveJournalSajuProfileId(
+  sb: SupabaseClient,
+  userId: string
+): Promise<string | null> {
+  const row = await loadUserProfileRow(sb, userId);
+  const fromJournal = await ownedProfileId(
+    sb,
+    userId,
+    row?.active_journal_profile_id
+  );
+  if (fromJournal) return fromJournal;
+
+  const fromLegacy = await ownedProfileId(
+    sb,
+    userId,
+    row?.active_saju_profile_id
+  );
+  if (fromLegacy) return fromLegacy;
+
+  return fallbackPrimaryOrOldest(sb, userId);
+}
+
+export async function resolveViewSajuProfileId(
+  sb: SupabaseClient,
+  userId: string
+): Promise<string | null> {
+  const row = await loadUserProfileRow(sb, userId);
+  const fromView = await ownedProfileId(sb, userId, row?.active_view_profile_id);
+  if (fromView) return fromView;
+  return resolveJournalSajuProfileId(sb, userId);
+}
+
+/** Client-side: preferred id, then primary, then first. */
 export function pickActiveSajuProfileId(
   profiles: Array<{ id: string; isPrimary?: boolean }>,
   preferredId?: string | null

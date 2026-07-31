@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { enableGuestMode, disableGuestMode } from "@/lib/auth/guestMode";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { ANALYTICS_EVENTS, captureEvent } from "@/lib/analytics/posthog";
 
 type Props = {
   onGuest: () => void;
@@ -34,6 +35,7 @@ export default function WelcomeAuthGate({ onGuest }: Props) {
     disableGuestMode();
     setLoading(true);
     setMessage("");
+    captureEvent(ANALYTICS_EVENTS.authGoogleClicked);
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
@@ -61,6 +63,9 @@ export default function WelcomeAuthGate({ onGuest }: Props) {
     setLoading(true);
     setMessage("");
     try {
+      captureEvent(ANALYTICS_EVENTS.authEmailSubmitted, {
+        mode: emailMode,
+      });
       if (emailMode === "signup") {
         const { data, error } = await supabase.auth.signUp({
           email,
@@ -110,6 +115,9 @@ export default function WelcomeAuthGate({ onGuest }: Props) {
         <h1 className="text-lg font-black" style={{ color: "var(--px-accent)" }}>
           시작하기
         </h1>
+        <p className="text-xs font-bold pt-1" style={{ color: "var(--px-text2)" }}>
+          Google 계정이 있으면 버튼 한 번이면 시작돼요. (가입 양식 없음)
+        </p>
       </section>
 
       <section
@@ -124,7 +132,7 @@ export default function WelcomeAuthGate({ onGuest }: Props) {
           className="w-full px-4 py-3 text-sm font-bold border-2"
           style={{ background: "#fff", borderColor: "#111", color: "#111" }}
         >
-          Google로 계속하기
+          Google로 3초 만에 시작
         </button>
 
         <button
@@ -139,7 +147,7 @@ export default function WelcomeAuthGate({ onGuest }: Props) {
           }}
           aria-expanded={showEmail}
         >
-          이메일로 계속하기
+          이메일이 더 편해요
         </button>
 
         {showEmail && (
@@ -242,14 +250,14 @@ export default function WelcomeAuthGate({ onGuest }: Props) {
           enableGuestMode();
           onGuest();
         }}
-        className="w-full px-4 py-3 text-sm font-bold border-2"
+        className="w-full px-4 py-2 text-xs font-bold underline"
         style={{
-          background: "var(--px-bg2)",
-          borderColor: "var(--px-border)",
+          background: "transparent",
+          border: "none",
           color: "var(--px-text2)",
         }}
       >
-        비로그인으로 시작
+        로그인 없이 둘러보기 (기록·AI 문장은 이 기기에만 / 제한됨)
       </button>
 
       {message && (

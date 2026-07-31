@@ -1,6 +1,7 @@
 import { describe, expect, test } from "@jest/globals";
-import { MemoryJournalStorage } from "@/lib/journal/indexedDbStorage";
 import { pickActiveSajuProfileId } from "@/lib/diary/activeSajuProfile";
+import { localProfilesSafeToMigrate } from "@/lib/diary/profileStorage";
+import { MemoryJournalStorage } from "@/lib/journal/indexedDbStorage";
 
 describe("per-profile journal isolation", () => {
   test("pickActiveSajuProfileId prefers primary then preferred", () => {
@@ -10,6 +11,28 @@ describe("per-profile journal isolation", () => {
     ];
     expect(pickActiveSajuProfileId(profiles)).toBe("b");
     expect(pickActiveSajuProfileId(profiles, "a")).toBe("a");
+  });
+
+  test("localProfilesSafeToMigrate blocks other-account cache", () => {
+    expect(localProfilesSafeToMigrate([], "user-b")).toBe(true);
+    expect(
+      localProfilesSafeToMigrate(
+        [{ userId: null }, { userId: undefined }],
+        "user-b"
+      )
+    ).toBe(true);
+    expect(
+      localProfilesSafeToMigrate([{ userId: "user-b" }], "user-b")
+    ).toBe(true);
+    expect(
+      localProfilesSafeToMigrate([{ userId: "user-admin" }], "user-b")
+    ).toBe(false);
+    expect(
+      localProfilesSafeToMigrate(
+        [{ userId: null }, { userId: "user-admin" }],
+        "user-b"
+      )
+    ).toBe(false);
   });
 
   test("MemoryJournalStorage keeps same-date entries per profile", async () => {

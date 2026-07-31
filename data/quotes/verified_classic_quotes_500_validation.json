@@ -1,0 +1,20 @@
+{
+  "file": "verified_classic_quotes_500_ko.json",
+  "record_count": 500,
+  "unique_ids": 500,
+  "unique_source_texts": 500,
+  "unique_korean_texts": 500,
+  "all_have_hangul": true,
+  "all_have_source_urls": true,
+  "all_have_locations": true,
+  "records_by_work": {
+    "도덕경": 81,
+    "논어": 100,
+    "법구경": 150,
+    "엥케이리디온": 50,
+    "손자병법": 70,
+    "명상록": 49
+  },
+  "file_size_bytes": 773119,
+  "warnings": []
+}

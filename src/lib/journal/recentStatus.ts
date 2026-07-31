@@ -127,10 +127,10 @@ function withCompat(
 
 /** OpenAI/템플릿 공통 폴백 — stats만으로 구조 생성 */
 export function buildTemplateRecentStatus(stats: HomeEStats): RecentStatusPayload {
-  const coreGood = focusFrom("핵심 · 좋아요", stats.coreBest ?? stats.best);
-  const coreWatch = focusFrom("핵심 · 아쉬워요", stats.coreWorst ?? stats.worst);
-  const domainGood = focusFrom("선택 · 좋아요", stats.domainBest);
-  const domainWatch = focusFrom("선택 · 아쉬워요", stats.domainWorst);
+  const coreGood = focusFrom("기본", stats.coreBest ?? stats.best);
+  const coreWatch = focusFrom("기본", stats.coreWorst ?? stats.worst);
+  const domainGood = focusFrom("생활", stats.domainBest);
+  const domainWatch = focusFrom("생활", stats.domainWorst);
 
   let headline: string;
   let advice: string;

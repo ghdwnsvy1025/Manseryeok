@@ -1,20 +1,24 @@
 "use client";
 
+import WeekTopicsCard from "@/components/journal/WeekTopicsCard";
 import { happinessTone } from "@/lib/journal/statsTone";
+import type { WeekTopicSummary } from "@/lib/journal/topics/weekTopics";
 
 type Props = {
   avg30: number | null;
   monthRecordedDays: number;
   streakDays: number;
   recordedToday: boolean;
+  weekTopics?: WeekTopicSummary | null;
 };
 
-/** 기록 탭 상단 — 장기 요약 숫자만 (홈의 최근 상태와 역할 분리) */
+/** 기록 탭 상단 — 요약 숫자 + 이번 주 화제 */
 export default function StatsSummaryStrip({
   avg30,
   monthRecordedDays,
   streakDays,
   recordedToday,
+  weekTopics,
 }: Props) {
   const items = [
     {
@@ -44,7 +48,10 @@ export default function StatsSummaryStrip({
   ];
 
   return (
-    <section className="stats-section" aria-label="기록 요약">
+    <section className="stats-section" aria-label="요약">
+      <div className="stats-emphasize-head">
+        <p className="stats-emphasize-title">요약</p>
+      </div>
       <div className="grid grid-cols-3 gap-2">
         {items.map((item) => (
           <div
@@ -71,6 +78,12 @@ export default function StatsSummaryStrip({
           </div>
         ))}
       </div>
+
+      {weekTopics && (
+        <div className="mt-3">
+          <WeekTopicsCard summary={weekTopics} variant="nested" />
+        </div>
+      )}
     </section>
   );
 }

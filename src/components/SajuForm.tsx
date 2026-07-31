@@ -5,6 +5,7 @@ import type { SajuInput, SajuOptions, CalendarType, DayChangeRule, TimeCorrectio
 import type { Gender } from "@/lib/saju/daeun";
 import { getBirthPrefillForForm } from "@/lib/diary/sajuSettings";
 import { useViewMode } from "@/contexts/ViewModeContext";
+import type { SajuProfile } from "@/lib/diary/types";
 
 interface SajuFormProps {
   onCalculate: (input: SajuInput, meta: { label?: string }) => void;
@@ -13,6 +14,10 @@ interface SajuFormProps {
   prefillBirth?: boolean;
   /** 이름 입력란 표시 (기본 true, 조회 전용이면 false) */
   showNameField?: boolean;
+  /** 기존 프로필 수정 시 초기값 */
+  seedProfile?: SajuProfile | null;
+  /** 제출 버튼 문구 */
+  submitLabel?: string;
 }
 
 const LABEL_STYLE = { color: "var(--px-text2)", fontSize: "14px", fontWeight: "700" as const };
@@ -84,7 +89,28 @@ function clampDayForMonth(dayStr: string, yearStr: string, monthStr: string): { 
   return { value: dayStr, hint: null };
 }
 
-function getInitialDateTimeParts(prefillBirth: boolean) {
+function getInitialDateTimeParts(
+  prefillBirth: boolean,
+  seedProfile?: SajuProfile | null
+) {
+  if (seedProfile) {
+    const [y, m, d] = seedProfile.birthDate.split("-");
+    const hasTime =
+      !seedProfile.birthTimeUnknown &&
+      seedProfile.birthHour !== undefined &&
+      seedProfile.birthMinute !== undefined;
+    return {
+      year: y ?? "",
+      month: m ? String(Number(m)) : "",
+      day: d ? String(Number(d)) : "",
+      hour: hasTime ? String(seedProfile.birthHour) : "",
+      minute: hasTime ? String(seedProfile.birthMinute) : "",
+      gender:
+        seedProfile.gender === "male" || seedProfile.gender === "female"
+          ? seedProfile.gender
+          : (undefined as Gender | undefined),
+    };
+  }
   if (prefillBirth) {
     const prefill = getBirthPrefillForForm();
     if (prefill) return prefill;
@@ -97,28 +123,54 @@ export default function SajuForm({
   isLoading,
   prefillBirth = true,
   showNameField = true,
+  seedProfile = null,
+  submitLabel,
 }: SajuFormProps) {
   const { isMobile } = useViewMode();
-  const [initialDateTime] = useState(() => getInitialDateTimeParts(prefillBirth));
-  const [displayName, setDisplayName] = useState("");
+  const [initialDateTime] = useState(() =>
+    getInitialDateTimeParts(prefillBirth, seedProfile)
+  );
+  const [displayName, setDisplayName] = useState(
+    () => seedProfile?.label?.trim() ?? ""
+  );
   const [year, setYear] = useState(initialDateTime.year);
   const [month, setMonth] = useState(initialDateTime.month);
   const [day, setDay] = useState(initialDateTime.day);
   const [hour, setHour] = useState(initialDateTime.hour);
   const [minute, setMinute] = useState(initialDateTime.minute);
   const [noTime, setNoTime] = useState(() => !initialDateTime.hour);
-  const [calendarType, setCalendarType] = useState<CalendarType>("solar");
+  const [calendarType, setCalendarType] = useState<CalendarType>(
+    () => seedProfile?.calendarType ?? "solar"
+  );
   const [gender, setGender] = useState<Gender>(
     () => initialDateTime.gender ?? "male"
   );
-  const [isLeapMonth, setIsLeapMonth] = useState(false);
+  const [isLeapMonth, setIsLeapMonth] = useState(
+    () => seedProfile?.isLeapMonth ?? false
+  );
   const [showAdvanced, setShowAdvanced] = useState(false);
-  const [dayChangeRule, setDayChangeRule] = useState<DayChangeRule>("midnight");
-  const [timeCorrection, setTimeCorrection] = useState<TimeCorrection>("trueSolarTime");
-  const [locationPresetId, setLocationPresetId] = useState<(typeof LOCATION_PRESETS)[number]["id"]>("seoul");
-  const [locationName, setLocationName] = useState("대한민국, 서울");
-  const [longitude, setLongitude] = useState(126.98);
-  const [latitude, setLatitude] = useState(37.57);
+  const [dayChangeRule, setDayChangeRule] = useState<DayChangeRule>(
+    () => seedProfile?.dayChangeRule ?? "midnight"
+  );
+  const [timeCorrection, setTimeCorrection] = useState<TimeCorrection>(
+    () => seedProfile?.timeCorrection ?? "trueSolarTime"
+  );
+  const [locationPresetId, setLocationPresetId] = useState<
+    (typeof LOCATION_PRESETS)[number]["id"]
+  >(() => {
+    if (!seedProfile?.locationName) return "seoul";
+    const hit = LOCATION_PRESETS.find((p) => p.name === seedProfile.locationName);
+    return hit?.id ?? "custom";
+  });
+  const [locationName, setLocationName] = useState(
+    () => seedProfile?.locationName ?? "대한민국, 서울"
+  );
+  const [longitude, setLongitude] = useState(
+    () => seedProfile?.longitude ?? 126.98
+  );
+  const [latitude, setLatitude] = useState(
+    () => seedProfile?.latitude ?? 37.57
+  );
   const [fieldHint, setFieldHint] = useState<string | null>(null);
 
   const handleDigitChange = (
@@ -601,7 +653,11 @@ export default function SajuForm({
         disabled={isLoading}
         className="px-btn w-full py-3 text-base"
       >
-        {isLoading ? "[ 등록 중... ]" : "[ 사주 등록하기 ]"}
+        {isLoading
+          ? "[ 저장 중... ]"
+          : submitLabel
+            ? `[ ${submitLabel} ]`
+            : "[ 사주 등록하기 ]"}
       </button>
     </form>
   );

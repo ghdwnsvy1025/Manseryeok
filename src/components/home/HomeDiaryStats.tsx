@@ -14,6 +14,7 @@ import {
   PERSONALIZATION_MAX_LEVEL,
   type PersonalizationLevelProgress,
 } from "@/lib/product/personalizationLevel";
+import { XP_GAUGE_FILL } from "@/lib/ui/xpGauge";
 
 type Props = {
   entries: DiaryEntry[];
@@ -200,7 +201,7 @@ function LevelProgressCard({
             className="h-full"
             style={{
               width: `${progress.progressRatio * 100}%`,
-              background: "var(--px-accent)",
+              background: XP_GAUGE_FILL,
             }}
           />
         </div>

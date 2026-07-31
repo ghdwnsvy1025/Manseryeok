@@ -57,9 +57,9 @@ describe("buildNatalDayInsight", () => {
     const insight = buildNatalDayInsight("2026-07-26", p);
     expect(insight).not.toBeNull();
     expect(insight!.byDomain.work.keywordLabels.length).toBeGreaterThanOrEqual(2);
-    expect(insight!.byDomain.finance.tensionPlain.length).toBeGreaterThan(10);
+    expect(insight!.byDomain.money.tensionPlain.length).toBeGreaterThan(10);
     expect(insight!.byDomain.health.tensionPlain).not.toEqual(
-      insight!.byDomain.finance.tensionPlain
+      insight!.byDomain.money.tensionPlain
     );
     expect(insight!.overallTraitPlain.length).toBeGreaterThan(5);
   });

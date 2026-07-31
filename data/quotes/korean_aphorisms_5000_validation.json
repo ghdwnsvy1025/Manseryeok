@@ -1,0 +1,117 @@
+{
+  "file": "korean_aphorisms_5000.json",
+  "record_count": 5000,
+  "unique_text_count": 5000,
+  "unique_hash_count": 5000,
+  "all_korean_text": true,
+  "category_counts": {
+    "감사": 250,
+    "겸손": 250,
+    "관계": 250,
+    "균형": 250,
+    "리더십": 250,
+    "배움": 250,
+    "변화": 250,
+    "성장": 250,
+    "시간": 250,
+    "실행": 250,
+    "용기": 250,
+    "인내": 250,
+    "자기이해": 250,
+    "절제": 250,
+    "정직": 250,
+    "집중": 250,
+    "창의성": 250,
+    "책임": 250,
+    "회복": 250,
+    "희망": 250
+  },
+  "file_size_bytes": 2937200,
+  "sample": [
+    {
+      "id": "KO-AF-04013",
+      "text": "현재의 어려움을 영원한 결론으로 보지 않는 사람은 힘든 시간을 견딜 이유를 보존한다.",
+      "author": "AI 생성 격언",
+      "language": "ko",
+      "category": "희망",
+      "tags": [
+        "희망",
+        "가능성",
+        "미래"
+      ],
+      "source_type": "ai_generated_original",
+      "is_real_person_quote": false,
+      "verification_status": "not_applicable",
+      "normalized_hash": "bf4282ab270e0451abcb51fe9632d839561455ff275678183bfd9b85dc404ddd",
+      "display_order": 1
+    },
+    {
+      "id": "KO-AF-04053",
+      "text": "막막할수록 오늘의 작은 행동을 선택하는 사람은 힘든 시간을 견딜 이유를 보존한다.",
+      "author": "AI 생성 격언",
+      "language": "ko",
+      "category": "희망",
+      "tags": [
+        "희망",
+        "가능성",
+        "미래"
+      ],
+      "source_type": "ai_generated_original",
+      "is_real_person_quote": false,
+      "verification_status": "not_applicable",
+      "normalized_hash": "daa59826a8cd2b47889cee4c156f08f804658ec2abf4cb0c2d125dcccc281d4e",
+      "display_order": 2
+    },
+    {
+      "id": "KO-AF-02237",
+      "text": "선택한 일에 필요한 도구만 남기는 사람은 결정의 수를 줄이고 실행의 질을 높인다.",
+      "author": "AI 생성 격언",
+      "language": "ko",
+      "category": "집중",
+      "tags": [
+        "집중",
+        "우선순위",
+        "몰입"
+      ],
+      "source_type": "ai_generated_original",
+      "is_real_person_quote": false,
+      "verification_status": "not_applicable",
+      "normalized_hash": "0c502a9a6e92f344a80bc93d6c4ec66c54d3c7125fcc711359e74dfcd6be1a97",
+      "display_order": 3
+    },
+    {
+      "id": "KO-AF-02458",
+      "text": "휴식과 일을 명확히 구분하는 사람은 중요한 것과 가까워지는 일정을 만든다.",
+      "author": "AI 생성 격언",
+      "language": "ko",
+      "category": "시간",
+      "tags": [
+        "시간",
+        "현재",
+        "우선순위"
+      ],
+      "source_type": "ai_generated_original",
+      "is_real_person_quote": false,
+      "verification_status": "not_applicable",
+      "normalized_hash": "9e4d4f26d9ad00d9005590ffcba7b1247499ade5629008a319274cda09d99548",
+      "display_order": 4
+    },
+    {
+      "id": "KO-AF-03296",
+      "text": "피하고 싶은 상황의 이유를 살피는 사람은 관계에서 더 분명한 경계를 세운다.",
+      "author": "AI 생성 격언",
+      "language": "ko",
+      "category": "자기이해",
+      "tags": [
+        "자기이해",
+        "성찰",
+        "정체성"
+      ],
+      "source_type": "ai_generated_original",
+      "is_real_person_quote": false,
+      "verification_status": "not_applicable",
+      "normalized_hash": "e3012f576914d30d97e7af0ed79879218bbc23c328c3f6f46664c63a58242da4",
+      "display_order": 5
+    }
+  ]
+}

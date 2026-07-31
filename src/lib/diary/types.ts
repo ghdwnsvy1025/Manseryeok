@@ -116,7 +116,12 @@ export type UserProfile = {
   id: string;
   locale?: string;
   timezone?: string;
+  /** @deprecated use activeJournalProfileId — kept as journal alias */
   activeSajuProfileId?: string | null;
+  /** Profile that owns journal / fortune / quote scope */
+  activeJournalProfileId?: string | null;
+  /** Profile currently shown on manseryeok (/saju) */
+  activeViewProfileId?: string | null;
   experienceMode?: ExperienceMode | null;
   onboardingCompletedAt?: string | null;
   createdAt: string;

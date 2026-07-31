@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
+import { useCallback, useEffect, useRef, useState } from "react";
 import InstallAppButton from "@/components/InstallAppButton";
 import LocalImportPanel from "@/components/diary/LocalImportPanel";
 import { getIndexedDbStorage } from "@/lib/diary/indexedDbStorage";
@@ -9,7 +8,11 @@ import {
   getDiaryStorage,
   resetDiaryStorageCache,
 } from "@/lib/diary/getStorage";
-import { syncLocalSajuProfileToAccount } from "@/lib/diary/profileStorage";
+import {
+  syncLocalSajuProfileToAccount,
+  clearLocalAccountScopedState,
+  reconcileLocalStateWithAuthUser,
+} from "@/lib/diary/profileStorage";
 import { disableGuestMode, enableGuestMode } from "@/lib/auth/guestMode";
 import type { DiaryEntry } from "@/lib/diary/types";
 import type { DiaryStorage } from "@/lib/diary/storage";
@@ -21,6 +24,38 @@ type ImportReady = {
   remoteStorage: DiaryStorage;
 };
 
+function Section({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section
+      className="space-y-3 p-4 border-2"
+      style={{
+        background: "var(--px-bg3)",
+        borderColor: "var(--px-border)",
+        boxShadow: "3px 3px 0 #000",
+      }}
+    >
+      <h3
+        className="text-sm font-black tracking-wide"
+        style={{ color: "var(--px-accent)" }}
+      >
+        {title}
+      </h3>
+      {children}
+    </section>
+  );
+}
+
+function safeNextPath(raw: string | null): string | null {
+  if (!raw || !raw.startsWith("/") || raw.startsWith("//")) return null;
+  return raw;
+}
+
 export default function DiaryLoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -29,13 +64,22 @@ export default function DiaryLoginPage() {
   const [loading, setLoading] = useState(false);
   const [importReady, setImportReady] = useState<ImportReady | null>(null);
   const [currentEmail, setCurrentEmail] = useState<string | null>(null);
+  const [authReady, setAuthReady] = useState(false);
+  const [showLoginForm, setShowLoginForm] = useState(false);
+  const [hasLocalBackup, setHasLocalBackup] = useState(false);
   const oauthHandled = useRef(false);
+  const nextPathRef = useRef<string | null>(null);
+
+  const goHomeOrNext = useCallback(() => {
+    window.location.href = nextPathRef.current ?? "/";
+  }, []);
 
   const prepareImportPrompt = async (): Promise<boolean> => {
     resetDiaryStorageCache();
     await syncLocalSajuProfileToAccount();
     const localStorage = getIndexedDbStorage();
     const localEntries = await localStorage.list();
+    setHasLocalBackup(localEntries.length > 0);
     if (localEntries.length === 0) {
       return false;
     }
@@ -45,79 +89,101 @@ export default function DiaryLoginPage() {
     return true;
   };
 
+  const refreshLocalBackupFlag = useCallback(async () => {
+    try {
+      const localEntries = await getIndexedDbStorage().list();
+      setHasLocalBackup(localEntries.length > 0);
+    } catch {
+      setHasLocalBackup(false);
+    }
+  }, []);
+
   useEffect(() => {
     const supabase = getSupabaseBrowserClient();
-    if (!supabase) return;
-
-    void supabase.auth.getUser().then(({ data }) => {
-      if (data.user) disableGuestMode();
-      setCurrentEmail(data.user ? data.user.email ?? "소셜 계정" : null);
-    });
-
     const params = new URLSearchParams(window.location.search);
+    nextPathRef.current = safeNextPath(params.get("next"));
+
+    if (!supabase) {
+      setAuthReady(true);
+      setShowLoginForm(true);
+      return;
+    }
+
+    void (async () => {
+      const { data } = await supabase.auth.getUser();
+      if (data.user) {
+        disableGuestMode();
+        setCurrentEmail(data.user.email ?? "소셜 계정");
+        await refreshLocalBackupFlag();
+      } else {
+        setCurrentEmail(null);
+        setShowLoginForm(true);
+      }
+      setAuthReady(true);
+    })();
+
     const authError = params.get("authError");
     if (authError) {
       const messages: Record<string, string> = {
         missing_code: "로그인 인증 코드가 없습니다. 다시 시도해주세요.",
-        not_configured: "Supabase 환경 변수가 설정되지 않았습니다.",
+        not_configured: "로그인 서버가 설정되지 않았습니다.",
         exchange_failed: "로그인 세션을 만들지 못했습니다. 다시 시도해주세요.",
       };
       setMessage(messages[authError] ?? "소셜 로그인에 실패했습니다.");
-      return;
-    }
-
-    if (
-      oauthHandled.current ||
-      (params.get("oauth") !== "success" && params.get("email") !== "confirmed")
+      setShowLoginForm(true);
+    } else if (
+      !oauthHandled.current &&
+      (params.get("oauth") === "success" || params.get("email") === "confirmed")
     ) {
-      return;
+      oauthHandled.current = true;
+      setLoading(true);
+      void prepareImportPrompt()
+        .then((needsImport) => {
+          if (!needsImport) {
+            goHomeOrNext();
+            return;
+          }
+          setMessage("이 기기 옛 기록을 계정에 합칠까요?");
+        })
+        .catch(() => {
+          setMessage("로그인은 완료됐지만 로컬 기록을 확인하지 못했습니다.");
+        })
+        .finally(() => setLoading(false));
     }
-
-    oauthHandled.current = true;
-    setLoading(true);
-    void prepareImportPrompt()
-      .then((needsImport) => {
-        if (!needsImport) {
-          window.location.replace("/");
-          return;
-        }
-        setMessage(
-          "로그인되었습니다. 이 기기의 기존 기록을 계정으로 가져올지 선택해주세요."
-        );
-      })
-      .catch(() => {
-        setMessage("로그인은 완료됐지만 로컬 기록을 확인하지 못했습니다.");
-      })
-      .finally(() => setLoading(false));
-    // 최초 OAuth 콜백 처리에서만 실행
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleGoogleLogin = async () => {
     const supabase = getSupabaseBrowserClient();
     if (!supabase) {
-      setMessage("Supabase 환경 변수가 설정되지 않았습니다.");
+      setMessage("로그인 서버가 설정되지 않았습니다.");
       return;
     }
 
     setLoading(true);
     setMessage("");
     disableGuestMode();
-    const next = encodeURIComponent("/diary/login?oauth=success");
+    void import("@/lib/analytics/posthog")
+      .then(({ ANALYTICS_EVENTS, captureEvent }) => {
+        captureEvent(ANALYTICS_EVENTS.authGoogleClicked);
+      })
+      .catch(() => undefined);
+    const next = encodeURIComponent(
+      nextPathRef.current
+        ? `/diary/login?oauth=success&next=${encodeURIComponent(nextPathRef.current)}`
+        : "/diary/login?oauth=success"
+    );
     const redirectTo = `${window.location.origin}/auth/callback?next=${next}`;
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
         redirectTo,
-        queryParams: { hl: "ko" },
+        queryParams: { hl: "ko", prompt: "select_account" },
       },
     });
-
     if (error) {
+      setMessage(error.message);
       setLoading(false);
-      setMessage(
-        "Google 로그인을 시작하지 못했습니다. 관리자 설정을 확인해주세요."
-      );
     }
   };
 
@@ -125,7 +191,7 @@ export default function DiaryLoginPage() {
     e.preventDefault();
     const supabase = getSupabaseBrowserClient();
     if (!supabase) {
-      setMessage("Supabase 환경 변수가 설정되지 않았습니다.");
+      setMessage("로그인 서버가 설정되지 않았습니다.");
       return;
     }
 
@@ -135,7 +201,11 @@ export default function DiaryLoginPage() {
 
     try {
       if (mode === "signup") {
-        const next = encodeURIComponent("/diary/login?email=confirmed");
+        const next = encodeURIComponent(
+          nextPathRef.current
+            ? `/diary/login?email=confirmed&next=${encodeURIComponent(nextPathRef.current)}`
+            : "/diary/login?email=confirmed"
+        );
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
@@ -146,14 +216,16 @@ export default function DiaryLoginPage() {
         if (error) throw error;
         if (data.session) {
           setCurrentEmail(data.user?.email ?? email);
+          setShowLoginForm(false);
           const needsImport = await prepareImportPrompt();
           if (!needsImport) {
-            window.location.href = "/";
+            goHomeOrNext();
             return;
           }
-          setMessage("가입과 로그인이 완료되었습니다. 로컬 기록을 가져올지 선택해주세요.");
+          setMessage("이 기기 옛 기록을 계정에 합칠까요?");
         } else {
-          setMessage("가입 확인 메일을 보냈습니다. 메일의 링크를 눌러 가입을 완료해주세요.");
+          setMessage("가입 메일을 보냈어요. 메일 확인 후 로그인해 주세요.");
+          setMode("login");
         }
       } else {
         const { data, error } = await supabase.auth.signInWithPassword({
@@ -162,15 +234,16 @@ export default function DiaryLoginPage() {
         });
         if (error) throw error;
         setCurrentEmail(data.user.email ?? email);
+        setShowLoginForm(false);
         const needsImport = await prepareImportPrompt();
         if (!needsImport) {
-          window.location.href = "/";
+          goHomeOrNext();
           return;
         }
-        setMessage("로그인되었습니다. 로컬 기록을 가져올지 선택해주세요.");
+        setMessage("이 기기 옛 기록을 계정에 합칠까요?");
       }
     } catch (err) {
-      setMessage(err instanceof Error ? err.message : "인증에 실패했습니다.");
+      setMessage(err instanceof Error ? err.message : "처리에 실패했습니다.");
     } finally {
       setLoading(false);
     }
@@ -179,216 +252,277 @@ export default function DiaryLoginPage() {
   const handleLogout = async () => {
     const supabase = getSupabaseBrowserClient();
     if (!supabase) return;
-    await supabase.auth.signOut();
-    resetDiaryStorageCache();
-    setImportReady(null);
-    setCurrentEmail(null);
-    setMessage("로그아웃되었습니다.");
+    setLoading(true);
+    setMessage("");
+    try {
+      await supabase.auth.signOut();
+      reconcileLocalStateWithAuthUser(null);
+      clearLocalAccountScopedState({ notify: true });
+      resetDiaryStorageCache();
+      setCurrentEmail(null);
+      setShowLoginForm(true);
+      setImportReady(null);
+      setHasLocalBackup(false);
+      setMessage("로그아웃했어요.");
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "로그아웃에 실패했습니다.");
+    } finally {
+      setLoading(false);
+    }
   };
 
+  const handleSwitchAccount = async () => {
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) return;
+    setLoading(true);
+    setMessage("");
+    try {
+      await supabase.auth.signOut();
+      reconcileLocalStateWithAuthUser(null);
+      clearLocalAccountScopedState({ notify: true });
+      resetDiaryStorageCache();
+      setCurrentEmail(null);
+      setShowLoginForm(true);
+      setImportReady(null);
+      setMode("login");
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "전환에 실패했습니다.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const startManualImport = async () => {
+    setLoading(true);
+    setMessage("");
+    try {
+      const needsImport = await prepareImportPrompt();
+      if (!needsImport) {
+        setMessage("가져올 로컬 기록이 없어요.");
+      }
+    } catch {
+      setMessage("로컬 기록을 확인하지 못했어요.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loggedIn = Boolean(currentEmail);
+
+  if (!authReady) {
+    return <p className="ui-hint p-4">불러오는 중…</p>;
+  }
+
   return (
-    <div className="max-w-md mx-auto space-y-4">
-      <h2 className="text-lg font-black" style={{ color: "var(--px-accent)" }}>
-        ■ 나
-      </h2>
-      <p className="text-xs" style={{ color: "var(--px-text2)" }}>
-        로그인하면 사주 프로필과 기록을 안전하게 백업하고 다른 기기에서도 이어서
-        사용할 수 있습니다. 로그인하지 않아도 이 기기에는 저장됩니다.
-      </p>
-
-      <div
-        className="space-y-2 p-3 border-2"
-        style={{ background: "var(--px-bg2)", borderColor: "var(--px-border)" }}
-      >
-        <p className="text-xs font-bold" style={{ color: "var(--px-accent)" }}>
-          내 설정
-        </p>
-        <div className="flex flex-col gap-1.5">
-          <Link
-            href="/saju"
-            className="text-sm font-bold underline"
-            style={{ color: "var(--px-text)" }}
-          >
-            내 사주 (만세력) →
-          </Link>
-          <Link
-            href="/diary/stats"
-            className="text-sm font-bold underline"
-            style={{ color: "var(--px-text)" }}
-          >
-            내 패턴 →
-          </Link>
-          <Link
-            href="/"
-            className="text-sm font-bold underline"
-            style={{ color: "var(--px-text)" }}
-          >
-            오늘로 →
-          </Link>
-        </div>
-      </div>
-
-      {!importReady && !currentEmail && (
-        <div className="space-y-3">
-          <div
-            className="space-y-2 p-4 border-2"
-            style={{
-              background: "var(--px-bg3)",
-              borderColor: "var(--px-border)",
-            }}
-          >
-            <p className="text-xs font-bold" style={{ color: "var(--px-accent)" }}>
-              간편 로그인
-            </p>
-            <button
-              type="button"
-              onClick={() => void handleGoogleLogin()}
-              disabled={loading}
-              className="w-full px-4 py-3 text-sm font-bold border-2"
-              style={{
-                background: "#fff",
-                borderColor: "#111",
-                color: "#111",
-              }}
-            >
-              Google로 계속하기
-            </button>
-            <p className="ui-hint">
-              소셜 로그인에서는 제공자가 전달하는 계정 식별 정보만 사용하며, 사주
-              정보와 일기 원문은 로그인 제공자에게 보내지 않습니다.
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2" aria-hidden="true">
-            <span className="h-px flex-1" style={{ background: "var(--px-border)" }} />
-            <span className="text-[11px]" style={{ color: "var(--px-text2)" }}>
-              또는 이메일
-            </span>
-            <span className="h-px flex-1" style={{ background: "var(--px-border)" }} />
-          </div>
-
-          <form
-            onSubmit={handleSubmit}
-            className="space-y-3 p-4 border-2"
-            style={{
-              background: "var(--px-bg3)",
-              borderColor: "var(--px-border)",
-            }}
-          >
-            <p className="ui-hint">
-              {mode === "signup"
-                ? "가입에는 이메일과 비밀번호만 필요합니다. 이름·전화번호·생년월일은 받지 않습니다."
-                : "이메일 계정으로 로그인하세요."}
-            </p>
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="이메일"
-            aria-label="이메일"
-            required
-            className="w-full px-3 py-2 text-sm border-2"
-            style={{
-              background: "var(--px-bg2)",
-              borderColor: "var(--px-border)",
-              color: "var(--px-text)",
-            }}
-          />
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="비밀번호"
-            aria-label="비밀번호"
-            required
-            minLength={8}
-            autoComplete={mode === "signup" ? "new-password" : "current-password"}
-            className="w-full px-3 py-2 text-sm border-2"
-            style={{
-              background: "var(--px-bg2)",
-              borderColor: "var(--px-border)",
-              color: "var(--px-text)",
-            }}
-          />
-          <div className="flex gap-2">
-            <button
-              type="submit"
-              disabled={loading}
-              className="flex-1 px-4 py-2 text-xs font-bold border-2"
-              style={{ background: "var(--px-accent)", borderColor: "#000", color: "#000" }}
-            >
-              {loading ? "처리 중..." : mode === "login" ? "로그인" : "가입"}
-            </button>
-            <button
-              type="button"
-              onClick={() => setMode(mode === "login" ? "signup" : "login")}
-              className="px-3 py-2 text-xs font-bold border"
-              style={{ borderColor: "var(--px-border)", color: "var(--px-text2)" }}
-            >
-              {mode === "login" ? "가입" : "로그인"}
-            </button>
-          </div>
-          </form>
-        </div>
-      )}
+    <div className="max-w-md mx-auto space-y-4 pb-8">
+      <header>
+        <h2
+          className="text-xl font-black"
+          style={{ color: "var(--px-accent)" }}
+        >
+          계정 및 설정
+        </h2>
+      </header>
 
       {importReady && (
         <LocalImportPanel
           localEntries={importReady.localEntries}
           remoteEntries={importReady.remoteEntries}
           remoteStorage={importReady.remoteStorage}
-          onSkip={() => {
-            window.location.href = "/";
-          }}
-          onComplete={() => {
-            window.location.href = "/";
-          }}
+          onSkip={goHomeOrNext}
+          onComplete={goHomeOrNext}
         />
       )}
 
-      {currentEmail && (
-        <div className="flex items-center justify-between gap-2">
-          <p className="ui-hint">{currentEmail} 계정으로 로그인됨</p>
-          <button
-            type="button"
-            onClick={handleLogout}
-            className="text-xs font-bold underline"
-            style={{ color: "var(--px-text2)" }}
-          >
-            로그아웃
-          </button>
-        </div>
+      {!importReady && (
+        <Section title="계정">
+          {loggedIn && !showLoginForm ? (
+            <div className="space-y-3">
+              <div
+                className="p-3.5 border-2"
+                style={{
+                  borderColor: "var(--px-border)",
+                  background: "var(--px-bg2)",
+                }}
+              >
+                <p
+                  className="text-base font-black break-all"
+                  style={{ color: "var(--px-text-on-panel)" }}
+                >
+                  {currentEmail}
+                </p>
+              </div>
+              <button
+                type="button"
+                disabled={loading}
+                onClick={() => void handleLogout()}
+                className="w-full px-4 py-3.5 text-base font-black border-2"
+                style={{
+                  borderColor: "var(--px-border)",
+                  background: "var(--px-bg2)",
+                  color: "var(--px-text-on-panel)",
+                }}
+              >
+                로그아웃
+              </button>
+              <button
+                type="button"
+                disabled={loading}
+                onClick={() => void handleSwitchAccount()}
+                className="w-full py-2 text-sm font-bold underline"
+                style={{ color: "var(--px-text2)", background: "transparent" }}
+              >
+                다른 계정으로 전환
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <button
+                type="button"
+                onClick={() => void handleGoogleLogin()}
+                disabled={loading}
+                className="w-full px-4 py-3.5 text-base font-black border-2"
+                style={{
+                  background: "#fff",
+                  borderColor: "#111",
+                  color: "#111",
+                }}
+              >
+                Google로 계속하기
+              </button>
+
+              <div className="flex items-center gap-2" aria-hidden="true">
+                <span
+                  className="h-px flex-1"
+                  style={{ background: "var(--px-border)" }}
+                />
+                <span className="text-xs font-bold" style={{ color: "var(--px-text2)" }}>
+                  또는
+                </span>
+                <span
+                  className="h-px flex-1"
+                  style={{ background: "var(--px-border)" }}
+                />
+              </div>
+
+              <form onSubmit={handleSubmit} className="space-y-3">
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="이메일"
+                  aria-label="이메일"
+                  required
+                  className="w-full px-3 py-3 text-base border-2"
+                  style={{
+                    background: "var(--px-bg2)",
+                    borderColor: "var(--px-border)",
+                    color: "var(--px-text)",
+                  }}
+                />
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="비밀번호"
+                  aria-label="비밀번호"
+                  required
+                  minLength={8}
+                  autoComplete={
+                    mode === "signup" ? "new-password" : "current-password"
+                  }
+                  className="w-full px-3 py-3 text-base border-2"
+                  style={{
+                    background: "var(--px-bg2)",
+                    borderColor: "var(--px-border)",
+                    color: "var(--px-text)",
+                  }}
+                />
+                <div className="flex gap-2">
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="flex-1 px-4 py-3.5 text-base font-black border-2"
+                    style={{
+                      background: "var(--px-accent)",
+                      borderColor: "#000",
+                      color: "#000",
+                    }}
+                  >
+                    {loading
+                      ? "처리 중..."
+                      : mode === "login"
+                        ? "로그인"
+                        : "가입하기"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setMode(mode === "login" ? "signup" : "login")
+                    }
+                    className="px-4 py-3.5 text-sm font-bold border-2"
+                    style={{
+                      borderColor: "var(--px-border)",
+                      color: "var(--px-text2)",
+                    }}
+                  >
+                    {mode === "login" ? "가입" : "로그인"}
+                  </button>
+                </div>
+              </form>
+
+              {!loggedIn && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    enableGuestMode();
+                    window.location.href = "/";
+                  }}
+                  className="w-full py-2 text-sm font-bold underline"
+                  style={{ color: "var(--px-text2)", background: "transparent" }}
+                >
+                  로그인 없이 둘러보기
+                </button>
+              )}
+            </div>
+          )}
+        </Section>
+      )}
+
+      {!importReady && (
+        <Section title="설정">
+          <InstallAppButton />
+          {loggedIn && !showLoginForm && hasLocalBackup && (
+            <button
+              type="button"
+              disabled={loading}
+              onClick={() => void startManualImport()}
+              className="w-full px-3 py-3.5 text-sm font-black border-2"
+              style={{
+                borderColor: "var(--px-border)",
+                background: "var(--px-bg2)",
+                color: "var(--px-text-on-panel)",
+              }}
+            >
+              이 기기 옛 기록 합치기
+            </button>
+          )}
+        </Section>
       )}
 
       {message && (
-        <p className="text-xs font-bold" style={{ color: "var(--px-text2)" }}>
-          {message}
-        </p>
-      )}
-
-      {!currentEmail && !importReady && (
-        <button
-          type="button"
-          onClick={() => {
-            enableGuestMode();
-            window.location.href = "/";
-          }}
-          className="w-full px-3 py-3 text-xs font-bold border-2"
+        <p
+          className="p-3.5 border-2 text-sm font-bold"
           style={{
             borderColor: "var(--px-border)",
             color: "var(--px-text2)",
             background: "var(--px-bg2)",
           }}
+          role="status"
         >
-          비로그인으로 계속하기
-        </button>
+          {message}
+        </p>
       )}
-
-      <Link href="/diary" className="text-xs font-bold" style={{ color: "var(--px-accent)" }}>
-        ← 기록으로 돌아가기
-      </Link>
-
-      <InstallAppButton />
     </div>
   );
 }

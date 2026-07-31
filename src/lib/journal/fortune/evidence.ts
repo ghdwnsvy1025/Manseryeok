@@ -4,11 +4,15 @@
  */
 import type { DailyInsightContext } from "@/lib/journal/insight/types";
 import {
-  computeBlendWeights,
   PERSONALIZATION_MATURITY_LEVEL,
   type BlendWeights,
   type DataMaturityTier,
 } from "@/lib/journal/insight/dynamicWeights";
+import {
+  resolveGatedBlend,
+  type PillarInfluence,
+  type RecordDayPhase,
+} from "@/lib/journal/insight/recordReflectGate";
 import type { NatalDayInsight } from "@/lib/journal/fortune/natalDaySignal";
 import { progressFromTotalXp } from "@/lib/product/personalizationLevel";
 
@@ -44,12 +48,17 @@ export type FortuneEvidence = {
   maturity: number;
   tier: DataMaturityTier;
   tierLabel: string;
-  /** 신호 혼합 비율 (합 = 1) */
+  /** 신호 혼합 비율 (합 = 1) — 일수 게이트 적용 후 */
   weights: {
     recent: number;
     keyword: number;
     natal: number;
   };
+  dayPhase: RecordDayPhase;
+  dayPhaseLabel: string;
+  journalShareCap: number;
+  guideKo: string;
+  pillarInfluence: PillarInfluence;
   overallConfidence: number;
   primaryKeyword: string | null;
   tensionKeyword: string | null;
@@ -90,31 +99,36 @@ export function buildFortuneEvidence(
 ): FortuneEvidence {
   const priorUniqueDays = Math.max(0, Math.floor(insight.priorUniqueDays || 0));
   const totalXp = Math.max(0, Math.floor(opts.totalXp || 0));
-  const w =
-    opts.weights ??
-    computeBlendWeights({
-      totalXp,
-      onboardingCompleted: opts.onboardingCompleted,
-    });
+  const gated = resolveGatedBlend({
+    totalXp,
+    onboardingCompleted: opts.onboardingCompleted,
+    priorUniqueDays,
+    weights: opts.weights,
+  });
   const level = progressFromTotalXp(totalXp).level;
 
   const natalDay: NatalDayInsight | null = insight.natalDay ?? null;
 
   return {
-    effectiveXp: w.effectiveXp,
-    maturityTargetXp: w.maturityTargetXp,
+    effectiveXp: gated.effectiveXp,
+    maturityTargetXp: gated.maturityTargetXp,
     priorUniqueDays,
     level,
     maturityLevel: PERSONALIZATION_MATURITY_LEVEL,
     onboardingCompleted: Boolean(opts.onboardingCompleted),
-    maturity: w.maturity,
-    tier: w.tier,
-    tierLabel: TIER_LABEL[w.tier],
+    maturity: gated.maturity,
+    tier: gated.tier,
+    tierLabel: TIER_LABEL[gated.tier],
     weights: {
-      recent: w.recent,
-      keyword: w.keyword,
-      natal: w.natal,
+      recent: gated.recent,
+      keyword: gated.keyword,
+      natal: gated.natal,
     },
+    dayPhase: gated.dayPhase,
+    dayPhaseLabel: gated.dayPhaseLabel,
+    journalShareCap: gated.journalShareCap,
+    guideKo: gated.guideKo,
+    pillarInfluence: gated.pillarInfluence,
     overallConfidence: Math.round((insight.overallConfidence ?? 0) * 100) / 100,
     primaryKeyword: insight.primaryKeyword ?? null,
     tensionKeyword: insight.tensionKeyword ?? null,
@@ -129,9 +143,12 @@ export function buildFortuneEvidence(
           overallTraitPlain: natalDay.overallTraitPlain,
           todayStemGod: natalDay.todayStemGod,
           relationLabels: natalDay.relationLabels,
-          domains: (["work", "relationship", "finance", "health"] as const).map(
-            (d) => {
-              const s = natalDay.byDomain[d];
+          domains: (
+            ["work", "relationships", "love", "money", "health"] as const
+          )
+            .map((d) => {
+              const s = natalDay.byDomain?.[d];
+              if (!s) return null;
               return {
                 domain: d,
                 tensionKind: s.tensionKind,
@@ -140,10 +157,10 @@ export function buildFortuneEvidence(
                 natalPlain: s.natalPlain,
                 todayPlain: s.todayPlain,
               };
-            }
-          ),
+            })
+            .filter((x): x is NonNullable<typeof x> => x != null),
         }
       : null,
-    version: w.version,
+    version: gated.version,
   };
 }

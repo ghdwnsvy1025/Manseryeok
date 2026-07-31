@@ -27,12 +27,20 @@ import {
   persistDailyQuestion,
 } from "@/lib/journal/insight/contextService";
 import { resolveInsightPersistClient } from "@/lib/journal/insight/persistClient";
+import { loadPersistedFortune } from "@/lib/journal/insight/persist";
+import { buildSajuWordingHints } from "@/lib/journal/sajuWordingHints";
 import { INSIGHT_ENGINE_VERSION } from "@/lib/journal/insight/types";
 import {
   buildShadowEvalReport,
   diagnoseModelRows,
   EVAL_METRICS_VERSION,
 } from "@/lib/personalization/evalMetrics";
+import { requireAuthUser } from "@/lib/api/requireAuth";
+import { checkLlmRateLimit } from "@/lib/api/rateLimit";
+import {
+  sanitizeFortuneQuestionContext,
+  type FortuneQuestionContext,
+} from "@/lib/journal/weekThemeSummary";
 
 export const runtime = "nodejs";
 
@@ -44,6 +52,8 @@ type Body = {
   ridgeByCategory?: Partial<Record<string, number | null>>;
   /** 클라 로컬 학습 편향 */
   keywordBiases?: KeywordBiasMap;
+  /** 홈에서 이미 본 오늘의 운세 스냅샷 */
+  fortune?: FortuneQuestionContext | null;
 };
 
 function sanitizeBiases(raw: unknown): KeywordBiasMap {
@@ -99,6 +109,11 @@ function mergeBiases(a: KeywordBiasMap, b: KeywordBiasMap): KeywordBiasMap {
 }
 
 export async function POST(req: NextRequest) {
+  const auth = await requireAuthUser();
+  if (!auth.ok) return auth.response;
+  const limited = checkLlmRateLimit(auth.user.id);
+  if (!limited.ok) return limited.response;
+
   let body: unknown;
   try {
     body = await req.json();
@@ -176,17 +191,58 @@ export async function POST(req: NextRequest) {
     keywordBiases,
   });
 
+  let fortuneCtx = sanitizeFortuneQuestionContext(b.fortune);
+  if (!fortuneCtx && earlySajuProfileId) {
+    const sbForFortune = sbAuthEarly ?? getSupabaseServerClient();
+    if (sbForFortune) {
+      const {
+        data: { user: fortuneUser },
+      } = await sbForFortune.auth.getUser();
+      if (fortuneUser?.id) {
+        const persisted = await loadPersistedFortune(
+          sbForFortune,
+          fortuneUser.id,
+          b.todayDate,
+          earlySajuProfileId
+        );
+        const overall =
+          persisted?.sections.find((s) => s.domain === "overall") ??
+          persisted?.sections[0] ??
+          null;
+        if (overall || persisted) {
+          fortuneCtx = sanitizeFortuneQuestionContext({
+            flow: overall?.flow ?? null,
+            score: overall?.score ?? null,
+            headline:
+              overall?.headline || persisted?.overallHeadline || null,
+            body:
+              overall?.interpretation ||
+              overall?.summary ||
+              persisted?.overallSummary ||
+              null,
+            action: overall?.action ?? null,
+            caution: overall?.caution ?? null,
+          });
+        }
+      }
+    }
+  }
+
   const decision = decideTodayQuestion({
     b: theme,
     bundle: liveBundle,
     enabledCodes,
     keywordRanking: keywords,
+    fortune: fortuneCtx,
   });
 
   const result = await generateTodayQuestion({
     b: theme,
     decision,
     ganjiKo: ctx.ganjiKo,
+    priorUniqueDays: keywords.priorUniqueDays,
+    fortune: fortuneCtx,
+    sajuHints: buildSajuWordingHints(b.todayDate, b.sajuProfile ?? null),
   });
 
   const ridgeShadow = shadowBundle
@@ -309,6 +365,7 @@ export async function POST(req: NextRequest) {
       contentScore: decision.contentScore,
       topKeywords: decision.topKeywords,
       evidence: decision.evidence,
+      weekTheme: decision.weekTheme,
     },
     contextId,
     questionId,

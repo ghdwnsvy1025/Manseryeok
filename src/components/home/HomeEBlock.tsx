@@ -6,6 +6,7 @@ import type { HomeEStats } from "@/lib/journal/homeStats";
 import WaveText from "@/components/motion/WaveText";
 import { personalizationFromXp } from "@/lib/journal/personalization";
 import { formatPersonalizationLevel } from "@/lib/product/personalizationLevel";
+import { XP_GAUGE_FILL } from "@/lib/ui/xpGauge";
 
 type Props = {
   stats: HomeEStats;
@@ -21,8 +22,8 @@ export default function HomeEBlock({ stats }: Props) {
 
   return (
     <section className="space-y-3">
-      <div className="flex items-baseline justify-between gap-2">
-        <WaveText className="ui-section-title">■ 나의 성장</WaveText>
+      <div className="ui-emphasize-head">
+        <WaveText className="ui-emphasize-title">맞춤 레벨</WaveText>
         <Link
           href="/stats"
           className="text-xs font-bold underline shrink-0"
@@ -72,7 +73,7 @@ export default function HomeEBlock({ stats }: Props) {
             className="h-full transition-[width] duration-500"
             style={{
               width: `${Math.max(4, Math.round(lv.progressRatio * 100))}%`,
-              background: "linear-gradient(90deg, #4ade80, var(--px-accent))",
+              background: XP_GAUGE_FILL,
             }}
           />
         </div>

@@ -333,6 +333,7 @@ export function aggregateHappinessByCharacters(entries: JournalEntry[]): {
   stems: CharacterHappiness[];
   branches: CharacterHappiness[];
   ganzhi: CharacterHappiness[];
+  overall: number | null;
 } {
   const byDate = latestByDate(entries);
   const overall = overallHappinessAvg(byDate);
@@ -368,6 +369,7 @@ export function aggregateHappinessByCharacters(entries: JournalEntry[]): {
       return hanja ? BRANCH_META[hanja].element : undefined;
     }),
     ganzhi: toRows(ganjiKeys, ganjiMap, overall, () => undefined),
+    overall,
   };
 }
 

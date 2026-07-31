@@ -16,7 +16,7 @@ import { getPillarsForDate } from "@/lib/diary/dayPillar";
 import type { FortuneDomainCode } from "@/lib/journal/insight/types";
 import type { KeywordCode } from "@/lib/journal/keywords/catalog";
 
-export const NATAL_DAY_SIGNAL_VERSION = "natal-day-signal-v1.0.0";
+export const NATAL_DAY_SIGNAL_VERSION = "natal-day-signal-v1.1.0";
 
 const ALL_GODS: TenGod[] = [
   "비견",
@@ -64,8 +64,9 @@ const GOD_FAMILY: Record<TenGod, GodFamily> = {
 const DOMAIN_FAMILIES: Record<FortuneDomainCode, GodFamily[]> = {
   overall: ["peer", "output", "wealth", "officer", "resource"],
   work: ["wealth", "officer", "output", "resource"],
-  relationship: ["peer", "officer", "output", "resource"],
-  finance: ["wealth", "peer", "officer"],
+  relationships: ["peer", "officer", "output", "resource"],
+  love: ["peer", "output", "wealth"],
+  money: ["wealth", "peer", "officer"],
   health: ["resource", "peer", "output"],
 };
 
@@ -355,11 +356,31 @@ function buildDomainSignal(
     familiesOf(todayForTension)
   );
 
-  // 합은 소폭 가산, 충·형은 소폭 감산
+  // 합은 소폭 가산, 충·형·파·해는 관계·소모 신호로 감산 (사건 예언 아님)
   let adj = 0;
-  if (relationLabels.some((l) => l.includes("합"))) adj += 0.04;
-  if (relationLabels.some((l) => /충|형|파|해/.test(l))) adj -= 0.05;
-  const natalScore = Math.max(0.15, Math.min(0.9, score + adj));
+  for (const l of relationLabels) {
+    if (l.includes("합")) adj += 0.055;
+    else if (l.includes("충")) adj -= 0.07;
+    else if (l.includes("해")) adj -= 0.05;
+    else if (l.includes("형")) adj -= 0.04;
+    else if (l.includes("파")) adj -= 0.03;
+  }
+
+  // 오늘 천간 십신이 이 영역 가족과 맞으면 활성화 가산
+  if (todayStemGod && families.includes(GOD_FAMILY[todayStemGod])) {
+    adj += kind === "support" ? 0.06 : kind === "tension" ? 0.02 : 0.04;
+  }
+  // 영역과 무관한 관성만 강하면 직장 외에서는 소폭 부담
+  if (
+    todayStemGod &&
+    GOD_FAMILY[todayStemGod] === "officer" &&
+    domain !== "work" &&
+    domain !== "overall"
+  ) {
+    adj -= 0.025;
+  }
+
+  const natalScore = Math.max(0.18, Math.min(0.88, score + adj));
 
   const keywordCodes = keywordCodesFor(natalGods, todayForTension, kind);
   return {
@@ -434,8 +455,9 @@ export function buildNatalDayInsight(
   const domains: FortuneDomainCode[] = [
     "overall",
     "work",
-    "relationship",
-    "finance",
+    "relationships",
+    "love",
+    "money",
     "health",
   ];
   const byDomain = {} as Record<FortuneDomainCode, DomainNatalDaySignal>;

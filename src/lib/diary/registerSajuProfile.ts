@@ -72,6 +72,47 @@ export async function registerSajuProfileFromResult(
     await completeOnboarding(opts?.experienceMode ?? "balanced");
   }
   notifySajuProfileChanged();
+  try {
+    const { ANALYTICS_EVENTS, captureEvent } = await import(
+      "@/lib/analytics/posthog"
+    );
+    captureEvent(ANALYTICS_EVENTS.profileCreated, {
+      is_primary: makePrimary,
+    });
+  } catch {
+    /* analytics optional */
+  }
+  return profile;
+}
+
+/** 기존 프로필 생년월일·이름 수정 */
+export async function updateSajuProfileFromResult(
+  existing: SajuProfile,
+  result: SajuResult,
+  opts?: { label?: string }
+): Promise<SajuProfile> {
+  const label = opts?.label?.trim() || existing.label || "이름 없음";
+  if (existing.isPrimary) {
+    persistBirthSettings(result);
+  }
+
+  const built = buildSajuProfileFromResult(result, {
+    id: existing.id,
+    userId: existing.userId,
+    label,
+    isPrimary: existing.isPrimary,
+  });
+
+  let profile = {
+    ...built,
+    createdAt: existing.createdAt,
+  };
+  try {
+    profile = await saveSajuProfile(profile);
+  } catch {
+    /* local already written inside saveSajuProfile when possible */
+  }
+  notifySajuProfileChanged();
   return profile;
 }
 

@@ -39,11 +39,8 @@ export default function JournalCategoriesPage() {
       <div className="space-y-4 max-w-lg mx-auto pb-8">
         <header>
           <h1 className="text-lg font-black" style={{ color: "var(--px-accent)" }}>
-            ■ 기록 카테고리
+            기록 카테고리
           </h1>
-          <p className="ui-hint mt-1">
-            최소 4 · 권장 6 · 최대 9. 꺼도 과거 점수는 삭제되지 않아요.
-          </p>
         </header>
         <CategoryPreferenceEditor
           initialEnabled={initial}

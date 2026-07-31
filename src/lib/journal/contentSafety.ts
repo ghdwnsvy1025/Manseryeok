@@ -1,7 +1,7 @@
 /**
  * 운세·오늘의 문장 공통 안전 필터
  */
-export const CONTENT_SAFETY_VERSION = "content-safety-v1.0.0";
+export const CONTENT_SAFETY_VERSION = "content-safety-v1.1.0";
 
 const FORBIDDEN_FORTUNE: RegExp[] = [
   /반드시\s*좋은\s*일이\s*생긴다/,
@@ -10,6 +10,7 @@ const FORBIDDEN_FORTUNE: RegExp[] = [
   /헤어질\s*운/,
   /사고가\s*난다/,
   /병이\s*생긴다/,
+  /병에\s*걸린다/,
   /직장을\s*잃는다/,
   /계약이\s*반드시\s*성공/,
   /오늘은\s*무조건\s*나쁘다/,
@@ -17,9 +18,11 @@ const FORBIDDEN_FORTUNE: RegExp[] = [
   /진단/,
   /치료\s*중단/,
   /투자하면\s*수익/,
-  /대출/,
+  /사망/,
   /이별한다/,
   /배신당/,
+  /암이\s*온다/,
+  /수술이\s*필요/,
 ];
 
 const FORBIDDEN_SENTENCE: RegExp[] = [

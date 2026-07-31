@@ -13,6 +13,8 @@ import {
   classifyAndSanitizeError,
   publicErrorDetail,
 } from "@/lib/app/publicErrors";
+import { requireAuthUser } from "@/lib/api/requireAuth";
+import { checkLlmRateLimit } from "@/lib/api/rateLimit";
 
 export const runtime = "nodejs";
 
@@ -48,11 +50,34 @@ function homeTemplateSentence(ganjiKo: string): string {
 
 /**
  * 홈 「오늘의 한 문장」
- * - no_theory: admin 학습 이론을 알 수 없음
- * - ok: 감성 한 문장 (이론 필수, 일기 통계는 있으면 보강)
- * - LLM 실패 시에도 템플릿으로 ok 응답 (화면이 깨지지 않음)
+ * - 로그인 필수 + rate limit
+ * - 이론/RAG 없으면 템플릿 문장으로 ok 응답 (화면이 "알 수 없다"로 비지 않음)
+ * - LLM 실패 시에도 템플릿으로 ok 응답
  */
+function templateOkResponse(
+  ganjiKo: string,
+  sameGanjiCount: number,
+  fallback: string,
+  detail?: string
+) {
+  const template = homeTemplateSentence(ganjiKo);
+  return Response.json({
+    status: "ok",
+    message: template,
+    detail: detail ?? "학습 이론이 없어 오늘의 문장 템플릿을 보여줍니다.",
+    chunkCount: 0,
+    sameGanjiCount,
+    theoryEvidence: [],
+    fallback,
+  });
+}
+
 export async function POST(req: NextRequest) {
+  const auth = await requireAuthUser();
+  if (!auth.ok) return auth.response;
+  const limited = checkLlmRateLimit(auth.user.id);
+  if (!limited.ok) return limited.response;
+
   let body: unknown;
   try {
     body = await req.json();
@@ -77,41 +102,32 @@ export async function POST(req: NextRequest) {
     chunkIndex: number;
   }> = [];
   if (!isServiceRoleConfigured()) {
-    return Response.json({
-      status: "no_theory",
-      message: "알 수 없다",
-      detail: "학습 서버가 설정되지 않아 학습 내용을 알 수 없습니다.",
-      chunkCount: 0,
+    return templateOkResponse(
+      body.ganjiKo,
       sameGanjiCount,
-      theoryEvidence: [],
-      fallback: null,
-    });
+      "template_no_service_role",
+      "학습 서버가 설정되지 않아 템플릿 문장을 보여줍니다."
+    );
   }
 
   try {
     theoryReady = await countReadyDocuments();
   } catch {
-    return Response.json({
-      status: "no_theory",
-      message: "알 수 없다",
-      detail: publicErrorDetail("rag"),
-      chunkCount: 0,
+    return templateOkResponse(
+      body.ganjiKo,
       sameGanjiCount,
-      theoryEvidence: [],
-      fallback: null,
-    });
+      "template_theory_count_failed",
+      publicErrorDetail("rag")
+    );
   }
 
   if (theoryReady <= 0) {
-    return Response.json({
-      status: "no_theory",
-      message: "알 수 없다",
-      detail: "Admin에서 학습시킨 사주 이론이 아직 없습니다.",
-      chunkCount: 0,
+    return templateOkResponse(
+      body.ganjiKo,
       sameGanjiCount,
-      theoryEvidence: [],
-      fallback: null,
-    });
+      "template_no_theory",
+      "Admin 학습 이론이 아직 없어 템플릿 문장을 보여줍니다."
+    );
   }
 
   try {
@@ -132,27 +148,21 @@ export async function POST(req: NextRequest) {
       chunkIndex: m.chunkIndex,
     }));
   } catch {
-    return Response.json({
-      status: "no_theory",
-      message: "알 수 없다",
-      detail: publicErrorDetail("rag"),
-      chunkCount: 0,
+    return templateOkResponse(
+      body.ganjiKo,
       sameGanjiCount,
-      theoryEvidence: [],
-      fallback: "rag_failed",
-    });
+      "template_rag_failed",
+      publicErrorDetail("rag")
+    );
   }
 
   if (evidence.length === 0) {
-    return Response.json({
-      status: "no_theory",
-      message: "알 수 없다",
-      detail: "오늘 일진에 맞는 학습 내용을 찾지 못했습니다.",
-      chunkCount: 0,
+    return templateOkResponse(
+      body.ganjiKo,
       sameGanjiCount,
-      theoryEvidence: [],
-      fallback: null,
-    });
+      "template_no_match",
+      "오늘 일진에 맞는 학습 내용을 찾지 못해 템플릿 문장을 보여줍니다."
+    );
   }
 
   const chunks = evidence.map((e) => e.content);

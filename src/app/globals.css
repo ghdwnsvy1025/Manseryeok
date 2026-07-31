@@ -273,6 +273,60 @@ textarea {
   color: #0a0a12;
   background: var(--chip-accent, var(--px-accent));
 }
+/* 핵심 섹션 강조 헤더 (기록·홈·일기 공통) */
+.stats-emphasize-head,
+.ui-emphasize-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.65rem 0.75rem;
+  border: 2px solid var(--px-accent);
+  background: var(--px-bg3);
+  box-shadow: 3px 3px 0 #4a3a00;
+}
+.stats-emphasize-title,
+.ui-emphasize-title {
+  font-size: 1rem;
+  font-weight: 900;
+  line-height: 1.2;
+  color: var(--px-accent);
+  letter-spacing: 0.02em;
+}
+.stats-category-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  padding: 0.85rem 0.75rem;
+  border: 2px solid color-mix(in srgb, #f0c14d 72%, var(--px-border2));
+  background: color-mix(in srgb, #f0c14d 11%, var(--px-bg3));
+  box-shadow: 3px 3px 0 color-mix(in srgb, #f0c14d 40%, #000);
+}
+.stats-category-title {
+  font-size: 0.8125rem;
+  font-weight: 900;
+  line-height: 1.2;
+  color: #f0c14d;
+  letter-spacing: 0.04em;
+}
+.stats-category-title::before {
+  content: "■ ";
+}
+.stats-chip-cat {
+  padding: 0.55rem 0.85rem;
+  font-size: 0.875rem;
+  font-weight: 900;
+  border: 2px solid var(--px-border);
+  color: var(--px-text-on-panel);
+  background: var(--px-bg2);
+  min-height: 2.5rem;
+}
+.stats-chip-cat.is-on {
+  border-color: var(--chip-accent, #f0c14d);
+  color: var(--chip-accent, #f0c14d);
+  background: color-mix(in srgb, var(--chip-accent, #f0c14d) 20%, var(--px-bg2));
+  box-shadow: 2px 2px 0 #000;
+}
 .stats-status-warn {
   font-size: 0.6875rem;
   font-weight: 700;
@@ -414,6 +468,21 @@ textarea {
 }
 .ui-action-btn-pulse {
   animation: ui-action-pulse 1.4s ease-in-out 2;
+}
+
+/* 일기 · 오늘의 질문 CTA — 느리게 깜빡여 탭 유도 */
+@keyframes motion-cta-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.38; }
+}
+.motion-cta-blink {
+  animation: motion-cta-blink 2.6s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .motion-cta-blink {
+    animation: none;
+    opacity: 1;
+  }
 }
 
 /* ── Inline feature callout ── */
@@ -838,6 +907,214 @@ body::before {
   line-height: 1.55;
 }
 
+/* 오늘의 운세 — 한 호흡 읽기 */
+.fortune-readable .fortune-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.fortune-readable .fortune-body p {
+  margin: 0;
+  font-size: 0.98rem;
+  line-height: 1.85;
+  font-weight: 500;
+  color: var(--px-text2);
+  letter-spacing: -0.01em;
+}
+
+.fortune-readable .fortune-body--compact p {
+  font-size: 0.9rem;
+  line-height: 1.75;
+}
+
+/* 오늘의 운세 — 설렘 CTA */
+@keyframes fortune-tease-breathe {
+  0%,
+  100% {
+    transform: scale(1);
+    box-shadow: 2px 2px 0 #000;
+  }
+  50% {
+    transform: scale(1.012);
+    box-shadow: 3px 3px 0 #000;
+  }
+}
+
+@keyframes fortune-tease-glow {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: scale(0.92);
+  }
+  50% {
+    opacity: 0.7;
+    transform: scale(1.08);
+  }
+}
+
+@keyframes fortune-tease-line-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fortune-tease-hint {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: translateY(0);
+  }
+  50% {
+    opacity: 1;
+    transform: translateY(2px);
+  }
+}
+
+.fortune-tease {
+  position: relative;
+  overflow: hidden;
+  border: 2px solid var(--px-border2);
+  background: linear-gradient(
+    165deg,
+    color-mix(in srgb, var(--px-accent) 14%, var(--px-bg2)) 0%,
+    var(--px-bg2) 55%,
+    var(--px-bg3) 100%
+  );
+  box-shadow: 2px 2px 0 #000;
+  animation: fortune-tease-breathe 2.8s ease-in-out infinite;
+}
+
+.fortune-tease-pulse {
+  position: absolute;
+  width: 7rem;
+  height: 7rem;
+  border-radius: 999px;
+  top: 50%;
+  left: 50%;
+  translate: -50% -50%;
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--px-accent) 35%, transparent) 0%,
+    transparent 70%
+  );
+  pointer-events: none;
+  animation: fortune-tease-glow 2.8s ease-in-out infinite;
+}
+
+.fortune-tease-title,
+.fortune-tease-sub {
+  position: relative;
+  animation: fortune-tease-line-in 0.55s ease both;
+}
+
+.fortune-tease-hint {
+  position: relative;
+  animation: fortune-tease-hint 2.2s ease-in-out infinite;
+}
+
+/* 운세/질문 로딩 — 감성 문구 전환 */
+@keyframes fortune-loading-phrase-in {
+  0% {
+    opacity: 0;
+    transform: translateY(14px) scale(0.97);
+    filter: blur(3px);
+    letter-spacing: 0.04em;
+  }
+  55% {
+    opacity: 1;
+    filter: blur(0);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+    letter-spacing: -0.01em;
+  }
+}
+
+.fortune-loading-stage {
+  position: relative;
+}
+
+.fortune-loading-phrase {
+  margin: 0;
+  color: var(--px-text-on-panel);
+  animation: fortune-loading-phrase-in 0.85s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.fortune-loading-phrase[data-kind="healing"] {
+  color: color-mix(in srgb, var(--px-accent) 55%, var(--px-text-on-panel));
+}
+
+.fortune-loading-phrase[data-kind="philosophy"] {
+  font-style: italic;
+  color: var(--px-text-on-panel);
+}
+
+.fortune-loading-phrase[data-kind="quote"] {
+  color: var(--px-accent);
+  font-weight: 700;
+}
+
+/* 오늘의 핵심 — 화면 진입 연출 */
+@keyframes fortune-reveal-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fortune-reveal-title {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.96);
+    letter-spacing: 0.06em;
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    letter-spacing: -0.01em;
+  }
+}
+
+.fortune-reveal {
+  opacity: 0;
+  animation: fortune-reveal-up 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.fortune-reveal-title {
+  opacity: 0;
+  animation: fortune-reveal-title 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fortune-tease,
+  .fortune-tease-pulse,
+  .fortune-tease-hint {
+    animation: none;
+  }
+  .fortune-tease-title,
+  .fortune-tease-sub,
+  .fortune-reveal,
+  .fortune-reveal-title,
+  .fortune-loading-phrase {
+    animation: none;
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
+}
+
 /* ── Motion / celebration ── */
 @keyframes motion-xp-float {
   0% {
@@ -867,22 +1144,22 @@ body::before {
     opacity: 0;
     transform: translateY(6px) scale(0.92);
   }
-  18% {
+  12% {
     opacity: 1;
-    transform: translateY(0) scale(1.06);
+    transform: translateY(0) scale(1.05);
   }
-  70% {
+  78% {
     opacity: 1;
     transform: translateY(-2px) scale(1);
   }
   100% {
-    opacity: 0.92;
+    opacity: 0.88;
     transform: translateY(0) scale(1);
   }
 }
 
 .save-xp-float {
-  animation: save-xp-pop 1.2s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: save-xp-pop 2.4s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 @keyframes save-quote-skel-pulse {
@@ -925,8 +1202,95 @@ body::before {
   animation: save-quote-hint-in 0.28s ease both;
 }
 
+@keyframes save-quote-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.save-quote-card {
+  animation: save-quote-card-in 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes save-quote-shimmer {
+  0% {
+    transform: translateX(-120%) skewX(-18deg);
+    opacity: 0;
+  }
+  25% {
+    opacity: 0.35;
+  }
+  55% {
+    opacity: 0.18;
+  }
+  100% {
+    transform: translateX(220%) skewX(-18deg);
+    opacity: 0;
+  }
+}
+
+.save-quote-shimmer {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    105deg,
+    transparent 35%,
+    color-mix(in srgb, var(--px-accent) 22%, transparent) 50%,
+    transparent 65%
+  );
+  animation: save-quote-shimmer 1.8s ease-out 0.15s both;
+}
+
+@keyframes save-quote-text-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+    filter: blur(2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+}
+
+.save-quote-reveal {
+  animation: save-quote-text-in 0.85s cubic-bezier(0.22, 1, 0.36, 1) 0.12s both;
+}
+
+.save-quote-attr {
+  opacity: 0;
+  animation: save-quote-hint-in 0.55s ease 0.55s both;
+}
+
+.save-quote-actions {
+  opacity: 0;
+  animation: save-quote-hint-in 0.45s ease 0.75s both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .save-quote-card,
+  .save-quote-shimmer,
+  .save-quote-reveal,
+  .save-quote-attr,
+  .save-quote-actions {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+    filter: none !important;
+  }
+}
+
 .save-xp-gauge-fill {
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, #a3e635 35%, transparent);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, #ff9ec8 40%, transparent),
+    0 0 10px color-mix(in srgb, #ffe066 28%, transparent);
 }
 
 @keyframes motion-backdrop-in {

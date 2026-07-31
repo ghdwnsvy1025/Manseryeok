@@ -5,8 +5,30 @@
 import type { BTheme } from "./bTheme";
 import type { ContentScoreBundle } from "./contentD";
 import type { CategoryCode } from "./types";
+import { getKeyword } from "./keywords/catalog";
 import type { KeywordScore } from "./keywords/rank";
 import { buildQuestionTemplate } from "./todayQuestionTemplate";
+import type {
+  FortuneQuestionContext,
+  WeekThemeSummary,
+} from "./weekThemeSummary";
+import { buildWeekThemeSummary } from "./weekThemeSummary";
+
+/** 포커스와 맞는 키워드를 앞에 두고, 질문용으로는 최대 1개만 쓴다 */
+function alignTopKeywordsForQuestion(
+  focus: CategoryCode | null,
+  ranking: KeywordScore[]
+): string[] {
+  if (ranking.length === 0) return [];
+  if (!focus) return [ranking[0]!.plainLabel];
+
+  const aligned = ranking.filter((k) => {
+    const def = getKeyword(k.code);
+    return def?.relatedCategories.includes(focus);
+  });
+  const primary = aligned[0] ?? ranking[0]!;
+  return [primary.plainLabel];
+}
 
 export type QuestionDecision = {
   focusCategory: CategoryCode | null;
@@ -14,12 +36,14 @@ export type QuestionDecision = {
   topKeywords: string[];
   keywordScores: KeywordScore[];
   templateHint: string;
+  weekTheme: WeekThemeSummary;
   /** 결정에 사용된 근거 (설명 가능) */
   evidence: {
     recentAByCategory: ContentScoreBundle["recentAByCategory"];
     dSources: Partial<Record<CategoryCode, string>>;
     sajuWeight?: number;
     priorUniqueDays?: number;
+    hasFortuneContext?: boolean;
   };
 };
 
@@ -52,6 +76,7 @@ export function decideTodayQuestion(opts: {
     sajuWeight?: number;
     priorUniqueDays?: number;
   };
+  fortune?: FortuneQuestionContext | null;
 }): QuestionDecision {
   const focus = pickFocusCategory(
     opts.bundle,
@@ -61,12 +86,22 @@ export function decideTodayQuestion(opts: {
   const contentScore = focus
     ? opts.bundle.contentScoreByCategory[focus]?.value ?? null
     : opts.bundle.recentAOverall;
-  const topKeywords = opts.keywordRanking.top.map((k) => k.plainLabel);
+  const topKeywords = alignTopKeywordsForQuestion(
+    focus,
+    opts.keywordRanking.top
+  );
+  const weekTheme = buildWeekThemeSummary({
+    enabledCodes: opts.enabledCodes,
+    bundle: opts.bundle,
+    topKeywords,
+  });
   const templateHint = buildQuestionTemplate({
     b: opts.b,
     focus,
     contentScore,
     topKeywords,
+    fortune: opts.fortune ?? null,
+    weekTheme,
   });
 
   const dSources: Partial<Record<CategoryCode, string>> = {};
@@ -81,11 +116,13 @@ export function decideTodayQuestion(opts: {
     topKeywords,
     keywordScores: opts.keywordRanking.top,
     templateHint,
+    weekTheme,
     evidence: {
       recentAByCategory: opts.bundle.recentAByCategory,
       dSources,
       sajuWeight: opts.keywordRanking.sajuWeight,
       priorUniqueDays: opts.keywordRanking.priorUniqueDays,
+      hasFortuneContext: Boolean(opts.fortune),
     },
   };
 }

@@ -69,15 +69,13 @@ export default function JournalRecordCalendar({
 
   return (
     <section className="stats-section" aria-label="기록 캘린더">
-      <div className="stats-section-head">
-        <div className="min-w-0">
-          <p className="ui-section-title">기록 캘린더</p>
-          <p className="stats-label mt-0.5">날짜 눌러 열람</p>
-        </div>
+      <div className="stats-emphasize-head">
+        <p className="stats-emphasize-title">기록 캘린더</p>
         <button
           type="button"
           onClick={() => setReportOpen((v) => !v)}
-          className="stats-link shrink-0"
+          className="shrink-0 text-xs font-black underline"
+          style={{ color: "var(--px-accent)" }}
           aria-expanded={reportOpen}
         >
           {reportOpen ? "주간 닫기" : "주간 리포트"}
@@ -220,12 +218,12 @@ export default function JournalRecordCalendar({
           })}
         </div>
 
-        <p className="stats-label tabular-nums">이달 {monthList.length}일</p>
+        <p className="stats-label tabular-nums">{monthList.length}일</p>
       </div>
 
       {monthList.length > 0 && (
         <div className="stats-section">
-          <p className="stats-label">이달 목록</p>
+          <p className="stats-label">목록</p>
           {visibleList.map((entry) => {
             const h = dayHappiness(entry);
             const ganji = getPillarsForDate(entry.entryDate).dayPillar.ganjiKo;

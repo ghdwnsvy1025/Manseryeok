@@ -6,6 +6,7 @@ import NewDiaryGate from "@/components/journal/NewDiaryGate";
 import PersonalizationStatsPanel, {
   type CategoryStatsRow,
 } from "@/components/journal/PersonalizationStatsPanel";
+import WeekTopicsCard from "@/components/journal/WeekTopicsCard";
 import { isPersonalizationEnabled } from "@/lib/app/featureFlags";
 import { getJournalStorage } from "@/lib/journal/getStorage";
 import { getCategoryByCode } from "@/lib/journal/categoryCatalog";
@@ -15,6 +16,7 @@ import {
   type AstroCategoryAggregate,
 } from "@/lib/journal/d1Aggregates";
 import { getEnabledCodesOrdered } from "@/lib/journal/preferences";
+import { buildWeekTopicSummary } from "@/lib/journal/topics/weekTopics";
 import type { CategoryCode, JournalEntry } from "@/lib/journal/types";
 import { todayDateString } from "@/lib/diary/dayPillar";
 
@@ -121,6 +123,16 @@ function JournalStatsInner() {
     [entries]
   );
 
+  const weekTopics = useMemo(
+    () =>
+      buildWeekTopicSummary(entries, {
+        asOf: todayDateString(),
+        windowDays: 7,
+        topN: 5,
+      }),
+    [entries]
+  );
+
   const ridgeRows: CategoryStatsRow[] = useMemo(
     () =>
       displayOn
@@ -147,6 +159,17 @@ function JournalStatsInner() {
 
   return (
     <div className="mx-auto max-w-lg px-4 py-8 space-y-8">
+      <header className="space-y-1">
+        <h1 className="text-xl font-black" style={{ color: "var(--px-accent)" }}>
+          기록 통계
+        </h1>
+        <p className="ui-hint">
+          점수·상태와 별도로, 일기 글에 반복된 화제도 함께 볼 수 있어요.
+        </p>
+      </header>
+
+      <WeekTopicsCard summary={weekTopics} />
+
       <D1Section
         aggregates={aggregates}
         entries={entries}
