@@ -14,62 +14,10 @@ import ContentFeedbackButtons from "@/components/journal/ContentFeedbackButtons"
 import OpenAiOriginHint from "@/components/journal/OpenAiOriginHint";
 import { submitContentFeedback } from "@/lib/journal/contentFeedback";
 import { trackContentExposure } from "@/lib/journal/exposure";
-import { burstFromElement, prefersReducedMotion } from "@/lib/ui/clickBurst";
+import { burstFromElement } from "@/lib/ui/clickBurst";
 import { XP_GAUGE_FILL, XP_GAIN_COLOR } from "@/lib/ui/xpGauge";
 import EmotionalLoadingHint from "@/components/ui/EmotionalLoadingHint";
-
-/** 벚꽃잎 팔레트 — 연분홍·살구·옅은 흰분홍 */
-const PETAL_COLORS = [
-  "#f6c6d4",
-  "#f2b6c8",
-  "#efd0da",
-  "#f8d4dc",
-  "#e8a8bc",
-  "#fce8ee",
-];
-
-type Petal = {
-  x: number;
-  y: number;
-  vx: number;
-  vy: number;
-  /** 잎 크기 (px) */
-  size: number;
-  /** 현재 회전각 (rad) */
-  rot: number;
-  /** 회전 속도 */
-  spin: number;
-  /** 좌우 흔들림 위상 */
-  sway: number;
-  swayAmp: number;
-  swaySpeed: number;
-  color: string;
-  life: number;
-  maxLife: number;
-};
-
-/** 벚꽃잎 한 장 — 하트에 가까운 두 잎 실 */
-function drawPetal(
-  ctx: CanvasRenderingContext2D,
-  size: number,
-  color: string
-) {
-  const s = size;
-  ctx.fillStyle = color;
-  ctx.beginPath();
-  ctx.moveTo(0, s * 0.55);
-  ctx.bezierCurveTo(s * 0.55, s * 0.15, s * 0.45, -s * 0.55, 0, -s * 0.35);
-  ctx.bezierCurveTo(-s * 0.45, -s * 0.55, -s * 0.55, s * 0.15, 0, s * 0.55);
-  ctx.closePath();
-  ctx.fill();
-  // 가운데 옅은 결
-  ctx.strokeStyle = "rgba(255,255,255,0.35)";
-  ctx.lineWidth = Math.max(0.6, s * 0.06);
-  ctx.beginPath();
-  ctx.moveTo(0, s * 0.35);
-  ctx.quadraticCurveTo(s * 0.04, 0, 0, -s * 0.2);
-  ctx.stroke();
-}
+import CherryBlossomLayer from "@/components/motion/CherryBlossomLayer";
 
 type Props = {
   entry: JournalEntry;
@@ -114,7 +62,6 @@ export default function JournalSaveCompleteModal({
   const closeRef = useRef<HTMLButtonElement>(null);
   const gaugeRef = useRef<HTMLDivElement>(null);
   const xpFloatRef = useRef<HTMLParagraphElement>(null);
-  const celebrateCanvasRef = useRef<HTMLCanvasElement>(null);
   const isVerified = contentType === "verified_quote";
   const title = isVerified ? "오늘의 명언" : "오늘의 문장";
   /** 계산 전·중에는 폴백 문장 대신 로딩 UI */
@@ -130,115 +77,6 @@ export default function JournalSaveCompleteModal({
   const moodChip =
     entry.moodLabel ?? entry.moodLabels?.[0] ?? null;
   const tagChips = entry.tags.map((t) => getTagName(t.tagCode)).filter(Boolean);
-
-  // 저장 완료 — 벚꽃잎이 흩날림
-  useEffect(() => {
-    if (prefersReducedMotion()) return;
-    const canvas = celebrateCanvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    let raf = 0;
-    let running = true;
-    const dpr = Math.min(2, window.devicePixelRatio || 1);
-
-    const resize = () => {
-      const w = window.innerWidth;
-      const h = window.innerHeight;
-      canvas.width = Math.floor(w * dpr);
-      canvas.height = Math.floor(h * dpr);
-      canvas.style.width = `${w}px`;
-      canvas.style.height = `${h}px`;
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    };
-    resize();
-    window.addEventListener("resize", resize);
-
-    const petals: Petal[] = [];
-    const spawn = (n: number, nearCenter = false) => {
-      const W = window.innerWidth;
-      const H = window.innerHeight;
-      const isNarrow = W < 480;
-      for (let i = 0; i < n; i++) {
-        // 팝업 바로 위~중간 높이에서 바로 흩날리도록
-        const y = nearCenter
-          ? H * (0.18 + Math.random() * 0.28)
-          : H * (0.08 + Math.random() * 0.22);
-        petals.push({
-          x: W * (0.12 + Math.random() * 0.76),
-          y,
-          vx: (Math.random() - 0.5) * (isNarrow ? 48 : 72),
-          vy: 8 + Math.random() * (isNarrow ? 36 : 52),
-          size: (isNarrow ? 5 : 6.5) + Math.random() * (isNarrow ? 4 : 5.5),
-          rot: Math.random() * Math.PI * 2,
-          spin: (Math.random() - 0.5) * 3.2,
-          sway: Math.random() * Math.PI * 2,
-          swayAmp: 18 + Math.random() * 28,
-          swaySpeed: 1.8 + Math.random() * 2.0,
-          color:
-            PETAL_COLORS[Math.floor(Math.random() * PETAL_COLORS.length)]!,
-          life: 0,
-          maxLife: 3.2 + Math.random() * 2.2,
-        });
-      }
-    };
-
-    const narrow = window.innerWidth < 480;
-    // 첫 파동은 화면 중상단에서 바로 터지듯
-    spawn(narrow ? 18 : 26, true);
-    const wave2 = window.setTimeout(() => spawn(narrow ? 8 : 12, false), 280);
-    const wave3 = window.setTimeout(() => spawn(narrow ? 5 : 8, true), 700);
-
-    let last = performance.now();
-    const tick = (now: number) => {
-      if (!running) return;
-      const dt = Math.min(0.033, (now - last) / 1000);
-      last = now;
-      const W = window.innerWidth;
-      const H = window.innerHeight;
-      ctx.clearRect(0, 0, W, H);
-
-      for (const p of petals) {
-        if (p.life >= p.maxLife) continue;
-        p.life += dt;
-        p.sway += p.swaySpeed * dt;
-        p.rot += p.spin * dt;
-        p.vy += 14 * dt;
-        p.vy = Math.min(p.vy, 110);
-        p.vx *= 1 - 0.22 * dt;
-        const swayX = Math.sin(p.sway) * p.swayAmp * dt;
-        p.x += p.vx * dt + swayX;
-        p.y += p.vy * dt;
-
-        const t = p.life / p.maxLife;
-        const fade =
-          t < 0.05 ? t / 0.05 : Math.max(0, 1 - (t - 0.45) / 0.55);
-        const alpha = fade * 0.82;
-        if (alpha <= 0.02) continue;
-
-        const flip = 0.35 + 0.65 * Math.abs(Math.sin(p.sway * 0.7 + p.rot));
-        ctx.save();
-        ctx.globalAlpha = alpha;
-        ctx.translate(p.x, p.y);
-        ctx.rotate(p.rot);
-        ctx.scale(flip, 1);
-        drawPetal(ctx, p.size, p.color);
-        ctx.restore();
-      }
-
-      raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-
-    return () => {
-      running = false;
-      cancelAnimationFrame(raf);
-      window.clearTimeout(wave2);
-      window.clearTimeout(wave3);
-      window.removeEventListener("resize", resize);
-    };
-  }, []);
 
   useEffect(() => {
     const from = startProgress.progressRatio;
@@ -430,7 +268,7 @@ export default function JournalSaveCompleteModal({
             </p>
 
             {showQuoteLoading ? (
-              <EmotionalLoadingHint status="오늘의 한 줄을 고르는 중…" intervalMs={4500} />
+              <EmotionalLoadingHint status="오늘의 한 줄을 고르는 중…" intervalMs={8000} />
             ) : (
               <>
                 <blockquote className="save-quote-reveal relative m-0 space-y-2">
@@ -745,11 +583,7 @@ export default function JournalSaveCompleteModal({
       </div>
 
       {/* 패널 위에 그려야 모바일에서도 가려지지 않음 */}
-      <canvas
-        ref={celebrateCanvasRef}
-        className="pointer-events-none fixed inset-0 z-[120]"
-        aria-hidden
-      />
+      <CherryBlossomLayer playToken={1} zIndex={120} />
     </div>
   );
 }

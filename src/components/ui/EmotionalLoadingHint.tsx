@@ -21,7 +21,7 @@ type Props = {
 export default function EmotionalLoadingHint({
   status,
   compact = false,
-  intervalMs = 5800,
+  intervalMs = 9000,
 }: Props) {
   const [extra, setExtra] = useState<LoadingPhrase[]>([]);
   const deck = useMemo(() => createLoadingPhraseDeck(extra), [extra]);

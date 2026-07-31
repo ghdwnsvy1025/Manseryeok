@@ -21,6 +21,7 @@ import type { FortuneEvidence } from "@/lib/journal/fortune/evidence";
 import { sajuProfileFortuneFingerprint } from "@/lib/journal/fortune/profileFingerprint";
 import type { SajuProfile } from "@/lib/diary/types";
 import EmotionalLoadingHint from "@/components/ui/EmotionalLoadingHint";
+import CherryBlossomLayer from "@/components/motion/CherryBlossomLayer";
 
 type Props = {
   todayDate: string;
@@ -670,6 +671,7 @@ export default function TodayFortunePanel({
   const [loaded, setLoaded] = useState(false);
   const [hydrating, setHydrating] = useState(v2);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [blossomToken, setBlossomToken] = useState(0);
   const profile = (sajuProfile ?? null) as SajuProfile | null;
   const profileId =
     profile && typeof profile === "object" && profile.id
@@ -883,6 +885,8 @@ export default function TodayFortunePanel({
             (data.error ||
               `오늘의 운세를 불러오지 못했어요 (${res.status}).`) + authHint
           );
+        } else if (gen === analyseGenRef.current) {
+          setBlossomToken((n) => n + 1);
         }
       } catch (err) {
         if (gen === analyseGenRef.current) {
@@ -940,6 +944,7 @@ export default function TodayFortunePanel({
     const idle = !hydrating && !loading && !loaded && !loadError && !overall;
     return (
       <section className="space-y-2" aria-label="오늘의 운세">
+        <CherryBlossomLayer playToken={blossomToken} />
         <div className="ui-emphasize-head">
           <p className="ui-emphasize-title">오늘의 운세</p>
           {overall && (

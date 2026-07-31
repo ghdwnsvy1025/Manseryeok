@@ -1346,7 +1346,7 @@ export default function SajuResult({
 
             return (
               <div
-                className="p-3 border-2 space-y-2.5"
+                className="p-2.5 border-2 space-y-1.5"
                 style={{
                   borderColor: "var(--px-accent)",
                   background:
@@ -1371,13 +1371,13 @@ export default function SajuResult({
                     </p>
                   )}
                 </div>
-                <div className="space-y-2">
+                <div className="space-y-1">
                   {(Object.entries(elemPct) as [Element, number][]).map(
                     ([elem, pct]) => {
                       const c = ELEM[elem];
                       const isStrong = elem === strongKey;
                       return (
-                        <div key={elem} className="flex items-center gap-2">
+                        <div key={elem} className="flex items-center gap-1.5">
                           <span
                             className={`font-black w-6 text-center ${isStrong ? "text-sm" : "text-xs"}`}
                             style={{ color: c.text }}
@@ -1395,7 +1395,7 @@ export default function SajuResult({
                             {ELEM_KO[elem]}
                           </span>
                           <div
-                            className={`flex-1 border ${isStrong ? "h-5" : "h-4"}`}
+                            className={`flex-1 border ${isStrong ? "h-3.5" : "h-3"}`}
                             style={{
                               borderColor: isStrong ? c.text : "var(--px-border)",
                               background: "var(--px-bg2)",

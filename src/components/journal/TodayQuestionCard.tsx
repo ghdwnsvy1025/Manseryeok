@@ -18,6 +18,7 @@ import type { SajuProfile } from "@/lib/diary/types";
 import type { FortuneQuestionContext } from "@/lib/journal/weekThemeSummary";
 import OpenAiOriginHint from "@/components/journal/OpenAiOriginHint";
 import EmotionalLoadingHint from "@/components/ui/EmotionalLoadingHint";
+import CherryBlossomLayer from "@/components/motion/CherryBlossomLayer";
 
 type KeywordRow = {
   code?: string;
@@ -231,7 +232,7 @@ function QuestionLoadingHint({ compact = false }: { compact?: boolean }) {
     <EmotionalLoadingHint
       compact={compact}
       status="질문을 고르는 중…"
-      intervalMs={6000}
+      intervalMs={9000}
     />
   );
 }
@@ -257,6 +258,7 @@ export default function TodayQuestionCard({
   const [feedbackMsg, setFeedbackMsg] = useState("");
   const [debug, setDebug] = useState<DebugInfo | null>(null);
   const [debugOpen, setDebugOpen] = useState(false);
+  const [blossomToken, setBlossomToken] = useState(0);
   const shownSent = useRef(false);
   /**
    * 언마운트 시 "응답 없이 떠남"(dismissed)을 실제로 발화하기 위한 최신 상태 스냅샷.
@@ -481,6 +483,7 @@ export default function TodayQuestionCard({
       }
       setPhase("ready");
       setPanelOpen(true);
+      setBlossomToken((n) => n + 1);
     } catch (err) {
       if (requestId !== requestIdRef.current) return;
       const fallback = "잠들기 전, 오늘 마음에 가장 남는 순간은 무엇이었나요?";
@@ -502,6 +505,7 @@ export default function TodayQuestionCard({
       });
       setPhase("ready");
       setPanelOpen(true);
+      setBlossomToken((n) => n + 1);
     }
   }, [phase, todayDate, enabledCodes, entries, sajuProfile]);
 
@@ -595,7 +599,9 @@ export default function TodayQuestionCard({
   // 로딩 칸과 같은 최소 높이로 점프를 막는다.
   if (isSheet && question) {
     return (
-      <section className="px-3 py-2.5 space-y-1.5 fortune-readable min-h-[4.75rem] flex flex-col justify-center">
+      <>
+        <CherryBlossomLayer playToken={blossomToken} />
+        <section className="px-3 py-2.5 space-y-1.5 fortune-readable min-h-[4.75rem] flex flex-col justify-center">
         <p
           className="text-[11px] font-black tracking-wider text-center"
           style={{ color: "var(--px-accent)" }}
@@ -609,10 +615,13 @@ export default function TodayQuestionCard({
           {question}
         </p>
       </section>
+      </>
     );
   }
 
   return (
+    <>
+    <CherryBlossomLayer playToken={blossomToken} />
     <section
       className="px-3 py-3 border-2 space-y-2 fortune-readable"
       style={{
@@ -749,5 +758,6 @@ export default function TodayQuestionCard({
         </div>
       )}
     </section>
+    </>
   );
 }
