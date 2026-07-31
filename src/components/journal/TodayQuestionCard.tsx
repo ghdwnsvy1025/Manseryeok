@@ -588,12 +588,16 @@ export default function TodayQuestionCard({
   if (phase === "idle" || phase === "loading") {
     return (
       <div
-        className="border-2"
-        style={{
-          borderColor: "var(--px-border2)",
-          background: "var(--px-bg2)",
-          boxShadow: isSheet ? "none" : "2px 2px 0 #000",
-        }}
+        className={isSheet ? "" : "border-2"}
+        style={
+          isSheet
+            ? undefined
+            : {
+                borderColor: "var(--px-border2)",
+                background: "var(--px-bg2)",
+                boxShadow: "2px 2px 0 #000",
+              }
+        }
       >
         <QuestionLoadingHint />
       </div>
@@ -620,12 +624,20 @@ export default function TodayQuestionCard({
 
   return (
     <section
-      className={`px-3 py-3 border-2 space-y-2 fortune-readable${isSheet ? " !shadow-none" : ""}`}
-      style={{
-        borderColor: "var(--px-border2)",
-        background: "var(--px-bg2)",
-        boxShadow: isSheet ? "none" : "2px 2px 0 #000",
-      }}
+      className={`fortune-readable ${isSheet ? "px-3 py-2.5 space-y-2" : "px-3 py-3 border-2 space-y-2"}`}
+      style={
+        isSheet
+          ? {
+              background: "transparent",
+              border: "none",
+              boxShadow: "none",
+            }
+          : {
+              borderColor: "var(--px-border2)",
+              background: "var(--px-bg2)",
+              boxShadow: "2px 2px 0 #000",
+            }
+      }
     >
       {!isSheet ? (
         <button
@@ -650,7 +662,7 @@ export default function TodayQuestionCard({
       ) : (
         <p
           className="text-[11px] font-black tracking-wider text-center"
-          style={{ color: "var(--px-text2)" }}
+          style={{ color: "var(--px-accent)" }}
         >
           오늘의 질문
         </p>
@@ -669,11 +681,14 @@ export default function TodayQuestionCard({
 
       {phase === "ready" && question && (
         <div
-          className="flex flex-wrap items-center justify-center gap-1 pt-0.5 fortune-reveal opacity-80"
-          style={{ animationDelay: "320ms" }}
+          className="flex flex-wrap items-center justify-center gap-1.5 pt-1.5 pb-1 fortune-reveal border-t"
+          style={{
+            animationDelay: "320ms",
+            borderColor: "var(--px-border)",
+          }}
         >
           <span
-            className="text-[10px] font-medium w-full text-center leading-snug"
+            className="text-[10px] font-bold w-full text-center leading-snug"
             style={{ color: "var(--px-text2)" }}
           >
             이 질문이 도움이 되었나요?
@@ -685,13 +700,13 @@ export default function TodayQuestionCard({
               disabled={answered}
               aria-pressed={fit === option.level}
               onClick={() => void sendFit(option.level)}
-              className="px-2 py-1 text-[10px] font-bold border disabled:opacity-50"
+              className="px-2.5 py-1.5 text-[10px] font-bold border-2 disabled:opacity-50"
               style={{
                 borderColor:
-                  fit === option.level ? "var(--px-accent)" : "var(--px-border)",
+                  fit === option.level ? "var(--px-accent)" : "var(--px-border2)",
                 color:
                   fit === option.level ? "var(--px-accent)" : "var(--px-text2)",
-                background: "transparent",
+                background: "var(--px-bg3)",
               }}
             >
               {option.label}
@@ -701,13 +716,13 @@ export default function TodayQuestionCard({
             type="button"
             disabled={answered}
             onClick={() => void sendSkip()}
-            className="text-[10px] font-medium underline disabled:opacity-50"
+            className="text-[10px] font-medium underline disabled:opacity-50 px-1"
             style={{ color: "var(--px-text2)" }}
           >
             건너뛰기
           </button>
           {feedbackMsg && (
-            <p className="text-[10px] w-full text-center" style={{ color: "var(--px-text2)" }}>
+            <p className="text-[10px] w-full text-center font-bold" style={{ color: "var(--px-text2)" }}>
               {feedbackMsg}
             </p>
           )}

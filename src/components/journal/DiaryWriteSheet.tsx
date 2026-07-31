@@ -20,7 +20,7 @@ type Props = {
 
 /**
  * 모바일 키보드에 가리지 않도록 visualViewport에 맞춘 전체화면 작성 시트.
- * 오늘의 질문 + 정리글 textarea를 한곳에서 작성한다.
+ * 상단: 오늘의 질문 / 하단: 넓은 일기 칸
  */
 export default function DiaryWriteSheet({
   open,
@@ -66,7 +66,7 @@ export default function DiaryWriteSheet({
 
     const focusTimer = window.setTimeout(() => {
       textareaRef.current?.focus({ preventScroll: true });
-    }, 80);
+    }, 120);
 
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
@@ -99,26 +99,13 @@ export default function DiaryWriteSheet({
       aria-modal="true"
       aria-labelledby="diary-write-sheet-title"
     >
-      <header
-        className="shrink-0 flex items-center gap-2 px-3 py-2.5 border-b-2"
+      <div
+        className="shrink-0 flex items-center justify-end px-3 py-1.5"
         style={{
-          borderColor: "var(--px-border2)",
-          background: "var(--px-bg2)",
-          paddingTop: "max(0.5rem, env(safe-area-inset-top))",
+          paddingTop: "max(0.4rem, env(safe-area-inset-top))",
+          background: "var(--px-bg)",
         }}
       >
-        <div className="min-w-0 flex-1">
-          <p
-            id="diary-write-sheet-title"
-            className="text-sm font-black truncate"
-            style={{ color: "var(--px-accent)" }}
-          >
-            하루 정리글
-          </p>
-          <p className="text-[10px] font-bold" style={{ color: "var(--px-text2)" }}>
-            질문 보고 짧게 적어도 돼요
-          </p>
-        </div>
         <button
           type="button"
           onClick={onClose}
@@ -132,12 +119,22 @@ export default function DiaryWriteSheet({
         >
           완료
         </button>
-      </header>
+      </div>
 
-      <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+      <div
+        id="diary-write-sheet-title"
+        className="shrink-0 px-2 pb-2"
+        style={{ maxHeight: "32%" }}
+      >
         <div
-          className="shrink-0 max-h-[38%] overflow-y-auto overscroll-contain px-2 pt-2"
-          style={{ WebkitOverflowScrolling: "touch" }}
+          className="h-full overflow-y-auto overscroll-contain border-2"
+          style={{
+            WebkitOverflowScrolling: "touch",
+            borderColor: "var(--px-accent)",
+            background: "var(--px-bg2)",
+            boxShadow: "3px 3px 0 #000",
+            maxHeight: "100%",
+          }}
         >
           <TodayQuestionCard
             todayDate={date}
@@ -147,46 +144,47 @@ export default function DiaryWriteSheet({
             variant="sheet"
           />
         </div>
+      </div>
 
-        <div className="flex-1 min-h-0 flex flex-col px-2 pb-2 pt-2 gap-1.5">
-          <label
-            className="text-[11px] font-black shrink-0"
-            style={{ color: "var(--px-text2)" }}
-            htmlFor="diary-write-sheet-textarea"
-          >
-            오늘 남길 글
-          </label>
-          <textarea
-            id="diary-write-sheet-textarea"
-            ref={textareaRef}
-            value={content}
-            onChange={(e) => {
-              const next = e.target.value;
-              if (next.trim().length > 0 && !startedRef.current) {
-                startedRef.current = true;
-                onDiaryStarted?.();
-              }
-              onContentChange(next);
-            }}
-            placeholder="예) 오늘은 회의가 길었지만, 끝나고 산책하니 좀 풀렸다."
-            className="flex-1 min-h-0 w-full px-3 py-3 border-2 text-base resize-none leading-relaxed"
-            style={{
-              background: "var(--px-bg3)",
-              borderColor: previewLen > 0 ? "var(--px-accent)" : "var(--px-border)",
-              color: "var(--px-text-on-panel)",
-            }}
-            enterKeyHint="done"
-          />
-          <div className="shrink-0 flex items-center justify-between px-0.5">
-            <p className="ui-hint">
-              {previewLen === 0
-                ? "한 줄만 적어도 운세·문장에 반영돼요."
-                : "고마워요. 이 글이 오늘을 더 잘 맞춥니다."}
-            </p>
-            {previewLen > 0 && (
-              <p className="ui-hint tabular-nums shrink-0">{previewLen}자</p>
-            )}
-          </div>
+      <div className="flex-1 min-h-0 flex flex-col px-2 pb-2 gap-1">
+        <label
+          className="text-[11px] font-black shrink-0 px-0.5"
+          style={{ color: "var(--px-text2)" }}
+          htmlFor="diary-write-sheet-textarea"
+        >
+          오늘 남길 글
+        </label>
+        <textarea
+          id="diary-write-sheet-textarea"
+          ref={textareaRef}
+          value={content}
+          onChange={(e) => {
+            const next = e.target.value;
+            if (next.trim().length > 0 && !startedRef.current) {
+              startedRef.current = true;
+              onDiaryStarted?.();
+            }
+            onContentChange(next);
+          }}
+          placeholder="예) 오늘은 회의가 길었지만, 끝나고 산책하니 좀 풀렸다."
+          className="flex-1 min-h-[12rem] w-full px-3 py-3 border-2 text-base resize-none leading-relaxed"
+          style={{
+            background: "var(--px-bg3)",
+            borderColor: previewLen > 0 ? "var(--px-accent)" : "var(--px-border2)",
+            color: "var(--px-text-on-panel)",
+            boxShadow: "2px 2px 0 #000",
+          }}
+          enterKeyHint="done"
+        />
+        <div className="shrink-0 flex items-center justify-between px-0.5 pb-[env(safe-area-inset-bottom,0px)]">
+          <p className="ui-hint">
+            {previewLen === 0
+              ? "한 줄만 적어도 운세·문장에 반영돼요."
+              : "고마워요. 이 글이 오늘을 더 잘 맞춥니다."}
+          </p>
+          {previewLen > 0 && (
+            <p className="ui-hint tabular-nums shrink-0">{previewLen}자</p>
+          )}
         </div>
       </div>
     </div>
