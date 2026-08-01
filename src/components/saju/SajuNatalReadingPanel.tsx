@@ -149,16 +149,20 @@ export default function SajuNatalReadingPanel({ profile }: Props) {
     }
   }, [profile]);
 
-  const openPanel = () => {
-    setPanelOpen(true);
+  const captureNatalReadingOpened = (hadCache: boolean) => {
     void import("@/lib/analytics/posthog").then(
-      ({ ANALYTICS_EVENTS, captureEvent }) => {
-        captureEvent(ANALYTICS_EVENTS.natalReadingOpened, {
+      ({ ANALYTICS_EVENTS, captureUiClick }) => {
+        captureUiClick(ANALYTICS_EVENTS.natalReadingOpened, "natal_reading_open", {
           surface: "saju_page",
-          had_cache: Boolean(data),
+          had_cache: hadCache,
         });
       }
     );
+  };
+
+  const openPanel = () => {
+    setPanelOpen(true);
+    captureNatalReadingOpened(Boolean(data));
     if (!data && !loading) {
       void load();
     }
@@ -189,7 +193,11 @@ export default function SajuNatalReadingPanel({ profile }: Props) {
             type="button"
             className="text-xs font-bold underline shrink-0"
             style={{ color: "var(--px-text2)" }}
-            onClick={() => setPanelOpen((v) => !v)}
+            onClick={() => {
+              const next = !panelOpen;
+              setPanelOpen(next);
+              if (next) captureNatalReadingOpened(true);
+            }}
             aria-expanded={panelOpen}
           >
             {panelOpen ? "접기" : "펼치기"}
@@ -208,7 +216,13 @@ export default function SajuNatalReadingPanel({ profile }: Props) {
         {idle && <NatalTeaseButton onClick={openPanel} />}
 
         {readyClosed && (
-          <NatalTeaseButton ready onClick={() => setPanelOpen(true)} />
+          <NatalTeaseButton
+            ready
+            onClick={() => {
+              setPanelOpen(true);
+              captureNatalReadingOpened(true);
+            }}
+          />
         )}
 
         {loading && !data && <NatalLoadingHint />}

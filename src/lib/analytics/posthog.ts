@@ -27,9 +27,12 @@ export const ANALYTICS_EVENTS = {
   journalStarted: "journal_started",
   journalSaved: "journal_saved",
   fortuneOpened: "fortune_opened",
+  fortuneCollapsed: "fortune_collapsed",
   questionShown: "question_shown",
+  questionTeaseClicked: "question_tease_clicked",
   quoteShown: "quote_shown",
   feedbackSubmitted: "feedback_submitted",
+  feedbackOpened: "feedback_opened",
   flowError: "flow_error",
   /** 기능 인기 / 탐색 */
   navTabClicked: "nav_tab_clicked",
@@ -39,6 +42,27 @@ export const ANALYTICS_EVENTS = {
   natalReadingOpened: "natal_reading_opened",
   diarySheetOpened: "diary_sheet_opened",
   checkinStep: "checkin_step",
+  homeTodayEntryClicked: "home_today_entry_clicked",
+  homeStatsTrendClicked: "home_stats_trend_clicked",
+  eventTagsExpanded: "event_tags_expanded",
+  contentFeedbackClicked: "content_feedback_clicked",
+  statsPeriodSelected: "stats_period_selected",
+  statsCategoriesMenuClicked: "stats_categories_menu_clicked",
+  statsMonthChanged: "stats_month_changed",
+  calendarDaySelected: "calendar_day_selected",
+  entryListSelected: "entry_list_selected",
+  entryListEditClicked: "entry_list_edit_clicked",
+  patternTabSelected: "pattern_tab_selected",
+  ganjiCollectionOpened: "ganji_collection_opened",
+  menuOpened: "menu_opened",
+  menuItemClicked: "menu_item_clicked",
+  profileEditClicked: "profile_edit_clicked",
+  profileAddClicked: "profile_add_clicked",
+  profileOpenManseryeokClicked: "profile_open_manseryeok_clicked",
+  sajuModeSelected: "saju_mode_selected",
+  sajuResearchHintClicked: "saju_research_hint_clicked",
+  sajuDaewoonClicked: "saju_daewoon_clicked",
+  sajuSewoonClicked: "saju_sewoon_clicked",
   installPromptShown: "install_prompt_shown",
   installClicked: "install_clicked",
   installAccepted: "install_accepted",
@@ -231,6 +255,28 @@ export function captureEvent(
   if (!initialized && isPostHogConfigured()) initPostHog();
   if (!initialized) return;
   posthog.capture(event, scrubProperties(properties));
+}
+
+/**
+ * 같은 세션에서 두 번째부터 is_repeat=true.
+ * Unique users 퍼널은 그대로, Total count로 재클릭(re)을 볼 수 있음.
+ */
+export function captureUiClick(
+  event: AnalyticsEvent | string,
+  repeatKey: string,
+  properties?: Record<string, string | number | boolean | null | undefined>
+): void {
+  let is_repeat = false;
+  if (typeof window !== "undefined") {
+    try {
+      const key = `manseryeok:ph_ui:${repeatKey}`;
+      is_repeat = window.sessionStorage.getItem(key) === "1";
+      window.sessionStorage.setItem(key, "1");
+    } catch {
+      /* ignore */
+    }
+  }
+  captureEvent(event, { ...properties, is_repeat });
 }
 
 export function captureAppOpenedOnce(props?: {

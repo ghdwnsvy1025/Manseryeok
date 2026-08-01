@@ -19,7 +19,16 @@ export default function BetaFeedbackHost() {
     <>
       <button
         type="button"
-        onClick={() => setOpen(true)}
+        onClick={() => {
+          setOpen(true);
+          void import("@/lib/analytics/posthog").then(
+            ({ ANALYTICS_EVENTS, captureUiClick }) => {
+              captureUiClick(ANALYTICS_EVENTS.feedbackOpened, "feedback_open", {
+                surface: "floating_button",
+              });
+            }
+          );
+        }}
         className="fixed z-[90] right-3 bottom-[calc(4.25rem+env(safe-area-inset-bottom,0px))] px-3 py-2 text-[12px] font-black border-2"
         style={{
           borderColor: "#000",
@@ -39,4 +48,11 @@ export default function BetaFeedbackHost() {
 export function openBetaFeedback(): void {
   if (typeof window === "undefined") return;
   window.dispatchEvent(new Event(OPEN_BETA_FEEDBACK_EVENT));
+  void import("@/lib/analytics/posthog").then(
+    ({ ANALYTICS_EVENTS, captureUiClick }) => {
+      captureUiClick(ANALYTICS_EVENTS.feedbackOpened, "feedback_open", {
+        surface: "header_menu",
+      });
+    }
+  );
 }

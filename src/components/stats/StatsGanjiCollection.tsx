@@ -152,7 +152,20 @@ export default function StatsGanjiCollection({
 
         <button
           type="button"
-          onClick={() => setExpanded((v) => !v)}
+          onClick={() => {
+            const next = !expanded;
+            setExpanded(next);
+            if (next) {
+              void import("@/lib/analytics/posthog").then(
+                ({ ANALYTICS_EVENTS, captureUiClick }) => {
+                  captureUiClick(
+                    ANALYTICS_EVENTS.ganjiCollectionOpened,
+                    "ganji_collection_open"
+                  );
+                }
+              );
+            }
+          }}
           className="w-full py-2 text-xs font-extrabold border-2"
           style={{
             borderColor: "var(--px-border2)",

@@ -28,6 +28,16 @@ export default function HomeEBlock({ stats }: Props) {
           href="/stats"
           className="text-xs font-bold underline shrink-0"
           style={{ color: "#60a5fa" }}
+          onClick={() => {
+            void import("@/lib/analytics/posthog").then(
+              ({ ANALYTICS_EVENTS, captureUiClick }) => {
+                captureUiClick(
+                  ANALYTICS_EVENTS.homeStatsTrendClicked,
+                  "home_stats_trend"
+                );
+              }
+            );
+          }}
         >
           기록 · 추이 보기
         </Link>

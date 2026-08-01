@@ -207,7 +207,18 @@ export default function CharacterHappinessHeatmap({
               <button
                 key={id}
                 type="button"
-                onClick={() => setTab(id)}
+                onClick={() => {
+                  setTab(id);
+                  void import("@/lib/analytics/posthog").then(
+                    ({ ANALYTICS_EVENTS, captureUiClick }) => {
+                      captureUiClick(
+                        ANALYTICS_EVENTS.patternTabSelected,
+                        "pattern_tab",
+                        { tab: id }
+                      );
+                    }
+                  );
+                }}
                 className={`stats-chip flex-1 text-center${tab === id ? " is-on" : ""}`}
               >
                 {label}

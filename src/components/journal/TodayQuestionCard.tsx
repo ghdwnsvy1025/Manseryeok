@@ -244,6 +244,24 @@ function QuestionTeaseButton({
   );
 }
 
+const QUESTION_TEASE_ONCE_KEY = "manseryeok:ph_question_tease_once";
+
+/** 세션 내 최초 1회만 발화 — 재오픈(캐시)에서는 다시 세지 않음 */
+function captureQuestionTeaseOnce() {
+  if (typeof window === "undefined") return;
+  try {
+    if (window.sessionStorage.getItem(QUESTION_TEASE_ONCE_KEY) === "1") return;
+    window.sessionStorage.setItem(QUESTION_TEASE_ONCE_KEY, "1");
+  } catch {
+    /* fire anyway this session */
+  }
+  void import("@/lib/analytics/posthog").then(
+    ({ ANALYTICS_EVENTS, captureEvent }) => {
+      captureEvent(ANALYTICS_EVENTS.questionTeaseClicked);
+    }
+  );
+}
+
 function QuestionLoadingHint({ compact = false }: { compact?: boolean }) {
   return (
     <EmotionalLoadingHint
@@ -614,7 +632,14 @@ export default function TodayQuestionCard({
   const showDebug = isAdmin;
 
   if (phase === "idle" && !isSheet) {
-    return <QuestionTeaseButton onClick={() => void loadQuestion()} />;
+    return (
+      <QuestionTeaseButton
+        onClick={() => {
+          captureQuestionTeaseOnce();
+          void loadQuestion();
+        }}
+      />
+    );
   }
 
   if (phase === "idle" || phase === "loading") {
@@ -641,6 +666,7 @@ export default function TodayQuestionCard({
       <QuestionTeaseButton
         ready
         onClick={() => {
+          captureQuestionTeaseOnce();
           void loadQuestion();
           void trackContentExposure({
             eventDate: todayDate,

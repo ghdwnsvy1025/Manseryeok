@@ -147,6 +147,8 @@ export default function HomeG() {
   const today = todayDateString();
   const [entries, setEntries] = useState<JournalEntry[]>([]);
   const [enabledCodes, setEnabledCodes] = useState<CategoryCode[]>([]);
+  /** prefs 로드 전에는 카테고리 CTA를 숨겨 깜빡임 방지 */
+  const [prefsReady, setPrefsReady] = useState(false);
   const [profile, setProfile] = useState<SajuProfile | null>(() => {
     if (typeof window === "undefined") return null;
     try {
@@ -198,6 +200,7 @@ export default function HomeG() {
         if (cancelled) return;
         setEntries(list);
         setEnabledCodes(getEnabledCodesOrdered(prefs));
+        setPrefsReady(true);
         if (!soft) {
           try {
             const remote = await loadPrimarySajuProfile();
@@ -435,6 +438,17 @@ export default function HomeG() {
               ? "color-mix(in srgb, #4ade80 10%, var(--px-bg2))"
               : "color-mix(in srgb, var(--px-accent) 10%, var(--px-bg2))",
           }}
+          onClick={() => {
+            void import("@/lib/analytics/posthog").then(
+              ({ ANALYTICS_EVENTS, captureUiClick }) => {
+                captureUiClick(
+                  ANALYTICS_EVENTS.homeTodayEntryClicked,
+                  "home_today_entry",
+                  { mode: todayEntry ? "edit" : "write" }
+                );
+              }
+            );
+          }}
         >
           {todayEntry ? (
             <span className="min-w-0 flex items-center gap-2 flex-wrap">
@@ -489,7 +503,7 @@ export default function HomeG() {
         </Link>
       </section>
 
-      {enabledCodes.length < 4 && (
+      {prefsReady && enabledCodes.length < 4 && (
         <div
           className="p-3 border-2 space-y-2"
           style={{ borderColor: "var(--px-accent)", background: "var(--px-bg2)" }}
@@ -534,6 +548,17 @@ export default function HomeG() {
       <Link
         href={`/journal?date=${today}`}
         className="ui-primary-btn block w-full py-3.5 text-center text-sm font-black"
+        onClick={() => {
+          void import("@/lib/analytics/posthog").then(
+            ({ ANALYTICS_EVENTS, captureUiClick }) => {
+              captureUiClick(
+                ANALYTICS_EVENTS.homeTodayEntryClicked,
+                "home_today_entry",
+                { mode: todayEntry ? "edit" : "write" }
+              );
+            }
+          );
+        }}
       >
         {todayEntry ? "오늘 일기 수정" : "일기 쓰기"}
       </Link>

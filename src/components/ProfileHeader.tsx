@@ -96,7 +96,17 @@ export default function ProfileHeader() {
       <div ref={menuRef} className="relative shrink-0">
         <button
           type="button"
-          onClick={() => setOpen((value) => !value)}
+          onClick={() => {
+            const next = !open;
+            setOpen(next);
+            if (next) {
+              void import("@/lib/analytics/posthog").then(
+                ({ ANALYTICS_EVENTS, captureUiClick }) => {
+                  captureUiClick(ANALYTICS_EVENTS.menuOpened, "menu_open");
+                }
+              );
+            }
+          }}
           className="w-9 h-9 flex items-center justify-center border-2 text-base font-black"
           style={{
             borderColor: open ? "var(--px-accent)" : "var(--px-border)",
@@ -127,6 +137,13 @@ export default function ProfileHeader() {
               onClick={() => {
                 closeMenu();
                 window.dispatchEvent(new Event(PROFILES_LIST_EVENT));
+                void import("@/lib/analytics/posthog").then(
+                  ({ ANALYTICS_EVENTS, captureUiClick }) => {
+                    captureUiClick(ANALYTICS_EVENTS.menuItemClicked, "menu_item_profiles", {
+                      item: "profiles",
+                    });
+                  }
+                );
                 if (pathname !== "/saju/profiles") {
                   router.push("/saju/profiles");
                 }
@@ -141,9 +158,12 @@ export default function ProfileHeader() {
               onClick={() => {
                 closeMenu();
                 void import("@/lib/analytics/posthog").then(
-                  ({ ANALYTICS_EVENTS, captureEvent }) => {
+                  ({ ANALYTICS_EVENTS, captureEvent, captureUiClick }) => {
                     captureEvent(ANALYTICS_EVENTS.sajuOpened, {
                       surface: "header_menu",
+                    });
+                    captureUiClick(ANALYTICS_EVENTS.menuItemClicked, "menu_item_saju", {
+                      item: "saju",
                     });
                   }
                 );
@@ -164,6 +184,13 @@ export default function ProfileHeader() {
               type="button"
               onClick={() => {
                 closeMenu();
+                void import("@/lib/analytics/posthog").then(
+                  ({ ANALYTICS_EVENTS, captureUiClick }) => {
+                    captureUiClick(ANALYTICS_EVENTS.menuItemClicked, "menu_item_feedback", {
+                      item: "feedback",
+                    });
+                  }
+                );
                 openBetaFeedback();
               }}
               className="ui-primary-btn block w-full px-3 py-3 text-center text-sm font-black"
@@ -186,6 +213,13 @@ export default function ProfileHeader() {
               type="button"
               onClick={() => {
                 closeMenu();
+                void import("@/lib/analytics/posthog").then(
+                  ({ ANALYTICS_EVENTS, captureUiClick }) => {
+                    captureUiClick(ANALYTICS_EVENTS.menuItemClicked, "menu_item_logout", {
+                      item: "logout",
+                    });
+                  }
+                );
                 void (async () => {
                   const supabase = getSupabaseBrowserClient();
                   if (supabase) {

@@ -234,6 +234,13 @@ export default function SajuResult({
         setShowExploreGuide(true);
       }
     }
+    void import("@/lib/analytics/posthog").then(
+      ({ ANALYTICS_EVENTS, captureUiClick }) => {
+        captureUiClick(ANALYTICS_EVENTS.sajuModeSelected, "saju_mode", {
+          mode: mode === "explore" ? "research" : "basic",
+        });
+      }
+    );
   };
 
   const completeExploreGuide = () => {
@@ -281,6 +288,15 @@ export default function SajuResult({
   const toggleHighlight = useCallback((next: Exclude<HighlightSelection, null>) => {
     if (!exploreMode) return;
     toggleHighlightWithHint(next);
+    void import("@/lib/analytics/posthog").then(
+      ({ ANALYTICS_EVENTS, captureUiClick }) => {
+        captureUiClick(
+          ANALYTICS_EVENTS.sajuResearchHintClicked,
+          "saju_research_hint",
+          { kind: next.kind }
+        );
+      }
+    );
   }, [exploreMode, toggleHighlightWithHint]);
 
   const visibleStemElements = useMemo(() => {
@@ -506,6 +522,13 @@ export default function SajuResult({
     branchElement: Element,
   ) => {
     captureScrollAnchor();
+    void import("@/lib/analytics/posthog").then(
+      ({ ANALYTICS_EVENTS, captureUiClick }) => {
+        captureUiClick(ANALYTICS_EVENTS.sajuDaewoonClicked, "saju_daewoon", {
+          selecting: !isSelected,
+        });
+      }
+    );
 
     if (isSelected) {
       setSelectedDaeunOrder(null);
@@ -1648,8 +1671,17 @@ export default function SajuResult({
                               stemTenGod={stemTenGod}
                               branchTenGod={branchTenGod}
                               onClick={() => {
-                                setSelectedSewoonYear((prev) =>
-                                  prev === item.year ? null : item.year
+                                const next =
+                                  selectedSewoonYear === item.year ? null : item.year;
+                                setSelectedSewoonYear(next);
+                                void import("@/lib/analytics/posthog").then(
+                                  ({ ANALYTICS_EVENTS, captureUiClick }) => {
+                                    captureUiClick(
+                                      ANALYTICS_EVENTS.sajuSewoonClicked,
+                                      "saju_sewoon",
+                                      { selecting: next != null }
+                                    );
+                                  }
                                 );
                               }}
                             />

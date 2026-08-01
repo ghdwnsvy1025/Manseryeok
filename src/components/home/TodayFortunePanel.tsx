@@ -1094,23 +1094,30 @@ export default function TodayFortunePanel({
               className="text-xs font-bold underline shrink-0"
               style={{ color: "var(--px-text2)" }}
               onClick={() => {
-                setPanelOpen((v) => {
-                  const next = !v;
-                  panelOpenRef.current = next;
-                  if (overall) {
-                    persistFortune(
-                      {
-                        version: "v2",
-                        overall,
-                        domains,
-                        presentation: presentation ?? undefined,
-                        evidence,
-                      },
-                      next
-                    );
+                const next = !panelOpen;
+                setPanelOpen(next);
+                panelOpenRef.current = next;
+                if (overall) {
+                  persistFortune(
+                    {
+                      version: "v2",
+                      overall,
+                      domains,
+                      presentation: presentation ?? undefined,
+                      evidence,
+                    },
+                    next
+                  );
+                }
+                void import("@/lib/analytics/posthog").then(
+                  ({ ANALYTICS_EVENTS, captureUiClick, captureEvent }) => {
+                    if (next) {
+                      captureUiClick(ANALYTICS_EVENTS.fortuneOpened, "fortune_open");
+                    } else {
+                      captureEvent(ANALYTICS_EVENTS.fortuneCollapsed);
+                    }
                   }
-                  return next;
-                });
+                );
               }}
               aria-expanded={panelOpen}
             >
@@ -1180,6 +1187,11 @@ export default function TodayFortunePanel({
                   contentId: "detail",
                   eventType: "fortune_detail_opened",
                 });
+                void import("@/lib/analytics/posthog").then(
+                  ({ ANALYTICS_EVENTS, captureUiClick }) => {
+                    captureUiClick(ANALYTICS_EVENTS.fortuneOpened, "fortune_open");
+                  }
+                );
               }}
             />
           )}

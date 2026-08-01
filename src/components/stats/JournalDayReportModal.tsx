@@ -321,11 +321,15 @@ export default function JournalDayReportModal({ entry, onClose }: Props) {
             className="ui-primary-btn flex-1 py-2.5 text-sm text-center"
             onClick={() => {
               void import("@/lib/analytics/posthog").then(
-                ({ ANALYTICS_EVENTS, captureEvent }) => {
+                ({ ANALYTICS_EVENTS, captureEvent, captureUiClick }) => {
                   captureEvent(ANALYTICS_EVENTS.pastEntryOpened, {
                     source: "day_report_edit",
                     has_entry: true,
                   });
+                  captureUiClick(
+                    ANALYTICS_EVENTS.entryListEditClicked,
+                    "entry_list_edit"
+                  );
                 }
               );
             }}

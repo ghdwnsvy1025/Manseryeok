@@ -304,6 +304,11 @@ export default function StatsPage() {
     const next = new Date(viewYear, viewMonth - 1 + delta, 1);
     setViewYear(next.getFullYear());
     setViewMonth(next.getMonth() + 1);
+    void import("@/lib/analytics/posthog").then(
+      ({ ANALYTICS_EVENTS, captureUiClick }) => {
+        captureUiClick(ANALYTICS_EVENTS.statsMonthChanged, "stats_month_changed");
+      }
+    );
   };
 
   const shiftTrend = (dir: -1 | 1) => {
@@ -317,11 +322,25 @@ export default function StatsPage() {
   const setViewMonthAbsolute = (year: number, month: number) => {
     setViewYear(year);
     setViewMonth(month);
+    void import("@/lib/analytics/posthog").then(
+      ({ ANALYTICS_EVENTS, captureUiClick }) => {
+        captureUiClick(ANALYTICS_EVENTS.statsMonthChanged, "stats_month_changed");
+      }
+    );
   };
 
   const toggle = (code: CategoryCode) => {
     setSelected((prev) =>
       prev.includes(code) ? prev.filter((c) => c !== code) : [...prev, code]
+    );
+    void import("@/lib/analytics/posthog").then(
+      ({ ANALYTICS_EVENTS, captureUiClick }) => {
+        captureUiClick(
+          ANALYTICS_EVENTS.statsCategoriesMenuClicked,
+          "stats_categories_menu",
+          { category: code }
+        );
+      }
     );
   };
 
@@ -377,6 +396,15 @@ export default function StatsPage() {
                   onClick={() => {
                     setTrendSpan(id);
                     if (id === "week") setWeekStart(mondayOf(today));
+                    void import("@/lib/analytics/posthog").then(
+                      ({ ANALYTICS_EVENTS, captureUiClick }) => {
+                        captureUiClick(
+                          ANALYTICS_EVENTS.statsPeriodSelected,
+                          "stats_period",
+                          { period: id }
+                        );
+                      }
+                    );
                   }}
                   className={`stats-chip flex-1 text-center${trendSpan === id ? " is-on" : ""}`}
                 >

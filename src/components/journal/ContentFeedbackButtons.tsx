@@ -100,6 +100,15 @@ export default function ContentFeedbackButtons({
                   contentId,
                   rating,
                 });
+                void import("@/lib/analytics/posthog").then(
+                  ({ ANALYTICS_EVENTS, captureUiClick }) => {
+                    captureUiClick(
+                      ANALYTICS_EVENTS.contentFeedbackClicked,
+                      `content_feedback:${contentType}:${mode}`,
+                      { surface: contentType, mode, rating }
+                    );
+                  }
+                );
               }}
             >
               {labels[rating]}

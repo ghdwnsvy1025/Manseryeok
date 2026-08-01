@@ -256,11 +256,16 @@ export default function JournalRecordCalendar({
                   onClick={() => {
                     setDayReport(entry);
                     void import("@/lib/analytics/posthog").then(
-                      ({ ANALYTICS_EVENTS, captureEvent }) => {
+                      ({ ANALYTICS_EVENTS, captureEvent, captureUiClick }) => {
                         captureEvent(ANALYTICS_EVENTS.pastEntryOpened, {
                           source: "stats_calendar",
                           has_entry: true,
                         });
+                        captureUiClick(
+                          ANALYTICS_EVENTS.calendarDaySelected,
+                          "calendar_day_select",
+                          { is_today: isToday }
+                        );
                       }
                     );
                   }}
@@ -293,11 +298,16 @@ export default function JournalRecordCalendar({
                 aria-label={`${cell.date} 미기록 · 작성하기`}
                 onClick={() => {
                   void import("@/lib/analytics/posthog").then(
-                    ({ ANALYTICS_EVENTS, captureEvent }) => {
+                    ({ ANALYTICS_EVENTS, captureEvent, captureUiClick }) => {
                       captureEvent(ANALYTICS_EVENTS.pastEntryOpened, {
                         source: "stats_calendar_empty",
                         has_entry: false,
                       });
+                      captureUiClick(
+                        ANALYTICS_EVENTS.calendarDaySelected,
+                        "calendar_day_select",
+                        { is_today: isToday }
+                      );
                     }
                   );
                 }}
@@ -329,7 +339,18 @@ export default function JournalRecordCalendar({
               <button
                 key={entry.id}
                 type="button"
-                onClick={() => setDayReport(entry)}
+                onClick={() => {
+                  setDayReport(entry);
+                  void import("@/lib/analytics/posthog").then(
+                    ({ ANALYTICS_EVENTS, captureUiClick }) => {
+                      captureUiClick(
+                        ANALYTICS_EVENTS.entryListSelected,
+                        "entry_list_select",
+                        { is_today: entry.entryDate === today }
+                      );
+                    }
+                  );
+                }}
                 className="block w-full text-left p-3 border-2"
                 style={{
                   background: "var(--px-bg3)",

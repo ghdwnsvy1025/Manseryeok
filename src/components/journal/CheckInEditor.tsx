@@ -1219,7 +1219,7 @@ export default function CheckInEditor({ initialDate }: Props) {
           has_text: content.trim().length > 0,
           text_length_bucket: textLengthBucket(content),
           has_checkin: true,
-          save_kind: editingExisting ? "update" : "create",
+          save_kind: editingExisting ? "edit" : "create",
           save_number_bucket: saveNumberBucket(priorBefore),
           save_duration_bucket: saveDurationBucket(
             peekJournalStartedAt(date, "checkin")
@@ -1615,7 +1615,20 @@ export default function CheckInEditor({ initialDate }: Props) {
       <div className="space-y-2">
         <button
           type="button"
-          onClick={() => setShowOptional((v) => !v)}
+          onClick={() => {
+            const next = !showOptional;
+            setShowOptional(next);
+            if (next) {
+              void import("@/lib/analytics/posthog").then(
+                ({ ANALYTICS_EVENTS, captureUiClick }) => {
+                  captureUiClick(
+                    ANALYTICS_EVENTS.eventTagsExpanded,
+                    "event_tags_expand"
+                  );
+                }
+              );
+            }
+          }}
           aria-expanded={showOptional}
           className="w-full text-left px-3 py-3 border-2"
           style={{
