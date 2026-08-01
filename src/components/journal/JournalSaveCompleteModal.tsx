@@ -63,6 +63,8 @@ export default function JournalSaveCompleteModal({
   const closeRef = useRef<HTMLButtonElement>(null);
   const gaugeRef = useRef<HTMLDivElement>(null);
   const xpFloatRef = useRef<HTMLParagraphElement>(null);
+  const blossomFiredRef = useRef(false);
+  const [blossomToken, setBlossomToken] = useState(0);
   const isVerified = contentType === "verified_quote";
   const title = isVerified ? "오늘의 명언" : "오늘의 문장";
   /** 계산 전·중에는 폴백 문장 대신 로딩 UI */
@@ -78,6 +80,17 @@ export default function JournalSaveCompleteModal({
   const moodChip =
     entry.moodLabel ?? entry.moodLabels?.[0] ?? null;
   const tagChips = entry.tags.map((t) => getTagName(t.tagCode)).filter(Boolean);
+
+  // 명언/문장 로딩이 끝난 뒤에만 벚꽃 (모달 오픈·로딩 중에는 안 함)
+  useEffect(() => {
+    if (showQuoteLoading) {
+      blossomFiredRef.current = false;
+      return;
+    }
+    if (blossomFiredRef.current) return;
+    blossomFiredRef.current = true;
+    setBlossomToken((n) => n + 1);
+  }, [showQuoteLoading]);
 
   useEffect(() => {
     const from = startProgress.progressRatio;
@@ -269,7 +282,7 @@ export default function JournalSaveCompleteModal({
             </p>
 
             {showQuoteLoading ? (
-              <EmotionalLoadingHint status="오늘의 한 줄을 고르는 중…" intervalMs={8000} />
+              <EmotionalLoadingHint status="오늘의 한 줄을 고르는 중…" intervalMs={4200} />
             ) : (
               <>
                 <blockquote className="save-quote-reveal relative m-0 space-y-2">
@@ -589,7 +602,7 @@ export default function JournalSaveCompleteModal({
       </div>
 
       {/* 패널 위에 그려야 모바일에서도 가려지지 않음 */}
-      <CherryBlossomLayer playToken={1} zIndex={120} />
+      <CherryBlossomLayer playToken={blossomToken} zIndex={120} />
     </div>
   );
 }

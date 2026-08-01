@@ -249,7 +249,7 @@ function QuestionLoadingHint({ compact = false }: { compact?: boolean }) {
     <EmotionalLoadingHint
       compact={compact}
       status="질문을 고르는 중…"
-      intervalMs={9000}
+      intervalMs={4200}
     />
   );
 }

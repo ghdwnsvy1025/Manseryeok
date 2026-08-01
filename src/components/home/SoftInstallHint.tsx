@@ -7,7 +7,9 @@ import {
   dismissInstallNudge,
   isInstallNudgeDismissed,
   isKakaoTalkInApp,
+  isPwaInstallKnown,
   isStandaloneDisplay,
+  markPwaInstalled,
 } from "@/lib/pwa/installState";
 
 type Surface = "home_nudge" | "save_complete";
@@ -32,7 +34,9 @@ export default function SoftInstallHint({
   const [kakao, setKakao] = useState(false);
 
   useEffect(() => {
-    if (isStandaloneDisplay()) return;
+    // 홈 화면 앱으로 한 번이라도 열리면 플래그 저장 → 이후 브라우저 탭에서도 숨김
+    if (isStandaloneDisplay()) markPwaInstalled();
+    if (isPwaInstallKnown()) return;
     if (isInstallNudgeDismissed()) return;
     if (surface === "home_nudge" && uniqueDays < 2) return;
     if (surface === "save_complete" && !wasFirstSaveOfDay) return;

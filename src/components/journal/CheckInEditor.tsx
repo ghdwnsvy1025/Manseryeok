@@ -882,12 +882,13 @@ export default function CheckInEditor({ initialDate }: Props) {
    */
   const runBackgroundAi = async (entryId: string, entries: JournalEntry[]) => {
     let summary: string | null = null;
+    const saved0 = entries.find((e) => e.id === entryId);
+    // 명언은 요약 LLM을 기다리지 않고 바로 요청 (체감 로딩 단축)
+    if (saved0) void fetchQuote(saved0, null, entries);
+
     if (!content.trim()) {
       setAiExtracting(false);
       setOpenAiStatus({ kind: "skipped", detail: "본문 없음" });
-      // 본문이 없으면 재저장 없이 방금 저장한 항목으로 문장만 생성
-      const saved = entries.find((e) => e.id === entryId);
-      if (saved) void fetchQuote(saved, null, entries);
       return;
     }
 
@@ -972,15 +973,11 @@ export default function CheckInEditor({ initialDate }: Props) {
         latest = await storage.list();
         setAllEntries(latest);
         setSavedUniqueDays(new Set(latest.map((e) => e.entryDate)).size);
-        void fetchQuote(reSaved.entry, summary, latest);
         return;
       } catch {
-        /* 재저장 실패 시 방금 저장본으로 문장 생성 */
+        /* 재저장 실패 무시 — 명언은 이미 요청됨 */
       }
     }
-
-    const saved = latest.find((e) => e.id === entryId);
-    if (saved) void fetchQuote(saved, summary, latest);
   };
 
   const handleSave = async () => {

@@ -1,4 +1,5 @@
 const DISMISS_UNTIL_KEY = "manseryeok:install_nudge_until_v1";
+const INSTALLED_FLAG_KEY = "manseryeok:pwa_installed_v1";
 
 /** 홈 설치 유도 숨김 기간 */
 export const INSTALL_NUDGE_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000;
@@ -21,6 +22,26 @@ export function isStandaloneDisplay(): boolean {
     ("standalone" in navigator &&
       Boolean((navigator as Navigator & { standalone?: boolean }).standalone))
   );
+}
+
+/** 설치 완료 플래그 — 브라우저 탭으로 열어도 유도 숨김 */
+export function markPwaInstalled(): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(INSTALLED_FLAG_KEY, "1");
+  } catch {
+    /* ignore */
+  }
+}
+
+export function isPwaInstallKnown(): boolean {
+  if (typeof window === "undefined") return true;
+  if (isStandaloneDisplay()) return true;
+  try {
+    return window.localStorage.getItem(INSTALLED_FLAG_KEY) === "1";
+  } catch {
+    return false;
+  }
 }
 
 export function isInstallNudgeDismissed(): boolean {

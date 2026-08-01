@@ -6,7 +6,9 @@ import {
   copyAppUrl,
   isIosDevice,
   isKakaoTalkInApp,
+  isPwaInstallKnown,
   isStandaloneDisplay,
+  markPwaInstalled,
 } from "@/lib/pwa/installState";
 
 type InstallPromptEvent = Event & {
@@ -91,7 +93,8 @@ export default function InstallAppButton({
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    setInstalled(isStandaloneDisplay());
+    if (isStandaloneDisplay()) markPwaInstalled();
+    setInstalled(isStandaloneDisplay() || isPwaInstallKnown());
     setIos(isIosDevice());
     const inKakao = isKakaoTalkInApp();
     setKakao(inKakao);
@@ -105,6 +108,7 @@ export default function InstallAppButton({
     const onInstalled = () => {
       setInstalled(true);
       setPromptEvent(null);
+      markPwaInstalled();
       captureEvent(ANALYTICS_EVENTS.installCompleted, { surface });
     };
 

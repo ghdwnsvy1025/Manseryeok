@@ -21,11 +21,26 @@ type Props = {
 export default function EmotionalLoadingHint({
   status,
   compact = false,
-  intervalMs = 9000,
+  intervalMs = 4200,
 }: Props) {
   const [extra, setExtra] = useState<LoadingPhrase[]>([]);
   const deck = useMemo(() => createLoadingPhraseDeck(extra), [extra]);
   const [idx, setIdx] = useState(0);
+  const [statusIdx, setStatusIdx] = useState(0);
+
+  const statusDeck = useMemo(() => {
+    if (!status?.trim()) return [] as string[];
+    const base = status.trim();
+    // 하단 상태줄도 조금씩 바꿔서 ‘항상 같은 문구’ 느낌을 줄임
+    return [
+      base,
+      "조금만 기다려 주세요…",
+      "거의 다 왔어요…",
+      base.replace(/중…$/, "중이에요…") === base
+        ? "잠시만요, 고르고 있어요…"
+        : base.replace(/중…$/, "중이에요…"),
+    ].filter((s, i, arr) => arr.indexOf(s) === i);
+  }, [status]);
 
   useEffect(() => {
     let cancelled = false;
@@ -42,6 +57,7 @@ export default function EmotionalLoadingHint({
     setIdx(Math.floor(Math.random() * deck.length));
     const id = window.setInterval(() => {
       setIdx((i) => (i + 1) % deck.length);
+      setStatusIdx((i) => i + 1);
     }, intervalMs);
     return () => window.clearInterval(id);
   }, [compact, deck, intervalMs]);
@@ -101,12 +117,12 @@ export default function EmotionalLoadingHint({
           {phrase.line}
         </p>
       </div>
-      {status && (
+      {statusDeck.length > 0 && (
         <p
           className="text-[11px] font-bold tracking-wide"
           style={{ color: "var(--px-text2)", opacity: 0.85 }}
         >
-          {status}
+          {statusDeck[statusIdx % statusDeck.length]}
         </p>
       )}
     </div>
