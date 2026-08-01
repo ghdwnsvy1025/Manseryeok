@@ -64,6 +64,14 @@ function SajuPageInner() {
       setResult(res);
       setResultKey((k) => k + 1);
       setMode("view");
+      void import("@/lib/analytics/posthog").then(
+        ({ ANALYTICS_EVENTS, captureEvent }) => {
+          captureEvent(ANALYTICS_EVENTS.sajuOpened, {
+            surface: "saju_page",
+            is_own_profile: !journalId || journalId === profile.id,
+          });
+        }
+      );
     };
 
     const load = async () => {

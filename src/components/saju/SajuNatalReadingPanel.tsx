@@ -151,6 +151,14 @@ export default function SajuNatalReadingPanel({ profile }: Props) {
 
   const openPanel = () => {
     setPanelOpen(true);
+    void import("@/lib/analytics/posthog").then(
+      ({ ANALYTICS_EVENTS, captureEvent }) => {
+        captureEvent(ANALYTICS_EVENTS.natalReadingOpened, {
+          surface: "saju_page",
+          had_cache: Boolean(data),
+        });
+      }
+    );
     if (!data && !loading) {
       void load();
     }

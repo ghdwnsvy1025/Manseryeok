@@ -253,7 +253,17 @@ export default function JournalRecordCalendar({
                   type="button"
                   className={cellClass}
                   style={cellStyle}
-                  onClick={() => setDayReport(entry)}
+                  onClick={() => {
+                    setDayReport(entry);
+                    void import("@/lib/analytics/posthog").then(
+                      ({ ANALYTICS_EVENTS, captureEvent }) => {
+                        captureEvent(ANALYTICS_EVENTS.pastEntryOpened, {
+                          source: "stats_calendar",
+                          has_entry: true,
+                        });
+                      }
+                    );
+                  }}
                   aria-label={`${cell.date} 기록 보기 행복도 ${happiness ?? "·"}`}
                 >
                   {cellInner}
@@ -281,6 +291,16 @@ export default function JournalRecordCalendar({
                 className={cellClass}
                 style={cellStyle}
                 aria-label={`${cell.date} 미기록 · 작성하기`}
+                onClick={() => {
+                  void import("@/lib/analytics/posthog").then(
+                    ({ ANALYTICS_EVENTS, captureEvent }) => {
+                      captureEvent(ANALYTICS_EVENTS.pastEntryOpened, {
+                        source: "stats_calendar_empty",
+                        has_entry: false,
+                      });
+                    }
+                  );
+                }}
               >
                 {cellInner}
               </Link>

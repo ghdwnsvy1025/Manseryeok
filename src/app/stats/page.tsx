@@ -117,6 +117,14 @@ export default function StatsPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    void import("@/lib/analytics/posthog").then(
+      ({ ANALYTICS_EVENTS, captureEvent }) => {
+        captureEvent(ANALYTICS_EVENTS.statsOpened, { surface: "stats_tab" });
+      }
+    );
+  }, []);
+
+  useEffect(() => {
     let cancelled = false;
     (async () => {
       try {

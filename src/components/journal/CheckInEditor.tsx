@@ -232,18 +232,37 @@ export default function CheckInEditor({ initialDate }: Props) {
 
   const markCheckInStarted = (startAction: "text_focus" | "checkin_select") => {
     void import("@/lib/analytics/posthog").then(
-      ({ captureJournalStartedOnce }) => {
+      ({ captureJournalStartedOnce, ANALYTICS_EVENTS, captureEvent }) => {
         void import("@/lib/analytics/buckets").then(({ questionIdForDate }) => {
-          captureJournalStartedOnce({
+          const fired = captureJournalStartedOnce({
             entryDate: date,
             entryType: "checkin",
             source: "home",
             questionId: questionIdForDate(date),
             startAction,
           });
+          if (fired) {
+            captureEvent(ANALYTICS_EVENTS.checkinStep, {
+              step: startAction === "text_focus" ? "diary" : "happiness_or_core",
+              entry_date_bucket: "today_or_selected",
+            });
+          }
         });
       }
     );
+  };
+
+  const openDiarySheet = () => {
+    setWriteSheetOpen(true);
+    void import("@/lib/analytics/posthog").then(
+      ({ ANALYTICS_EVENTS, captureEvent }) => {
+        captureEvent(ANALYTICS_EVENTS.diarySheetOpened, {
+          surface: "checkin_editor",
+          had_text: content.trim().length > 0,
+        });
+      }
+    );
+    markCheckInStarted("text_focus");
   };
 
   /** 필수 = 행복도 + 핵심 상태 4개 (점수 필수, 해당 없음 불가) */
@@ -757,7 +776,24 @@ export default function CheckInEditor({ initialDate }: Props) {
   };
 
   const changeHappiness = (value: HappinessScore | null) => {
-    if (value != null) markCheckInStarted("checkin_select");
+    if (value != null) {
+      markCheckInStarted("checkin_select");
+      try {
+        const key = `manseryeok:ph_checkin_happiness:${date}`;
+        if (typeof window !== "undefined" && window.sessionStorage.getItem(key) !== "1") {
+          window.sessionStorage.setItem(key, "1");
+          void import("@/lib/analytics/posthog").then(
+            ({ ANALYTICS_EVENTS, captureEvent }) => {
+              captureEvent(ANALYTICS_EVENTS.checkinStep, {
+                step: "happiness",
+              });
+            }
+          );
+        }
+      } catch {
+        /* ignore */
+      }
+    }
     setHappiness(value);
     setFieldError((e) => (e?.scope === "happiness" ? null : e));
   };
@@ -1393,7 +1429,7 @@ export default function CheckInEditor({ initialDate }: Props) {
       <section className="space-y-2" aria-label="하루 정리글">
         <button
           type="button"
-          onClick={() => setWriteSheetOpen(true)}
+          onClick={openDiarySheet}
           className="w-full text-left px-3 py-3.5 border-2 space-y-1.5"
           style={{
             borderColor: content.trim() ? "var(--px-accent)" : "var(--px-border2)",

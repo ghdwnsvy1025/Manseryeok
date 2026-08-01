@@ -319,6 +319,16 @@ export default function JournalDayReportModal({ entry, onClose }: Props) {
           <Link
             href={`/journal?date=${entry.entryDate}`}
             className="ui-primary-btn flex-1 py-2.5 text-sm text-center"
+            onClick={() => {
+              void import("@/lib/analytics/posthog").then(
+                ({ ANALYTICS_EVENTS, captureEvent }) => {
+                  captureEvent(ANALYTICS_EVENTS.pastEntryOpened, {
+                    source: "day_report_edit",
+                    has_entry: true,
+                  });
+                }
+              );
+            }}
           >
             수정하기
           </Link>

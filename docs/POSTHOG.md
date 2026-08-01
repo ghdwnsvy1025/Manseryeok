@@ -1,64 +1,85 @@
 # PostHog 설정 (지인 베타)
 
-코드는 P0 이벤트가 붙어 있습니다. **키만** 넣으면 동작합니다.
+코드에 P0 핵심 루프 + **기능 인기** 이벤트가 붙어 있습니다. 키만 넣으면 동작합니다.
 
-## 1. PostHog 프로젝트
-
-1. https://posthog.com 가입
-2. 새 프로젝트 생성
-3. **Project Settings → Project API Key** (`phc_…`) 복사
-4. 리전이 US면 host 기본값 그대로, EU면 `https://eu.i.posthog.com`
-
-## 2. 환경 변수
-
-로컬 `.env.local` 및 Vercel Production:
+## 1. 환경 변수
 
 ```
 NEXT_PUBLIC_POSTHOG_KEY=phc_xxxxxxxx
 NEXT_PUBLIC_POSTHOG_HOST=https://us.i.posthog.com
-# 선택
 NEXT_PUBLIC_BETA_COHORT=friends_2026_w31
-NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA=  # Vercel이 자동 주입하면 app_version에 사용
 ```
 
-Vercel에 넣은 뒤 **Redeploy** 해야 클라이언트에 반영됩니다.
+Vercel Production에 넣고 **Redeploy**.
 
-## 3. P0 이벤트 (본문·생일·이메일·질문/운세 문장·raw error 미포함)
+## 2. 핵심 루프 이벤트
 
 | 이벤트 | 언제 |
 |--------|------|
-| `app_opened` | 세션당 1회 (landing_surface, has_auth_session) |
-| `auth_guest_clicked` | 비로그인 시작 |
-| `auth_google_clicked` | Google 버튼 |
-| `signed_in` | 게스트 로컬 세션 / Google 세션 확정 |
-| `signed_out` | 로그아웃 |
-| `profile_started` | 사주 온보딩 화면 노출 |
-| `profile_created` | 프로필 저장 성공 |
+| `app_opened` | 세션당 1회 |
+| `auth_guest_clicked` / `auth_google_clicked` | 로그인 선택 |
+| `signed_in` / `signed_out` | 세션 |
+| `profile_started` / `profile_created` | 사주 온보딩 |
 | `fortune_opened` | 운세 열람 |
-| `question_shown` | 오늘의 질문 노출 (question_id만, 본문 없음) |
-| `journal_started` | 체크인/본문 최초 상호작용 (세션·날짜당 1회) |
-| `journal_saved` | 저장 성공 (길이 구간·save_number 등) |
-| `quote_shown` | 저장 후 명언 |
-| `flow_error` | 핵심 흐름 실패 (allowlist error_code만) |
-| `feedback_submitted` | 베타 피드백 |
-| install_* | PWA 유도 |
+| `question_shown` | 질문 노출 (본문 없음) |
+| `journal_started` | 체크인/글 최초 상호작용 |
+| `journal_saved` | 저장 성공 (`has_text` 포함) |
+| `quote_shown` | 명언 노출 |
+| `flow_error` | 핵심 흐름 실패 |
 
-공통 super properties: `auth_provider`, `in_app_browser`, `is_pwa_standalone`, `beta_cohort`, `app_version`
+## 3. 기능 인기 이벤트 (추천 구조)
 
-게스트는 Supabase 세션이 없으므로 `guest:{uuid}` 로 identify 합니다.
+| 이벤트 | 언제 | 주요 properties |
+|--------|------|-----------------|
+| `nav_tab_clicked` | 하단 탭 클릭 | `tab`: journal\|home\|stats |
+| `stats_opened` | 기록 탭 페이지 진입 | `surface` |
+| `past_entry_opened` | 캘린더 날짜·수정하기 | `source`, `has_entry` |
+| `saju_opened` | 내 사주 화면 | `surface` |
+| `natal_reading_opened` | 종합풀이 열기 | `surface`, `had_cache` |
+| `diary_sheet_opened` | 하루 정리글 시트 열기 | `had_text` |
+| `checkin_step` | 행복도 등 단계 | `step`: happiness\|… |
 
-## 4. PostHog에서 만들 퍼널 (수동)
+공통: `auth_provider`, `in_app_browser`, `is_pwa_standalone`, `beta_cohort`, `app_version`  
+금지: 일기/질문/운세/풀이 **문장**, 생일, 이메일.
 
-**Activation (24h, unique users)**  
-`app_opened → signed_in → profile_created → fortune_opened → journal_saved`
+## 4. PostHog에서 만들 Insight
 
-**Core loop (30m)**  
-`fortune_opened → question_shown → journal_started → journal_saved → quote_shown`
+### 이미 만든 것
+- `01 Beta Entrants` — Trends `$pageview` 또는 `app_opened`
+- `02 Activation` — Funnel
+- `03 Core Loop` — Funnel
 
-## 5. 프라이버시
+### 추가로 만들 것 (기능 인기)
 
-- 일기/피드백/질문/운세 **문장 금지**
-- `captureEvent`에서 민감 키·120자 초과 문자열 차단
-- Session Replay는 PostHog 프로젝트 설정에서 input masking 권장
+**09 Feature popularity** (Trends)
+1. New insight → **Trends**
+2. 시리즈를 여러 개 추가 (각각 Unique users):
+   - `nav_tab_clicked` (breakdown `tab` 해도 됨)
+   - `fortune_opened`
+   - `question_shown`
+   - `diary_sheet_opened`
+   - `stats_opened`
+   - `past_entry_opened`
+   - `saju_opened`
+   - `natal_reading_opened`
+3. 이름: `09 Feature popularity` → 대시보드에 추가
+
+**10 Save with/without diary** (Trends)
+1. Event: `journal_saved`
+2. Breakdown: `has_text`
+3. Unique users
+4. 이름: `10 Save quality (has_text)`  
+→ `true` = 정리글 있음, `false` = 기분체크만 하고 저장
+
+### (선택)
+- `07 flow_error` by `step`
+- Retention: start `journal_saved` → return `$pageview`
+
+## 5. 매일 보는 법
+
+1. Feature popularity — 어떤 기능 Unique users가 많은지  
+2. Save quality — 일기 없이 저장 비율  
+3. Core Loop — 어디서 끊기는지 한 단계  
+4. (막히면) Session replay 1~2개  
 
 키가 없으면 분석만 꺼지고 앱은 그대로 동작합니다.

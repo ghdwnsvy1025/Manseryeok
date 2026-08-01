@@ -3,10 +3,12 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { isNewDiaryEnabled } from "@/lib/app/featureFlags";
+import { ANALYTICS_EVENTS, captureEvent } from "@/lib/analytics/posthog";
 
 type NavItem = {
   href: string;
   label: string;
+  tab: "journal" | "home" | "stats";
   isActive: (path: string) => boolean;
 };
 
@@ -22,6 +24,7 @@ export default function AppNav() {
     {
       href: diaryHref,
       label: "일기",
+      tab: "journal",
       isActive: (path) =>
         path === "/diary" ||
         path.startsWith("/diary/history") ||
@@ -32,11 +35,13 @@ export default function AppNav() {
     {
       href: "/",
       label: "홈",
+      tab: "home",
       isActive: (path) => path === "/",
     },
     {
       href: "/stats",
       label: "기록",
+      tab: "stats",
       isActive: (path) =>
         path === "/stats" ||
         path.startsWith("/stats/") ||
@@ -64,6 +69,19 @@ export default function AppNav() {
             <Link
               key={item.href}
               href={item.href}
+              onClick={() => {
+                captureEvent(ANALYTICS_EVENTS.navTabClicked, {
+                  tab: item.tab,
+                  from_path:
+                    pathname === "/"
+                      ? "home"
+                      : pathname.startsWith("/journal")
+                        ? "journal"
+                        : pathname.startsWith("/stats")
+                          ? "stats"
+                          : "other",
+                });
+              }}
               className="flex-1 flex items-center justify-center py-3.5 border-r last:border-r-0 transition-colors"
               style={{
                 borderColor: "var(--px-border)",

@@ -140,6 +140,13 @@ export default function ProfileHeader() {
               type="button"
               onClick={() => {
                 closeMenu();
+                void import("@/lib/analytics/posthog").then(
+                  ({ ANALYTICS_EVENTS, captureEvent }) => {
+                    captureEvent(ANALYTICS_EVENTS.sajuOpened, {
+                      surface: "header_menu",
+                    });
+                  }
+                );
                 const meId = profile?.id;
                 router.push(
                   meId
