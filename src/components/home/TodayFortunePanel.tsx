@@ -404,6 +404,9 @@ type V2Payload = {
   evidence?: FortuneEvidence | null;
   presentation?: FortunePresentationMeta;
   cached?: boolean;
+  /** 접기/펼치기 유지 */
+  panelOpen?: boolean;
+  revealed?: boolean;
   insight?: {
     primaryKeyword?: string | null;
     tensionKeyword?: string | null;
@@ -435,6 +438,30 @@ function parseFortunePayload(raw: string | null): V2Payload | null {
   }
 }
 
+/** 프로필 로드 전에도 당일 운세를 동기 복원 (첫 페인트 지연 제거) */
+function peekFortuneForDate(date: string): V2Payload | null {
+  if (typeof window === "undefined") return null;
+  const workspace: "guest" | "account" = isGuestMode() ? "guest" : "account";
+  const prefix = `manseryeok:today-fortune-v2.5:${date}:`;
+  const preferred: string[] = [];
+  const fallback: string[] = [];
+  try {
+    for (let i = 0; i < window.localStorage.length; i++) {
+      const key = window.localStorage.key(i);
+      if (!key?.startsWith(prefix)) continue;
+      if (key.includes(`:${workspace}:`)) preferred.push(key);
+      else fallback.push(key);
+    }
+  } catch {
+    return null;
+  }
+  for (const key of [...preferred, ...fallback]) {
+    const hit = parseFortunePayload(window.localStorage.getItem(key));
+    if (hit) return hit;
+  }
+  return null;
+}
+
 function readLocalFortune(
   date: string,
   opts: {
@@ -460,7 +487,9 @@ function readLocalFortune(
       /* try next */
     }
   }
-  // 프로필 id 만 바뀐 옛 키 탐색 (…:uuid:fp)
+  // 프로필 id 만 바뀐 옛 키 · 워크스페이스 스캔
+  const scanned = peekFortuneForDate(date);
+  if (scanned) return scanned;
   try {
     const prefix = `manseryeok:today-fortune-v2.5:${date}:`;
     for (let i = 0; i < window.localStorage.length; i++) {
@@ -485,7 +514,8 @@ function writeLocalFortune(
     fingerprint: string;
     workspace: "guest" | "account";
   },
-  data: V2Payload
+  data: V2Payload,
+  panelOpen = true
 ) {
   if (typeof window === "undefined") return;
   const payload = JSON.stringify({
@@ -496,6 +526,7 @@ function writeLocalFortune(
     evidence: data.evidence ?? null,
     cached: true,
     revealed: true,
+    panelOpen,
   });
   const { profileCacheKey, fingerprint, workspace } = opts;
   const fp = fingerprint || "none";
@@ -708,19 +739,35 @@ export default function TodayFortunePanel({
   enabledCodes = EMPTY_CODES,
 }: Props) {
   const v2 = isDailyFortuneV2Enabled();
+  const cachedBoot =
+    typeof window !== "undefined" && v2
+      ? peekFortuneForDate(todayDate)
+      : null;
   const [open, setOpen] = useState(false);
-  const [panelOpen, setPanelOpen] = useState(false);
+  const [panelOpen, setPanelOpen] = useState(() =>
+    cachedBoot?.overall ? cachedBoot.panelOpen !== false : false
+  );
   const [sections, setSections] = useState<FortuneSection[]>([]);
-  const [overall, setOverall] = useState<FortuneDomainResult | null>(null);
-  const [domains, setDomains] = useState<FortuneDomainResult[]>([]);
+  const [overall, setOverall] = useState<FortuneDomainResult | null>(
+    () => cachedBoot?.overall ?? null
+  );
+  const [domains, setDomains] = useState<FortuneDomainResult[]>(
+    () => cachedBoot?.domains ?? []
+  );
   const [presentation, setPresentation] =
-    useState<FortunePresentationMeta | null>(null);
+    useState<FortunePresentationMeta | null>(
+      () => cachedBoot?.presentation ?? null
+    );
   const [openAi, setOpenAi] = useState<OpenAiCallStatus | null>(null);
-  const [evidence, setEvidence] = useState<FortuneEvidence | null>(null);
+  const [evidence, setEvidence] = useState<FortuneEvidence | null>(
+    () => cachedBoot?.evidence ?? null
+  );
   const [showEvidence, setShowEvidence] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [loaded, setLoaded] = useState(false);
-  const [hydrating, setHydrating] = useState(v2);
+  const [loaded, setLoaded] = useState(() => Boolean(cachedBoot?.overall));
+  const [hydrating, setHydrating] = useState(
+    () => v2 && !cachedBoot?.overall
+  );
   const [loadError, setLoadError] = useState<string | null>(null);
   const [blossomToken, setBlossomToken] = useState(0);
   const profile = (sajuProfile ?? null) as SajuProfile | null;
@@ -744,9 +791,18 @@ export default function TodayFortunePanel({
   const codesRef = useRef(enabledCodes);
   const profileRef = useRef(sajuProfile);
   const analyseGenRef = useRef(0);
+  const panelOpenRef = useRef(panelOpen);
   entriesRef.current = entries;
   codesRef.current = enabledCodes;
   profileRef.current = sajuProfile;
+  panelOpenRef.current = panelOpen;
+
+  const persistFortune = (
+    data: V2Payload,
+    nextPanelOpen: boolean = panelOpenRef.current
+  ) => {
+    writeLocalFortune(todayDate, cacheOpts, data, nextPanelOpen);
+  };
 
   const applyPayload = (
     data: V2Payload,
@@ -760,12 +816,14 @@ export default function TodayFortunePanel({
     setEvidence(data.evidence ?? null);
     setLoaded(true);
     setOpen(false);
-    // openPanel 미지정이면 펼침 상태 유지 (백그라운드 동기화 시 깜빡임 방지)
-    if (typeof opts?.openPanel === "boolean") {
-      setPanelOpen(opts.openPanel);
-    }
+    const nextOpen =
+      typeof opts?.openPanel === "boolean"
+        ? opts.openPanel
+        : data.panelOpen !== false;
+    setPanelOpen(nextOpen);
+    panelOpenRef.current = nextOpen;
     if (opts?.persistLocal) {
-      writeLocalFortune(todayDate, cacheOpts, data);
+      persistFortune(data, nextOpen);
     }
     if (opts?.impress) {
       void trackContentExposure({
@@ -780,7 +838,7 @@ export default function TodayFortunePanel({
 
   /**
    * 날짜·사주 프로필이 바뀌면 당일 캐시 복원.
-   * 한 번 본 운세는 그날 내내 펼친 채로 유지 (비로그인·구글).
+   * 펼침/접힘 상태까지 그대로 유지 (비로그인·구글).
    */
   useEffect(() => {
     if (!v2) return;
@@ -789,10 +847,12 @@ export default function TodayFortunePanel({
 
     const local = readLocalFortune(todayDate, cacheOpts);
     if (local?.overall) {
-      applyPayload(local, { openPanel: true, persistLocal: true });
+      applyPayload(local, {
+        openPanel: local.panelOpen !== false,
+        persistLocal: true,
+      });
       setLoading(false);
       setHydrating(false);
-      // 구글 등 서버 캐시가 있으면 조용히 동기화. 비로그인 cached:false 는 무시.
       void (async () => {
         try {
           const res = await fetch("/api/journal/today-fortune", {
@@ -810,12 +870,21 @@ export default function TodayFortunePanel({
           const data = (await res.json()) as V2Payload & { cached?: boolean };
           if (gen !== analyseGenRef.current) return;
           if (data.cached && data.overall) {
-            applyPayload(data, { persistLocal: true, openPanel: true });
+            applyPayload(
+              { ...data, panelOpen: panelOpenRef.current },
+              { persistLocal: true, openPanel: panelOpenRef.current }
+            );
           }
         } catch {
           /* keep local */
         }
       })();
+      return;
+    }
+
+    // 이미 첫 페인트에 캐시가 있으면 비우지 않음
+    if (overall) {
+      setHydrating(false);
       return;
     }
 
@@ -1011,7 +1080,23 @@ export default function TodayFortunePanel({
               className="text-xs font-bold underline shrink-0"
               style={{ color: "var(--px-text2)" }}
               onClick={() => {
-                setPanelOpen((v) => !v);
+                setPanelOpen((v) => {
+                  const next = !v;
+                  panelOpenRef.current = next;
+                  if (overall) {
+                    persistFortune(
+                      {
+                        version: "v2",
+                        overall,
+                        domains,
+                        presentation: presentation ?? undefined,
+                        evidence,
+                      },
+                      next
+                    );
+                  }
+                  return next;
+                });
               }}
               aria-expanded={panelOpen}
             >

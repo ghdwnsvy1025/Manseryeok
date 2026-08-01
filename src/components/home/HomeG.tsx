@@ -19,7 +19,9 @@ import { yesterdayOf } from "@/lib/journal/emptyDays";
 import { getPillarsForDate } from "@/lib/diary/dayPillar";
 import { getPillarTenGods } from "@/lib/diary/currentDaeun";
 import {
+  loadLocalSajuProfiles,
   loadPrimarySajuProfile,
+  SAJU_PROFILE_CHANGED_EVENT,
 } from "@/lib/diary/profileStorage";
 import type { SajuProfile } from "@/lib/diary/types";
 import {
@@ -144,8 +146,16 @@ export default function HomeG() {
   const today = todayDateString();
   const [entries, setEntries] = useState<JournalEntry[]>([]);
   const [enabledCodes, setEnabledCodes] = useState<CategoryCode[]>([]);
-  const [profile, setProfile] = useState<SajuProfile | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [profile, setProfile] = useState<SajuProfile | null>(() => {
+    if (typeof window === "undefined") return null;
+    try {
+      const list = loadLocalSajuProfiles();
+      return list.find((p) => p.isPrimary) ?? list[0] ?? null;
+    } catch {
+      return null;
+    }
+  });
+  /** 전체 화면을 막지 않음 — 운세 캐시가 첫 페인트에 바로 보이게 */
   const [showTenGods, setShowTenGods] = useState(false);
 
   useEffect(() => {
@@ -178,13 +188,6 @@ export default function HomeG() {
 
     const load = async (opts?: { soft?: boolean }) => {
       const soft = Boolean(opts?.soft);
-      if (!soft) {
-        setLoading(true);
-      }
-      const timeout = window.setTimeout(() => {
-        if (!cancelled && !soft) setLoading(false);
-      }, 2000);
-
       try {
         const storage = await getJournalStorage();
         const [list, prefs] = await Promise.all([
@@ -197,16 +200,13 @@ export default function HomeG() {
         if (!soft) {
           try {
             const remote = await loadPrimarySajuProfile();
-            if (!cancelled) setProfile(remote);
+            if (!cancelled && remote) setProfile(remote);
           } catch {
-            if (!cancelled) setProfile(null);
+            /* keep local profile */
           }
         }
       } catch {
         /* show shell even if storage fails */
-      } finally {
-        window.clearTimeout(timeout);
-        if (!cancelled && !soft) setLoading(false);
       }
     };
 
@@ -215,13 +215,24 @@ export default function HomeG() {
     const onProgress = () => {
       void load({ soft: true });
     };
+    const onProfile = () => {
+      try {
+        const list = loadLocalSajuProfiles();
+        setProfile(list.find((p) => p.isPrimary) ?? list[0] ?? null);
+      } catch {
+        /* ignore */
+      }
+      void load({ soft: true });
+    };
     window.addEventListener(JOURNAL_PROGRESS_CHANGED_EVENT, onProgress);
     window.addEventListener("focus", onProgress);
+    window.addEventListener(SAJU_PROFILE_CHANGED_EVENT, onProfile);
 
     return () => {
       cancelled = true;
       window.removeEventListener(JOURNAL_PROGRESS_CHANGED_EVENT, onProgress);
       window.removeEventListener("focus", onProgress);
+      window.removeEventListener(SAJU_PROFILE_CHANGED_EVENT, onProfile);
     };
   }, []);
 
@@ -278,10 +289,6 @@ export default function HomeG() {
     () => entries.map((e) => e.entryDate),
     [entries]
   );
-
-  if (loading) {
-    return <p className="ui-hint p-4">불러오는 중…</p>;
-  }
 
   return (
     <div className="home-readable space-y-4 pb-8">

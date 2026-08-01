@@ -173,7 +173,11 @@ export default function CheckInEditor({ initialDate }: Props) {
   const [domains, setDomains] = useState<DomainStateUi[]>([]);
   const [showAllDomains, setShowAllDomains] = useState(false);
   const [existingId, setExistingId] = useState<string | undefined>();
-  const [status, setStatus] = useState<"idle" | "loading" | "saving">("loading");
+  const [status, setStatus] = useState<"idle" | "loading" | "saving">(() => {
+    if (typeof window === "undefined") return "loading";
+    const d = initialDate ?? todayDateString();
+    return isSavedFormComplete(peekLastSavedForm(d)) ? "idle" : "loading";
+  });
   const [message, setMessage] = useState("");
   const [draftHint, setDraftHint] = useState("");
   const [reloadToken, setReloadToken] = useState(0);
