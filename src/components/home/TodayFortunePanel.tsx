@@ -453,14 +453,6 @@ function writeLocalFortune(
   }
 }
 
-function clearLocalFortune(date: string, profileCacheKey: string) {
-  try {
-    window.localStorage.removeItem(fortuneLocalKey(date, profileCacheKey));
-  } catch {
-    /* ignore */
-  }
-}
-
 /** 0~1 값을 가로 막대로 표시 */
 function MeterBar({
   value,
@@ -742,7 +734,9 @@ export default function TodayFortunePanel({
     const local = readLocalFortune(todayDate, profileCacheKey);
     if (local && applyPayload(local)) {
       setHydrating(false);
-      // 서버 캐시로 조용히 동기화 (실패해도 로컬 유지)
+      // 서버에 당일 캐시가 있으면 조용히 동기화.
+      // 비로그인은 서버 캐시가 없어 cached:false 가 오는데,
+      // 예전엔 이때 로컬을 지워 탭 복귀마다 운세를 다시 열게 됐음 → 로컬 유지.
       void (async () => {
         try {
           const res = await fetch("/api/journal/today-fortune", {
@@ -761,31 +755,6 @@ export default function TodayFortunePanel({
           if (gen !== analyseGenRef.current) return;
           if (data.cached && data.overall) {
             applyPayload(data, { persistLocal: true });
-            return;
-          }
-          // 서버 캐시 무효: 화면은 유지한 채 조용히 재생성 (내용이 사라졌다 나타나는 깜빡임 방지)
-          if (data.cached === false) {
-            clearLocalFortune(todayDate, profileCacheKey);
-            if (gen !== analyseGenRef.current) return;
-            try {
-              const regen = await fetch("/api/journal/today-fortune", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  todayDate,
-                  sajuProfile: profileRef.current,
-                  entries: entriesRef.current.slice(-60),
-                  enabledCodes: codesRef.current,
-                  skipLlm: false,
-                }),
-              });
-              if (gen !== analyseGenRef.current || !regen.ok) return;
-              const next = (await regen.json()) as V2Payload;
-              if (gen !== analyseGenRef.current) return;
-              applyPayload(next, { persistLocal: true });
-            } catch {
-              /* keep local UI */
-            }
           }
         } catch {
           /* keep local */

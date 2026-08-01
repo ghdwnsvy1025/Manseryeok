@@ -139,12 +139,21 @@ function readLocalFortuneSnapshot(
   sajuProfile: unknown | null
 ): FortuneQuestionContext | null {
   try {
-    const fp = sajuProfileFortuneFingerprint(
-      (sajuProfile as SajuProfile | null) ?? null
-    );
-    const raw = window.localStorage.getItem(
-      `manseryeok:today-fortune-v2.5:${date}:${fp}`
-    );
+    const profile = (sajuProfile as SajuProfile | null) ?? null;
+    const fp = sajuProfileFortuneFingerprint(profile);
+    const profileId =
+      profile && typeof profile === "object" && profile.id
+        ? String(profile.id)
+        : "none";
+    // TodayFortunePanel 과 동일한 키: date + profileId:fingerprint
+    const raw =
+      window.localStorage.getItem(
+        `manseryeok:today-fortune-v2.5:${date}:${profileId}:${fp}`
+      ) ??
+      // 예전 fingerprint-only 키 호환
+      window.localStorage.getItem(
+        `manseryeok:today-fortune-v2.5:${date}:${fp}`
+      );
     if (!raw) return null;
     const data = JSON.parse(raw) as {
       overall?: {
