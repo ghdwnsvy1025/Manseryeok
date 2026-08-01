@@ -281,10 +281,20 @@ export default function JournalEditor({ initialDate }: Props) {
         authorName?: string | null;
         workTitle?: string | null;
         delivery?: { deliveryId?: string | null };
+        error?: string;
       };
+      if (!res.ok) {
+        setQuote(null);
+        setQuoteOpenAi({
+          kind: "failed",
+          reason: "request_failed",
+          detail: data.error ?? `HTTP ${res.status}`,
+        });
+        return;
+      }
       const text = data.sentence ?? data.quote ?? null;
       setQuote(text);
-      setQuoteOpenAi(data.openAi ?? null);
+      setQuoteOpenAi(data.openAi ?? { kind: "used" });
       const meta = {
         contentType: data.contentType ?? null,
         sourceLabel: data.sourceLabel ?? null,
@@ -303,6 +313,8 @@ export default function JournalEditor({ initialDate }: Props) {
           },
           profileKey
         );
+      } else {
+        setQuoteOpenAi(data.openAi ?? { kind: "skipped", detail: "empty" });
       }
     } catch (err) {
       setQuoteOpenAi({

@@ -35,8 +35,8 @@ import {
   diagnoseModelRows,
   EVAL_METRICS_VERSION,
 } from "@/lib/personalization/evalMetrics";
-import { requireAuthUser } from "@/lib/api/requireAuth";
-import { checkLlmRateLimit } from "@/lib/api/rateLimit";
+import { getOptionalAuthUser } from "@/lib/api/requireAuth";
+import { checkLlmRateLimit, clientIpFromRequest } from "@/lib/api/rateLimit";
 import {
   sanitizeFortuneQuestionContext,
   type FortuneQuestionContext,
@@ -109,9 +109,12 @@ function mergeBiases(a: KeywordBiasMap, b: KeywordBiasMap): KeywordBiasMap {
 }
 
 export async function POST(req: NextRequest) {
-  const auth = await requireAuthUser();
-  if (!auth.ok) return auth.response;
-  const limited = checkLlmRateLimit(auth.user.id);
+  // 비로그인(게스트)도 허용 — 운세·명언과 동일하게 IP rate limit
+  const auth = await getOptionalAuthUser();
+  const rateLimitKey = auth.user
+    ? auth.user.id
+    : `guest:${clientIpFromRequest(req)}`;
+  const limited = checkLlmRateLimit(rateLimitKey);
   if (!limited.ok) return limited.response;
 
   let body: unknown;

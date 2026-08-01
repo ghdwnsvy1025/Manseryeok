@@ -16,7 +16,7 @@ type Surface = "home_nudge" | "save_complete";
 
 type Props = {
   surface: Surface;
-  /** 홈: 기록 일수 (2일 이상일 때 표시) */
+  /** 홈: 기록 일수 (1일 이상일 때 표시) */
   uniqueDays?: number;
   /** 저장 완료: 그날 첫 저장일 때만 */
   wasFirstSaveOfDay?: boolean;
@@ -38,7 +38,7 @@ export default function SoftInstallHint({
     if (isStandaloneDisplay()) markPwaInstalled();
     if (isPwaInstallKnown()) return;
     if (isInstallNudgeDismissed()) return;
-    if (surface === "home_nudge" && uniqueDays < 2) return;
+    if (surface === "home_nudge" && uniqueDays < 1) return;
     if (surface === "save_complete" && !wasFirstSaveOfDay) return;
 
     setKakao(isKakaoTalkInApp());

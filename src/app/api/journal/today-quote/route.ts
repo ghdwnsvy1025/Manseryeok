@@ -22,8 +22,8 @@ import {
   isQuoteRagEnabled,
   isVerifiedQuoteEnabled,
 } from "@/lib/app/featureFlags";
-import { requireAuthUser } from "@/lib/api/requireAuth";
-import { checkLlmRateLimit } from "@/lib/api/rateLimit";
+import { getOptionalAuthUser } from "@/lib/api/requireAuth";
+import { checkLlmRateLimit, clientIpFromRequest } from "@/lib/api/rateLimit";
 import { totalJournalXp } from "@/lib/product/personalizationLevel";
 import { buildSajuWordingHints } from "@/lib/journal/sajuWordingHints";
 import { buildPillarQuoteHints } from "@/lib/journal/quote/pillarQuoteHints";
@@ -42,9 +42,12 @@ const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export async function POST(req: NextRequest) {
-  const auth = await requireAuthUser();
-  if (!auth.ok) return auth.response;
-  const limited = checkLlmRateLimit(auth.user.id);
+  // 비로그인(게스트)도 허용 — 운세와 동일하게 IP rate limit
+  const auth = await getOptionalAuthUser();
+  const rateLimitKey = auth.user
+    ? auth.user.id
+    : `guest:${clientIpFromRequest(req)}`;
+  const limited = checkLlmRateLimit(rateLimitKey);
   if (!limited.ok) return limited.response;
 
   let body: unknown;
