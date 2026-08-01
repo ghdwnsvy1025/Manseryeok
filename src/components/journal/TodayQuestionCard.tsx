@@ -145,15 +145,23 @@ function readLocalFortuneSnapshot(
       profile && typeof profile === "object" && profile.id
         ? String(profile.id)
         : "none";
-    // TodayFortunePanel 과 동일한 키: date + profileId:fingerprint
-    const raw =
-      window.localStorage.getItem(
-        `manseryeok:today-fortune-v2.5:${date}:${profileId}:${fp}`
-      ) ??
-      // 예전 fingerprint-only 키 호환
-      window.localStorage.getItem(
-        `manseryeok:today-fortune-v2.5:${date}:${fp}`
-      );
+    const workspace =
+      typeof window !== "undefined" &&
+      window.localStorage.getItem("manseryeok_guest_mode") === "1"
+        ? "guest"
+        : "account";
+    // TodayFortunePanel 과 동일한 우선순위 키
+    const keys = [
+      `manseryeok:today-fortune-v2.5:${date}:${workspace}:${fp}`,
+      `manseryeok:today-fortune-v2.5:${date}:${profileId}:${fp}`,
+      `manseryeok:today-fortune-v2.5:${date}:none:${fp}`,
+      `manseryeok:today-fortune-v2.5:${date}:${fp}`,
+    ];
+    let raw: string | null = null;
+    for (const key of keys) {
+      raw = window.localStorage.getItem(key);
+      if (raw) break;
+    }
     if (!raw) return null;
     const data = JSON.parse(raw) as {
       overall?: {

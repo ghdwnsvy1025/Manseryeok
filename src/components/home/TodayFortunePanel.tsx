@@ -20,6 +20,7 @@ import OpenAiOriginHint from "@/components/journal/OpenAiOriginHint";
 import type { FortuneEvidence } from "@/lib/journal/fortune/evidence";
 import { sajuProfileFortuneFingerprint } from "@/lib/journal/fortune/profileFingerprint";
 import type { SajuProfile } from "@/lib/diary/types";
+import { isGuestMode } from "@/lib/auth/guestMode";
 import EmotionalLoadingHint from "@/components/ui/EmotionalLoadingHint";
 import CherryBlossomLayer from "@/components/motion/CherryBlossomLayer";
 
@@ -414,15 +415,18 @@ function fortuneLocalKey(date: string, profileCacheKey: string) {
   return `manseryeok:today-fortune-v2.5:${date}:${profileCacheKey}`;
 }
 
-function readLocalFortune(
+/** 비로그인/구글을 나누고, 프로필 id 로딩 레이스에 안 깨지는 안정 키 */
+function fortuneStableKey(
   date: string,
-  profileCacheKey: string
-): V2Payload | null {
+  workspace: "guest" | "account",
+  fingerprint: string
+) {
+  return fortuneLocalKey(date, `${workspace}:${fingerprint || "none"}`);
+}
+
+function parseFortunePayload(raw: string | null): V2Payload | null {
+  if (!raw) return null;
   try {
-    const raw = window.localStorage.getItem(
-      fortuneLocalKey(date, profileCacheKey)
-    );
-    if (!raw) return null;
     const data = JSON.parse(raw) as V2Payload;
     if (data.version !== "v2" || !data.overall) return null;
     return data;
@@ -431,25 +435,80 @@ function readLocalFortune(
   }
 }
 
+function readLocalFortune(
+  date: string,
+  opts: {
+    profileCacheKey: string;
+    fingerprint: string;
+    workspace: "guest" | "account";
+  }
+): V2Payload | null {
+  if (typeof window === "undefined") return null;
+  const { profileCacheKey, fingerprint, workspace } = opts;
+  const fp = fingerprint || "none";
+  const candidates = [
+    fortuneStableKey(date, workspace, fp),
+    fortuneLocalKey(date, profileCacheKey),
+    fortuneLocalKey(date, `none:${fp}`),
+    fortuneLocalKey(date, fp),
+  ];
+  for (const key of candidates) {
+    try {
+      const hit = parseFortunePayload(window.localStorage.getItem(key));
+      if (hit) return hit;
+    } catch {
+      /* try next */
+    }
+  }
+  // 프로필 id 만 바뀐 옛 키 탐색 (…:uuid:fp)
+  try {
+    const prefix = `manseryeok:today-fortune-v2.5:${date}:`;
+    for (let i = 0; i < window.localStorage.length; i++) {
+      const key = window.localStorage.key(i);
+      if (!key?.startsWith(prefix)) continue;
+      if (!key.endsWith(`:${fp}`) && !key.endsWith(`:${workspace}:${fp}`)) {
+        continue;
+      }
+      const hit = parseFortunePayload(window.localStorage.getItem(key));
+      if (hit) return hit;
+    }
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
+
 function writeLocalFortune(
   date: string,
-  profileCacheKey: string,
+  opts: {
+    profileCacheKey: string;
+    fingerprint: string;
+    workspace: "guest" | "account";
+  },
   data: V2Payload
 ) {
-  try {
-    window.localStorage.setItem(
-      fortuneLocalKey(date, profileCacheKey),
-      JSON.stringify({
-        version: "v2",
-        overall: data.overall,
-        domains: data.domains ?? [],
-        presentation: data.presentation ?? null,
-        evidence: data.evidence ?? null,
-        cached: true,
-      })
-    );
-  } catch {
-    /* ignore quota */
+  if (typeof window === "undefined") return;
+  const payload = JSON.stringify({
+    version: "v2",
+    overall: data.overall,
+    domains: data.domains ?? [],
+    presentation: data.presentation ?? null,
+    evidence: data.evidence ?? null,
+    cached: true,
+    revealed: true,
+  });
+  const { profileCacheKey, fingerprint, workspace } = opts;
+  const fp = fingerprint || "none";
+  const keys = [
+    fortuneStableKey(date, workspace, fp),
+    fortuneLocalKey(date, profileCacheKey),
+  ];
+  for (const key of keys) {
+    try {
+      window.localStorage.setItem(key, payload);
+    } catch {
+      /* ignore quota */
+    }
   }
 }
 
@@ -672,6 +731,14 @@ export default function TodayFortunePanel({
   const profileFp = sajuProfileFortuneFingerprint(profile);
   /** 생일·일주가 바뀌면 캐시 키도 바뀜 */
   const profileCacheKey = `${profileId}:${profileFp}`;
+  const fortuneWorkspace: "guest" | "account" = isGuestMode()
+    ? "guest"
+    : "account";
+  const cacheOpts = {
+    profileCacheKey,
+    fingerprint: profileFp,
+    workspace: fortuneWorkspace,
+  };
 
   const entriesRef = useRef(entries);
   const codesRef = useRef(enabledCodes);
@@ -698,7 +765,7 @@ export default function TodayFortunePanel({
       setPanelOpen(opts.openPanel);
     }
     if (opts?.persistLocal) {
-      writeLocalFortune(todayDate, profileCacheKey, data);
+      writeLocalFortune(todayDate, cacheOpts, data);
     }
     if (opts?.impress) {
       void trackContentExposure({
@@ -712,31 +779,20 @@ export default function TodayFortunePanel({
   };
 
   /**
-   * 날짜·사주 프로필이 바뀌면 초기화 후 당일 캐시 복원.
-   * 한 번 본 운세는 그날 내내 유지.
+   * 날짜·사주 프로필이 바뀌면 당일 캐시 복원.
+   * 한 번 본 운세는 그날 내내 펼친 채로 유지 (비로그인·구글).
    */
   useEffect(() => {
     if (!v2) return;
     const gen = ++analyseGenRef.current;
     setLoadError(null);
-    setOverall(null);
-    setDomains([]);
-    setPresentation(null);
-    setOpenAi(null);
-    setEvidence(null);
-    setShowEvidence(false);
-    setLoaded(false);
-    setLoading(false);
-    setOpen(false);
-    setPanelOpen(false);
-    setHydrating(true);
 
-    const local = readLocalFortune(todayDate, profileCacheKey);
-    if (local && applyPayload(local)) {
+    const local = readLocalFortune(todayDate, cacheOpts);
+    if (local?.overall) {
+      applyPayload(local, { openPanel: true, persistLocal: true });
+      setLoading(false);
       setHydrating(false);
-      // 서버에 당일 캐시가 있으면 조용히 동기화.
-      // 비로그인은 서버 캐시가 없어 cached:false 가 오는데,
-      // 예전엔 이때 로컬을 지워 탭 복귀마다 운세를 다시 열게 됐음 → 로컬 유지.
+      // 구글 등 서버 캐시가 있으면 조용히 동기화. 비로그인 cached:false 는 무시.
       void (async () => {
         try {
           const res = await fetch("/api/journal/today-fortune", {
@@ -754,7 +810,7 @@ export default function TodayFortunePanel({
           const data = (await res.json()) as V2Payload & { cached?: boolean };
           if (gen !== analyseGenRef.current) return;
           if (data.cached && data.overall) {
-            applyPayload(data, { persistLocal: true });
+            applyPayload(data, { persistLocal: true, openPanel: true });
           }
         } catch {
           /* keep local */
@@ -762,6 +818,18 @@ export default function TodayFortunePanel({
       })();
       return;
     }
+
+    setOverall(null);
+    setDomains([]);
+    setPresentation(null);
+    setOpenAi(null);
+    setEvidence(null);
+    setShowEvidence(false);
+    setLoaded(false);
+    setLoading(false);
+    setOpen(false);
+    setPanelOpen(false);
+    setHydrating(true);
 
     void (async () => {
       try {
@@ -783,7 +851,10 @@ export default function TodayFortunePanel({
         }
         const data = (await res.json()) as V2Payload & { error?: string };
         if (gen !== analyseGenRef.current) return;
-        if (data.cached && applyPayload(data, { persistLocal: true })) {
+        if (
+          data.cached &&
+          applyPayload(data, { persistLocal: true, openPanel: true })
+        ) {
           setHydrating(false);
           return;
         }
@@ -793,7 +864,9 @@ export default function TodayFortunePanel({
         if (gen === analyseGenRef.current) setHydrating(false);
       }
     })();
-  }, [v2, todayDate, profileCacheKey]);
+    // cacheOpts fields listed explicitly
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [v2, todayDate, profileCacheKey, profileFp, fortuneWorkspace]);
 
   const startAnalysis = () => {
     if (!v2 || loading || hydrating) return;
@@ -804,7 +877,7 @@ export default function TodayFortunePanel({
       setLoadError(null);
       return;
     }
-    const local = readLocalFortune(todayDate, profileCacheKey);
+    const local = readLocalFortune(todayDate, cacheOpts);
     if (local?.overall) {
       applyPayload(local, { openPanel: true, persistLocal: true });
       setLoadError(null);
