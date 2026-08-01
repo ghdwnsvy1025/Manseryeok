@@ -230,6 +230,22 @@ export default function CheckInEditor({ initialDate }: Props) {
     {}
   );
 
+  const markCheckInStarted = (startAction: "text_focus" | "checkin_select") => {
+    void import("@/lib/analytics/posthog").then(
+      ({ captureJournalStartedOnce }) => {
+        void import("@/lib/analytics/buckets").then(({ questionIdForDate }) => {
+          captureJournalStartedOnce({
+            entryDate: date,
+            entryType: "checkin",
+            source: "home",
+            questionId: questionIdForDate(date),
+            startAction,
+          });
+        });
+      }
+    );
+  };
+
   /** 필수 = 행복도 + 핵심 상태 4개 (점수 필수, 해당 없음 불가) */
   const requiredDone = useMemo(() => {
     let n = happiness != null ? 1 : 0;
@@ -733,11 +749,15 @@ export default function CheckInEditor({ initialDate }: Props) {
   };
 
   const setCoreRow = (code: CoreStateCode, next: CoreStateUi) => {
+    if (next.ordinal != null || next.isNotApplicable) {
+      markCheckInStarted("checkin_select");
+    }
     setCore((prev) => ({ ...prev, [code]: next }));
     setFieldError((e) => (e?.scope === "core" && e.code === code ? null : e));
   };
 
   const changeHappiness = (value: HappinessScore | null) => {
+    if (value != null) markCheckInStarted("checkin_select");
     setHappiness(value);
     setFieldError((e) => (e?.scope === "happiness" ? null : e));
   };
@@ -809,6 +829,13 @@ export default function CheckInEditor({ initialDate }: Props) {
           reason: "request_failed",
           detail: data.error ?? `HTTP ${res.status}`,
         });
+        void import("@/lib/analytics/posthog").then(({ captureFlowError }) => {
+          captureFlowError({
+            step: "quote_load",
+            errorCode: res.status === 429 ? "RATE_LIMITED" : "REQUEST_FAILED",
+            recoverable: true,
+          });
+        });
         return;
       }
       const text = data.sentence ?? data.quote ?? null;
@@ -841,6 +868,13 @@ export default function CheckInEditor({ initialDate }: Props) {
         kind: "failed",
         reason: "network",
         detail: err instanceof Error ? err.message : String(err),
+      });
+      void import("@/lib/analytics/posthog").then(({ captureFlowError }) => {
+        captureFlowError({
+          step: "quote_load",
+          errorCode: "NETWORK",
+          recoverable: true,
+        });
       });
     } finally {
       setQuoteLoading(false);
@@ -1131,13 +1165,34 @@ export default function CheckInEditor({ initialDate }: Props) {
       setShowComplete(true);
       notifyJournalProgressChanged();
       try {
-        const { ANALYTICS_EVENTS, captureEvent } = await import(
-          "@/lib/analytics/posthog"
-        );
+        const { ANALYTICS_EVENTS, captureEvent, markPersonActivated, peekJournalStartedAt } =
+          await import("@/lib/analytics/posthog");
+        const {
+          textLengthBucket,
+          saveDurationBucket,
+          saveNumberBucket,
+          questionIdForDate,
+        } = await import("@/lib/analytics/buckets");
+        const priorSuccessful = allEntriesRef.current.filter(
+          (e) => (e.xpAwarded ?? 0) > 0
+        ).length;
+        const priorBefore = priorSuccessful;
         captureEvent(ANALYTICS_EVENTS.journalSaved, {
+          entry_type: "checkin",
+          question_id: questionIdForDate(date),
+          has_text: content.trim().length > 0,
+          text_length_bucket: textLengthBucket(content),
+          has_checkin: true,
+          save_kind: editingExisting ? "update" : "create",
+          save_number_bucket: saveNumberBucket(priorBefore),
+          save_duration_bucket: saveDurationBucket(
+            peekJournalStartedAt(date, "checkin")
+          ),
           was_first_save_of_day: result.xp.wasFirstSaveOfDay,
-          checkin_v2: true,
         });
+        if (result.xp.wasFirstSaveOfDay && priorBefore === 0) {
+          markPersonActivated();
+        }
       } catch {
         /* analytics optional */
       }
@@ -1211,6 +1266,15 @@ export default function CheckInEditor({ initialDate }: Props) {
           : raw;
       setMessage(friendlier);
       setStatus("idle");
+      void import("@/lib/analytics/posthog").then(({ captureFlowError }) => {
+        captureFlowError({
+          step: "journal_save",
+          errorCode: /foreign key|event_tag/i.test(raw)
+            ? "VALIDATION"
+            : "UNKNOWN",
+          recoverable: true,
+        });
+      });
     }
   };
 
@@ -1386,6 +1450,7 @@ export default function CheckInEditor({ initialDate }: Props) {
         onDiaryStarted={() => {
           if (diaryStartedRef.current === date) return;
           diaryStartedRef.current = date;
+          markCheckInStarted("text_focus");
           void trackContentExposure({
             eventDate: date,
             contentType: "free_diary",

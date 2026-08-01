@@ -47,6 +47,9 @@ export type RegisterSajuOptions = {
    * 생략 시: 기존 프로필이 없으면 true, 있으면 false(추가만).
    */
   makePrimary?: boolean;
+  /** PostHog: onboarding | settings */
+  analyticsSource?: "onboarding" | "settings";
+  analyticsStartedAt?: number;
 };
 
 /** 이미 계산된 결과로 프로필 저장 + 온보딩 완료 */
@@ -102,12 +105,14 @@ export async function registerSajuProfileFromResult(
   }
   notifySajuProfileChanged();
   try {
-    const { ANALYTICS_EVENTS, captureEvent } = await import(
-      "@/lib/analytics/posthog"
-    );
+    const { ANALYTICS_EVENTS, captureEvent, markPersonProfileCreated } =
+      await import("@/lib/analytics/posthog");
+    const { completionTimeBucket } = await import("@/lib/analytics/buckets");
     captureEvent(ANALYTICS_EVENTS.profileCreated, {
-      is_primary: makePrimary,
+      source: opts?.analyticsSource ?? (makePrimary ? "onboarding" : "settings"),
+      completion_time_bucket: completionTimeBucket(opts?.analyticsStartedAt),
     });
+    markPersonProfileCreated();
   } catch {
     /* analytics optional */
   }

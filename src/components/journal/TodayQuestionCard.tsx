@@ -436,17 +436,14 @@ export default function TodayQuestionCard({
         ? "잠들기 전, 오늘 마음에 가장 남는 순간은 무엇이었나요?"
         : data.question ?? null;
       setQuestion(q);
-      if (q) {
-        try {
-          const { ANALYTICS_EVENTS, captureEvent } = await import(
-            "@/lib/analytics/posthog"
-          );
-          captureEvent(ANALYTICS_EVENTS.questionShown, {
-            ok: res.ok,
+      if (!res.ok) {
+        void import("@/lib/analytics/posthog").then(({ captureFlowError }) => {
+          captureFlowError({
+            step: "question_load",
+            errorCode: "REQUEST_FAILED",
+            recoverable: true,
           });
-        } catch {
-          /* analytics optional */
-        }
+        });
       }
       setOpenAi(
         !res.ok
@@ -466,6 +463,22 @@ export default function TodayQuestionCard({
         .filter((x): x is string => Boolean(x));
       setKeywords(kwLabels);
       setKeywordCodes(kwCodes);
+      if (q) {
+        try {
+          const { ANALYTICS_EVENTS, captureEvent } = await import(
+            "@/lib/analytics/posthog"
+          );
+          const { questionIdForDate } = await import("@/lib/analytics/buckets");
+          captureEvent(ANALYTICS_EVENTS.questionShown, {
+            question_id: questionIdForDate(todayDate),
+            question_category: kwCodes[0] ?? "unknown",
+            question_version: "v1",
+            surface: isSheet ? "sheet" : "journal_home",
+          });
+        } catch {
+          /* analytics optional */
+        }
+      }
       setDebug({
         isolation: data.isolation,
         decision: data.decision,

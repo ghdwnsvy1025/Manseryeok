@@ -1012,6 +1012,13 @@ export default function TodayFortunePanel({
             (data.error ||
               `오늘의 운세를 불러오지 못했어요 (${res.status}).`) + authHint
           );
+          void import("@/lib/analytics/posthog").then(({ captureFlowError }) => {
+            captureFlowError({
+              step: "fortune_load",
+              errorCode: res.status === 401 ? "AUTH_REQUIRED" : "REQUEST_FAILED",
+              recoverable: true,
+            });
+          });
         } else if (gen === analyseGenRef.current) {
           setBlossomToken((n) => n + 1);
         }
@@ -1024,6 +1031,13 @@ export default function TodayFortunePanel({
               ? "서버 연결이 끊겼어요. 개발 서버가 켜져 있는지 확인해주세요."
               : `운세를 불러오지 못했어요: ${detail}`
           );
+          void import("@/lib/analytics/posthog").then(({ captureFlowError }) => {
+            captureFlowError({
+              step: "fortune_load",
+              errorCode: "NETWORK",
+              recoverable: true,
+            });
+          });
         }
       } finally {
         if (gen === analyseGenRef.current) setLoading(false);

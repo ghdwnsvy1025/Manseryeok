@@ -8,7 +8,7 @@ import {
   stashAuthNextPath,
 } from "@/lib/auth/redirectOrigin";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
-import { ANALYTICS_EVENTS, captureEvent } from "@/lib/analytics/posthog";
+import { ANALYTICS_EVENTS, captureEvent, captureFlowError, identifyGuestUser } from "@/lib/analytics/posthog";
 import { enableGuestMode } from "@/lib/auth/guestMode";
 import { activateGuestWorkspace } from "@/lib/diary/profileStorage";
 
@@ -39,7 +39,11 @@ export default function WelcomeAuthGate({
 
     setLoading("google");
     setMessage("");
-    captureEvent(ANALYTICS_EVENTS.authGoogleClicked);
+    captureEvent(ANALYTICS_EVENTS.authGoogleClicked, {
+      surface: "landing",
+      auth_state_before: "none",
+      intent: "sign_in",
+    });
 
     // 로그인 화면은 일반 OAuth (linkIdentity는 인증코드 누락·기존 계정 충돌이 잦음)
     stashAuthNextPath(authNextPath);
@@ -51,16 +55,30 @@ export default function WelcomeAuthGate({
     if (!result.ok) {
       setLoading(null);
       setMessage(result.error ?? "Google 연결에 실패했어요.");
+      captureFlowError({
+        step: "auth_google",
+        errorCode: "OAUTH_FAILED",
+        recoverable: true,
+      });
     }
   };
 
   const startAsGuest = async () => {
     setLoading("guest");
     setMessage("");
+    captureEvent(ANALYTICS_EVENTS.authGuestClicked, {
+      surface: "landing",
+      has_auth_session: false,
+    });
     // 기기 로컬만 사용. 익명 세션을 새로 만들면 빈 원격 프로필이 로컬을 덮어
     // 비로그인 재진입마다 사주/일기가 초기화되는 문제가 난다.
     enableGuestMode();
     activateGuestWorkspace();
+    identifyGuestUser();
+    captureEvent(ANALYTICS_EVENTS.signedIn, {
+      auth_provider: "guest",
+      auth_transition: "guest_created",
+    });
     unlockEntry();
     setLoading(null);
     onGuest();

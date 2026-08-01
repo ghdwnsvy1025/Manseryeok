@@ -1,10 +1,15 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { CalendarType, SajuInput } from "@/lib/saju/types";
 import type { Gender } from "@/lib/saju/daeun";
 import { completeOnboarding } from "@/lib/app/experienceMode";
 import { registerSajuProfile } from "@/lib/diary/registerSajuProfile";
+import {
+  ANALYTICS_EVENTS,
+  captureEvent,
+  captureFlowError,
+} from "@/lib/analytics/posthog";
 
 type Props = {
   onCompleted: () => void;
@@ -71,6 +76,17 @@ export default function SajuProfileSetup({ onCompleted }: Props) {
   const dayRef = useRef<HTMLInputElement>(null);
   const hourRef = useRef<HTMLInputElement>(null);
   const minuteRef = useRef<HTMLInputElement>(null);
+  const profileStartedAtRef = useRef(Date.now());
+  const profileStartedSentRef = useRef(false);
+
+  useEffect(() => {
+    if (profileStartedSentRef.current) return;
+    profileStartedSentRef.current = true;
+    profileStartedAtRef.current = Date.now();
+    captureEvent(ANALYTICS_EVENTS.profileStarted, {
+      source: "onboarding",
+    });
+  }, []);
 
   const location =
     LOCATION_PRESETS.find((p) => p.id === locationId) ?? LOCATION_PRESETS[0];
@@ -122,10 +138,17 @@ export default function SajuProfileSetup({ onCompleted }: Props) {
       await registerSajuProfile(input, {
         label: displayName.trim(),
         makePrimary: true,
+        analyticsSource: "onboarding",
+        analyticsStartedAt: profileStartedAtRef.current,
       });
       onCompleted();
     } catch (err) {
       setError(err instanceof Error ? err.message : "프로필을 만들지 못했어요.");
+      captureFlowError({
+        step: "profile_create",
+        errorCode: "UNKNOWN",
+        recoverable: true,
+      });
     } finally {
       setSaving(false);
     }
