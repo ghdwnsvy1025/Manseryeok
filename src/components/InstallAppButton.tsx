@@ -10,11 +10,12 @@ import {
   isStandaloneDisplay,
   markPwaInstalled,
 } from "@/lib/pwa/installState";
-
-type InstallPromptEvent = Event & {
-  prompt: () => Promise<void>;
-  userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
-};
+import {
+  ensureInstallPromptCapture,
+  getDeferredInstallPrompt,
+  promptNativeInstall,
+  subscribeInstallPrompt,
+} from "@/lib/pwa/installPromptStore";
 
 type Props = {
   /** 홈 배너 등 짧은 CTA */
@@ -83,9 +84,7 @@ export default function InstallAppButton({
   surface = "settings",
   className,
 }: Props) {
-  const [promptEvent, setPromptEvent] = useState<InstallPromptEvent | null>(
-    null
-  );
+  const [canPrompt, setCanPrompt] = useState(false);
   const [showGuide, setShowGuide] = useState(false);
   const [installed, setInstalled] = useState(false);
   const [ios, setIos] = useState(false);
@@ -93,32 +92,22 @@ export default function InstallAppButton({
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
+    ensureInstallPromptCapture();
     if (isStandaloneDisplay()) markPwaInstalled();
     setInstalled(isStandaloneDisplay() || isPwaInstallKnown());
     setIos(isIosDevice());
     const inKakao = isKakaoTalkInApp();
     setKakao(inKakao);
-    // 카톡에서는 바로 설치가 안 되므로 안내를 기본으로 펼침 (quiet 제외)
+    setCanPrompt(Boolean(getDeferredInstallPrompt()) && !inKakao);
     if (inKakao && !quiet) setShowGuide(true);
 
-    const onPrompt = (event: Event) => {
-      event.preventDefault();
-      setPromptEvent(event as InstallPromptEvent);
-    };
-    const onInstalled = () => {
-      setInstalled(true);
-      setPromptEvent(null);
-      markPwaInstalled();
-      captureEvent(ANALYTICS_EVENTS.installCompleted, { surface });
-    };
-
-    window.addEventListener("beforeinstallprompt", onPrompt);
-    window.addEventListener("appinstalled", onInstalled);
-    return () => {
-      window.removeEventListener("beforeinstallprompt", onPrompt);
-      window.removeEventListener("appinstalled", onInstalled);
-    };
-  }, [surface, quiet]);
+    return subscribeInstallPrompt(() => {
+      setInstalled(isStandaloneDisplay() || isPwaInstallKnown());
+      setCanPrompt(
+        Boolean(getDeferredInstallPrompt()) && !isKakaoTalkInApp()
+      );
+    });
+  }, [quiet]);
 
   if (installed) {
     if (compact || quiet) return null;
@@ -133,8 +122,6 @@ export default function InstallAppButton({
     );
   }
 
-  const canPrompt = Boolean(promptEvent) && !kakao;
-
   const runInstall = async () => {
     captureEvent(ANALYTICS_EVENTS.installClicked, {
       surface,
@@ -143,16 +130,15 @@ export default function InstallAppButton({
       kakao,
       quiet,
     });
-    if (promptEvent && !kakao) {
-      await promptEvent.prompt();
-      const choice = await promptEvent.userChoice;
+    if (canPrompt && !kakao) {
+      const outcome = await promptNativeInstall();
       captureEvent(
-        choice.outcome === "accepted"
+        outcome === "accepted"
           ? ANALYTICS_EVENTS.installAccepted
           : ANALYTICS_EVENTS.installDismissed,
-        { surface }
+        { surface, outcome }
       );
-      setPromptEvent(null);
+      if (outcome === "accepted") setInstalled(true);
       return;
     }
     setShowGuide((prev) => !prev);

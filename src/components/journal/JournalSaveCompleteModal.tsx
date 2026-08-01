@@ -18,7 +18,6 @@ import { burstFromElement } from "@/lib/ui/clickBurst";
 import { XP_GAUGE_FILL, XP_GAIN_COLOR } from "@/lib/ui/xpGauge";
 import EmotionalLoadingHint from "@/components/ui/EmotionalLoadingHint";
 import CherryBlossomLayer from "@/components/motion/CherryBlossomLayer";
-import SoftInstallHint from "@/components/home/SoftInstallHint";
 
 type Props = {
   entry: JournalEntry;
@@ -585,11 +584,6 @@ export default function JournalSaveCompleteModal({
             background: "var(--px-bg2)",
           }}
         >
-          <SoftInstallHint
-            surface="save_complete"
-            uniqueDays={uniqueDays}
-            wasFirstSaveOfDay={xp.wasFirstSaveOfDay}
-          />
           <button
             ref={closeRef}
             type="button"

@@ -35,6 +35,7 @@ import ScoreSlider from "@/components/journal/ScoreSlider";
 import { reportQuestionFeedback } from "@/lib/journal/reportQuestionFeedback";
 import { peekDayQuote, setDayQuote } from "@/lib/journal/dayQuoteCache";
 import { sajuProfileFortuneFingerprint } from "@/lib/journal/fortune/profileFingerprint";
+import { requestHomeInstallSheet } from "@/lib/pwa/installState";
 
 const WEEKDAY_KO = ["일", "월", "화", "수", "목", "금", "토"] as const;
 const HAPPINESS_PINK = "#f472b6";
@@ -834,6 +835,7 @@ export default function JournalEditor({ initialDate }: Props) {
           deliveryId={quoteMeta.deliveryId}
           onClose={() => {
             setShowComplete(false);
+            requestHomeInstallSheet();
             router.push("/");
           }}
         />

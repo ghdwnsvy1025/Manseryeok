@@ -1,5 +1,6 @@
 const DISMISS_UNTIL_KEY = "manseryeok:install_nudge_until_v1";
 const INSTALLED_FLAG_KEY = "manseryeok:pwa_installed_v1";
+const POST_SAVE_INSTALL_SHEET_KEY = "manseryeok:show_install_sheet_v1";
 
 /** 홈 설치 유도 숨김 기간 */
 export const INSTALL_NUDGE_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000;
@@ -68,6 +69,30 @@ export function dismissInstallNudge(
     );
   } catch {
     /* ignore */
+  }
+}
+
+/** 일기 저장 완료 → 홈으로 갈 때 하단 설치 시트 요청 */
+export function requestHomeInstallSheet(): void {
+  if (typeof window === "undefined") return;
+  if (isPwaInstallKnown()) return;
+  try {
+    window.sessionStorage.setItem(POST_SAVE_INSTALL_SHEET_KEY, "1");
+  } catch {
+    /* ignore */
+  }
+}
+
+/** 홈에서 한 번 읽고 소비. true면 하단 설치 시트를 연다. */
+export function consumeHomeInstallSheetRequest(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    const raw = window.sessionStorage.getItem(POST_SAVE_INSTALL_SHEET_KEY);
+    if (raw !== "1") return false;
+    window.sessionStorage.removeItem(POST_SAVE_INSTALL_SHEET_KEY);
+    return true;
+  } catch {
+    return false;
   }
 }
 

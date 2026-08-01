@@ -7,6 +7,7 @@ import TodayStatusCard from "@/components/home/TodayStatusCard";
 import TodayRecordPrompt from "@/components/home/TodayRecordPrompt";
 import YesterdayGapPrompt from "@/components/home/YesterdayGapPrompt";
 import InstallAppNudge from "@/components/home/InstallAppNudge";
+import HomeInstallSheet from "@/components/home/HomeInstallSheet";
 import HomeEBlock from "@/components/home/HomeEBlock";
 import { getJournalStorage } from "@/lib/journal/getStorage";
 import { getEnabledCodesOrdered } from "@/lib/journal/preferences";
@@ -526,6 +527,8 @@ export default function HomeG() {
           uniqueDays={new Set(entries.map((e) => e.entryDate)).size}
         />
       )}
+
+      <HomeInstallSheet />
 
       <TodayStatusCard
         stats={eStats}
