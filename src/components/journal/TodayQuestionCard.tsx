@@ -352,6 +352,35 @@ export default function TodayQuestionCard({
 
   const loadQuestion = useCallback(async () => {
     if (phase === "loading") return;
+
+    // 당일 캐시가 있으면 네트워크·로딩 없이 즉시 펼침
+    const cachedHit = readCachedQuestion(todayDate, sajuProfile);
+    if (cachedHit || (phase === "ready" && question)) {
+      const data = cachedHit;
+      if (data) {
+        setQuestion(data.question);
+        setKeywords(data.keywords ?? []);
+        setKeywordCodes(data.keywordCodes ?? []);
+        setOpenAi(data.openAi ?? null);
+        setDebug(data.debug ?? null);
+        contextRef.current = {
+          questionText: data.question,
+          keywords:
+            (data.keywordCodes?.length ?? 0) > 0
+              ? data.keywordCodes
+              : data.keywords ?? [],
+        };
+        if (hasLocalFitFeedback(todayDate)) {
+          setFit("good");
+          answeredRef.current = true;
+          setFeedbackMsg("오늘 피드백을 남겨주셨어요.");
+        }
+      }
+      setPhase("ready");
+      setPanelOpen(true);
+      return;
+    }
+
     const requestId = ++requestIdRef.current;
     setPhase("loading");
     setPanelOpen(true);
@@ -507,7 +536,7 @@ export default function TodayQuestionCard({
       setPanelOpen(true);
       setBlossomToken((n) => n + 1);
     }
-  }, [phase, todayDate, enabledCodes, entries, sajuProfile]);
+  }, [phase, question, todayDate, enabledCodes, entries, sajuProfile]);
 
   const answered = fit != null || skipped;
 
@@ -582,7 +611,7 @@ export default function TodayQuestionCard({
       <QuestionTeaseButton
         ready
         onClick={() => {
-          setPanelOpen(true);
+          void loadQuestion();
           void trackContentExposure({
             eventDate: todayDate,
             contentType: "daily_question",

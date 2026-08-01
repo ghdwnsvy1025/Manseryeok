@@ -827,7 +827,23 @@ export default function TodayFortunePanel({
   }, [v2, todayDate, profileCacheKey]);
 
   const startAnalysis = () => {
-    if (!v2 || loading || loaded || hydrating) return;
+    if (!v2 || loading || hydrating) return;
+
+    // 당일 이미 본 운세 → 로딩 없이 즉시 펼침 (비로그인·구글 로컬 캐시)
+    if (overall) {
+      setPanelOpen(true);
+      setLoadError(null);
+      return;
+    }
+    const local = readLocalFortune(todayDate, profileCacheKey);
+    if (local?.overall) {
+      applyPayload(local, { openPanel: true, persistLocal: true });
+      setLoadError(null);
+      return;
+    }
+
+    if (loaded) return;
+
     const gen = ++analyseGenRef.current;
     setLoadError(null);
     // overall을 미리 비우지 않음 — 로딩 중 깜빡임 방지 (없을 때만 로딩 UI)
@@ -1016,7 +1032,7 @@ export default function TodayFortunePanel({
             <FortuneTeaseButton
               ready
               onClick={() => {
-                setPanelOpen(true);
+                startAnalysis();
                 void trackContentExposure({
                   eventDate: todayDate,
                   contentType: "daily_fortune",

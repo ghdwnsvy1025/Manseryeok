@@ -75,6 +75,7 @@ import {
   type SavedCheckInForm,
 } from "@/lib/journal/lastSavedCheckIn";
 import { peekDayQuote, setDayQuote } from "@/lib/journal/dayQuoteCache";
+import { sajuProfileFortuneFingerprint } from "@/lib/journal/fortune/profileFingerprint";
 
 const WEEKDAY_KO = ["일", "월", "화", "수", "목", "금", "토"] as const;
 const HAPPINESS_PINK = "#f472b6";
@@ -747,7 +748,8 @@ export default function CheckInEditor({ initialDate }: Props) {
     summary: string | null,
     entries: JournalEntry[]
   ) => {
-    const cached = peekDayQuote(entry.entryDate);
+    const profileKey = sajuProfileFortuneFingerprint(sajuProfile);
+    const cached = peekDayQuote(entry.entryDate, profileKey);
     if (cached) {
       setQuote(cached.quote);
       setQuoteOpenAi({ kind: "skipped", detail: "cached_same_day" });
@@ -806,12 +808,15 @@ export default function CheckInEditor({ initialDate }: Props) {
       };
       setQuoteMeta(meta);
       if (text?.trim()) {
-        setDayQuote({
-          entryDate: entry.entryDate,
-          quote: text,
-          ...meta,
-          at: Date.now(),
-        });
+        setDayQuote(
+          {
+            entryDate: entry.entryDate,
+            quote: text,
+            ...meta,
+            at: Date.now(),
+          },
+          profileKey
+        );
       }
     } catch (err) {
       setQuoteOpenAi({
@@ -1080,16 +1085,34 @@ export default function CheckInEditor({ initialDate }: Props) {
         })
       );
       // 저장 완료 팝업 + 축하 이펙트 (닫으면 홈)
-      setQuote(null);
-      setQuoteLoading(true);
-      setQuoteOpenAi(null);
-      setQuoteMeta({
-        contentType: null,
-        sourceLabel: null,
-        authorName: null,
-        workTitle: null,
-        deliveryId: null,
-      });
+      // 당일 명언 캐시가 있으면 로딩 없이 바로 표시
+      {
+        const profileKey = sajuProfileFortuneFingerprint(sajuProfile);
+        const cachedQuote = peekDayQuote(date, profileKey);
+        if (cachedQuote) {
+          setQuote(cachedQuote.quote);
+          setQuoteLoading(false);
+          setQuoteOpenAi({ kind: "skipped", detail: "cached_same_day" });
+          setQuoteMeta({
+            contentType: cachedQuote.contentType,
+            sourceLabel: cachedQuote.sourceLabel,
+            authorName: cachedQuote.authorName,
+            workTitle: cachedQuote.workTitle,
+            deliveryId: cachedQuote.deliveryId,
+          });
+        } else {
+          setQuote(null);
+          setQuoteLoading(true);
+          setQuoteOpenAi(null);
+          setQuoteMeta({
+            contentType: null,
+            sourceLabel: null,
+            authorName: null,
+            workTitle: null,
+            deliveryId: null,
+          });
+        }
+      }
       setShowComplete(true);
       notifyJournalProgressChanged();
       try {
