@@ -9,6 +9,7 @@ import {
   isPwaInstallKnown,
   isStandaloneDisplay,
   markPwaInstalled,
+  openInExternalBrowser,
 } from "@/lib/pwa/installState";
 import {
   ensureInstallPromptCapture,
@@ -70,6 +71,12 @@ export default function HomeInstallCTA() {
       kakao,
     });
 
+    if (kakao) {
+      openInExternalBrowser();
+      setShowGuide(true);
+      return;
+    }
+
     if (canPrompt) {
       setBusy(true);
       try {
@@ -101,14 +108,12 @@ export default function HomeInstallCTA() {
   };
 
   const primaryLabel = kakao
-    ? "설치 방법 보기"
+    ? "브라우저에서 앱 설치하기"
     : canPrompt
       ? busy
         ? "설치 창 여는 중…"
         : "앱 설치하기"
-      : ios
-        ? "앱 설치하기"
-        : "앱 설치하기";
+      : "앱 설치하기";
 
   return (
     <section
@@ -138,7 +143,7 @@ export default function HomeInstallCTA() {
           style={{ color: "var(--px-text2)" }}
         >
           {kakao
-            ? "카톡 안에서는 설치가 안 돼요. Safari·Chrome으로 연 뒤 추가해 주세요."
+            ? "버튼을 누르면 Chrome·Safari로 열려요. 열린 화면에서 「앱 설치하기」를 다시 눌러 주세요."
             : canPrompt
               ? "아래 버튼을 누르면 바로 설치할 수 있어요. 아이콘 한 번으로 운세·일기가 열려요."
               : ios

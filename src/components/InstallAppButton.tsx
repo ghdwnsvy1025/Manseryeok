@@ -9,6 +9,7 @@ import {
   isPwaInstallKnown,
   isStandaloneDisplay,
   markPwaInstalled,
+  openInExternalBrowser,
 } from "@/lib/pwa/installState";
 import {
   ensureInstallPromptCapture,
@@ -130,7 +131,12 @@ export default function InstallAppButton({
       kakao,
       quiet,
     });
-    if (canPrompt && !kakao) {
+    if (kakao) {
+      openInExternalBrowser();
+      setShowGuide(true);
+      return;
+    }
+    if (canPrompt) {
       const outcome = await promptNativeInstall();
       captureEvent(
         outcome === "accepted"
@@ -158,9 +164,7 @@ export default function InstallAppButton({
   };
 
   const primaryLabel = kakao
-    ? showGuide
-      ? "안내 접기"
-      : "설치 방법 보기"
+    ? "브라우저에서 앱 설치하기"
     : canPrompt
       ? quiet
         ? "홈 화면에 두기"
@@ -254,7 +258,7 @@ export default function InstallAppButton({
           style={{ color: "var(--px-text2)" }}
         >
           {kakao
-            ? "카카오톡 안에서는 설치가 안 돼요. Safari·Chrome으로 연 뒤 홈 화면에 추가하세요."
+            ? "버튼을 누르면 Chrome·Safari로 열려요. 카톡 안에서는 앱 설치가 막혀 있어요."
             : "매일 운세·기록이 한 탭으로 열려요. 알림처럼 바로 찾을 수 있어요."}
         </p>
       </div>

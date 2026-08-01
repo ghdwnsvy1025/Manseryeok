@@ -16,6 +16,24 @@ export function isKakaoTalkInApp(): boolean {
   return /KAKAOTALK/i.test(navigator.userAgent);
 }
 
+/**
+ * 카톡 인앱에서 외부 브라우저(Chrome/Safari)로 현재 페이지 열기.
+ * 카톡 WebView 안에서는 beforeinstallprompt가 없어 PWA 설치가 불가하고,
+ * 비교군도 대개 이 스킴으로 “앱 설치” 버튼을 구현한다.
+ */
+export function openInExternalBrowser(url?: string): boolean {
+  if (typeof window === "undefined") return false;
+  const target = url ?? window.location.href;
+  try {
+    // 카카오 공식: 외부 브라우저로 URL 열기
+    window.location.href =
+      "kakaotalk://web/openExternal?url=" + encodeURIComponent(target);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function isStandaloneDisplay(): boolean {
   if (typeof window === "undefined") return false;
   return (

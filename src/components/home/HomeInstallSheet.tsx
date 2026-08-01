@@ -11,6 +11,7 @@ import {
   isPwaInstallKnown,
   isStandaloneDisplay,
   markPwaInstalled,
+  openInExternalBrowser,
 } from "@/lib/pwa/installState";
 import {
   ensureInstallPromptCapture,
@@ -78,6 +79,13 @@ export default function HomeInstallSheet() {
       kakao,
     });
 
+    // 카톡 안에서는 PWA 설치 API가 없음 → 외부 브라우저로 연 뒤 거기서 설치
+    if (kakao) {
+      openInExternalBrowser();
+      setShowGuide(true);
+      return;
+    }
+
     if (canPrompt) {
       setBusy(true);
       try {
@@ -116,7 +124,7 @@ export default function HomeInstallSheet() {
   };
 
   const primaryLabel = kakao
-    ? "설치 방법 보기"
+    ? "브라우저에서 앱 설치하기"
     : canPrompt
       ? busy
         ? "설치 창 여는 중…"
@@ -155,7 +163,7 @@ export default function HomeInstallSheet() {
               style={{ color: "var(--px-text2)" }}
             >
               {kakao
-                ? "카톡 안에서는 설치가 안 돼요. Safari·Chrome으로 연 뒤 추가해 주세요."
+                ? "버튼을 누르면 Chrome·Safari로 열려요. 거기서 홈 화면에 앱을 추가할 수 있어요."
                 : canPrompt
                   ? "버튼을 누르면 바로 설치 창이 열려요."
                   : ios
