@@ -520,7 +520,12 @@ export default function HomeG() {
         <YesterdayGapPrompt todayDate={today} entryDates={entryDates} />
       )}
 
-      {entries.length > 0 && <InstallAppNudge hasEntries />}
+      {entries.length > 0 && (
+        <InstallAppNudge
+          hasEntries
+          uniqueDays={new Set(entries.map((e) => e.entryDate)).size}
+        />
+      )}
 
       <TodayStatusCard
         stats={eStats}

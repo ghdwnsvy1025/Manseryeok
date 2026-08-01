@@ -17,8 +17,10 @@ type InstallPromptEvent = Event & {
 type Props = {
   /** 홈 배너 등 짧은 CTA */
   compact?: boolean;
+  /** 텍스트 링크형 — 저장 완료 등 거부감 적은 유도 */
+  quiet?: boolean;
   /** 노출 위치 (분석) */
-  surface?: "settings" | "home_nudge";
+  surface?: "settings" | "home_nudge" | "save_complete";
   className?: string;
 };
 
@@ -75,6 +77,7 @@ function InstallGuide({
  */
 export default function InstallAppButton({
   compact = false,
+  quiet = false,
   surface = "settings",
   className,
 }: Props) {
@@ -92,8 +95,8 @@ export default function InstallAppButton({
     setIos(isIosDevice());
     const inKakao = isKakaoTalkInApp();
     setKakao(inKakao);
-    // 카톡에서는 바로 설치가 안 되므로 안내를 기본으로 펼침
-    if (inKakao) setShowGuide(true);
+    // 카톡에서는 바로 설치가 안 되므로 안내를 기본으로 펼침 (quiet 제외)
+    if (inKakao && !quiet) setShowGuide(true);
 
     const onPrompt = (event: Event) => {
       event.preventDefault();
@@ -111,10 +114,10 @@ export default function InstallAppButton({
       window.removeEventListener("beforeinstallprompt", onPrompt);
       window.removeEventListener("appinstalled", onInstalled);
     };
-  }, [surface]);
+  }, [surface, quiet]);
 
   if (installed) {
-    if (compact) return null;
+    if (compact || quiet) return null;
     return (
       <p
         className="text-sm font-bold py-1"
@@ -134,6 +137,7 @@ export default function InstallAppButton({
       can_prompt: canPrompt,
       ios,
       kakao,
+      quiet,
     });
     if (promptEvent && !kakao) {
       await promptEvent.prompt();
@@ -166,14 +170,48 @@ export default function InstallAppButton({
   const primaryLabel = kakao
     ? showGuide
       ? "안내 접기"
-      : "카톡에서 설치 방법"
+      : "설치 방법 보기"
     : canPrompt
-      ? compact
-        ? "홈 화면에 앱 추가"
-        : "지금 설치하기"
+      ? quiet
+        ? "홈 화면에 두기"
+        : compact
+          ? "홈 화면에 앱 추가"
+          : "지금 설치하기"
       : showGuide
         ? "안내 접기"
-        : "홈 화면에 앱 추가";
+        : quiet
+          ? "추가 방법 보기"
+          : "홈 화면에 앱 추가";
+
+  if (quiet) {
+    return (
+      <div className={className ?? "space-y-1"}>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <button
+            type="button"
+            className="text-[12px] font-bold underline"
+            style={{ color: "var(--px-accent)", background: "transparent" }}
+            onClick={() => void runInstall()}
+          >
+            {primaryLabel}
+          </button>
+          {kakao && (
+            <button
+              type="button"
+              className="text-[12px] font-bold underline"
+              style={{ color: "var(--px-text2)", background: "transparent" }}
+              onClick={() => void onCopyLink()}
+            >
+              {copied ? "링크 복사됨" : "링크 복사"}
+            </button>
+          )}
+        </div>
+        {showGuide && !canPrompt && (
+          <InstallGuide kakao={kakao} ios={ios} compact />
+        )}
+      </div>
+    );
+  }
 
   if (compact) {
     return (
