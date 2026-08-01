@@ -6,8 +6,8 @@ import TodayFortunePanel from "@/components/home/TodayFortunePanel";
 import TodayStatusCard from "@/components/home/TodayStatusCard";
 import TodayRecordPrompt from "@/components/home/TodayRecordPrompt";
 import YesterdayGapPrompt from "@/components/home/YesterdayGapPrompt";
-import InstallAppNudge from "@/components/home/InstallAppNudge";
 import HomeInstallSheet from "@/components/home/HomeInstallSheet";
+import HomeInstallCTA from "@/components/home/HomeInstallCTA";
 import HomeEBlock from "@/components/home/HomeEBlock";
 import { getJournalStorage } from "@/lib/journal/getStorage";
 import { getEnabledCodesOrdered } from "@/lib/journal/preferences";
@@ -521,13 +521,6 @@ export default function HomeG() {
         <YesterdayGapPrompt todayDate={today} entryDates={entryDates} />
       )}
 
-      {entries.length > 0 && (
-        <InstallAppNudge
-          hasEntries
-          uniqueDays={new Set(entries.map((e) => e.entryDate)).size}
-        />
-      )}
-
       <HomeInstallSheet />
 
       <TodayStatusCard
@@ -544,6 +537,8 @@ export default function HomeG() {
       >
         {todayEntry ? "오늘 일기 수정" : "일기 쓰기"}
       </Link>
+
+      <HomeInstallCTA />
     </div>
   );
 }
