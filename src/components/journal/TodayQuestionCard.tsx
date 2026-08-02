@@ -82,19 +82,19 @@ type CachedQuestion = {
 const QUESTION_TEASE_LINES = [
   {
     title: "잠들기 전, 오늘을 한 번만",
-    sub: "일기에 담기 전에 마음에 건넬 질문이에요",
+    sub: "대답 필수는 아니에요. 일기 쓸 때 참고만 해도 돼요",
   },
   {
     title: "오늘 하루, 뭐가 남았을까?",
-    sub: "운세와 한 주의 결을 모아 조용히 물어볼게요",
+    sub: "운세와 한 주의 결을 모은 참고용 한 문장이에요",
   },
   {
     title: "일기 쓰기 전, 짧은 숨",
-    sub: "스스로를 다독이는 한 문장이 기다려요",
+    sub: "꼭 답하지 않아도 괜찮아요. 떠오르면 적기만 해도 돼요",
   },
   {
     title: "밤에 꺼내 보는 질문",
-    sub: "판단 없이, 오늘을 가만히 들여다볼 때",
+    sub: "판단 없이 오늘을 들여다볼 때 — 선택은 자유예요",
   },
 ] as const;
 
@@ -212,14 +212,14 @@ function QuestionTeaseButton({
       type="button"
       onClick={onClick}
       className="fortune-tease w-full py-5 px-3 flex flex-col items-center text-center gap-2"
-      aria-label={ready ? "오늘의 질문 펼치기" : "오늘의 질문 받기"}
+      aria-label={ready ? "오늘의 질문 펼치기" : "참고용 오늘의 질문 받기"}
     >
       <span className="fortune-tease-pulse" aria-hidden />
       <p
         className="text-[11px] font-black tracking-wider relative"
         style={{ color: "var(--px-text2)" }}
       >
-        오늘의 질문
+        오늘의 질문 · 참고용
       </p>
       <p
         key={line.title}
@@ -239,7 +239,7 @@ function QuestionTeaseButton({
         className="mt-1 text-[11px] font-black tracking-wide fortune-tease-hint"
         style={{ color: "var(--px-text-on-panel)" }}
       >
-        {ready ? "살짝 펼쳐보기 ↓" : "밤에 건넬 질문 열기 ↓"}
+        {ready ? "살짝 펼쳐보기 ↓" : "참고용 질문 열기 ↓"}
       </span>
     </button>
   );
@@ -679,7 +679,7 @@ export default function TodayQuestionCard({
               className="text-[11px] font-black tracking-wider"
               style={{ color: "var(--px-accent)" }}
             >
-              오늘의 질문
+              오늘의 질문 · 참고용
             </p>
             <div className="flex items-center gap-1" role="group" aria-label="질문 피드백">
               {QUESTION_FIT_THUMBS.map((option) => (
@@ -712,6 +712,12 @@ export default function TodayQuestionCard({
             style={{ color: "var(--px-text-on-panel)", lineHeight: 1.55 }}
           >
             {question}
+          </p>
+          <p
+            className="text-[10px] text-center font-bold leading-snug"
+            style={{ color: "var(--px-text2)" }}
+          >
+            꼭 대답하지 않아도 돼요. 아래 글은 자유롭게 적어도 됩니다.
           </p>
           {feedbackMsg && (
             <p
@@ -747,13 +753,13 @@ export default function TodayQuestionCard({
           className="text-[11px] font-black tracking-wider text-center"
           style={{ color: "var(--px-text2)" }}
         >
-          오늘의 질문 · 접기 ↑
+          오늘의 질문 · 참고용 · 접기 ↑
         </p>
         <p
           className="mt-1 text-[1.2rem] font-black leading-[1.35] tracking-tight text-center fortune-reveal-title"
           style={{ color: "var(--px-accent)", animationDelay: "60ms" }}
         >
-          잠들기 전, 한 번만
+          잠들기 전, 떠올려 보기
         </p>
       </button>
 
@@ -766,6 +772,12 @@ export default function TodayQuestionCard({
         }}
       >
         {question}
+      </p>
+      <p
+        className="text-[11px] font-bold text-center leading-snug fortune-reveal"
+        style={{ color: "var(--px-text2)", animationDelay: "220ms" }}
+      >
+        꼭 대답하지 않아도 돼요. 일기 쓸 때 참고만 해도 충분해요.
       </p>
 
       {phase === "ready" && question && (

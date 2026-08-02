@@ -1483,7 +1483,7 @@ export default function CheckInEditor({ initialDate }: Props) {
             </p>
           ) : (
             <p className="text-[12px] font-bold leading-snug" style={{ color: "var(--px-text2)" }}>
-              오늘의 질문과 함께, 키보드에 가리지 않게 전체 화면에서 적어요.
+              선택이에요. 질문을 참고해도 되고, 안 적어도 저장할 수 있어요.
             </p>
           )}
           {content.trim().length > 0 && (
@@ -1492,7 +1492,7 @@ export default function CheckInEditor({ initialDate }: Props) {
         </button>
         <p className="ui-hint">
           {content.trim().length === 0
-            ? "한 줄만 적어도 AI가 오늘 감정·점수를 읽어 운세와 문장에 반영해요."
+            ? "필수는 행복도·기분·핵심 상태예요. 글은 적으면 운세·문장이 더 잘 맞아요."
             : "고마워요. 남긴 글로 오늘의 문장과 운세가 더 잘 맞아요."}
         </p>
       </section>

@@ -20,7 +20,7 @@ type Props = {
 
 /**
  * 모바일 키보드에 가리지 않도록 visualViewport에 맞춘 전체화면 작성 시트.
- * 상단 질문(+굿/배드) · 넓은 일기 칸 · 완료는 「오늘 남길 글」 줄
+ * 상단 질문(+굿/배드)은 참고용(선택) · 넓은 일기 칸도 선택 · 완료는 「오늘 남길 글」 줄
  */
 export default function DiaryWriteSheet({
   open,
@@ -126,7 +126,7 @@ export default function DiaryWriteSheet({
             style={{ color: "var(--px-text2)" }}
             htmlFor="diary-write-sheet-textarea"
           >
-            오늘 남길 글
+            오늘 남길 글 (선택)
           </label>
           <button
             type="button"
@@ -154,7 +154,7 @@ export default function DiaryWriteSheet({
             }
             onContentChange(next);
           }}
-          placeholder="예) 오늘은 회의가 길었지만, 끝나고 산책하니 좀 풀렸다."
+          placeholder="질문에 꼭 대답하지 않아도 돼요. 오늘 생각이 나면 자유롭게 적어도 됩니다."
           className="flex-1 min-h-[12rem] w-full px-3 py-3 border-2 text-base resize-none leading-relaxed"
           style={{
             background: "var(--px-bg3)",
@@ -168,7 +168,7 @@ export default function DiaryWriteSheet({
         <div className="shrink-0 flex items-center justify-between px-0.5 pb-[env(safe-area-inset-bottom,0px)]">
           <p className="ui-hint">
             {previewLen === 0
-              ? "한 줄만 적어도 운세·문장에 반영돼요."
+              ? "안 적어도 저장할 수 있어요. 적으면 운세·문장이 더 잘 맞아요."
               : "고마워요. 이 글이 오늘을 더 잘 맞춥니다."}
           </p>
           {previewLen > 0 && (
