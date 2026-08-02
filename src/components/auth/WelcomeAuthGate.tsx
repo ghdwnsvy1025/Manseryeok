@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useState } from "react";
 import { startGoogleAuth } from "@/lib/auth/anonymousSession";
 import { unlockEntry } from "@/lib/auth/entryGate";
@@ -8,14 +9,18 @@ import {
   stashAuthNextPath,
 } from "@/lib/auth/redirectOrigin";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
-import { ANALYTICS_EVENTS, captureEvent, captureFlowError, identifyGuestUser } from "@/lib/analytics/posthog";
+import {
+  ANALYTICS_EVENTS,
+  captureEvent,
+  captureFlowError,
+  identifyGuestUser,
+} from "@/lib/analytics/posthog";
 import { enableGuestMode } from "@/lib/auth/guestMode";
 import { activateGuestWorkspace } from "@/lib/diary/profileStorage";
 
 type Props = {
   onGuest: () => void;
   authNextPath?: string;
-  /** OAuth 등 외부에서 넘긴 안내 문구 */
   initialMessage?: string;
 };
 
@@ -45,7 +50,6 @@ export default function WelcomeAuthGate({
       intent: "sign_in",
     });
 
-    // 로그인 화면은 일반 OAuth (linkIdentity는 인증코드 누락·기존 계정 충돌이 잦음)
     stashAuthNextPath(authNextPath);
     const redirectTo = getAuthCallbackUrl();
     const result = await startGoogleAuth({
@@ -70,8 +74,6 @@ export default function WelcomeAuthGate({
       surface: "landing",
       has_auth_session: false,
     });
-    // 기기 로컬만 사용. 익명 세션을 새로 만들면 빈 원격 프로필이 로컬을 덮어
-    // 비로그인 재진입마다 사주/일기가 초기화되는 문제가 난다.
     enableGuestMode();
     activateGuestWorkspace();
     identifyGuestUser();
@@ -85,29 +87,61 @@ export default function WelcomeAuthGate({
   };
 
   return (
-    <div className="max-w-md mx-auto space-y-4 pb-6 pt-6 px-1">
-      <section
-        className="p-5 border-2 space-y-2 text-center"
-        style={{
-          background: "var(--px-bg2)",
-          borderColor: "var(--px-accent)",
-          boxShadow: "4px 4px 0 #000",
-        }}
-      >
-        <p className="text-xs font-bold" style={{ color: "var(--px-text2)" }}>
+    <div
+      className="max-w-md mx-auto w-full min-h-[calc(100dvh-1.5rem)] flex flex-col px-1 py-4"
+      style={{
+        background:
+          "radial-gradient(ellipse 80% 50% at 50% 0%, color-mix(in srgb, var(--px-accent) 14%, transparent), transparent 70%)",
+      }}
+    >
+      <section className="flex flex-col items-center text-center gap-3 pt-4 pb-2">
+        <div
+          className="relative w-[5.5rem] h-[5.5rem] overflow-hidden"
+          style={{
+            borderRadius: "1.15rem",
+            boxShadow: "0 10px 28px rgba(0,0,0,0.35), 0 0 0 2px #f5c45155",
+          }}
+        >
+          <Image
+            src="/icons/app-icon-512.png"
+            alt=""
+            width={512}
+            height={512}
+            priority
+            className="w-full h-full object-cover"
+          />
+        </div>
+        <p
+          className="text-[11px] font-black tracking-[0.14em]"
+          style={{ color: "var(--px-accent)" }}
+        >
           오늘의 사주 일기
         </p>
-        <h1 className="text-xl font-black" style={{ color: "var(--px-accent)" }}>
-          로그인
+        <h1
+          className="text-[1.45rem] font-black leading-snug tracking-tight"
+          style={{ color: "var(--px-text)" }}
+        >
+          밤의 한 줄이
+          <br />
+          내일의 결을 닮아갑니다
         </h1>
-        <p className="text-xs font-bold leading-relaxed" style={{ color: "var(--px-text2)" }}>
-          시작하려면 Google 또는 비로그인 중 하나를 골라 주세요.
+        <p
+          className="text-[13px] font-bold leading-relaxed max-w-[18rem]"
+          style={{ color: "var(--px-text2)" }}
+        >
+          짧게 적어도 괜찮아요.
+          <br />
+          기록이 쌓일수록, 사주도 당신 곁으로.
         </p>
       </section>
 
       <section
-        className="p-4 border-2 space-y-3"
-        style={{ background: "var(--px-bg3)", borderColor: "var(--px-border)" }}
+        className="mt-5 p-4 border-2 space-y-3"
+        style={{
+          background: "var(--px-bg3)",
+          borderColor: "var(--px-border)",
+          boxShadow: "3px 3px 0 #000",
+        }}
         aria-label="로그인 방법"
       >
         <button
@@ -134,7 +168,7 @@ export default function WelcomeAuthGate({
           ).map((line) => (
             <li
               key={line}
-              className="text-[11px] font-bold leading-snug pl-2"
+              className="text-[12px] font-bold leading-snug pl-2"
               style={{
                 color: "var(--px-text2)",
                 borderLeft: "2px solid var(--px-accent)",
@@ -155,7 +189,7 @@ export default function WelcomeAuthGate({
           type="button"
           disabled={loading !== null}
           onClick={() => void startAsGuest()}
-          className="w-full px-4 py-4 text-base font-black border-2"
+          className="w-full px-4 py-3.5 text-sm font-black border-2"
           style={{
             background: "var(--px-bg2)",
             borderColor: "#000",
@@ -163,19 +197,19 @@ export default function WelcomeAuthGate({
             boxShadow: "3px 3px 0 #000",
           }}
         >
-          {loading === "guest" ? "준비 중…" : "비로그인으로 시작하기"}
+          {loading === "guest" ? "준비 중…" : "비로그인으로 둘러보기"}
         </button>
         <p
           className="text-[11px] font-bold text-center leading-snug"
           style={{ color: "var(--px-text2)" }}
         >
-          베타 테스트용 · 나중에 Google로 이어갈 수 있어요
+          이 기기에만 저장 · 나중에 Google로 이어갈 수 있어요
         </p>
       </section>
 
       {message && (
         <p
-          className="p-3 border text-xs font-bold"
+          className="mt-3 p-3 border text-xs font-bold"
           style={{
             borderColor: "var(--px-border)",
             color: "var(--px-text2)",
@@ -186,6 +220,60 @@ export default function WelcomeAuthGate({
           {message}
         </p>
       )}
+
+      <div className="flex-1 min-h-6" aria-hidden />
+
+      <section
+        className="mt-auto pt-4 pb-2 space-y-3"
+        aria-label="앱에서 할 수 있는 일"
+      >
+        <p
+          className="text-[11px] font-black tracking-wide text-center"
+          style={{ color: "var(--px-accent)" }}
+        >
+          여기서 할 수 있는 일
+        </p>
+        <div className="grid grid-cols-1 gap-2">
+          {(
+            [
+              {
+                title: "오늘의 운세",
+                body: "사주와 기록이 만나 오늘의 결을 읽어 줘요",
+              },
+              {
+                title: "짧은 체크인",
+                body: "기분·행복도를 남겨 나만의 패턴을 쌓아요",
+              },
+              {
+                title: "주간 리포트",
+                body: "한 주의 흐름을 숫자와 한 줄로 돌아봐요",
+              },
+            ] as const
+          ).map((item) => (
+            <div
+              key={item.title}
+              className="px-3 py-2.5 border-2 text-left"
+              style={{
+                borderColor: "var(--px-border)",
+                background: "color-mix(in srgb, var(--px-bg2) 88%, transparent)",
+              }}
+            >
+              <p
+                className="text-[13px] font-black"
+                style={{ color: "var(--px-text)" }}
+              >
+                {item.title}
+              </p>
+              <p
+                className="mt-0.5 text-[12px] font-bold leading-snug"
+                style={{ color: "var(--px-text2)" }}
+              >
+                {item.body}
+              </p>
+            </div>
+          ))}
+        </div>
+      </section>
     </div>
   );
 }

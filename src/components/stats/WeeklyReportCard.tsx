@@ -3,7 +3,7 @@
 import { useState } from "react";
 import type { WeeklyReport } from "@/lib/journal/statsInsight";
 import { happinessTone } from "@/lib/journal/statsTone";
-import { shareAppText } from "@/lib/app/shareInvite";
+import { shareAppInvite } from "@/lib/app/shareInvite";
 
 type Props = {
   report: WeeklyReport;
@@ -19,7 +19,7 @@ export default function WeeklyReportCard({ report, embedded }: Props) {
 
   const share = async () => {
     try {
-      await shareAppText(report.shareText, "/");
+      await shareAppInvite("/");
       setShared("done");
     } catch (err) {
       if (err instanceof DOMException && err.name === "AbortError") return;

@@ -6,8 +6,8 @@ import {
   buildTemplateRecentStatus,
   normalizeRecentStatus,
 } from "@/lib/journal/recentStatus";
-import { requireAuthUser } from "@/lib/api/requireAuth";
-import { checkLlmRateLimit } from "@/lib/api/rateLimit";
+import { getOptionalAuthUser } from "@/lib/api/requireAuth";
+import { checkLlmRateLimit, clientIpFromRequest } from "@/lib/api/rateLimit";
 
 export const runtime = "nodejs";
 
@@ -16,9 +16,10 @@ type Body = {
 };
 
 export async function POST(req: NextRequest) {
-  const auth = await requireAuthUser();
-  if (!auth.ok) return auth.response;
-  const limited = checkLlmRateLimit(auth.user.id);
+  // 게스트(비로그인)도 허용 — 운세·질문과 동일하게 IP rate limit
+  const auth = await getOptionalAuthUser();
+  const rateLimitKey = auth.user?.id ?? `ip:${clientIpFromRequest(req)}`;
+  const limited = checkLlmRateLimit(rateLimitKey);
   if (!limited.ok) return limited.response;
 
   let body: unknown;

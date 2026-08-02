@@ -18,7 +18,7 @@ import { burstFromElement } from "@/lib/ui/clickBurst";
 import { XP_GAUGE_FILL, XP_GAIN_COLOR } from "@/lib/ui/xpGauge";
 import EmotionalLoadingHint from "@/components/ui/EmotionalLoadingHint";
 import CherryBlossomLayer from "@/components/motion/CherryBlossomLayer";
-import { shareAppText } from "@/lib/app/shareInvite";
+import { shareAppInvite } from "@/lib/app/shareInvite";
 
 type Props = {
   entry: JournalEntry;
@@ -178,10 +178,8 @@ export default function JournalSaveCompleteModal({
     : sourceLabel ?? "앱이 오늘의 기록을 바탕으로 새로 쓴 문장입니다.";
 
   const handleShare = async () => {
-    if (!quote) return;
-    const body = `${quote}\n— ${attributionLine}`;
     try {
-      await shareAppText(body, "/");
+      await shareAppInvite("/");
       setSharedLocal(true);
       void submitContentFeedback({
         eventDate: entry.entryDate,

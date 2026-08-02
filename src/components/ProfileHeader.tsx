@@ -14,10 +14,11 @@ import {
 } from "@/lib/diary/profileStorage";
 import type { SajuProfile } from "@/lib/diary/types";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
-import { lockEntry } from "@/lib/auth/entryGate";
-import { disableGuestMode } from "@/lib/auth/guestMode";
+import { lockEntry, ENTRY_CHANGED_EVENT } from "@/lib/auth/entryGate";
+import { disableGuestMode, isGuestMode } from "@/lib/auth/guestMode";
 import { resetDiaryStorageCache } from "@/lib/diary/getStorage";
 import { resetJournalStorageCache } from "@/lib/journal/getStorage";
+import { isAnonymousUser } from "@/lib/auth/anonymousSession";
 
 function birthDateLabel(profile: SajuProfile): string {
   return profile.birthDate.replaceAll("-", ".");
@@ -34,6 +35,30 @@ export default function ProfileHeader() {
   const menuRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
   const [profile, setProfile] = useState<SajuProfile | null>(null);
+  const [authKind, setAuthKind] = useState<"guest" | "account" | "loading">(
+    "loading"
+  );
+
+  const refreshAuthKind = useCallback(() => {
+    if (typeof window === "undefined") return;
+    if (isGuestMode()) {
+      setAuthKind("guest");
+      return;
+    }
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) {
+      setAuthKind("guest");
+      return;
+    }
+    void supabase.auth
+      .getSession()
+      .then(({ data }) => {
+        const user = data.session?.user;
+        if (user && !isAnonymousUser(user)) setAuthKind("account");
+        else setAuthKind(isGuestMode() ? "guest" : "guest");
+      })
+      .catch(() => setAuthKind(isGuestMode() ? "guest" : "guest"));
+  }, []);
 
   const refresh = useCallback(async () => {
     try {
@@ -45,25 +70,42 @@ export default function ProfileHeader() {
 
   useEffect(() => {
     void refresh();
-  }, [pathname, refresh]);
+    refreshAuthKind();
+  }, [pathname, refresh, refreshAuthKind]);
 
   useEffect(() => {
-    const handleChange = () => void refresh();
+    const handleChange = () => {
+      void refresh();
+      refreshAuthKind();
+    };
     const handleStorage = (event: StorageEvent) => {
       if (
         event.key === "manseryeok_saju_profile_v2" ||
-        event.key === "manseryeok_saju_profiles_v2"
+        event.key === "manseryeok_saju_profiles_v2" ||
+        event.key === "manseryeok_guest_mode"
       ) {
         void refresh();
+        refreshAuthKind();
       }
     };
     window.addEventListener(SAJU_PROFILE_CHANGED_EVENT, handleChange);
+    window.addEventListener(PROFILES_LIST_EVENT, handleChange);
+    window.addEventListener(ENTRY_CHANGED_EVENT, handleChange);
     window.addEventListener("storage", handleStorage);
+
+    const supabase = getSupabaseBrowserClient();
+    const sub = supabase?.auth.onAuthStateChange(() => {
+      refreshAuthKind();
+    });
+
     return () => {
       window.removeEventListener(SAJU_PROFILE_CHANGED_EVENT, handleChange);
+      window.removeEventListener(PROFILES_LIST_EVENT, handleChange);
+      window.removeEventListener(ENTRY_CHANGED_EVENT, handleChange);
       window.removeEventListener("storage", handleStorage);
+      sub?.data.subscription.unsubscribe();
     };
-  }, [refresh]);
+  }, [refresh, refreshAuthKind]);
 
   useEffect(() => {
     if (!open) return;
@@ -246,27 +288,55 @@ export default function ProfileHeader() {
               }}
               role="menuitem"
             >
-              로그아웃
+              {authKind === "guest" ? "처음으로" : "로그아웃"}
             </button>
           </div>
         )}
       </div>
 
       <div className="min-w-0 flex-1">
-        <p
-          className="truncate text-sm font-black"
-          style={{ color: "var(--px-accent)" }}
-        >
-          {profile ? `${name}` : "사주 프로필 없음"}
-          {profile && (
+        <div className="flex items-center gap-1.5 min-w-0">
+          <p
+            className="truncate text-sm font-black"
+            style={{ color: "var(--px-accent)" }}
+          >
+            {profile ? `${name}` : "사주 프로필 없음"}
+          </p>
+          {authKind !== "loading" && (
             <span
-              className="font-bold ml-2"
-              style={{ color: "var(--px-text2)" }}
+              className="shrink-0 text-[10px] font-black px-1.5 py-0.5 border leading-none"
+              style={
+                authKind === "account"
+                  ? {
+                      borderColor: "var(--px-accent)",
+                      color: "#111",
+                      background: "var(--px-accent)",
+                    }
+                  : {
+                      borderColor: "var(--px-border2)",
+                      color: "var(--px-text2)",
+                      background: "var(--px-bg3)",
+                    }
+              }
+              title={
+                authKind === "account"
+                  ? "Google 계정으로 로그인됨"
+                  : "비로그인 · 이 기기에만 저장"
+              }
             >
-              {birthDateLabel(profile)}
+              {authKind === "account" ? "계정" : "비로그인"}
             </span>
           )}
-        </p>
+        </div>
+        {profile && (
+          <p
+            className="text-[11px] font-bold truncate mt-0.5"
+            style={{ color: "var(--px-text2)" }}
+          >
+            {birthDateLabel(profile)}
+            {authKind === "guest" ? " · 이 기기만" : ""}
+          </p>
+        )}
       </div>
 
       <HeaderProgressBadge />

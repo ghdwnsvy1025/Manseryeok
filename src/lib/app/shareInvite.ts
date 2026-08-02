@@ -1,5 +1,5 @@
 /**
- * 공유 문구에 앱 진입 링크를 붙여, 받는 사람이 바로 열 수 있게 함.
+ * 앱 초대 공유 — 개인 내용 없이 링크만 전달.
  */
 export function getAppOrigin(): string {
   if (typeof window !== "undefined" && window.location?.origin) {
@@ -22,29 +22,39 @@ export function getAppShareUrl(path = "/"): string {
   }
 }
 
-const INVITE_LINE = "오늘의 사주 일기 — 나의 하루를 남겨보세요";
+const INVITE_TITLE = "오늘의 사주 일기";
+const INVITE_LINE = "나의 하루를 남겨보세요";
 
-/** 본문 뒤에 초대 문구 + 앱 링크를 붙인 공유 텍스트 */
-export function withAppInvite(body: string, path = "/"): string {
+/** 초대용 짧은 텍스트 (개인 기록/문장 없음) */
+export function buildAppInviteText(path = "/"): string {
   const url = getAppShareUrl(path);
-  const trimmed = body.trim();
-  if (!url) return `${trimmed}\n\n${INVITE_LINE}`;
-  return `${trimmed}\n\n${INVITE_LINE}\n${url}`;
+  if (!url) return `${INVITE_TITLE}\n${INVITE_LINE}`;
+  return `${INVITE_TITLE}\n${INVITE_LINE}\n${url}`;
 }
 
-export async function shareAppText(body: string, path = "/"): Promise<"shared" | "copied"> {
-  const text = withAppInvite(body, path);
+/** @deprecated 내용+링크 합치기 — 초대는 buildAppInviteText / shareAppInvite 사용 */
+export function withAppInvite(body: string, path = "/"): string {
+  const invite = buildAppInviteText(path);
+  const trimmed = body.trim();
+  if (!trimmed) return invite;
+  return `${trimmed}\n\n${invite}`;
+}
+
+/** 앱 링크만 공유 (친구 초대) */
+export async function shareAppInvite(
+  path = "/"
+): Promise<"shared" | "copied"> {
+  const text = buildAppInviteText(path);
   const url = getAppShareUrl(path);
   if (typeof navigator !== "undefined" && navigator.share) {
     try {
       await navigator.share({
-        title: "오늘의 사주 일기",
-        text,
+        title: INVITE_TITLE,
+        text: INVITE_LINE,
         url: url || undefined,
       });
       return "shared";
     } catch (err) {
-      // 사용자가 공유 시트를 닫으면 AbortError — 실패로 취급하지 않되 상위에서 처리
       if (err instanceof DOMException && err.name === "AbortError") throw err;
     }
   }
@@ -53,4 +63,12 @@ export async function shareAppText(body: string, path = "/"): Promise<"shared" |
     return "copied";
   }
   throw new Error("share_unavailable");
+}
+
+/** @deprecated shareAppInvite 사용 */
+export async function shareAppText(
+  _body: string,
+  path = "/"
+): Promise<"shared" | "copied"> {
+  return shareAppInvite(path);
 }

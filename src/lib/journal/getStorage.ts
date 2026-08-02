@@ -55,36 +55,10 @@ export async function getJournalStorage(): Promise<JournalStorage> {
     }
   }
 
-  let local = getIndexedDbJournalStorage(profileId);
-  // 프로필이 바뀌어 빈 저장소인데, 예전 프로필 id에 일기가 남아 있으면 복구
-  try {
-    const listed = await local.list();
-    if (listed.length === 0) {
-      const { listAllLocalJournalEntries } = await import(
-        "@/lib/journal/indexedDbStorage"
-      );
-      const all = await listAllLocalJournalEntries();
-      if (all.length > 0) {
-        const recoveredId = all[0]?.sajuProfileId || "local";
-        if (recoveredId !== profileId) {
-          profileId = recoveredId;
-          local = getIndexedDbJournalStorage(profileId);
-          try {
-            const { clearLastSavedCheckIn } = await import(
-              "@/lib/journal/lastSavedCheckIn"
-            );
-            clearLastSavedCheckIn();
-          } catch {
-            /* ignore */
-          }
-        }
-      }
-    }
-  } catch {
-    /* keep primary-scoped storage */
-  }
-
-  cached = local;
+  // 현재 활성 사주 프로필 스코프만 사용.
+  // 빈 저장소일 때 IndexedDB에 남은 *다른* 프로필 일기를 붙이면
+  // 게스트↔계정 전환 시 남의(이전 계정) 오늘 기록이 폼에 채워진다.
+  cached = getIndexedDbJournalStorage(profileId);
   cachedProfileId = profileId;
   return cached;
 }

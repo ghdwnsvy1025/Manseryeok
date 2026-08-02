@@ -7,6 +7,7 @@ import {
   type OpenAiCallStatus,
 } from "@/lib/journal/openaiStatus";
 import {
+  buildTemplateRecentStatus,
   describeRecentHappiness,
   STATUS_FOCUS_EMOJI,
   type RecentStatusPayload,
@@ -315,23 +316,33 @@ export default function TodayStatusCard({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ stats }),
         });
-        const data = (await res.json()) as RecentStatusPayload & {
-          openAi?: OpenAiCallStatus;
-        };
+        const data = (await res.json().catch(() => null)) as
+          | (RecentStatusPayload & { openAi?: OpenAiCallStatus; error?: string })
+          | null;
         if (cancelled) return;
-        const next = normalizeStatusPayload(data);
+        const next =
+          res.ok && data
+            ? normalizeStatusPayload(data)
+            : buildTemplateRecentStatus(stats);
+        const openAiStatus =
+          res.ok && data?.openAi
+            ? data.openAi
+            : ({ kind: "skipped", detail: "guest_or_offline" } satisfies OpenAiCallStatus);
         setStatus(next);
-        setOpenAi(data.openAi ?? null);
+        setOpenAi(openAiStatus);
         if (next) {
-          saveRecentStatusCache(
-            cacheDate,
-            fingerprint,
-            next,
-            data.openAi ?? null
-          );
+          saveRecentStatusCache(cacheDate, fingerprint, next, openAiStatus);
         }
       } catch {
-        if (!cancelled) setStatus(null);
+        if (!cancelled) {
+          const fallback = buildTemplateRecentStatus(stats);
+          setStatus(fallback);
+          setOpenAi({ kind: "skipped", detail: "offline" });
+          saveRecentStatusCache(cacheDate, fingerprint, fallback, {
+            kind: "skipped",
+            detail: "offline",
+          });
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }

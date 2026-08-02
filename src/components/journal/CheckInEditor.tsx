@@ -70,7 +70,6 @@ import { celebrateClick } from "@/lib/ui/clickBurst";
 import {
   buildSavedCheckInForm,
   isSavedFormComplete,
-  peekLastSavedEntry,
   peekLastSavedForm,
   setLastSavedCheckIn,
   type SavedCheckInForm,
@@ -412,17 +411,21 @@ export default function CheckInEditor({ initialDate }: Props) {
 
   const applyDayFromList = useCallback(
     (targetDate: string, list: JournalEntry[]) => {
+      const listHit = list.find((e) => e.entryDate === targetDate);
       const snapForm = peekLastSavedForm(targetDate);
-      // 필수(행복도+핵심4)까지 갖춘 스냅샷만 우선 — 불완전 스냅샷이 빈 core로 덮어쓰지 않게
-      if (isSavedFormComplete(snapForm)) {
+      // 스냅샷은 *현재 목록에 같은 날이 있을 때만* 우선.
+      // 없으면 이전 계정 잔여 스냅샷이 빈 날에 복사된다.
+      if (
+        listHit &&
+        isSavedFormComplete(snapForm) &&
+        (!snapForm!.entryId || snapForm!.entryId === listHit.id)
+      ) {
         clearCheckInDraft(targetDate);
         applySavedForm(snapForm!);
         return;
       }
 
-      const existing =
-        list.find((e) => e.entryDate === targetDate) ??
-        peekLastSavedEntry(targetDate);
+      const existing = listHit;
 
       if (existing) {
         clearCheckInDraft(targetDate);
@@ -572,11 +575,13 @@ export default function CheckInEditor({ initialDate }: Props) {
   const applyDayFromListRef = useRef(applyDayFromList);
   applyDayFromListRef.current = applyDayFromList;
 
-  // 저장 직후 홈→수정: 네트워크보다 먼저 스냅샷으로 폼을 채운다
+  // 저장 직후 홈→수정: 목록에 오늘이 있거나 스냅샷이 같은 날이면 즉시 채움
   useLayoutEffect(() => {
     const snap = peekLastSavedForm(date);
     if (!isSavedFormComplete(snap)) return;
-    applyDayFromListRef.current(date, allEntriesRef.current);
+    const list = allEntriesRef.current;
+    if (!list.some((e) => e.entryDate === date)) return;
+    applyDayFromListRef.current(date, list);
   }, [date]);
 
   useEffect(() => {
