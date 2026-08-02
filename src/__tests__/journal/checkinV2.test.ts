@@ -4,6 +4,7 @@ import {
   DOMAIN_POOL_CODES,
   MAX_CHECKIN_TAGS,
   MAX_MOODS,
+  MIN_MOODS,
   NONE_SPECIAL_TAG,
   OTHER_EVENT_TAG,
   ordinalToJournalScore,
@@ -75,20 +76,25 @@ function entryWithScore(
 }
 
 describe("checkin v2 contract (step 3)", () => {
-  test("mood catalog is exactly 9 including 답답함", () => {
+  test("mood catalog includes 답답함 and allows selecting many (no low max)", () => {
     expect([...MOOD_OPTIONS]).toEqual([
       "기쁨",
-      "평온",
+      "뿌듯함",
       "설렘",
+      "평온",
+      "무덤덤",
+      "지침",
+      "답답함",
+      "짜증남",
       "불안",
       "분노",
-      "답답함",
       "슬픔",
-      "지침",
-      "무덤덤",
+      "우울함",
+      "후회스러움",
     ]);
-    expect(MOOD_OPTIONS).toHaveLength(9);
-    expect(MAX_MOODS).toBe(3);
+    expect(MOOD_OPTIONS).toContain("답답함");
+    expect(MAX_MOODS).toBe(99);
+    expect(MIN_MOODS).toBe(1);
   });
 
   test("core states are the 4 required labels' codes", () => {
@@ -138,16 +144,31 @@ describe("checkin v2 contract (step 3)", () => {
     ).toBe(true);
   });
 
-  test("rejects more than 3 moods and unknown/duplicate moods", () => {
+  test("allows selecting all mood options at once (no low max)", () => {
     expect(
       validateCheckInSave({
         happiness: 5,
-        moods: ["기쁨", "평온", "설렘", "지침"],
+        moods: [...MOOD_OPTIONS],
+        tagCodes: [],
+        core: validCore(),
+        domains: [],
+      }).ok
+    ).toBe(true);
+  });
+
+  test("rejects empty moods (min 1 required)", () => {
+    expect(
+      validateCheckInSave({
+        happiness: 5,
+        moods: [],
         tagCodes: [],
         core: validCore(),
         domains: [],
       }).ok
     ).toBe(false);
+  });
+
+  test("rejects unknown/duplicate moods", () => {
     expect(
       validateCheckInSave({
         happiness: 5,

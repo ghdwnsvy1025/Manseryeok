@@ -6,7 +6,7 @@ import {
   MONTH_SEED_MARKER,
   planMonthSeed,
 } from "@/lib/journal/seed/monthSequential";
-import type { JournalEntry } from "@/lib/journal/types";
+import { MOOD_OPTIONS, type JournalEntry } from "@/lib/journal/types";
 
 function seedEntry(date: string): JournalEntry {
   return {
@@ -166,7 +166,8 @@ describe("monthSequential seed", () => {
     expect(input.happinessScore).toBeGreaterThanOrEqual(0);
     expect(input.happinessScore).toBeLessThanOrEqual(10);
     expect(input.moodLabels?.length).toBeGreaterThanOrEqual(1);
-    expect(input.moodLabels?.length).toBeLessThanOrEqual(3);
+    expect(input.moodLabels?.length).toBeLessThanOrEqual(MOOD_OPTIONS.length);
+    expect(input.moodLabels).not.toContain(undefined);
     expect(input.coreStates).toBeTruthy();
     for (const code of [
       "energy",

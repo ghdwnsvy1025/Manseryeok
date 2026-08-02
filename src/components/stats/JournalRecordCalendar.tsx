@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { getPillarsForDate } from "@/lib/diary/dayPillar";
 import { dayHappiness } from "@/lib/journal/homeStats";
@@ -27,6 +27,7 @@ type Props = {
 };
 
 const LIST_PREVIEW = 3;
+const DAY_MODAL_STATE = { manseryeokStatsDayModal: true } as const;
 
 /** 기록 캘린더 — 월 격자 + 행복도·기분·간지 / 주간 리포트는 여기서만 */
 export default function JournalRecordCalendar({
@@ -41,6 +42,24 @@ export default function JournalRecordCalendar({
   const [reportOpen, setReportOpen] = useState(false);
   const [dayReport, setDayReport] = useState<JournalEntry | null>(null);
   const [listExpanded, setListExpanded] = useState(false);
+
+  /** 모달 열릴 때 history push → 뒤로가기가 기록탭을 나가지 않고 모달만 닫음 */
+  useEffect(() => {
+    if (!dayReport) return;
+    const onPop = () => setDayReport(null);
+    window.history.pushState(DAY_MODAL_STATE, "");
+    window.addEventListener("popstate", onPop);
+    return () => {
+      window.removeEventListener("popstate", onPop);
+    };
+  }, [dayReport]);
+
+  const closeDayReport = () => {
+    setDayReport(null);
+    if (window.history.state?.manseryeokStatsDayModal) {
+      window.history.back();
+    }
+  };
 
   const byDate = useMemo(() => {
     const map = new Map<string, JournalEntry>();
@@ -407,7 +426,7 @@ export default function JournalRecordCalendar({
       {dayReport && (
         <JournalDayReportModal
           entry={dayReport}
-          onClose={() => setDayReport(null)}
+          onClose={closeDayReport}
         />
       )}
     </section>

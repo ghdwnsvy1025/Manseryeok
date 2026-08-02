@@ -262,9 +262,9 @@ export function buildRandomMonthSeedInput(
 ): JournalSaveInput {
   const happiness = randomHappiness();
 
-  const moodCount = randInt(1, MAX_MOODS);
-  const moods: string[] = [];
   const moodPool = shuffleInPlace([...MOOD_OPTIONS]);
+  const moodCount = randInt(1, Math.min(MAX_MOODS, moodPool.length));
+  const moods: string[] = [];
   for (let i = 0; i < moodCount; i += 1) {
     moods.push(moodPool[i]!);
   }

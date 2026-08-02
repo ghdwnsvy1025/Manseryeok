@@ -142,7 +142,7 @@ export default function StatsPage() {
         setJournalEntries(jList);
         const enabled = getEnabledCodesOrdered(prefs);
         setEnabledCodes(enabled);
-        setSelected(enabled.slice(0, 1));
+        setSelected([]);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -473,7 +473,7 @@ export default function StatsPage() {
                 >
                   <span
                     className="inline-block w-4 h-[3px]"
-                    style={{ background: "var(--px-accent)" }}
+                    style={{ background: "#f472b6" }}
                     aria-hidden
                   />
                   행복도

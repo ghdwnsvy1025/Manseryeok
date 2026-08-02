@@ -69,6 +69,7 @@ export default function AppNav() {
             <Link
               key={item.href}
               href={item.href}
+              replace
               onClick={() => {
                 captureEvent(ANALYTICS_EVENTS.navTabClicked, {
                   tab: item.tab,

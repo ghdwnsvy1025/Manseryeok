@@ -265,16 +265,17 @@ export default function CheckInEditor({ initialDate }: Props) {
     markCheckInStarted("text_focus");
   };
 
-  /** 필수 = 행복도 + 핵심 상태 4개 (점수 필수, 해당 없음 불가) */
+  /** 필수 = 행복도 + 기분(≥1) + 핵심 상태 4개 */
   const requiredDone = useMemo(() => {
     let n = happiness != null ? 1 : 0;
+    if (moods.length >= 1) n += 1;
     for (const code of CORE_STATE_CODES) {
       const row = core[code];
       if (row && row.ordinal != null && !row.isNotApplicable) n += 1;
     }
     return n;
-  }, [happiness, core]);
-  const requiredTotal = 1 + CORE_STATE_CODES.length;
+  }, [happiness, moods.length, core]);
+  const requiredTotal = 2 + CORE_STATE_CODES.length;
   const allRequiredDone = requiredDone >= requiredTotal;
 
   const hasMeaningfulEvent =
@@ -762,7 +763,6 @@ export default function CheckInEditor({ initialDate }: Props) {
   const toggleMood = (m: string) => {
     setMoods((prev) => {
       if (prev.includes(m)) return prev.filter((x) => x !== m);
-      if (prev.length >= MAX_MOODS) return prev;
       return [...prev, m];
     });
   };
@@ -1225,6 +1225,9 @@ export default function CheckInEditor({ initialDate }: Props) {
             peekJournalStartedAt(date, "checkin")
           ),
           was_first_save_of_day: result.xp.wasFirstSaveOfDay,
+          has_main_event: mainEvent.trim().length > 0,
+          tag_count: tags.filter((t) => t !== "none_special").length,
+          mood_count: moods.length,
         });
         if (result.xp.wasFirstSaveOfDay && priorBefore === 0) {
           markPersonActivated();
@@ -1529,28 +1532,25 @@ export default function CheckInEditor({ initialDate }: Props) {
         <div className="ui-emphasize-head">
           <p className="ui-emphasize-title">기분</p>
           <p className="ui-hint">
-            {moods.length}/{MAX_MOODS}
+            {moods.length === 0 ? "최소 1개" : `${moods.length}개`}
           </p>
         </div>
         <div className="grid grid-cols-4 gap-2">
           {MOOD_OPTIONS.map((m) => {
             const on = moods.includes(m);
-            const blocked = !on && moods.length >= MAX_MOODS;
             return (
               <button
                 key={m}
                 type="button"
-                disabled={blocked}
                 aria-pressed={on}
                 onClick={(e) => {
                   const wasOn = moods.includes(m);
                   toggleMood(m);
-                  // 선택할 때만 이펙트 (해제는 조용히)
-                  if (!wasOn && !blocked) {
+                  if (!wasOn) {
                     celebrateClick(e, { variant: "mood", label: m });
                   }
                 }}
-                className="min-h-[3.25rem] px-2 py-2.5 text-sm font-black border-2 leading-tight disabled:opacity-40"
+                className="min-h-[3.25rem] px-2 py-2.5 text-sm font-black border-2 leading-tight"
                 style={{
                   borderColor: on ? "var(--px-accent)" : "var(--px-border)",
                   color: on ? "var(--px-accent)" : "var(--px-text)",

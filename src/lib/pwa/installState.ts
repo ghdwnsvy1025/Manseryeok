@@ -16,14 +16,31 @@ export function isKakaoTalkInApp(): boolean {
   return /KAKAOTALK/i.test(navigator.userAgent);
 }
 
+/** URL에 install_guide=1을 붙여 준다 (해시는 맨 뒤에 그대로 보존). */
+function withInstallGuideParam(url: string): string {
+  try {
+    const parsed = new URL(url);
+    parsed.searchParams.set("install_guide", "1");
+    return parsed.toString();
+  } catch {
+    // 상대 경로 등 URL 생성자로 파싱 안 되는 경우 수동으로 붙인다.
+    const hashIndex = url.indexOf("#");
+    const hash = hashIndex >= 0 ? url.slice(hashIndex) : "";
+    const base = hashIndex >= 0 ? url.slice(0, hashIndex) : url;
+    const sep = base.includes("?") ? "&" : "?";
+    return `${base}${sep}install_guide=1${hash}`;
+  }
+}
+
 /**
  * 카톡 인앱에서 외부 브라우저(Chrome/Safari)로 현재 페이지 열기.
  * 카톡 WebView 안에서는 beforeinstallprompt가 없어 PWA 설치가 불가하고,
  * 비교군도 대개 이 스킴으로 “앱 설치” 버튼을 구현한다.
+ * 외부 브라우저에서 열리면 install_guide=1을 붙여, 설치 안내 팝업을 띄운다.
  */
 export function openInExternalBrowser(url?: string): boolean {
   if (typeof window === "undefined") return false;
-  const target = url ?? window.location.href;
+  const target = withInstallGuideParam(url ?? window.location.href);
   try {
     // 카카오 공식: 외부 브라우저로 URL 열기
     window.location.href =

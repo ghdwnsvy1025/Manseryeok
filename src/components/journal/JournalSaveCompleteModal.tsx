@@ -58,7 +58,7 @@ export default function JournalSaveCompleteModal({
   const [xpFloatVisible, setXpFloatVisible] = useState(false);
   const [savedLocal, setSavedLocal] = useState(false);
   const [sharedLocal, setSharedLocal] = useState(false);
-  const [showDetail, setShowDetail] = useState(false);
+  const [showDetail, setShowDetail] = useState(true);
   const closeRef = useRef<HTMLButtonElement>(null);
   const gaugeRef = useRef<HTMLDivElement>(null);
   const xpFloatRef = useRef<HTMLParagraphElement>(null);

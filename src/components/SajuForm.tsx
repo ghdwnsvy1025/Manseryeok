@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import type { SajuInput, SajuOptions, CalendarType, DayChangeRule, TimeCorrection } from "@/lib/saju/types";
 import type { Gender } from "@/lib/saju/daeun";
 import { getBirthPrefillForForm } from "@/lib/diary/sajuSettings";
@@ -34,6 +34,15 @@ const LOCATION_PRESETS = [
   { id: "jeju", name: "대한민국, 제주", longitude: 126.53, latitude: 33.50 },
   { id: "custom", name: "직접 입력", longitude: 126.98, latitude: 37.57 },
 ] as const;
+
+const YEAR_OPTIONS: string[] = (() => {
+  const currentYear = new Date().getFullYear();
+  const years: string[] = [];
+  for (let y = currentYear; y >= 1920; y--) {
+    years.push(String(y));
+  }
+  return years;
+})();
 
 function getCurrentDateTimeParts() {
   const now = new Date();
@@ -134,6 +143,13 @@ export default function SajuForm({
     () => seedProfile?.label?.trim() ?? ""
   );
   const [year, setYear] = useState(initialDateTime.year);
+  const yearOptions = useMemo(() => {
+    const y = parseInt(initialDateTime.year, 10);
+    if (Number.isFinite(y) && y > 0 && y < 1920) {
+      return [String(y), ...YEAR_OPTIONS];
+    }
+    return YEAR_OPTIONS;
+  }, [initialDateTime.year]);
   const [month, setMonth] = useState(initialDateTime.month);
   const [day, setDay] = useState(initialDateTime.day);
   const [hour, setHour] = useState(initialDateTime.hour);
@@ -152,8 +168,8 @@ export default function SajuForm({
   const [dayChangeRule, setDayChangeRule] = useState<DayChangeRule>(
     () => seedProfile?.dayChangeRule ?? "midnight"
   );
-  const [timeCorrection, setTimeCorrection] = useState<TimeCorrection>(
-    () => seedProfile?.timeCorrection ?? "trueSolarTime"
+  const [timeCorrection] = useState<TimeCorrection>(
+    () => seedProfile?.timeCorrection ?? "none"
   );
   const [locationPresetId, setLocationPresetId] = useState<
     (typeof LOCATION_PRESETS)[number]["id"]
@@ -285,16 +301,7 @@ export default function SajuForm({
     setFieldHint(null);
   };
 
-  const handleYearChange = (raw: string) => {
-    const { max, label } = DIGIT_LIMITS.year;
-    const digits = raw.replace(/\D/g, "");
-    if (digits.length > max) {
-      setYear(digits.slice(0, max));
-      setFieldHint(`${label}은(는) 최대 ${max}자리까지 입력할 수 있습니다.`);
-      return;
-    }
-
-    const nextYear = digits;
+  const handleYearChange = (nextYear: string) => {
     setYear(nextYear);
     const clamped = clampDayForMonth(day, nextYear, month);
     if (clamped.value !== day) {
@@ -302,15 +309,6 @@ export default function SajuForm({
       setFieldHint(clamped.hint);
     } else {
       setFieldHint(null);
-    }
-    // 4자리 연도 입력 완료 시 월로 이동 (기존 월 값 비움)
-    if (nextYear.length === 4) {
-      const y = Number(nextYear);
-      if (y >= 1900 && y <= 2100) {
-        setMonth("");
-        setDay("");
-        requestAnimationFrame(() => monthRef.current?.focus());
-      }
     }
   };
 
@@ -442,14 +440,19 @@ export default function SajuForm({
         <div className="flex flex-wrap gap-2 items-end">
           <div className="flex flex-col gap-1">
             <label style={LABEL_STYLE}>년</label>
-            <input
-              type="text"
-              inputMode="numeric"
+            <select
               value={year}
               onChange={(e) => handleYearChange(e.target.value)}
-              className="px-input px-3 py-2 text-sm w-24"
+              className="px-select px-3 py-2 text-sm w-28"
               required
-            />
+            >
+              {!year && <option value="">선택</option>}
+              {yearOptions.map((y) => (
+                <option key={y} value={y}>
+                  {y}
+                </option>
+              ))}
+            </select>
           </div>
           <div className="flex flex-col gap-1">
             <label style={LABEL_STYLE}>월</label>
@@ -630,36 +633,6 @@ export default function SajuForm({
                       textAlign: "left",
                     }}
                     onClick={() => setDayChangeRule(val)}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* 시간 보정 */}
-            <div>
-              <p className="mb-2 text-xs font-bold" style={{ color: "var(--px-text2)" }}>
-                ◆ 시간 보정
-              </p>
-              <div className="saju-choice-track" role="radiogroup" aria-label="시간 보정" style={{ maxWidth: "100%", flexDirection: "column" }}>
-                {([
-                  ["none",               "없음 (병원 기록 KST 기준)"],
-                  ["localMeanSolarTime", "평균태양시 (LMT)"],
-                  ["trueSolarTime",      "진태양시 (균시차 포함)"],
-                ] as [TimeCorrection, string][]).map(([val, label], idx, arr) => (
-                  <button
-                    key={val}
-                    type="button"
-                    role="radio"
-                    aria-checked={timeCorrection === val}
-                    className={`saju-choice-chip${timeCorrection === val ? " is-on" : ""}`}
-                    style={{
-                      borderRight: "none",
-                      borderBottom: idx < arr.length - 1 ? "2px solid #000" : "none",
-                      textAlign: "left",
-                    }}
-                    onClick={() => setTimeCorrection(val)}
                   >
                     {label}
                   </button>

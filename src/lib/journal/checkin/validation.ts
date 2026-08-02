@@ -6,6 +6,7 @@ import {
   DOMAIN_POOL_CODES,
   MAX_CHECKIN_TAGS,
   MAX_MOODS,
+  MIN_MOODS,
   NONE_SPECIAL_TAG,
   isDomainCode,
   isOrdinalScore,
@@ -36,6 +37,9 @@ export function validateCheckInSave(input: {
     return { ok: false, error: "행복도를 0~10 중에서 골라주세요." };
   }
 
+  if (input.moods.length < MIN_MOODS) {
+    return { ok: false, error: "기분을 하나 이상 골라주세요." };
+  }
   if (input.moods.length > MAX_MOODS) {
     return { ok: false, error: `기분은 최대 ${MAX_MOODS}개까지 고를 수 있어요.` };
   }

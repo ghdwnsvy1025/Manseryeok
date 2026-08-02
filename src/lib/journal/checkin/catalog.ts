@@ -24,7 +24,9 @@ export const DOMAIN_POOL_CODES = [
 
 export type DomainCode = (typeof DOMAIN_POOL_CODES)[number];
 
-export const MAX_MOODS = 3;
+export const MAX_MOODS = 99; // 사실상 무제한 (옵션 개수 이하)
+/** 저장 시 기분 최소 개수 */
+export const MIN_MOODS = 1;
 export const MAX_CHECKIN_TAGS = 3;
 export const MAX_DAILY_DOMAINS = 2;
 

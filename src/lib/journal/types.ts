@@ -146,7 +146,7 @@ export const RECOMMENDED_ENABLED_CATEGORIES = 6;
 export { JOURNAL_SCORE_LABELS as SCORE_LABELS } from "./scoreScale";
 export type { JournalScore } from "./scoreScale";
 
-/** 체크인 v2 기분 (최대 3개 선택) — 키워드 랭킹·문장 안전필터와 연동 */
+/** 체크인 v2 기분 (최소 1개, 개수 제한 없음) — 키워드 랭킹·문장 안전필터와 연동 */
 export const MOOD_OPTIONS = [
   "기쁨",
   "뿌듯함",

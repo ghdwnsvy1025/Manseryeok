@@ -219,7 +219,7 @@ export default function TrendOverlayChart({
               cx={xAt(Number(iStr))}
               cy={yAt(Number(vStr))}
               r={3}
-              fill="var(--px-accent)"
+              fill="#f472b6"
             />
           );
         }
@@ -227,7 +227,7 @@ export default function TrendOverlayChart({
           <polyline
             key={`${uid}-h-${si}`}
             fill="none"
-            stroke="var(--px-accent)"
+            stroke="#f472b6"
             strokeWidth={2.6}
             strokeLinejoin="round"
             strokeLinecap="round"
@@ -245,7 +245,7 @@ export default function TrendOverlayChart({
             cx={xAt(i)}
             cy={yAt(p.value)}
             r={2.5}
-            fill="var(--px-accent)"
+            fill="#f472b6"
           >
             <title>
               {formatMd(p.date)} · 행복도 {p.value}점

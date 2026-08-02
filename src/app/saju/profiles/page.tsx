@@ -40,6 +40,7 @@ export default function SajuProfilesPage() {
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [deletingListId, setDeletingListId] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     setError(null);
@@ -144,34 +145,55 @@ export default function SajuProfilesPage() {
     }
   };
 
-  const canDeleteEditing =
-    Boolean(editing) &&
-    editing!.id !== journalId &&
-    !editing!.isPrimary;
+  /** 저널(내) 프로필·대표 프로필은 목록/수정폼 어디서도 삭제할 수 없음 */
+  const canDeleteProfile = useCallback(
+    (profile: SajuProfile) => profile.id !== journalId && !profile.isPrimary,
+    [journalId]
+  );
 
-  const handleDelete = async () => {
-    if (!editing || !canDeleteEditing) return;
-    const name = profileDisplayName(editing);
+  const canDeleteEditing = Boolean(editing) && canDeleteProfile(editing!);
+
+  const deleteProfileWithConfirm = async (
+    profile: SajuProfile
+  ): Promise<boolean> => {
+    const name = profileDisplayName(profile);
     if (
       !window.confirm(
         `「${name}」 프로필을 삭제할까요?\n삭제하면 되돌릴 수 없어요.`
       )
     ) {
-      return;
+      return false;
     }
-    setDeleting(true);
     setError(null);
     try {
-      await deleteSajuProfile(editing.id);
-      setEditing(null);
+      await deleteSajuProfile(profile.id);
       await refresh();
+      return true;
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "프로필을 삭제하지 못했어요."
       );
-    } finally {
-      setDeleting(false);
+      return false;
     }
+  };
+
+  const handleDelete = async () => {
+    if (!editing || !canDeleteEditing) return;
+    setDeleting(true);
+    const ok = await deleteProfileWithConfirm(editing);
+    if (ok) setEditing(null);
+    setDeleting(false);
+  };
+
+  const handleDeleteFromList = async (profile: SajuProfile) => {
+    if (!canDeleteProfile(profile)) return;
+    captureEvent(ANALYTICS_EVENTS.profileEditClicked, {
+      is_self: false,
+      action: "delete_from_list",
+    });
+    setDeletingListId(profile.id);
+    await deleteProfileWithConfirm(profile);
+    setDeletingListId(null);
   };
 
   if (loading) {
@@ -409,6 +431,21 @@ export default function SajuProfilesPage() {
                   >
                     수정
                   </button>
+                  {canDeleteProfile(profile) && (
+                    <button
+                      type="button"
+                      disabled={deletingListId === profile.id}
+                      onClick={() => void handleDeleteFromList(profile)}
+                      className="shrink-0 px-3.5 self-stretch flex items-center text-[13px] font-black border-l-2 disabled:opacity-60"
+                      style={{
+                        borderColor: "var(--px-border)",
+                        color: "#f87171",
+                        background: "var(--px-bg3)",
+                      }}
+                    >
+                      {deletingListId === profile.id ? "삭제 중…" : "삭제"}
+                    </button>
+                  )}
                 </div>
               );
             })}

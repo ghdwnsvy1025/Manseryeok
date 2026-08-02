@@ -8,6 +8,7 @@ import type { SajuProfile } from "@/lib/diary/types";
 import type { NatalReadingResult } from "@/lib/saju/reading/natalReadingTypes";
 import { formatOpenAiStatus } from "@/lib/journal/openaiStatus";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
+import { todayDateString } from "@/lib/diary/dayPillar";
 
 import EmotionalLoadingHint from "@/components/ui/EmotionalLoadingHint";
 
@@ -20,6 +21,30 @@ type ApiPayload = NatalReadingResult & {
   detail?: string;
   cached?: boolean;
 };
+
+function natalDayCacheKey(profileId: string): string {
+  return `manseryeok:natal_day:${profileId}:${todayDateString()}`;
+}
+
+function readNatalDayCache(profileId: string): ApiPayload | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(natalDayCacheKey(profileId));
+    if (!raw) return null;
+    return JSON.parse(raw) as ApiPayload;
+  } catch {
+    return null;
+  }
+}
+
+function writeNatalDayCache(profileId: string, data: ApiPayload): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(natalDayCacheKey(profileId), JSON.stringify(data));
+  } catch {
+    /* ignore quota errors */
+  }
+}
 
 const NATAL_TEASE_LINES = [
   {
@@ -114,6 +139,13 @@ export default function SajuNatalReadingPanel({ profile }: Props) {
   const [panelOpen, setPanelOpen] = useState(false);
 
   const load = useCallback(async () => {
+    const cached = readNatalDayCache(profile.id);
+    if (cached) {
+      setData(cached);
+      setError(null);
+      return;
+    }
+
     setLoading(true);
     setError(null);
     const controller = new AbortController();
@@ -136,6 +168,7 @@ export default function SajuNatalReadingPanel({ profile }: Props) {
         return;
       }
       setData(json);
+      writeNatalDayCache(profile.id, json);
     } catch (e) {
       if (e instanceof Error && e.name === "AbortError") {
         setError("종합풀이 생성 시간이 너무 길어요. 잠시 후 다시 열어 주세요.");
@@ -148,6 +181,12 @@ export default function SajuNatalReadingPanel({ profile }: Props) {
       setLoading(false);
     }
   }, [profile]);
+
+  // 오늘 이미 받아 둔 종합풀이가 있으면 네트워크 없이 바로 채워 둔다 (펼침은 여전히 클릭으로).
+  useEffect(() => {
+    const cached = readNatalDayCache(profile.id);
+    if (cached) setData(cached);
+  }, [profile.id]);
 
   const captureNatalReadingOpened = (hadCache: boolean) => {
     void import("@/lib/analytics/posthog").then(
@@ -162,7 +201,8 @@ export default function SajuNatalReadingPanel({ profile }: Props) {
 
   const openPanel = () => {
     setPanelOpen(true);
-    captureNatalReadingOpened(Boolean(data));
+    const hadCache = Boolean(data) || Boolean(readNatalDayCache(profile.id));
+    captureNatalReadingOpened(hadCache);
     if (!data && !loading) {
       void load();
     }
