@@ -160,6 +160,150 @@ PostHog Live/Insight에 영어로 보이면 이 표를 보면 됩니다.
 
 ---
 
+## 3.5 탭별 Trends 만들기 (따라하기)
+
+공통:
+- 타입 **Trends** · 집계 먼저 **Unique users** (인기/도달)
+- 재클릭이 궁금하면 같은 Insight를 복제해 **Total count**로 저장하거나 Edit으로 전환
+- 대시보드 예: `main`에 붙이거나 「탭별 Trends」보드 새로 만들기
+- 이벤트 이름이 목록에 없으면 **그 버튼을 Production에서 한 번 누른 뒤** 다시 검색
+
+하단 탭은 `home` / `journal`(일기) / `stats`(기록) 세 개이고, **프로필·사주는 메뉴로 들어가는 화면**입니다.
+
+---
+
+### T0 · 탭 이동 (공통 1장)
+**이름:** `Trends · Nav tabs`  
+**시리즈 (Unique):**
+| 이벤트 | 한글 |
+|--------|------|
+| `nav_tab_clicked` | 하단 탭 클릭 |
+
+**Breakdown:** `tab` → `home` / `journal` / `stats`  
+☐ 만들었음
+
+---
+
+### T1 · 홈 탭
+**이름:** `Trends · Home`  
+**시리즈 (Unique) — 아래를 한 Insight에 여러 줄로:**
+
+| # | 이벤트 | 의미 |
+|---|--------|------|
+| 1 | `fortune_opened` | 오늘의 운세 열기/펼치기 |
+| 2 | `fortune_collapsed` | 오늘의 운세 접기 |
+| 3 | `home_today_entry_clicked` | 오늘 일기 쓰기·수정 |
+| 4 | `home_stats_trend_clicked` | 기록·추이 보기 |
+| 5 | `install_prompt_shown` | 설치 안내 노출 (있으면) |
+| 6 | `install_clicked` | 설치 버튼 |
+
+**선택 Breakdown**
+- `home_today_entry_clicked` → `mode` (`write` / `edit`)
+- 재클릭 보고 싶으면 복제본 Total, 또는 `is_repeat`
+
+☐ Unique / ☐ (선택) Total 복제
+
+---
+
+### T2 · 일기 탭 (journal)
+**이름:** `Trends · Journal`  
+
+| # | 이벤트 | 의미 |
+|---|--------|------|
+| 1 | `question_tease_clicked` | 오늘의 질문 첫 클릭 |
+| 2 | `question_shown` | 질문 로드(첫 API) |
+| 3 | `journal_started` | 작성 시작 |
+| 4 | `journal_saved` | 저장 |
+| 5 | `quote_shown` | 명언 노출 |
+| 6 | `event_tags_expanded` | 무슨 일이 있었나요 펼치기 |
+| 7 | `diary_sheet_opened` | 자유 일기 시트 |
+| 8 | `checkin_step` | 체크인 단계 |
+| 9 | `content_feedback_clicked` | 문장 도움됐 피드백 |
+
+**선택 Breakdown**
+- `journal_saved` → `save_kind` (`create` / `edit`), `has_text`
+- `content_feedback_clicked` → `surface` 또는 `mode`
+- `checkin_step` → `step`
+
+☐ Unique / ☐ (선택) Total 복제
+
+---
+
+### T3 · 기록 탭 (stats)
+**이름:** `Trends · Stats`  
+
+| # | 이벤트 | 의미 |
+|---|--------|------|
+| 1 | `stats_opened` | 기록 화면 열림 |
+| 2 | `stats_period_selected` | 주 / 월 |
+| 3 | `stats_categories_menu_clicked` | 카테고리 메뉴 |
+| 4 | `stats_month_changed` | 월 바꾸기 |
+| 5 | `calendar_day_selected` | 캘린더 날짜 |
+| 6 | `entry_list_selected` | 목록에서 일기 선택 |
+| 7 | `entry_list_edit_clicked` | 목록·리포트에서 수정 |
+| 8 | `past_entry_opened` | 지난 일기 열람 |
+| 9 | `pattern_tab_selected` | 사주패턴 천간/지지 |
+| 10 | `ganji_collection_opened` | 간지 도감 |
+
+**선택 Breakdown**
+- `stats_period_selected` → `period` (`week` / `month`)
+- `calendar_day_selected` → `is_today`
+- `pattern_tab_selected` → `tab` (`stem` / `branch`)
+
+☐ Unique / ☐ (선택) Total 복제
+
+---
+
+### T4 · 프로필 (메뉴 → 프로필 관리)
+**이름:** `Trends · Profile`  
+
+| # | 이벤트 | 의미 |
+|---|--------|------|
+| 1 | `menu_opened` | 헤더 메뉴 열기 |
+| 2 | `menu_item_clicked` | 메뉴 항목 선택 |
+| 3 | `profile_edit_clicked` | 프로필 수정 |
+| 4 | `profile_add_clicked` | 다른 사람(+) 추가 |
+| 5 | `profile_open_manseryeok_clicked` | 프로필에서 만세력 열기 |
+| 6 | `profile_started` | 사주 입력 시작 |
+| 7 | `profile_created` | 사주 등록 완료 |
+| 8 | `feedback_opened` | 의견 보내기 열림 |
+| 9 | `feedback_submitted` | 의견 제출 |
+| 10 | `signed_out` | 로그아웃 |
+
+**선택 Breakdown**
+- `menu_item_clicked` → `item` (`profiles` / `saju` / `feedback` / `logout`)
+
+☐ Unique / ☐ (선택) Total 복제
+
+---
+
+### T5 · 사주 탭 (메뉴 → 내 사주)
+**이름:** `Trends · Saju`  
+
+| # | 이벤트 | 의미 |
+|---|--------|------|
+| 1 | `saju_opened` | 내 사주 화면 |
+| 2 | `saju_mode_selected` | 기본 / 연구 모드 |
+| 3 | `saju_research_hint_clicked` | 연구모드 글자·힌트 |
+| 4 | `saju_daewoon_clicked` | 대운 |
+| 5 | `saju_sewoon_clicked` | 세운 |
+| 6 | `natal_reading_opened` | 사주 종합풀이 |
+
+**선택 Breakdown**
+- `saju_mode_selected` → `mode` (`basic` / `research`)
+
+☐ Unique / ☐ (선택) Total 복제
+
+---
+
+### 만드는 순서 (추천)
+1. T0 Nav → T1 Home → T2 Journal → T3 Stats → T4 Profile → T5 Saju  
+2. 전부 **Unique**로 `main`(또는 새 보드)에 Add  
+3. 재클릭이 궁금한 묶음만 Total 복제  
+4. 가설용 Funnel(02·03·H*)는 Trends와 **별도** — 섞지 말 것
+
+---
+
 ## 4. 대시보드 「베타 Day1」— 01~10 전부
 
 **「베타 Day1」= 베타용 메인 대시보드 이름**입니다.  
