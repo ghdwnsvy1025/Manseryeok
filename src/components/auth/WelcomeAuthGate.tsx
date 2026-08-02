@@ -133,6 +133,19 @@ export default function WelcomeAuthGate({
           <br />
           기록이 쌓일수록, 사주도 당신 곁으로.
         </p>
+        <p
+          className="text-[12px] font-bold leading-snug max-w-[20rem] px-3 py-2 border"
+          style={{
+            color: "var(--px-text-on-panel)",
+            borderColor: "var(--px-border2)",
+            background: "color-mix(in srgb, var(--px-bg2) 90%, transparent)",
+          }}
+          role="note"
+        >
+          일기·체크인은 본인만 볼 수 있어요.
+          <br />
+          링크를 공유해도 기록 내용은 열리지 않습니다.
+        </p>
       </section>
 
       <section
@@ -162,8 +175,8 @@ export default function WelcomeAuthGate({
           {(
             [
               "확인 메일·비밀번호 없이 바로 시작",
+              "같은 Google 계정에서만 일기 확인",
               "기기 바꿔도 기록이 이어져요",
-              "이 기기 기록도 계정에 자동 저장",
             ] as const
           ).map((line) => (
             <li
@@ -203,7 +216,9 @@ export default function WelcomeAuthGate({
           className="text-[11px] font-bold text-center leading-snug"
           style={{ color: "var(--px-text2)" }}
         >
-          이 기기에만 저장 · 나중에 Google로 이어갈 수 있어요
+          이 기기에만 저장 · 다른 사람은 볼 수 없어요
+          <br />
+          나중에 Google로 이어갈 수 있어요
         </p>
       </section>
 
