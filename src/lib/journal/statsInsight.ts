@@ -637,30 +637,23 @@ export function buildWeeklyReport(
 
   const rangeLabel = `${formatMd(from)} ~ ${formatMd(to)}`;
   const shareLines = [
-    `주간 기록 리포트 (${rangeLabel})`,
-    `기록 ${recorded.length}/${range.length}일`,
-    avg != null ? `평균 행복도 ${avg.toFixed(1)}/10` : "평균 행복도 -",
+    `주간 리포트 (${rangeLabel})`,
+    avg != null ? `이번 주 평균 행복도 ${avg.toFixed(1)}` : "이번 주 평균 행복도 —",
   ];
-  if (deltaFromPrevWeek != null) {
-    shareLines.push(`지난주 대비 ${formatDelta(deltaFromPrevWeek)}`);
-  }
   if (bestDay) {
     shareLines.push(
-      `가장 좋았던 날 ${formatMd(bestDay.date)} (${bestDay.value.toFixed(1)})`
+      `가장 환했던 날 ${formatMd(bestDay.date)} (${bestDay.value.toFixed(1)})`
     );
   }
   if (bestCategory) {
     shareLines.push(
-      `잘 지킨 것 ${bestCategory.name} ${bestCategory.average.toFixed(1)}`
+      `잘 흘러간 영역 ${bestCategory.name} ${bestCategory.average.toFixed(1)}`
     );
   }
   if (worstCategory) {
     shareLines.push(
-      `아쉬운 것 ${worstCategory.name} ${worstCategory.average.toFixed(1)}`
+      `돌봐줄 영역 ${worstCategory.name} ${worstCategory.average.toFixed(1)}`
     );
-  }
-  if (newGanji.length > 0) {
-    shareLines.push(`새로 채운 간지 ${newGanji.join(", ")}`);
   }
 
   return {

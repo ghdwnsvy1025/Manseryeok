@@ -9,6 +9,7 @@ import {
   useState,
 } from "react";
 import { useRouter } from "next/navigation";
+import { usePlayWhenVisible } from "@/hooks/usePlayWhenVisible";
 import { getJournalStorage } from "@/lib/journal/getStorage";
 import {
   JOURNAL_PROGRESS_CHANGED_EVENT,
@@ -1335,9 +1336,14 @@ export default function CheckInEditor({ initialDate }: Props) {
     </span>
   );
 
+  const ritualRef = usePlayWhenVisible<HTMLDivElement>();
+
   return (
-    <div className="space-y-4 pb-24">
-      <header className="space-y-2">
+    <div ref={ritualRef} className="checkin-ritual space-y-4 pb-24">
+      <header
+        className="checkin-ritual__block js-play-when-visible space-y-2"
+        style={{ ["--ci" as string]: 0 }}
+      >
         <div className="space-y-1.5" aria-label={`기록 날짜 ${date}`}>
           <div className="flex items-stretch gap-1.5">
             <button
@@ -1434,7 +1440,11 @@ export default function CheckInEditor({ initialDate }: Props) {
         </div>
       </header>
 
-      <section className="space-y-2" aria-label="하루 정리글">
+      <section
+        className="checkin-ritual__block js-play-when-visible space-y-2"
+        style={{ ["--ci" as string]: 1 }}
+        aria-label="하루 정리글"
+      >
         <button
           type="button"
           onClick={openDiarySheet}
@@ -1505,7 +1515,8 @@ export default function CheckInEditor({ initialDate }: Props) {
 
       <section
         ref={happinessRef}
-        className="space-y-3 scroll-mt-4"
+        className="checkin-ritual__block js-play-when-visible space-y-3 scroll-mt-4"
+        style={{ ["--ci" as string]: 2 }}
       >
         <div className="ui-emphasize-head">
           <p className="ui-emphasize-title">행복도 (0~10)</p>
@@ -1533,7 +1544,10 @@ export default function CheckInEditor({ initialDate }: Props) {
         </div>
       </section>
 
-      <section className="space-y-2">
+      <section
+        className="checkin-ritual__block js-play-when-visible space-y-2"
+        style={{ ["--ci" as string]: 3 }}
+      >
         <div className="ui-emphasize-head">
           <p className="ui-emphasize-title">기분</p>
           <p className="ui-hint">
@@ -1557,7 +1571,9 @@ export default function CheckInEditor({ initialDate }: Props) {
                     celebrateClick(e, { variant: "mood", label: m });
                   }
                 }}
-                className="min-h-[3.25rem] px-2 py-2.5 text-sm font-black border-2 leading-tight"
+                className={`min-h-[3.25rem] px-2 py-2.5 text-sm font-black border-2 leading-tight${
+                  on ? " checkin-mood-ink" : ""
+                }`}
                 style={{
                   borderColor: on ? "var(--px-accent)" : "var(--px-border)",
                   color: on ? "var(--px-accent)" : "var(--px-text)",
@@ -1574,7 +1590,10 @@ export default function CheckInEditor({ initialDate }: Props) {
         </div>
       </section>
 
-      <section className="space-y-3">
+      <section
+        className="checkin-ritual__block js-play-when-visible space-y-3"
+        style={{ ["--ci" as string]: 4 }}
+      >
         <div className="ui-emphasize-head">
           <p className="ui-emphasize-title">핵심 상태</p>
           {requiredBadge}
@@ -1619,7 +1638,10 @@ export default function CheckInEditor({ initialDate }: Props) {
         })}
       </section>
 
-      <div className="space-y-2">
+      <div
+        className="checkin-ritual__block js-play-when-visible space-y-2"
+        style={{ ["--ci" as string]: 5 }}
+      >
         <button
           type="button"
           onClick={() => {

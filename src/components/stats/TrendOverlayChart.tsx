@@ -1,6 +1,7 @@
 "use client";
 
 import { useId, useMemo } from "react";
+import { usePlayWhenVisible } from "@/hooks/usePlayWhenVisible";
 import type { HappinessPoint } from "@/lib/journal/homeStats";
 import type { CategoryCode } from "@/lib/journal/types";
 
@@ -52,6 +53,10 @@ export default function TrendOverlayChart({
   dates,
 }: Props) {
   const uid = useId();
+  const wrapRef = usePlayWhenVisible<HTMLDivElement>(
+    true,
+    ".js-play-when-visible"
+  );
   const hasData =
     happiness.length > 0 || overlays.some((o) => o.points.length > 0);
 
@@ -134,9 +139,10 @@ export default function TrendOverlayChart({
   }
 
   return (
+    <div ref={wrapRef} className="w-full">
     <svg
       viewBox={`0 0 ${width} ${height}`}
-      className="w-full h-auto"
+      className="w-full h-auto stats-chart-reveal js-play-when-visible"
       role="img"
       aria-label="행복도와 카테고리 월간 추이 그래프"
     >
@@ -204,6 +210,7 @@ export default function TrendOverlayChart({
               strokeLinecap="round"
               points={toSvgPoints(seg)}
               opacity={0.9}
+              className="stats-chart-overlay"
             />
           );
         })
@@ -226,12 +233,14 @@ export default function TrendOverlayChart({
         return (
           <polyline
             key={`${uid}-h-${si}`}
+            className="stats-chart-line stats-chart-line--main"
             fill="none"
             stroke="#f472b6"
             strokeWidth={2.6}
             strokeLinejoin="round"
             strokeLinecap="round"
             points={toSvgPoints(seg)}
+            pathLength={1}
           />
         );
       })}
@@ -242,6 +251,7 @@ export default function TrendOverlayChart({
         return (
           <circle
             key={p.date}
+            className="stats-chart-dot"
             cx={xAt(i)}
             cy={yAt(p.value)}
             r={2.5}
@@ -274,5 +284,6 @@ export default function TrendOverlayChart({
         );
       })}
     </svg>
+    </div>
   );
 }

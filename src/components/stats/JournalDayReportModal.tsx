@@ -132,7 +132,7 @@ export default function JournalDayReportModal({
 
   return (
     <div
-      className="fixed inset-0 z-[10050] flex items-end sm:items-center justify-center p-3"
+      className="fixed inset-0 z-[10050] flex items-center justify-center p-3"
       style={{ background: "rgba(0,0,0,0.55)" }}
       role="dialog"
       aria-modal="true"

@@ -18,6 +18,7 @@ import { burstFromElement } from "@/lib/ui/clickBurst";
 import { XP_GAUGE_FILL, XP_GAIN_COLOR } from "@/lib/ui/xpGauge";
 import EmotionalLoadingHint from "@/components/ui/EmotionalLoadingHint";
 import CherryBlossomLayer from "@/components/motion/CherryBlossomLayer";
+import { shareAppText } from "@/lib/app/shareInvite";
 
 type Props = {
   entry: JournalEntry;
@@ -56,7 +57,6 @@ export default function JournalSaveCompleteModal({
 }: Props) {
   const [gauge, setGauge] = useState(0);
   const [xpFloatVisible, setXpFloatVisible] = useState(false);
-  const [savedLocal, setSavedLocal] = useState(false);
   const [sharedLocal, setSharedLocal] = useState(false);
   const [showDetail, setShowDetail] = useState(true);
   const closeRef = useRef<HTMLButtonElement>(null);
@@ -171,34 +171,6 @@ export default function JournalSaveCompleteModal({
       });
   }, [quote, quoteLoading, entry.entryDate, contentType, deliveryId, isVerified]);
 
-  const handleSave = () => {
-    if (!quote || typeof window === "undefined") return;
-    try {
-      const key = `manseryeok:saved-sentences:v1`;
-      const raw = window.localStorage.getItem(key);
-      const list = raw ? (JSON.parse(raw) as unknown[]) : [];
-      list.unshift({
-        text: quote,
-        contentType,
-        sourceLabel,
-        authorName,
-        workTitle,
-        entryDate: entry.entryDate,
-        savedAt: new Date().toISOString(),
-      });
-      window.localStorage.setItem(key, JSON.stringify(list.slice(0, 50)));
-      setSavedLocal(true);
-      void submitContentFeedback({
-        eventDate: entry.entryDate,
-        contentType: contentType ?? "app_original_sentence",
-        contentId: deliveryId,
-        saved: true,
-      });
-    } catch {
-      /* ignore */
-    }
-  };
-
   const attributionLine = isVerified
     ? [authorName, workTitle].filter(Boolean).join(" · ") ||
       sourceLabel ||
@@ -207,13 +179,9 @@ export default function JournalSaveCompleteModal({
 
   const handleShare = async () => {
     if (!quote) return;
-    const shareText = `${quote}\n— ${attributionLine}`;
+    const body = `${quote}\n— ${attributionLine}`;
     try {
-      if (navigator.share) {
-        await navigator.share({ text: shareText });
-      } else if (navigator.clipboard) {
-        await navigator.clipboard.writeText(shareText);
-      }
+      await shareAppText(body, "/");
       setSharedLocal(true);
       void submitContentFeedback({
         eventDate: entry.entryDate,
@@ -222,7 +190,7 @@ export default function JournalSaveCompleteModal({
         shared: true,
       });
     } catch {
-      /* ignore */
+      /* ignore cancel / unavailable */
     }
   };
 
@@ -303,40 +271,24 @@ export default function JournalSaveCompleteModal({
                     className="text-[10px] leading-relaxed"
                   />
                 </blockquote>
-                <div className="save-quote-actions flex gap-2 relative">
+                <div className="save-quote-actions relative">
                   <button
                     type="button"
-                    className="min-h-9 px-3 text-xs font-bold border-2"
-                    style={{
-                      borderColor: savedLocal
-                        ? "var(--px-accent)"
-                        : "var(--px-border)",
-                      color: savedLocal
-                        ? "var(--px-accent)"
-                        : "var(--px-text-on-panel)",
-                      background: "var(--px-bg2)",
-                    }}
-                    onClick={handleSave}
-                    title="이 문장을 기기에 담아 두어요"
-                  >
-                    {savedLocal ? "담김" : "담기"}
-                  </button>
-                  <button
-                    type="button"
-                    className="min-h-9 px-3 text-xs font-bold border-2"
+                    className="w-full min-h-10 px-3 text-sm font-black border-2"
                     style={{
                       borderColor: sharedLocal
                         ? "var(--px-accent)"
-                        : "var(--px-border)",
-                      color: sharedLocal
-                        ? "var(--px-accent)"
-                        : "var(--px-text-on-panel)",
-                      background: "var(--px-bg2)",
+                        : "#000",
+                      color: sharedLocal ? "var(--px-accent)" : "#111",
+                      background: sharedLocal
+                        ? "color-mix(in srgb, var(--px-accent) 14%, var(--px-bg2))"
+                        : "var(--px-accent)",
+                      boxShadow: sharedLocal ? "none" : "2px 2px 0 #000",
                     }}
                     onClick={() => void handleShare()}
-                    title="공유 창이 없으면 클립보드에 복사해요"
+                    title="앱 링크와 함께 공유해요"
                   >
-                    {sharedLocal ? "공유됨" : "공유"}
+                    {sharedLocal ? "공유됨 · 링크 포함" : "친구에게 공유"}
                   </button>
                 </div>
               </>

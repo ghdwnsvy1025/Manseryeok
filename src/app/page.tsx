@@ -6,6 +6,7 @@ import SajuProfileSetup from "@/components/home/SajuProfileSetup";
 import HomeHub from "@/components/home/HomeHub";
 import HomeG from "@/components/home/HomeG";
 import HomeSaveCelebration from "@/components/home/HomeSaveCelebration";
+import HomeMotionGate from "@/components/home/HomeMotionGate";
 import { useUserAppState } from "@/hooks/useUserAppState";
 import { isNewDiaryEnabled } from "@/lib/app/featureFlags";
 import { isAnonymousUser } from "@/lib/auth/anonymousSession";
@@ -29,10 +30,10 @@ import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 
 function withCelebration(node: ReactNode) {
   return (
-    <>
+    <HomeMotionGate>
       <HomeSaveCelebration />
       {node}
-    </>
+    </HomeMotionGate>
   );
 }
 

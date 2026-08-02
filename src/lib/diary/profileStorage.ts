@@ -1,6 +1,7 @@
 import type { SajuInput, SajuResult } from "@/lib/saju/types";
 import type { Gender } from "@/lib/saju/daeun";
 import { isGuestMode } from "@/lib/auth/guestMode";
+import { clearUiSessionCaches } from "@/lib/app/clearUiSessionCaches";
 import {
   DIARY_SCHEMA_VERSION,
   type SajuProfile,
@@ -89,6 +90,35 @@ export function isGuestOwnedProfiles(
 ): boolean {
   if (profiles.length === 0) return true;
   return profiles.every((p) => !p.userId);
+}
+
+/**
+ * 로컬 IndexedDB → 계정 이관에 포함해도 되는 사주 프로필 id.
+ * 다른 계정 잔여 일기는 제외한다.
+ * @param userId 없으면 게스트 소유분만
+ */
+export function localJournalMigrationAllowlist(
+  userId?: string | null
+): Set<string> {
+  const ids = new Set<string>();
+  const take = (profiles: SajuProfile[]) => {
+    for (const p of profiles) {
+      if (!p?.id) continue;
+      if (!p.userId || (userId != null && p.userId === userId)) ids.add(p.id);
+    }
+  };
+
+  const active = loadLocalSajuProfiles();
+  const stash = readGuestStashProfiles();
+
+  if (isGuestOwnedProfiles(active)) take(active);
+  if (stash.length > 0 && isGuestOwnedProfiles(stash)) take(stash);
+  if (userId && localProfilesSafeToMigrate(active, userId)) take(active);
+
+  // 레거시 로컬 프로필 키
+  ids.add("local");
+
+  return ids;
 }
 
 function readGuestStashProfiles(): SajuProfile[] {
@@ -182,7 +212,7 @@ export function activateGuestWorkspace(): void {
 
 /**
  * 사주/유저 프로필 로컬 캐시 삭제 (활성 워크스페이스만).
- * 비로그인 스냅샷은 유지한다.
+ * 비로그인 스냅샷은 유지한다. UI 캐시(운세·초안 등)도 함께 비운다.
  */
 export function clearLocalAccountScopedState(opts?: {
   notify?: boolean;
@@ -201,9 +231,11 @@ export function clearLocalAccountScopedState(opts?: {
     localStorage.removeItem("manseryeok_experience_mode");
     localStorage.removeItem("manseryeok_onboarding_completed_at");
     localStorage.removeItem("manseryeok_first_visit_welcome_v1");
+    localStorage.removeItem("manseryeok_first_visit_welcome_v2");
   } catch {
     /* ignore */
   }
+  clearUiSessionCaches();
   if (opts?.notify !== false) {
     notifySajuProfileChanged();
   }
@@ -227,6 +259,9 @@ export function reconcileLocalStateWithAuthUser(
     prev = null;
   }
   if (userId === prev) return;
+
+  // 사용자 경계가 바뀌면 운세·초안 등 UI 캐시 먼저 비움
+  clearUiSessionCaches();
 
   // 로그아웃 → 비로그인 워크스페이스로 전환
   if (!userId) {

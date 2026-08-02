@@ -170,7 +170,7 @@ describe("statsInsight", () => {
     expect(report.days).toHaveLength(7);
     expect(report.recordedDays).toBe(3);
     expect(report.avg).toBe(8);
-    expect(report.shareText).toContain("주간 기록 리포트");
+    expect(report.shareText).toContain("주간 리포트");
   });
 
   test("weekly report handles empty week", () => {

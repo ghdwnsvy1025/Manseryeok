@@ -14,6 +14,19 @@ type Props = {
   intervalMs?: number;
 };
 
+function PoeticSpinner({ size = "md" }: { size?: "sm" | "md" }) {
+  const dim = size === "sm" ? "w-5 h-5" : "w-10 h-10";
+  return (
+    <div className={`emotion-loader ${dim}`} aria-hidden>
+      <span className="emotion-loader__ring" />
+      <span className="emotion-loader__core" />
+      <span className="emotion-loader__mote emotion-loader__mote--1" />
+      <span className="emotion-loader__mote emotion-loader__mote--2" />
+      <span className="emotion-loader__mote emotion-loader__mote--3" />
+    </div>
+  );
+}
+
 /**
  * 운세·질문·명언 공통 감성 로딩.
  * 마운트마다 문구 순서를 섞고, 가능하면 명언 DB 문장으로 보강.
@@ -31,7 +44,6 @@ export default function EmotionalLoadingHint({
   const statusDeck = useMemo(() => {
     if (!status?.trim()) return [] as string[];
     const base = status.trim();
-    // 하단 상태줄도 조금씩 바꿔서 ‘항상 같은 문구’ 느낌을 줄임
     return [
       base,
       "조금만 기다려 주세요…",
@@ -69,15 +81,7 @@ export default function EmotionalLoadingHint({
         aria-live="polite"
         aria-busy="true"
       >
-        <div className="relative w-5 h-5 shrink-0" aria-hidden>
-          <span
-            className="absolute inset-0 rounded-full border-2 animate-spin"
-            style={{
-              borderColor: "color-mix(in srgb, var(--px-accent) 22%, transparent)",
-              borderTopColor: "var(--px-accent)",
-            }}
-          />
-        </div>
+        <PoeticSpinner size="sm" />
         <p
           className="text-[12px] font-bold leading-snug"
           style={{ color: "var(--px-text2)" }}
@@ -99,15 +103,7 @@ export default function EmotionalLoadingHint({
       aria-live="polite"
       aria-busy="true"
     >
-      <div className="relative w-9 h-9" aria-hidden>
-        <span
-          className="absolute inset-0 rounded-full border-2 animate-spin"
-          style={{
-            borderColor: "color-mix(in srgb, var(--px-accent) 22%, transparent)",
-            borderTopColor: "var(--px-accent)",
-          }}
-        />
-      </div>
+      <PoeticSpinner size="md" />
       <div className="fortune-loading-stage max-w-[20rem] min-h-[4.5rem] flex items-center justify-center">
         <p
           key={`${idx}-${phrase.line.slice(0, 16)}`}

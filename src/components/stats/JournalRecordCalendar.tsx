@@ -120,16 +120,42 @@ export default function JournalRecordCalendar({
         <p className="stats-emphasize-title">기록 캘린더</p>
         <button
           type="button"
-          onClick={() => setReportOpen((v) => !v)}
+          onClick={() => setReportOpen(true)}
           className="shrink-0 text-xs font-black underline"
           style={{ color: "var(--px-accent)" }}
-          aria-expanded={reportOpen}
+          aria-haspopup="dialog"
         >
-          {reportOpen ? "주간 닫기" : "주간 리포트"}
+          주간 리포트
         </button>
       </div>
 
-      {reportOpen && <WeeklyReportCard report={weeklyReport} />}
+      {reportOpen && (
+        <div
+          className="fixed inset-0 z-[10000] flex items-center justify-center p-4"
+          style={{ background: "rgba(0,0,0,0.7)" }}
+          role="dialog"
+          aria-modal="true"
+          aria-label="주간 리포트"
+          onClick={() => setReportOpen(false)}
+        >
+          <div
+            className="w-full max-w-sm max-h-[85dvh] overflow-y-auto motion-modal-card"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-end mb-2">
+              <button
+                type="button"
+                className="text-xs font-bold underline"
+                style={{ color: "var(--px-text2)", background: "transparent" }}
+                onClick={() => setReportOpen(false)}
+              >
+                닫기
+              </button>
+            </div>
+            <WeeklyReportCard report={weeklyReport} embedded />
+          </div>
+        </div>
+      )}
 
       <div className="stats-panel space-y-3">
         {showMonthNav && (

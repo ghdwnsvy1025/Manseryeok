@@ -1,128 +1,107 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import {
   hasSeenFirstVisitWelcome,
   isFirstVisitWelcomePath,
   markFirstVisitWelcomeSeen,
+  setWelcomeOverlayPhase,
 } from "@/lib/app/firstVisitWelcome";
 
 /**
- * 앱을 처음 쓸 때 홈에서 한 번만 보이는 소개 팝업.
+ * 로그인 후 홈에 처음 들어올 때 한 번 —
+ * 아이콘과 짧은 시가 차례로 피어나는 장면.
  */
 export default function FirstVisitWelcome() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const [leaving, setLeaving] = useState(false);
 
   useEffect(() => {
-    if (hasSeenFirstVisitWelcome()) return;
-    if (!isFirstVisitWelcomePath(pathname)) return;
+    if (hasSeenFirstVisitWelcome()) {
+      setWelcomeOverlayPhase("idle");
+      return;
+    }
+    if (!isFirstVisitWelcomePath(pathname)) {
+      setWelcomeOverlayPhase("idle");
+      return;
+    }
 
-    const t = window.setTimeout(() => setOpen(true), 450);
-    return () => window.clearTimeout(t);
+    // 홈 연출이 창 뒤에서 돌지 않도록 바로 대기
+    setWelcomeOverlayPhase("pending");
+    const t = window.setTimeout(() => {
+      setOpen(true);
+      setWelcomeOverlayPhase("open");
+    }, 280);
+    return () => {
+      window.clearTimeout(t);
+    };
   }, [pathname]);
 
   const dismiss = () => {
+    if (leaving) return;
+    setLeaving(true);
     markFirstVisitWelcomeSeen();
-    setOpen(false);
+    window.setTimeout(() => {
+      setOpen(false);
+      setWelcomeOverlayPhase("closed");
+    }, 480);
   };
 
   if (!open) return null;
 
   return (
     <div
-      className="fixed inset-0 z-[10000] flex items-center justify-center p-4"
-      style={{ background: "rgba(0,0,0,0.72)" }}
+      className={`welcome-splash ${leaving ? "welcome-splash--out" : ""}`}
       role="dialog"
       aria-modal="true"
       aria-labelledby="first-visit-title"
     >
-      <div
-        className="w-full max-w-sm border-2 p-5 space-y-4 motion-modal-card"
-        style={{
-          background: "var(--px-bg2)",
-          borderColor: "var(--px-border2)",
-          boxShadow: "6px 6px 0 #000",
-        }}
-      >
-        <p
-          className="text-[11px] font-bold tracking-[0.06em]"
-          style={{ color: "var(--px-text2)" }}
-        >
-          오늘의 사주 일기
-        </p>
+      <div className="welcome-splash__glow" aria-hidden />
+      <div className="welcome-splash__dust" aria-hidden>
+        {Array.from({ length: 14 }, (_, i) => (
+          <span key={i} className={`welcome-splash__mote welcome-splash__mote--${i + 1}`} />
+        ))}
+      </div>
 
-        <h2
-          id="first-visit-title"
-          className="text-[1.35rem] font-black leading-[1.35] tracking-tight"
-          style={{ color: "var(--px-text)" }}
-        >
-          하루의 기록에,
-          <br />
-          <span style={{ color: "var(--px-accent)" }}>사주를 살짝 곁들이다</span>
-        </h2>
+      <div className="welcome-splash__stage">
+        <div className="welcome-splash__icon-wrap">
+          <div className="welcome-splash__icon-ring" aria-hidden />
+          <div className="welcome-splash__icon">
+            <Image
+              src="/icons/app-icon-512.png"
+              alt=""
+              width={512}
+              height={512}
+              priority
+              className="w-full h-full object-cover"
+            />
+          </div>
+        </div>
 
-        <p
-          className="text-[13px] font-bold leading-[1.65]"
-          style={{ color: "var(--px-text-on-panel, var(--px-text))" }}
-        >
-          짧게 적어도 괜찮아요. 그날의 기운과 기록이 만나 운세·문장·조언을
-          건네고, 마음을 조금 더 따뜻하게 정리해 드려요.
-        </p>
-
-        <ul
-          className="space-y-2.5 pt-1 pb-1"
-          style={{
-            borderTop: "1px solid var(--px-border)",
-            borderBottom: "1px solid var(--px-border)",
-            paddingTop: "0.85rem",
-            paddingBottom: "0.85rem",
-          }}
-        >
-          {(
-            [
-              ["홈", "오늘 마음과 맞는 운세·문장"],
-              ["일기", "부담 없이 남기는 하루 기록"],
-              ["기록", "쌓인 이야기를 다시 돌아보기"],
-            ] as const
-          ).map(([tab, desc]) => (
-            <li key={tab} className="flex items-baseline gap-3">
-              <span
-                className="shrink-0 w-8 text-[12px] font-black"
-                style={{ color: "var(--px-accent)" }}
-              >
-                {tab}
-              </span>
-              <span
-                className="text-[12px] font-bold leading-snug"
-                style={{ color: "var(--px-text2)" }}
-              >
-                {desc}
-              </span>
-            </li>
-          ))}
-        </ul>
+        <div className="welcome-splash__copy">
+          <h2 id="first-visit-title" className="welcome-splash__line welcome-splash__line--1">
+            밤의 한 줄이
+          </h2>
+          <p className="welcome-splash__line welcome-splash__line--2">
+            내일의 결을 닮아갑니다
+          </p>
+          <p className="welcome-splash__line welcome-splash__line--3">
+            짧게 적어도 괜찮아요.
+            <br />
+            기록이 쌓일수록, 사주도 당신 곁으로.
+          </p>
+        </div>
 
         <button
           type="button"
           onClick={dismiss}
-          className="w-full py-3.5 text-sm font-black border-2"
-          style={{
-            borderColor: "#000",
-            color: "#111",
-            background: "var(--px-accent)",
-            boxShadow: "3px 3px 0 #000",
-          }}
+          className="welcome-splash__cta"
         >
-          시작하기
+          오늘의 홈으로
         </button>
-        <p
-          className="text-center text-[10px] font-bold"
-          style={{ color: "var(--px-text2)", opacity: 0.85 }}
-        >
-          이 안내는 처음 한 번만 보여요
-        </p>
       </div>
     </div>
   );

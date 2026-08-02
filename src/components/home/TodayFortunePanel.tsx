@@ -425,24 +425,22 @@ function parseFortunePayload(raw: string | null): V2Payload | null {
   }
 }
 
-/** 프로필 로드 전에도 당일 운세를 동기 복원 (첫 페인트 지연 제거) */
+/** 프로필 로드 전에도 당일 운세를 동기 복원 — 현재 workspace만 */
 function peekFortuneForDate(date: string): V2Payload | null {
   if (typeof window === "undefined") return null;
   const workspace: "guest" | "account" = isGuestMode() ? "guest" : "account";
   const prefix = `manseryeok:today-fortune-v2.5:${date}:`;
   const preferred: string[] = [];
-  const fallback: string[] = [];
   try {
     for (let i = 0; i < window.localStorage.length; i++) {
       const key = window.localStorage.key(i);
       if (!key?.startsWith(prefix)) continue;
       if (key.includes(`:${workspace}:`)) preferred.push(key);
-      else fallback.push(key);
     }
   } catch {
     return null;
   }
-  for (const key of [...preferred, ...fallback]) {
+  for (const key of preferred) {
     const hit = parseFortunePayload(window.localStorage.getItem(key));
     if (hit) return hit;
   }
@@ -463,8 +461,8 @@ function readLocalFortune(
   const candidates = [
     fortuneStableKey(date, workspace, fp),
     fortuneLocalKey(date, profileCacheKey),
+    fortuneLocalKey(date, `${workspace}:${fp}`),
     fortuneLocalKey(date, `none:${fp}`),
-    fortuneLocalKey(date, fp),
   ];
   for (const key of candidates) {
     try {
@@ -474,15 +472,14 @@ function readLocalFortune(
       /* try next */
     }
   }
-  // 프로필 id 만 바뀐 옛 키 · 워크스페이스 스캔
-  const scanned = peekFortuneForDate(date);
-  if (scanned) return scanned;
+  // 같은 workspace 안에서 fingerprint/프로필 id만 다른 키
   try {
     const prefix = `manseryeok:today-fortune-v2.5:${date}:`;
     for (let i = 0; i < window.localStorage.length; i++) {
       const key = window.localStorage.key(i);
       if (!key?.startsWith(prefix)) continue;
-      if (!key.endsWith(`:${fp}`) && !key.endsWith(`:${workspace}:${fp}`)) {
+      if (!key.includes(`:${workspace}:`)) continue;
+      if (!key.endsWith(`:${fp}`) && !key.includes(`:${workspace}:${fp}`)) {
         continue;
       }
       const hit = parseFortunePayload(window.localStorage.getItem(key));
@@ -1102,7 +1099,7 @@ export default function TodayFortunePanel({
 
         {showEvidence && evidence && (
           <div
-            className="fixed inset-0 z-[88] flex items-end justify-center motion-modal-backdrop"
+            className="fixed inset-0 z-[88] flex items-center justify-center p-4 motion-modal-backdrop"
             style={{ background: "rgba(0,0,0,0.55)" }}
             role="dialog"
             aria-modal="true"
@@ -1110,11 +1107,11 @@ export default function TodayFortunePanel({
             onClick={() => setShowEvidence(false)}
           >
             <div
-              className="w-full max-w-md max-h-[75dvh] overflow-y-auto border-2 p-3 space-y-2 motion-bottom-sheet"
+              className="w-full max-w-md max-h-[80dvh] overflow-y-auto border-2 p-3 space-y-2 motion-modal-card"
               style={{
                 background: "var(--px-bg2)",
                 borderColor: "var(--px-accent)",
-                boxShadow: "0 -4px 0 #000",
+                boxShadow: "4px 4px 0 #4a3a00",
               }}
               onClick={(e) => e.stopPropagation()}
             >

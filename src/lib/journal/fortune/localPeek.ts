@@ -22,7 +22,7 @@ function parsePayload(raw: string | null): FortuneCachePayload | null {
   }
 }
 
-/** 날짜 기준 캐시 스캔 (프로필 키 레이스 허용) */
+/** 날짜·현재 워크스페이스 캐시만 (다른 계정/게스트 폴백 금지) */
 export function peekFortuneEvidenceForDate(
   date: string
 ): FortuneEvidence | null {
@@ -30,18 +30,16 @@ export function peekFortuneEvidenceForDate(
   const workspace: "guest" | "account" = isGuestMode() ? "guest" : "account";
   const prefix = `manseryeok:today-fortune-v2.5:${date}:`;
   const preferred: string[] = [];
-  const fallback: string[] = [];
   try {
     for (let i = 0; i < window.localStorage.length; i++) {
       const key = window.localStorage.key(i);
       if (!key?.startsWith(prefix)) continue;
       if (key.includes(`:${workspace}:`)) preferred.push(key);
-      else fallback.push(key);
     }
   } catch {
     return null;
   }
-  for (const key of [...preferred, ...fallback]) {
+  for (const key of preferred) {
     const hit = parsePayload(window.localStorage.getItem(key));
     if (hit?.evidence) return hit.evidence;
   }

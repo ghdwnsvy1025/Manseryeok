@@ -1,6 +1,7 @@
 "use client";
 
 import WeekTopicsCard from "@/components/journal/WeekTopicsCard";
+import { usePlayWhenVisible } from "@/hooks/usePlayWhenVisible";
 import { happinessTone } from "@/lib/journal/statsTone";
 import type { WeekTopicSummary } from "@/lib/journal/topics/weekTopics";
 
@@ -20,6 +21,8 @@ export default function StatsSummaryStrip({
   recordedToday,
   weekTopics,
 }: Props) {
+  const rootRef = usePlayWhenVisible<HTMLElement>();
+
   const items = [
     {
       label: "30일 평균",
@@ -48,15 +51,23 @@ export default function StatsSummaryStrip({
   ];
 
   return (
-    <section className="stats-section" aria-label="요약">
-      <div className="stats-emphasize-head">
+    <section
+      ref={rootRef}
+      className="stats-section stats-reveal-root"
+      aria-label="요약"
+    >
+      <div
+        className="stats-emphasize-head stats-reveal-block js-play-when-visible"
+        style={{ ["--si" as string]: 0 }}
+      >
         <p className="stats-emphasize-title">요약</p>
       </div>
       <div className="grid grid-cols-3 gap-2">
-        {items.map((item) => (
+        {items.map((item, i) => (
           <div
             key={item.label}
-            className="stats-panel text-center space-y-1.5 !shadow-none"
+            className="stats-panel stats-reveal-block js-play-when-visible text-center space-y-1.5 !shadow-none"
+            style={{ ["--si" as string]: i + 1 }}
           >
             <p className="stats-label">{item.label}</p>
             <p
@@ -80,7 +91,10 @@ export default function StatsSummaryStrip({
       </div>
 
       {weekTopics && weekTopics.entryDays > 0 && (
-        <div className="mt-3">
+        <div
+          className="mt-3 stats-reveal-block js-play-when-visible"
+          style={{ ["--si" as string]: 4 }}
+        >
           <WeekTopicsCard summary={weekTopics} variant="nested" />
         </div>
       )}

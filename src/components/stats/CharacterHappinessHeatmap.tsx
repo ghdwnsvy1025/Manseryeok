@@ -21,6 +21,7 @@ import {
   loadLocalSajuProfiles,
 } from "@/lib/diary/profileStorage";
 import JournalDayReportModal from "@/components/stats/JournalDayReportModal";
+import { usePlayWhenVisible } from "@/hooks/usePlayWhenVisible";
 
 const ELEM_COLORS: Record<Element, string> = {
   wood: "#4ade80",
@@ -49,10 +50,12 @@ function HappinessTile({
   row,
   compact,
   onOpen,
+  revealIndex = 0,
 }: {
   row: CharacterHappiness;
   compact?: boolean;
   onOpen: () => void;
+  revealIndex?: number;
 }) {
   /** 0회만 비움 — 1회여도 그날 행복도가 곧 평균 */
   const insufficient = row.count < 1;
@@ -75,6 +78,10 @@ function HappinessTile({
   const delta = row.deltaFromOverall ?? 0;
 
   return (
+    <div
+      className="stats-tile-reveal js-play-when-visible"
+      style={{ ["--si" as string]: revealIndex }}
+    >
     <button
       type="button"
       onClick={onOpen}
@@ -140,6 +147,7 @@ function HappinessTile({
         {row.count}회
       </span>
     </button>
+    </div>
   );
 }
 
@@ -180,7 +188,7 @@ function PatternCharSheet({
 
   return (
     <div
-      className="fixed inset-0 z-[10000] flex items-end sm:items-center justify-center p-3 sm:p-4"
+      className="fixed inset-0 z-[10000] flex items-center justify-center p-3 sm:p-4"
       style={{ background: "rgba(0,0,0,0.7)" }}
       role="dialog"
       aria-modal="true"
@@ -517,6 +525,11 @@ export default function CharacterHappinessHeatmap({
   const cols = tab === "stem" ? "grid-cols-5" : "grid-cols-4";
   const hasAny = data.stems.some((r) => r.count > 0);
   const unlocked = !early && hasAny;
+  const gridRef = usePlayWhenVisible<HTMLDivElement>(
+    unlocked,
+    ".js-play-when-visible",
+    tab
+  );
 
   const openChar = (kind: Tab, row: CharacterHappiness) => {
     setSelected({ kind, row });
@@ -614,12 +627,13 @@ export default function CharacterHappinessHeatmap({
             ))}
           </div>
 
-          <div className={`grid gap-1.5 ${cols}`}>
-            {rows.map((row) => (
+          <div ref={gridRef} className={`grid gap-1.5 ${cols}`}>
+            {rows.map((row, i) => (
               <HappinessTile
-                key={row.key}
+                key={`${tab}-${row.key}`}
                 row={row}
                 compact
+                revealIndex={i}
                 onOpen={() => openChar(tab, row)}
               />
             ))}
