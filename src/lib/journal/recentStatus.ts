@@ -43,7 +43,7 @@ export function describeRecentHappiness(score: number): HappinessBand {
     return {
       label: "아주 좋음",
       emoji: "😄",
-      description: "최근 만족도가 높은 편이에요.",
+      description: "",
       color: "#4ade80",
     };
   }
@@ -51,7 +51,7 @@ export function describeRecentHappiness(score: number): HappinessBand {
     return {
       label: "좋음",
       emoji: "🙂",
-      description: "최근 만족도가 중간보다 높아요.",
+      description: "",
       color: "#60a5fa",
     };
   }
@@ -59,7 +59,7 @@ export function describeRecentHappiness(score: number): HappinessBand {
     return {
       label: "보통",
       emoji: "😐",
-      description: "최근 만족도가 중간 정도예요.",
+      description: "",
       color: "var(--px-accent)",
     };
   }
@@ -67,14 +67,14 @@ export function describeRecentHappiness(score: number): HappinessBand {
     return {
       label: "살짝 지침",
       emoji: "😕",
-      description: "최근 만족도가 중간보다 낮아요.",
+      description: "",
       color: "#fbbf24",
     };
   }
   return {
     label: "많이 지침",
     emoji: "😣",
-    description: "최근 만족도가 낮은 편이에요.",
+    description: "",
     color: "#f87171",
   };
 }

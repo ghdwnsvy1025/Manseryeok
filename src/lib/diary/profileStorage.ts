@@ -2,6 +2,7 @@ import type { SajuInput, SajuResult } from "@/lib/saju/types";
 import type { Gender } from "@/lib/saju/daeun";
 import { isGuestMode } from "@/lib/auth/guestMode";
 import { clearUiSessionCaches } from "@/lib/app/clearUiSessionCaches";
+import { sajuProfileFortuneFingerprint } from "@/lib/journal/fortune/profileFingerprint";
 import {
   DIARY_SCHEMA_VERSION,
   type SajuProfile,
@@ -627,7 +628,17 @@ export async function saveSajuProfile(profile: SajuProfile): Promise<SajuProfile
     updatedAt: new Date().toISOString(),
   };
 
+  const prev = loadLocalSajuProfiles().find((p) => p.id === withMeta.id);
+  const birthChanged =
+    Boolean(prev) &&
+    sajuProfileFortuneFingerprint(prev) !==
+      sajuProfileFortuneFingerprint(withMeta);
+
   upsertLocalProfileList(withMeta);
+
+  if (birthChanged) {
+    clearUiSessionCaches();
+  }
 
   const supabase = getSupabaseBrowserClient();
   if (!supabase) return withMeta;

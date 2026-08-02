@@ -21,9 +21,11 @@ type Props = {
   /** 추이와 공유하는 월 */
   year: number;
   month: number;
-  /** false면 상단 월 이동 UI 숨김 (부모가 공유 네비 사용) */
-  showMonthNav?: boolean;
-  onMonthChange?: (year: number, month: number) => void;
+  /** 주/월 기간 — 제목 아래 표시 */
+  trendSpan: "week" | "month";
+  periodLabel: string;
+  onTrendSpanChange: (span: "week" | "month") => void;
+  onPeriodShift: (dir: -1 | 1) => void;
 };
 
 const LIST_PREVIEW = 3;
@@ -36,8 +38,10 @@ export default function JournalRecordCalendar({
   weeklyReport,
   year,
   month,
-  showMonthNav = false,
-  onMonthChange,
+  trendSpan,
+  periodLabel,
+  onTrendSpanChange,
+  onPeriodShift,
 }: Props) {
   const [reportOpen, setReportOpen] = useState(false);
   const [dayReport, setDayReport] = useState<JournalEntry | null>(null);
@@ -109,11 +113,6 @@ export default function JournalRecordCalendar({
     ? monthList
     : monthList.slice(0, LIST_PREVIEW);
 
-  const shiftMonth = (delta: number) => {
-    const next = new Date(year, month - 1 + delta, 1);
-    onMonthChange?.(next.getFullYear(), next.getMonth() + 1);
-  };
-
   return (
     <section className="stats-section" aria-label="기록 캘린더">
       <div className="stats-emphasize-head">
@@ -126,6 +125,57 @@ export default function JournalRecordCalendar({
           aria-haspopup="dialog"
         >
           주간 리포트
+        </button>
+      </div>
+
+      <div className="flex gap-1.5">
+        {(
+          [
+            ["week", "주"],
+            ["month", "월"],
+          ] as const
+        ).map(([id, label]) => (
+          <button
+            key={id}
+            type="button"
+            onClick={() => onTrendSpanChange(id)}
+            className={`stats-chip flex-1 text-center${trendSpan === id ? " is-on" : ""}`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      <div className="flex items-center justify-between gap-2">
+        <button
+          type="button"
+          onClick={() => onPeriodShift(-1)}
+          className="px-2.5 py-1.5 text-xs font-bold border-2"
+          style={{
+            borderColor: "var(--px-border)",
+            color: "var(--px-text2)",
+            background: "var(--px-bg3)",
+          }}
+        >
+          ‹
+        </button>
+        <p
+          className="text-base font-black tabular-nums"
+          style={{ color: "var(--px-accent)" }}
+        >
+          {periodLabel}
+        </p>
+        <button
+          type="button"
+          onClick={() => onPeriodShift(1)}
+          className="px-2.5 py-1.5 text-xs font-bold border-2"
+          style={{
+            borderColor: "var(--px-border)",
+            color: "var(--px-text2)",
+            background: "var(--px-bg3)",
+          }}
+        >
+          ›
         </button>
       </div>
 
@@ -158,39 +208,6 @@ export default function JournalRecordCalendar({
       )}
 
       <div className="stats-panel space-y-3">
-        {showMonthNav && (
-          <div className="flex items-center justify-between gap-2">
-            <button
-              type="button"
-              onClick={() => shiftMonth(-1)}
-              className="px-2 py-1 border text-xs font-bold"
-              style={{
-                borderColor: "var(--px-border)",
-                color: "var(--px-text2)",
-              }}
-            >
-              ‹
-            </button>
-            <p
-              className="text-sm font-black tabular-nums"
-              style={{ color: "var(--px-text-on-panel)" }}
-            >
-              {year}년 {month}월
-            </p>
-            <button
-              type="button"
-              onClick={() => shiftMonth(1)}
-              className="px-2 py-1 border text-xs font-bold"
-              style={{
-                borderColor: "var(--px-border)",
-                color: "var(--px-text2)",
-              }}
-            >
-              ›
-            </button>
-          </div>
-        )}
-
         {emptyInMonth > 0 && nearestEmpty && (
           <div className="flex items-center justify-between gap-2 px-0.5">
             <p
@@ -370,8 +387,15 @@ export default function JournalRecordCalendar({
       </div>
 
       {monthList.length > 0 && (
-        <div className="stats-section">
-          <p className="stats-label">목록</p>
+        <div className="stats-section space-y-2">
+          <div className="stats-emphasize-head">
+            <p
+              className="stats-emphasize-title"
+              style={{ fontSize: "1.2rem", color: "#fffef8" }}
+            >
+              목록
+            </p>
+          </div>
           {visibleList.map((entry) => {
             const h = dayHappiness(entry);
             const ganji = getPillarsForDate(entry.entryDate).dayPillar.ganjiKo;

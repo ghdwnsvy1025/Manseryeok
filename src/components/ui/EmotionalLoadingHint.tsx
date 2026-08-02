@@ -34,7 +34,7 @@ function PoeticSpinner({ size = "md" }: { size?: "sm" | "md" }) {
 export default function EmotionalLoadingHint({
   status,
   compact = false,
-  intervalMs = 4200,
+  intervalMs = 6800,
 }: Props) {
   const [extra, setExtra] = useState<LoadingPhrase[]>([]);
   const deck = useMemo(() => createLoadingPhraseDeck(extra), [extra]);

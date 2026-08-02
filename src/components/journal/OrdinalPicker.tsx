@@ -14,6 +14,8 @@ type Props = {
   disabled?: boolean;
   /** 기본: 매우 나쁨~매우 좋음. 사건 반응용으로 짧은 라벨을 넘길 수 있음 */
   labels?: Record<OrdinalScore, string>;
+  /** 선택 강조색 (핵심 상태별 구분) */
+  accent?: string;
 };
 
 export default function OrdinalPicker({
@@ -22,10 +24,11 @@ export default function OrdinalPicker({
   onChange,
   disabled,
   labels = ORDINAL_LABELS,
+  accent = "var(--px-accent)",
 }: Props) {
   return (
     <div
-      className="grid grid-cols-5 gap-1"
+      className="grid grid-cols-5 gap-1.5"
       role="group"
       aria-label={`${label} 1에서 5`}
     >
@@ -43,21 +46,20 @@ export default function OrdinalPicker({
               onChange(n);
               celebrateClick(e, { variant: "ordinal", value: n });
             }}
-            className="min-h-[3rem] px-1 py-2 border-2 flex flex-col items-center justify-center gap-0.5"
+            className="min-h-[3.1rem] px-1 py-2 border flex flex-col items-center justify-center gap-0.5"
             style={{
-              borderColor: on ? "var(--px-accent)" : "var(--px-border)",
-              color: on ? "var(--px-accent)" : "var(--px-text2)",
+              borderColor: on ? accent : "var(--px-border)",
+              color: on ? accent : "#b0b0c0",
               background: on
-                ? "color-mix(in srgb, var(--px-accent) 14%, var(--px-bg3))"
+                ? `color-mix(in srgb, ${accent} 14%, var(--px-bg3))`
                 : "var(--px-bg3)",
-              boxShadow: on ? "2px 2px 0 #000" : "none",
-              opacity: disabled ? 0.45 : 1,
+              opacity: disabled ? 0.4 : 1,
             }}
           >
-            <span className="text-lg font-black tabular-nums leading-none">
+            <span className="text-[1.05rem] font-semibold tabular-nums leading-none">
               {n}
             </span>
-            <span className="text-[9px] font-bold leading-tight text-center">
+            <span className="text-[10px] font-medium leading-tight text-center opacity-90">
               {text}
             </span>
           </button>

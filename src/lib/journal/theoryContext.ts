@@ -113,7 +113,7 @@ export function theoryUsageRules(
 - categoryEvidence[domain] = 영역별 근거 2~4개만. natalSignatures·dayStructureBrief는 보강.
 - 각 domain은 domainHooks + categoryEvidence를 반영하고, 긍정 활용과 주의를 함께 쓴다.
 - digest/RAG는 짧은 참고. 길게 인용하지 말 것.
-- 모든 domain interpretation 3~5문장. 영역마다 다른 생활 장면.
+- 모든 domain interpretation 3~5문장. 자세해도 됨. 문장은 한 이야기처럼 이어지게. 영역마다 다른 생활 장면.
 - mixRatio(일수 게이트)대로 기록 톤만 섞는다.
 - auxiliaryScores로 길흉을 정하지 않는다.
 - 사용자 문장에 십신·용신·합충·방합 용어 금지(내부 brief는 번역).

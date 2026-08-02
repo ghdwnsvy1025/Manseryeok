@@ -28,7 +28,7 @@
  *   — 시동 구간 natal 비중이 커도 점수가 전부 0.5 근처로 평탄화되지 않게 함
  *
  * ## 흐름 라벨 (flow) / 톤 (tone)
- * - flow: 원활≥0.68 · 안정≥0.54 · 혼합≥0.40 · 그 외 관리
+ * - flow: 최고≥0.80 · 좋음≥0.64 · 무난≥0.48 · 아쉬움≥0.34 · 그 외 주의
  * - tone: supportive≥0.60 · caution≤0.45 · 그 외 balanced
  */
 import type { DailyInsightContext, FortuneDomainResult } from "@/lib/journal/insight/types";

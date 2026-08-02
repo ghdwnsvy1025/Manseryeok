@@ -61,26 +61,29 @@ export default function HappinessSlider({
   };
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-2.5">
       <div className="flex items-end justify-between gap-3">
         <div className="min-w-0">
-          <p className="truncate text-sm font-bold" style={{ color: ACCENT }}>
+          <p
+            className="truncate text-[13px] font-medium"
+            style={{ color: committed ? ACCENT : "#a8a8b8" }}
+          >
             {committed ? HAPPINESS_LABELS[display] : "슬라이더로 골라주세요"}
           </p>
         </div>
         <p
           ref={scoreRef}
-          className="text-5xl font-black tabular-nums leading-none shrink-0"
+          className="text-[2rem] font-semibold tabular-nums leading-none shrink-0"
           style={{
-            color: committed ? ACCENT : "var(--px-text2)",
-            opacity: committed ? 1 : 0.45,
+            color: committed ? ACCENT : "#8a8a9a",
+            opacity: committed ? 1 : 0.7,
           }}
           aria-live="polite"
         >
           {committed ? display : "—"}
           <span
-            className="font-bold ml-1 text-sm"
-            style={{ color: "var(--px-text2)" }}
+            className="font-medium ml-0.5 text-[12px]"
+            style={{ color: "#a8a8b8" }}
           >
             /10
           </span>
@@ -111,14 +114,13 @@ export default function HappinessSlider({
           if (disabled) return;
           const score = clampHappinessScore(Number(e.currentTarget.value));
           onChange(score);
-          // 슬라이더는 얇아서 숫자 표시 중심에서 방출
           burst(score, scoreRef.current);
         }}
-        className="w-full cursor-pointer h-3 disabled:opacity-50"
+        className="w-full cursor-pointer h-2.5 disabled:opacity-50"
         style={{ accentColor: ACCENT }}
       />
 
-      <div className="grid grid-cols-11 gap-0.5">
+      <div className="grid grid-cols-11 gap-1">
         {HAPPINESS_VALUES.map((n) => {
           const on = committed && value === n;
           return (
@@ -129,13 +131,13 @@ export default function HappinessSlider({
               aria-label={`${n}점 ${HAPPINESS_LABELS[n]}`}
               aria-pressed={on}
               onClick={(e) => commit(n, e.currentTarget)}
-              className="py-2 text-[10px] font-black border tabular-nums"
+              className="min-h-[2rem] py-1.5 text-[11px] font-semibold border tabular-nums"
               style={{
                 borderColor: on ? ACCENT : "var(--px-border)",
-                color: on ? ACCENT : "var(--px-text2)",
+                color: on ? ACCENT : "#b0b0c0",
                 background: on
-                  ? `color-mix(in srgb, ${ACCENT} 18%, var(--px-bg3))`
-                  : "var(--px-bg3)",
+                  ? `color-mix(in srgb, ${ACCENT} 14%, var(--px-bg3))`
+                  : "var(--px-bg2)",
               }}
             >
               {n}
@@ -145,9 +147,8 @@ export default function HappinessSlider({
       </div>
 
       <div
-        className="grid grid-cols-3 gap-2 pt-1 text-[11px] leading-snug"
-        style={{ color: "var(--px-text2)" }}
-        aria-hidden={false}
+        className="grid grid-cols-3 gap-2 pt-0.5 text-[11px] leading-snug font-medium"
+        style={{ color: "#9a9aac" }}
       >
         {HAPPINESS_ANCHORS.map((a) => (
           <p
@@ -160,7 +161,7 @@ export default function HappinessSlider({
                   : "text-right"
             }
           >
-            <span className="font-black tabular-nums" style={{ color: ACCENT }}>
+            <span className="font-semibold tabular-nums" style={{ color: ACCENT }}>
               {a.value}
             </span>{" "}
             {a.label}

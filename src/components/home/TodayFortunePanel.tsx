@@ -26,6 +26,8 @@ import CherryBlossomLayer from "@/components/motion/CherryBlossomLayer";
 import FortuneEvidencePanel, {
   FortuneEvidenceSummary,
 } from "@/components/home/FortuneEvidenceView";
+import { normalizeFortuneFlow } from "@/lib/journal/fortune/labels";
+import WaveText from "@/components/motion/WaveText";
 
 type Props = {
   todayDate: string;
@@ -53,7 +55,7 @@ function FortuneScoreChip({ score }: { score: number | null | undefined }) {
   if (!label) return null;
   return (
     <span
-      className="text-[14px] font-black tabular-nums px-2.5 py-1 border-2"
+      className="text-[1.35rem] font-black tabular-nums px-3.5 py-1.5 border-2 leading-none"
       style={{
         color: "var(--px-text-on-panel)",
         borderColor: "var(--px-border2)",
@@ -62,41 +64,47 @@ function FortuneScoreChip({ score }: { score: number | null | undefined }) {
       title="오늘 기운 (10점 만점, 참고용)"
     >
       {label}
-      <span className="font-bold opacity-60 text-[12px]">/10</span>
+      <span className="font-bold opacity-55 text-[0.85rem] ml-0.5">/10</span>
     </span>
   );
 }
 
-/** 흐름 라벨 색 — 원활=초록, 안정=노랑, 혼합=파랑, 관리=주황 */
+/** 흐름 라벨 색 — 최고·좋음·무난·아쉬움·주의 */
 function flowTone(flow: string | null | undefined): {
   color: string;
   border: string;
   bg: string;
 } {
-  switch (flow) {
-    case "원활":
+  switch (normalizeFortuneFlow(flow) ?? flow) {
+    case "최고":
       return {
         color: "#4ade80",
         border: "#4ade8077",
         bg: "color-mix(in srgb, #4ade80 14%, var(--px-bg3))",
       };
-    case "안정":
+    case "좋음":
+      return {
+        color: "#34d399",
+        border: "#34d39977",
+        bg: "color-mix(in srgb, #34d399 14%, var(--px-bg3))",
+      };
+    case "무난":
       return {
         color: "#fbbf24",
         border: "#fbbf2477",
         bg: "color-mix(in srgb, #fbbf24 14%, var(--px-bg3))",
       };
-    case "혼합":
-      return {
-        color: "#60a5fa",
-        border: "#60a5fa77",
-        bg: "color-mix(in srgb, #60a5fa 14%, var(--px-bg3))",
-      };
-    case "관리":
+    case "아쉬움":
       return {
         color: "#fb923c",
         border: "#fb923c77",
         bg: "color-mix(in srgb, #fb923c 14%, var(--px-bg3))",
+      };
+    case "주의":
+      return {
+        color: "#f87171",
+        border: "#f8717177",
+        bg: "color-mix(in srgb, #f87171 14%, var(--px-bg3))",
       };
     default:
       return {
@@ -107,18 +115,6 @@ function flowTone(flow: string | null | undefined): {
   }
 }
 
-function displayHeadline(headline: string): string | null {
-  const h = headline.trim();
-  if (!h) return null;
-  const compact = h.replace(/\s/g, "");
-  if (
-    /^(종합|종합운|오늘의흐름을살펴보기|오늘의운세|핵심|요약)$/.test(compact)
-  ) {
-    return null;
-  }
-  return h;
-}
-
 function FortuneActionBoxes({
   action,
   caution,
@@ -126,51 +122,55 @@ function FortuneActionBoxes({
   action: string;
   caution: string;
 }) {
+  if (!action && !caution) return null;
   return (
-    <div className="grid grid-cols-1 gap-2.5" aria-label="오늘 행동">
-      <div
-        className="p-3.5 border-2"
-        style={{
-          borderColor: "var(--px-accent)",
-          background:
-            "color-mix(in srgb, var(--px-accent) 12%, var(--px-bg3))",
-          boxShadow: "2px 2px 0 #000",
-        }}
-      >
-        <p
-          className="text-[12px] font-black mb-1.5 tracking-wide"
-          style={{ color: "var(--px-accent)" }}
+    <div className="grid gap-2.5" aria-label="오늘 추천·비추천">
+      {action ? (
+        <div
+          className="border-2 px-3.5 py-3 space-y-1.5"
+          style={{
+            borderColor: "color-mix(in srgb, #4ade80 70%, var(--px-border2))",
+            background: "color-mix(in srgb, #4ade80 14%, var(--px-bg3))",
+            boxShadow: "2px 2px 0 #000",
+          }}
         >
-          하기
-        </p>
-        <p
-          className="text-[15px] font-bold leading-snug"
-          style={{ color: "var(--px-text-on-panel)" }}
+          <p
+            className="text-[13px] font-black tracking-wide"
+            style={{ color: "#86efac" }}
+          >
+            추천
+          </p>
+          <p
+            className="text-[15px] font-bold leading-relaxed"
+            style={{ color: "#fafafc", lineHeight: 1.7 }}
+          >
+            {action}
+          </p>
+        </div>
+      ) : null}
+      {caution ? (
+        <div
+          className="border-2 px-3.5 py-3 space-y-1.5"
+          style={{
+            borderColor: "color-mix(in srgb, #fb923c 70%, var(--px-border2))",
+            background: "color-mix(in srgb, #fb923c 14%, var(--px-bg3))",
+            boxShadow: "2px 2px 0 #000",
+          }}
         >
-          {action}
-        </p>
-      </div>
-      <div
-        className="p-3.5 border-2"
-        style={{
-          borderColor: "var(--px-border2)",
-          background: "var(--px-bg3)",
-          boxShadow: "2px 2px 0 #000",
-        }}
-      >
-        <p
-          className="text-[12px] font-black mb-1.5 tracking-wide"
-          style={{ color: "var(--px-text2)" }}
-        >
-          줄이기
-        </p>
-        <p
-          className="text-[15px] font-medium leading-snug"
-          style={{ color: "var(--px-text2)" }}
-        >
-          {caution}
-        </p>
-      </div>
+          <p
+            className="text-[13px] font-black tracking-wide"
+            style={{ color: "#fdba74" }}
+          >
+            비추천
+          </p>
+          <p
+            className="text-[15px] font-bold leading-relaxed"
+            style={{ color: "#fafafc", lineHeight: 1.7 }}
+          >
+            {caution}
+          </p>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -245,68 +245,45 @@ function FortuneTeaseButton({
 
 /** 요약·영역 공통 읽기 구조 — 등장 시 순차 연출 */
 function FortuneReadingBlock({
-  sectionLabel,
   flow,
   score,
-  headline,
   body,
   action,
   caution,
   animateKey,
 }: {
-  sectionLabel: string;
   flow?: string | null;
   score?: number | null;
-  headline?: string | null;
   body: string;
   action: string;
   caution: string;
   animateKey?: string;
 }) {
-  const tone = flowTone(flow);
-  const lead = headline ? displayHeadline(headline) : null;
+  const flowLabel = normalizeFortuneFlow(flow) ?? flow;
+  const tone = flowTone(flowLabel);
   return (
     <div
       className="space-y-3.5 fortune-reading"
-      key={animateKey ?? sectionLabel}
+      key={animateKey ?? "fortune-reading"}
     >
-      <p
-        className="text-[1.35rem] font-black leading-[1.3] tracking-tight text-center fortune-reveal-title"
-        style={{ color: "var(--px-accent)", animationDelay: "80ms" }}
-      >
-        {sectionLabel}
-      </p>
-
       <div
-        className="flex items-center justify-center gap-2.5 flex-wrap fortune-reveal"
-        style={{ animationDelay: "160ms" }}
+        className="flex items-center justify-center gap-3 flex-wrap fortune-reveal"
+        style={{ animationDelay: "80ms" }}
       >
-        {flow && (
+        {flowLabel && (
           <span
-            className="text-[14px] font-black px-2.5 py-1 border-2"
+            className="text-[1.05rem] font-black px-3.5 py-1.5 border-2"
             style={{
               color: tone.color,
               borderColor: tone.border,
               background: tone.bg,
             }}
           >
-            {flow}
+            {flowLabel}
           </span>
         )}
         <FortuneScoreChip score={score} />
       </div>
-
-      {lead ? (
-        <p
-          className="text-[15px] font-bold leading-snug text-center fortune-reveal"
-          style={{
-            color: "var(--px-text-on-panel)",
-            animationDelay: "240ms",
-          }}
-        >
-          {lead}
-        </p>
-      ) : null}
 
       <FortuneBody text={body} reveal />
 
@@ -350,19 +327,42 @@ function FortuneBody({
   if (parts.length === 0) return null;
   return (
     <div className={`fortune-body ${compact ? "fortune-body--compact" : ""}`}>
-      {parts.map((p, i) => (
-        <p
-          key={`${i}-${p.slice(0, 12)}`}
-          className={reveal ? "fortune-reveal" : undefined}
-          style={
-            reveal
-              ? { animationDelay: `${280 + Math.min(i, 5) * 90}ms` }
-              : undefined
-          }
-        >
-          {p}
-        </p>
-      ))}
+      {parts.map((p, i) => {
+        const isLead = i === 0;
+        return (
+          <p
+            key={`${i}-${p.slice(0, 12)}`}
+            className={
+              reveal
+                ? isLead
+                  ? "fortune-reveal fortune-body__lead"
+                  : "fortune-reveal"
+                : isLead
+                  ? "fortune-body__lead"
+                  : undefined
+            }
+            style={
+              reveal
+                ? { animationDelay: `${280 + Math.min(i, 5) * 90}ms` }
+                : undefined
+            }
+          >
+            {isLead ? (
+              <>
+                <span className="fortune-body__lead-mark" aria-hidden>
+                  “
+                </span>
+                {p}
+                <span className="fortune-body__lead-mark" aria-hidden>
+                  ”
+                </span>
+              </>
+            ) : (
+              p
+            )}
+          </p>
+        );
+      })}
     </div>
   );
 }
@@ -402,7 +402,7 @@ type V2Payload = {
 };
 
 function fortuneLocalKey(date: string, profileCacheKey: string) {
-  return `manseryeok:today-fortune-v2.5:${date}:${profileCacheKey}`;
+  return `manseryeok:today-fortune-v2.10:${date}:${profileCacheKey}`;
 }
 
 /** 비로그인/구글을 나누고, 프로필 id 로딩 레이스에 안 깨지는 안정 키 */
@@ -425,17 +425,26 @@ function parseFortunePayload(raw: string | null): V2Payload | null {
   }
 }
 
-/** 프로필 로드 전에도 당일 운세를 동기 복원 — 현재 workspace만 */
-function peekFortuneForDate(date: string): V2Payload | null {
+/**
+ * 당일 운세 동기 복원 — 현재 workspace + 프로필 지문만.
+ * 지문 없이 workspace만 맞으면 옛 생일 운세를 잘못 붙잡는다.
+ */
+function peekFortuneForDate(
+  date: string,
+  fingerprint: string
+): V2Payload | null {
   if (typeof window === "undefined") return null;
+  const fp = fingerprint || "none";
   const workspace: "guest" | "account" = isGuestMode() ? "guest" : "account";
-  const prefix = `manseryeok:today-fortune-v2.5:${date}:`;
+  const prefix = `manseryeok:today-fortune-v2.10:${date}:`;
   const preferred: string[] = [];
   try {
     for (let i = 0; i < window.localStorage.length; i++) {
       const key = window.localStorage.key(i);
       if (!key?.startsWith(prefix)) continue;
-      if (key.includes(`:${workspace}:`)) preferred.push(key);
+      if (!key.includes(`:${workspace}:`)) continue;
+      if (!key.endsWith(`:${fp}`)) continue;
+      preferred.push(key);
     }
   } catch {
     return null;
@@ -474,7 +483,7 @@ function readLocalFortune(
   }
   // 같은 workspace 안에서 fingerprint/프로필 id만 다른 키
   try {
-    const prefix = `manseryeok:today-fortune-v2.5:${date}:`;
+    const prefix = `manseryeok:today-fortune-v2.10:${date}:`;
     for (let i = 0; i < window.localStorage.length; i++) {
       const key = window.localStorage.key(i);
       if (!key?.startsWith(prefix)) continue;
@@ -534,9 +543,11 @@ export default function TodayFortunePanel({
   enabledCodes = EMPTY_CODES,
 }: Props) {
   const v2 = isDailyFortuneV2Enabled();
+  const bootProfile = (sajuProfile ?? null) as SajuProfile | null;
+  const bootFp = sajuProfileFortuneFingerprint(bootProfile);
   const cachedBoot =
     typeof window !== "undefined" && v2
-      ? peekFortuneForDate(todayDate)
+      ? peekFortuneForDate(todayDate, bootFp)
       : null;
   const [open, setOpen] = useState(false);
   const [panelOpen, setPanelOpen] = useState(() =>
@@ -677,12 +688,7 @@ export default function TodayFortunePanel({
       return;
     }
 
-    // 이미 첫 페인트에 캐시가 있으면 비우지 않음
-    if (overall) {
-      setHydrating(false);
-      return;
-    }
-
+    // 프로필(생일)이 바뀌어 현재 지문 캐시가 없으면 옛 운세를 붙잡지 않는다
     setOverall(null);
     setDomains([]);
     setPresentation(null);
@@ -879,10 +885,10 @@ export default function TodayFortunePanel({
   if (v2) {
     const idle = !hydrating && !loading && !loaded && !loadError && !overall;
     return (
-      <section className="space-y-2" aria-label="오늘의 운세">
+      <section className="home-section home-section--fortune" aria-label="오늘의 운세">
         <CherryBlossomLayer playToken={blossomToken} />
-        <div className="ui-emphasize-head">
-          <p className="ui-emphasize-title">오늘의 운세</p>
+        <div className="home-section__label">
+          <WaveText className="home-section__title">오늘의 운세</WaveText>
           {overall && (
             <button
               type="button"
@@ -994,28 +1000,13 @@ export default function TodayFortunePanel({
           {overall && panelOpen && (
             <div className="fortune-readable space-y-4">
               <FortuneReadingBlock
-                sectionLabel="오늘의 핵심"
                 flow={overall.flow}
                 score={overall.score}
-                headline={overall.headline}
                 body={domainBodyText(overall)}
                 action={presentation?.todayFocus || overall.action}
                 caution={presentation?.todayAvoid || overall.caution}
                 animateKey="fortune-core"
               />
-
-              {presentation?.signatureEcho && (
-                <p
-                  className="text-[13px] leading-relaxed pl-2.5"
-                  style={{
-                    color: "var(--px-accent)",
-                    borderLeft: "2px solid var(--px-accent)",
-                    opacity: 0.95,
-                  }}
-                >
-                  {presentation.signatureEcho}
-                </p>
-              )}
 
               {/* 영역별 메뉴 — 당분간 잠금 (나중에 열 예정) */}
               <div
@@ -1058,41 +1049,32 @@ export default function TodayFortunePanel({
               </div>
 
               <div
-                className="pt-1 border-t"
+                className="pt-1 border-t space-y-3"
                 style={{ borderColor: "var(--px-border)" }}
               >
+                {evidence && (
+                  <FortuneEvidenceSummary
+                    evidence={evidence}
+                    onDetailClick={() => {
+                      setShowEvidence(true);
+                      void trackContentExposure({
+                        eventDate: todayDate,
+                        contentType: "daily_fortune",
+                        contentId: "evidence",
+                        eventType: "fortune_evidence_opened",
+                      });
+                    }}
+                  />
+                )}
                 <ContentFeedbackButtons
                   eventDate={todayDate}
                   contentType="daily_fortune"
                   contentId="overall"
-                  mode="match"
-                  prompt="이 문장이 오늘과 맞았나요?"
+                  mode="thumbs"
+                  prompt="오늘과 맞았나요?"
                 />
-                {presentation?.notice && (
-                  <p
-                    className="mt-1 text-[11px] leading-relaxed"
-                    style={{ color: "var(--px-text2)", opacity: 0.85 }}
-                  >
-                    {presentation.notice}
-                  </p>
-                )}
-                <OpenAiOriginHint status={openAi} className="mt-1 text-[10px] leading-relaxed" />
+                <OpenAiOriginHint status={openAi} className="text-[10px] leading-relaxed" />
               </div>
-
-              {evidence && (
-                <FortuneEvidenceSummary
-                  evidence={evidence}
-                  onDetailClick={() => {
-                    setShowEvidence(true);
-                    void trackContentExposure({
-                      eventDate: todayDate,
-                      contentType: "daily_fortune",
-                      contentId: "evidence",
-                      eventType: "fortune_evidence_opened",
-                    });
-                  }}
-                />
-              )}
             </div>
           )}
         </div>
@@ -1140,9 +1122,9 @@ export default function TodayFortunePanel({
   }
 
   return (
-    <section className="space-y-2" aria-label="오늘의 운세">
-      <div className="ui-emphasize-head">
-        <p className="ui-emphasize-title">오늘의 운세</p>
+    <section className="home-section home-section--fortune" aria-label="오늘의 운세">
+      <div className="home-section__label">
+        <WaveText className="home-section__title">오늘의 운세</WaveText>
         <button
           type="button"
           className="text-xs font-bold underline shrink-0"

@@ -7,13 +7,13 @@ const EXACT_KEYS = [
   "manseryeok:last-saved-checkin:v2",
   "manseryeok:home-sentence-cache:v1",
   "manseryeok:recent-status:v1",
-  "manseryeok:week-topic-support:v2",
+  "manseryeok:week-topic-support:v4",
   "manseryeok:keyword-bias:v1",
   "manseryeok:day-quote-cache:v1",
 ] as const;
 
 const PREFIXES = [
-  "manseryeok:today-fortune-v2.5:",
+  "manseryeok:today-fortune-v2.10:",
   "manseryeok:today-question-v3:",
   "manseryeok:checkin-draft:v1:",
   "manseryeok:day-quote-cache:v2:",

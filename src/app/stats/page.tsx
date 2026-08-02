@@ -18,15 +18,12 @@ import {
 } from "@/lib/journal/homeStats";
 import {
   buildCollectionMission,
-  buildReflectWriteCta,
   buildWeeklyReport,
   computeRecordStreak,
   happinessByGanji,
 } from "@/lib/journal/statsInsight";
-import { buildWeekTopicSummary } from "@/lib/journal/topics/weekTopics";
 import TrendOverlayChart from "@/components/stats/TrendOverlayChart";
 import StatsSummaryStrip from "@/components/stats/StatsSummaryStrip";
-import StatsReflectCta from "@/components/stats/StatsReflectCta";
 import JournalRecordCalendar from "@/components/stats/JournalRecordCalendar";
 import CharacterHappinessHeatmap from "@/components/stats/CharacterHappinessHeatmap";
 import StatsGanjiCollection from "@/components/stats/StatsGanjiCollection";
@@ -102,7 +99,7 @@ const LINE_COLORS = [
 ];
 
 /**
- * 기록 탭 — 요약 → 추이 → 캘린더 → 사주 패턴 → 도감
+ * 기록 탭 — 요약 → 캘린더 → 추이 → 사주 패턴 → 도감
  */
 export default function StatsPage() {
   const today = todayDateString();
@@ -171,16 +168,6 @@ export default function StatsPage() {
 
   const weeklyReport = useMemo(
     () => buildWeeklyReport(journalEntries, today),
-    [journalEntries, today]
-  );
-
-  const weekTopics = useMemo(
-    () =>
-      buildWeekTopicSummary(journalEntries, {
-        asOf: today,
-        windowDays: 30,
-        topN: 5,
-      }),
     [journalEntries, today]
   );
 
@@ -291,15 +278,6 @@ export default function StatsPage() {
     return { delta };
   }, [rangeAvg, prevRangeAvg]);
 
-  const reflectCta = useMemo(
-    () =>
-      buildReflectWriteCta(journalEntries, today, {
-        viewMonthAvg: rangeAvg,
-        prevMonthAvg: prevRangeAvg,
-      }),
-    [journalEntries, today, rangeAvg, prevRangeAvg]
-  );
-
   const shiftViewMonth = (delta: number) => {
     const next = new Date(viewYear, viewMonth - 1 + delta, 1);
     setViewYear(next.getFullYear());
@@ -313,20 +291,15 @@ export default function StatsPage() {
 
   const shiftTrend = (dir: -1 | 1) => {
     if (trendSpan === "week") {
-      setWeekStart((w) => shiftDate(w, dir * 7));
+      setWeekStart((w) => {
+        const next = shiftDate(w, dir * 7);
+        setViewYear(Number(next.slice(0, 4)));
+        setViewMonth(Number(next.slice(5, 7)));
+        return next;
+      });
       return;
     }
     shiftViewMonth(dir);
-  };
-
-  const setViewMonthAbsolute = (year: number, month: number) => {
-    setViewYear(year);
-    setViewMonth(month);
-    void import("@/lib/analytics/posthog").then(
-      ({ ANALYTICS_EVENTS, captureUiClick }) => {
-        captureUiClick(ANALYTICS_EVENTS.statsMonthChanged, "stats_month_changed");
-      }
-    );
   };
 
   const toggle = (code: CategoryCode) => {
@@ -360,7 +333,35 @@ export default function StatsPage() {
             monthRecordedDays={monthRecordedDays}
             streakDays={streak.current}
             recordedToday={streak.recordedToday}
-            weekTopics={weekTopics}
+          />
+
+          <JournalRecordCalendar
+            entries={journalEntries}
+            today={today}
+            weeklyReport={weeklyReport}
+            year={viewYear}
+            month={viewMonth}
+            trendSpan={trendSpan}
+            periodLabel={trendPeriodLabel}
+            onTrendSpanChange={(id) => {
+              setTrendSpan(id);
+              if (id === "week") {
+                const start = mondayOf(today);
+                setWeekStart(start);
+                setViewYear(Number(start.slice(0, 4)));
+                setViewMonth(Number(start.slice(5, 7)));
+              }
+              void import("@/lib/analytics/posthog").then(
+                ({ ANALYTICS_EVENTS, captureUiClick }) => {
+                  captureUiClick(
+                    ANALYTICS_EVENTS.statsPeriodSelected,
+                    "stats_period",
+                    { period: id }
+                  );
+                }
+              );
+            }}
+            onPeriodShift={shiftTrend}
           />
 
           <section className="stats-section">
@@ -381,69 +382,6 @@ export default function StatsPage() {
                   <span className="stats-metric-unit">/10</span>
                 ) : null}
               </p>
-            </div>
-
-            <div className="flex gap-1.5">
-              {(
-                [
-                  ["week", "주"],
-                  ["month", "월"],
-                ] as const
-              ).map(([id, label]) => (
-                <button
-                  key={id}
-                  type="button"
-                  onClick={() => {
-                    setTrendSpan(id);
-                    if (id === "week") setWeekStart(mondayOf(today));
-                    void import("@/lib/analytics/posthog").then(
-                      ({ ANALYTICS_EVENTS, captureUiClick }) => {
-                        captureUiClick(
-                          ANALYTICS_EVENTS.statsPeriodSelected,
-                          "stats_period",
-                          { period: id }
-                        );
-                      }
-                    );
-                  }}
-                  className={`stats-chip flex-1 text-center${trendSpan === id ? " is-on" : ""}`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-
-            <div className="flex items-center justify-between gap-2">
-              <button
-                type="button"
-                onClick={() => shiftTrend(-1)}
-                className="px-2.5 py-1.5 text-xs font-bold border-2"
-                style={{
-                  borderColor: "var(--px-border)",
-                  color: "var(--px-text2)",
-                  background: "var(--px-bg3)",
-                }}
-              >
-                ‹
-              </button>
-              <p
-                className="text-base font-black tabular-nums"
-                style={{ color: "var(--px-accent)" }}
-              >
-                {trendPeriodLabel}
-              </p>
-              <button
-                type="button"
-                onClick={() => shiftTrend(1)}
-                className="px-2.5 py-1.5 text-xs font-bold border-2"
-                style={{
-                  borderColor: "var(--px-border)",
-                  color: "var(--px-text2)",
-                  background: "var(--px-bg3)",
-                }}
-              >
-                ›
-              </button>
             </div>
 
             {periodCompare.delta != null ? (
@@ -546,18 +484,6 @@ export default function StatsPage() {
               </div>
             </div>
           </section>
-
-          <JournalRecordCalendar
-            entries={journalEntries}
-            today={today}
-            weeklyReport={weeklyReport}
-            year={viewYear}
-            month={viewMonth}
-            showMonthNav={trendSpan === "week"}
-            onMonthChange={setViewMonthAbsolute}
-          />
-
-          <StatsReflectCta cta={reflectCta} />
 
           <CharacterHappinessHeatmap
             entries={journalEntries}

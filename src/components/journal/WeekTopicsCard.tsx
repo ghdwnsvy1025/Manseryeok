@@ -8,13 +8,11 @@ type Props = {
   combinedAdvice?: string | null;
   /**
    * card — 독립 패널
-   * nested — 요약 등 안에 구분선만
-   * focus — 홈 「살피면 좋은 쪽」과 같은 좌측 액센트 행
+   * nested — 요약 등 안에 구분선만 (기록 탭: 칩만, 나열 문장 없음)
+   * focus — 홈: 칩 + 감성 조언 한 문장
    */
   variant?: "card" | "nested" | "focus";
 };
-
-const FOCUS_COLOR = "#f472b6";
 
 /**
  * 행복도·상태값과 다른 축 — 일기 글에 반복된 화제
@@ -26,55 +24,103 @@ export default function WeekTopicsCard({
 }: Props) {
   const { topics, plainLine, from, to, entryDays } = summary;
   const topTopics = topics.slice(0, 3);
+  const adviceLine = combinedAdvice?.trim() || null;
+
+  const topicChips = (
+    <ol className="space-y-2 list-none m-0 p-0">
+      {topTopics.map((t, idx) => {
+        const lead = idx === 0;
+        return (
+          <li
+            key={t.topicId}
+            className="flex items-center gap-2.5 min-w-0 border-2 px-3 py-2.5"
+            style={{
+              borderColor: lead ? "var(--px-accent)" : "var(--px-border2)",
+              borderLeftWidth: lead ? 4 : 2,
+              background: "var(--px-bg2)",
+              boxShadow: lead ? "2px 2px 0 #000" : "none",
+            }}
+            title={`${t.label} · ${t.dayCount}일`}
+          >
+            <span
+              className="shrink-0 w-7 h-7 flex items-center justify-center text-[13px] font-black border-2 tabular-nums"
+              style={{
+                color: lead ? "#111" : "#fafafc",
+                borderColor: lead ? "var(--px-accent)" : "var(--px-border2)",
+                background: lead ? "var(--px-accent)" : "var(--px-bg3)",
+              }}
+              aria-hidden
+            >
+              {idx + 1}
+            </span>
+            <span
+              className={`min-w-0 flex-1 truncate font-black leading-snug ${
+                lead ? "text-[1.08rem]" : "text-[15px]"
+              }`}
+              style={{ color: "#fffef8" }}
+            >
+              {t.label}
+            </span>
+            <span
+              className="shrink-0 text-[14px] font-black tabular-nums"
+              style={{ color: lead ? "var(--px-accent)" : "#c8c8d4" }}
+            >
+              {t.dayCount}
+              <span
+                className="ml-0.5 text-[12px] font-bold"
+                style={{ color: "#a8a8b8" }}
+              >
+                일
+              </span>
+            </span>
+          </li>
+        );
+      })}
+    </ol>
+  );
 
   if (variant === "focus") {
     return (
       <div
-        className="space-y-2.5 pl-2.5"
-        style={{ borderLeft: `3px solid ${FOCUS_COLOR}` }}
+        className="space-y-3 p-3.5 border-2"
+        style={{
+          borderColor: "var(--px-border2)",
+          background: "var(--px-bg3)",
+          boxShadow: "2px 2px 0 #000",
+        }}
         aria-label="지난 30일 화제"
       >
-        <p
-          className="text-xs font-black tracking-wide"
-          style={{ color: FOCUS_COLOR }}
-        >
-          지난 30일 화제
-        </p>
+        <div className="flex items-baseline justify-between gap-2">
+          <p
+            className="text-[15px] font-black tracking-wide"
+            style={{ color: "#fffef8" }}
+          >
+            지난 30일 화제
+          </p>
+          <p
+            className="text-[12px] font-bold tabular-nums"
+            style={{ color: "#b0b0c0" }}
+          >
+            {entryDays}일 기록
+          </p>
+        </div>
 
         {topTopics.length > 0 ? (
           <div className="space-y-2.5">
-            <div className="flex flex-wrap gap-1.5">
-              {topTopics.map((t) => (
-                <span
-                  key={t.topicId}
-                  className="inline-block max-w-full px-2 py-0.5 text-[12px] font-black leading-snug border-2 truncate"
-                  style={{
-                    color: FOCUS_COLOR,
-                    borderColor: `color-mix(in srgb, ${FOCUS_COLOR} 65%, var(--px-border))`,
-                    background: `color-mix(in srgb, ${FOCUS_COLOR} 14%, var(--px-bg2))`,
-                  }}
-                  title={`${t.label} · ${t.dayCount}일`}
-                >
-                  {t.label}
-                </span>
-              ))}
-            </div>
-            {combinedAdvice && (
+            {topicChips}
+            {adviceLine && (
               <p
-                className="text-[13px] font-medium leading-relaxed"
-                style={{
-                  color: "var(--px-text2)",
-                  lineHeight: 1.65,
-                }}
+                className="text-[14px] font-semibold leading-relaxed"
+                style={{ color: "#e8e8f0", lineHeight: 1.65 }}
               >
-                {combinedAdvice}
+                {adviceLine}
               </p>
             )}
           </div>
         ) : (
           <p
-            className="text-sm font-bold leading-snug"
-            style={{ color: "var(--px-text-on-panel)" }}
+            className="text-[14px] font-semibold leading-snug"
+            style={{ color: "#e8e8f0" }}
           >
             {plainLine}
           </p>
@@ -86,66 +132,43 @@ export default function WeekTopicsCard({
   const body = (
     <>
       <div className="flex items-baseline justify-between gap-2">
-        <p
-          className="text-[11px] font-black"
-          style={{ color: "var(--signal-emotion)" }}
-        >
+        <p className="text-[15px] font-black" style={{ color: "#fffef8" }}>
           지난 30일 화제
         </p>
         <p
-          className="text-[10px] font-bold tabular-nums"
-          style={{ color: "var(--px-text2)" }}
+          className="text-[12px] font-bold tabular-nums"
+          style={{ color: "#b0b0c0" }}
         >
           {from.slice(5)} ~ {to.slice(5)} · {entryDays}일
         </p>
       </div>
 
-      <p
-        className="text-sm font-bold leading-snug"
-        style={{ color: "var(--px-text-on-panel)" }}
-      >
-        {combinedAdvice || plainLine}
-      </p>
-
-      {topTopics.length > 0 && (
-        <ul className="flex flex-wrap gap-1.5">
-          {topTopics.map((t) => (
-            <li
-              key={t.topicId}
-              className="px-2 py-1 text-[11px] font-bold border-2"
-              style={{
-                borderColor:
-                  "color-mix(in srgb, var(--signal-emotion) 45%, var(--px-border))",
-                background:
-                  "color-mix(in srgb, var(--signal-emotion) 12%, var(--px-bg3))",
-                color: "var(--signal-emotion)",
-              }}
-              title={`${t.dayCount}일에 등장 · 언급 ${t.mentionCount}회`}
-            >
-              {t.label}
-              <span
-                className="ml-1 tabular-nums opacity-80"
-                style={{ color: "var(--px-text2)" }}
-              >
-                {t.dayCount}일
-              </span>
-            </li>
-          ))}
-        </ul>
-      )}
-
-      {variant === "card" && (
-        <p className="text-[10px] leading-relaxed" style={{ color: "var(--px-text2)" }}>
-          행복도·상태 점수와 별개로, 일기 글에 나온 소재를 모은 거예요.
+      {topTopics.length > 0 ? (
+        topicChips
+      ) : (
+        <p
+          className="text-[14px] font-semibold leading-snug"
+          style={{ color: "#e8e8f0" }}
+        >
+          {plainLine}
         </p>
       )}
+
+      {variant === "card" && adviceLine ? (
+        <p
+          className="text-[14px] font-semibold leading-relaxed"
+          style={{ color: "#e8e8f0", lineHeight: 1.65 }}
+        >
+          {adviceLine}
+        </p>
+      ) : null}
     </>
   );
 
   if (variant === "nested") {
     return (
       <div
-        className="space-y-2 pt-3 border-t"
+        className="space-y-2.5 pt-3 border-t"
         style={{ borderColor: "var(--px-border)" }}
         aria-label="지난 30일 화제"
       >
@@ -156,10 +179,10 @@ export default function WeekTopicsCard({
 
   return (
     <section
-      className="p-3 border-2 space-y-2.5"
+      className="p-3.5 border-2 space-y-2.5"
       style={{
-        background: "var(--px-bg2)",
-        borderColor: "var(--px-border)",
+        background: "var(--px-bg3)",
+        borderColor: "var(--px-border2)",
         boxShadow: "2px 2px 0 #000",
       }}
       aria-label="지난 30일 화제"

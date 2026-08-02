@@ -71,8 +71,7 @@ function WeightRow({
 }
 
 /**
- * 운세 본문 아래 상시 노출 — 기록%/사주% 한 줄.
- * onDetailClick 있으면 「자세히」로 상세 시트 오픈.
+ * 운세 본문 아래 상시 노출 — 지금 운세 = 기록 N% + 사주 M%
  */
 export function FortuneEvidenceSummary({
   evidence,
@@ -88,39 +87,36 @@ export function FortuneEvidenceSummary({
 
   return (
     <div
-      className="border-2 px-2.5 py-2 flex items-center justify-between gap-2"
+      className="border-2 px-3.5 py-3.5 space-y-2"
       style={{
         borderColor: "var(--px-accent)",
         background:
-          "color-mix(in srgb, var(--px-accent) 12%, var(--px-bg2))",
+          "linear-gradient(135deg, color-mix(in srgb, var(--px-accent) 22%, var(--px-bg2)), var(--px-bg3))",
+        boxShadow: "2px 2px 0 #000",
       }}
-      aria-label={`지금 운세 근거, 기록 ${journalPct}퍼센트, 사주 ${natalPct}퍼센트`}
+      aria-label={`지금 운세는 기록 ${journalPct}퍼센트와 사주 ${natalPct}퍼센트`}
     >
-      <p className="text-[12px] font-black leading-snug min-w-0">
-        <span style={{ color: "var(--px-accent)" }}>
-          기록 {journalPct}%
-        </span>
-        <span style={{ color: "var(--px-text2)" }}> · </span>
-        <span style={{ color: "var(--px-text-on-panel)" }}>
-          사주 {natalPct}%
-        </span>
-        <span
-          className="block text-[10px] font-bold mt-0.5"
-          style={{ color: "var(--px-text2)" }}
+      <div className="flex items-start justify-between gap-2">
+        <p
+          className="text-[15px] font-black leading-snug tracking-tight min-w-0"
+          style={{ color: "#fffef8" }}
         >
-          지금 운세 = 내 기록 반영 + 사주
-        </span>
-      </p>
-      {onDetailClick && (
-        <button
-          type="button"
-          onClick={onDetailClick}
-          className="shrink-0 text-[11px] font-black underline"
-          style={{ color: "var(--px-accent)" }}
-        >
-          {detailLabel}
-        </button>
-      )}
+          지금 운세 ={" "}
+          <span style={{ color: "var(--px-accent)" }}>기록 {journalPct}%</span>
+          <span style={{ color: "#d4d4e0" }}> + </span>
+          <span style={{ color: "#fde68a" }}>사주 {natalPct}%</span>
+        </p>
+        {onDetailClick && (
+          <button
+            type="button"
+            onClick={onDetailClick}
+            className="shrink-0 text-[12px] font-black underline mt-0.5"
+            style={{ color: "var(--px-accent)" }}
+          >
+            {detailLabel}
+          </button>
+        )}
+      </div>
     </div>
   );
 }
@@ -151,11 +147,11 @@ export default function FortuneEvidencePanel({
           className="p-2 border-2 flex items-center justify-center gap-1 text-center"
           style={{ borderColor: "var(--px-accent)", background: "var(--px-bg2)" }}
         >
-          <span className="text-sm font-black" style={{ color: "var(--px-accent)" }}>
-            지금 운세 = 내 기록 반영 {journalPct}%
-          </span>
-          <span className="text-sm font-black" style={{ color: "var(--px-text2)" }}>
-            + 사주 {natalPct}%
+          <span className="text-sm font-black" style={{ color: "#fffef8" }}>
+            지금 운세 ={" "}
+            <span style={{ color: "var(--px-accent)" }}>기록 {journalPct}%</span>
+            <span style={{ color: "#d4d4e0" }}> + </span>
+            <span style={{ color: "#fde68a" }}>사주 {natalPct}%</span>
           </span>
         </div>
       )}

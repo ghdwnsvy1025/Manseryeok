@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useState, type CSSProperties } from "react";
 import { todayDateString } from "@/lib/diary/dayPillar";
 import type { HomeEStats } from "@/lib/journal/homeStats";
 import {
@@ -9,7 +9,6 @@ import {
 import {
   buildTemplateRecentStatus,
   describeRecentHappiness,
-  STATUS_FOCUS_EMOJI,
   type RecentStatusPayload,
   type StatusFocus,
 } from "@/lib/journal/recentStatus";
@@ -94,62 +93,55 @@ function TypewriterText({
 function HappinessGauge({ score }: { score: number }) {
   const band = describeRecentHappiness(score);
   const pct = Math.min(100, Math.max(0, score * 10));
-  // 막대는 점수와 무관한 차분한 soft teal — 감정 단계는 이모지·라벨 색으로만 구분
-  const barFill =
-    "linear-gradient(90deg, #2dd4bf88, #5eead4)";
+  const barFill = `linear-gradient(90deg, color-mix(in srgb, ${band.color} 55%, #2dd4bf), ${band.color})`;
 
   return (
     <div
-      className="p-3.5 border-2 space-y-3"
+      className="p-4 border-2 space-y-3.5"
       style={{
-        borderColor: "var(--px-border2)",
-        background: "var(--px-bg3)",
+        borderColor: `color-mix(in srgb, ${band.color} 45%, var(--px-border2))`,
+        background: `linear-gradient(165deg, color-mix(in srgb, ${band.color} 16%, var(--px-bg2)), var(--px-bg3))`,
+        boxShadow: "2px 2px 0 #000",
       }}
       aria-label={`최근 7일 행복도 ${score}점, ${band.label} ${band.emoji}`}
     >
       <div className="flex items-end justify-between gap-3">
-        <div className="space-y-1 min-w-0">
+        <div className="space-y-1.5 min-w-0">
           <p
-            className="text-xs font-semibold tracking-wide"
-            style={{ color: "var(--px-text2)" }}
+            className="text-[13px] font-black tracking-wide"
+            style={{ color: "#fafafc" }}
           >
             최근 7일 행복도
           </p>
           <p
-            className="text-lg font-extrabold leading-tight"
+            className="text-[1.2rem] font-black leading-tight"
             style={{ color: band.color }}
           >
-            <span className="mr-1.5" aria-hidden>
+            <span className="mr-1.5 text-[1.35rem]" aria-hidden>
               {band.emoji}
             </span>
             {band.label}
           </p>
-          <p
-            className="text-xs font-medium leading-snug"
-            style={{ color: "var(--px-text2)" }}
-          >
-            {band.description}
-          </p>
         </div>
         <p
-          className="shrink-0 tabular-nums leading-none font-extrabold"
-          style={{ color: band.color, fontSize: "1.5rem" }}
+          className="shrink-0 tabular-nums leading-none font-black"
+          style={{ color: "#fffef8", fontSize: "2.05rem" }}
         >
           {score.toFixed(1)}
           <span
-            className="ml-1 text-xs font-semibold"
-            style={{ color: "var(--px-text2)" }}
+            className="ml-1 text-[14px] font-bold"
+            style={{ color: "#c8c8d4" }}
           >
-            / 10
+            /10
           </span>
         </p>
       </div>
 
-      <div className="space-y-1.5">
+      <div className="space-y-2">
         <div
-          className="relative h-3.5 border-2 overflow-hidden"
+          className="relative h-5 border-2 overflow-hidden"
           style={{
-            borderColor: "var(--px-border)",
+            borderColor: "var(--px-border2)",
             background: "var(--px-bg)",
           }}
         >
@@ -161,15 +153,15 @@ function HappinessGauge({ score }: { score: number }) {
             className="absolute top-0 bottom-0 w-0.5"
             style={{
               left: "50%",
-              background: "var(--px-text-on-panel)",
-              opacity: 0.55,
+              background: "#fffef8",
+              opacity: 0.7,
             }}
             aria-hidden
           />
         </div>
         <div
-          className="flex justify-between text-xs font-semibold"
-          style={{ color: "var(--px-text2)" }}
+          className="flex justify-between text-[12px] font-bold"
+          style={{ color: "#d4d4e0" }}
         >
           <span>낮음</span>
           <span>중간 5점</span>
@@ -180,73 +172,76 @@ function HappinessGauge({ score }: { score: number }) {
   );
 }
 
-function FocusChip({
+function pickTopFocus(
+  primary: StatusFocus | null | undefined,
+  secondary: StatusFocus | null | undefined,
+  prefer: "high" | "low"
+): StatusFocus | null {
+  const a = primary ?? null;
+  const b = secondary ?? null;
+  if (a && !b) return a;
+  if (b && !a) return b;
+  if (!a || !b) return null;
+  const sa = a.score;
+  const sb = b.score;
+  if (sa == null && sb == null) return a;
+  if (sa == null) return b;
+  if (sb == null) return a;
+  if (prefer === "high") return sa >= sb ? a : b;
+  return sa <= sb ? a : b;
+}
+
+function FocusToneSquare({
+  title,
   item,
   tone,
 }: {
+  title: string;
   item: StatusFocus;
   tone: "good" | "watch";
 }) {
-  const color = tone === "good" ? "#4ade80" : "#fbbf24";
+  const color = tone === "good" ? "#86efac" : "#fcd34d";
+  const glyph = tone === "good" ? "👍" : "👀";
   const border =
     tone === "good"
-      ? "color-mix(in srgb, #4ade80 55%, var(--px-border))"
-      : "color-mix(in srgb, #fbbf24 55%, var(--px-border))";
+      ? "color-mix(in srgb, #4ade80 60%, var(--px-border))"
+      : "color-mix(in srgb, #fbbf24 60%, var(--px-border))";
   return (
     <div
-      className="p-3 border-2 space-y-1.5 min-w-0"
+      className="min-w-0 p-3 border-2 space-y-2"
       style={{
         borderColor: border,
         background: "var(--px-bg3)",
+        boxShadow: "2px 2px 0 #000",
       }}
+      aria-label={`${title} ${item.value}${item.score != null ? ` ${item.score}점` : ""}`}
     >
+      <div className="flex items-center gap-1.5">
+        <span className="text-[1.35rem] leading-none" aria-hidden>
+          {glyph}
+        </span>
+      </div>
       <p
-        className="text-sm font-black leading-snug truncate"
-        style={{ color: "var(--px-text-on-panel)" }}
+        className="text-[1.05rem] font-black leading-snug truncate"
+        style={{ color: "#fafafc" }}
         title={item.value}
       >
-        <span className="mr-1" aria-hidden>
-          {STATUS_FOCUS_EMOJI[tone]}
-        </span>
         {item.value}
       </p>
       {item.score != null && (
-        <p className="text-sm font-bold tabular-nums" style={{ color }}>
+        <p
+          className="text-[1.5rem] font-black tabular-nums leading-none"
+          style={{ color }}
+        >
           {item.score}
           <span
-            className="text-xs ml-0.5 font-semibold"
-            style={{ color: "var(--px-text2)" }}
+            className="text-[0.85rem] ml-0.5 font-semibold"
+            style={{ color: "#c8c8d4" }}
           >
             /10
           </span>
         </p>
       )}
-    </div>
-  );
-}
-
-function FocusToneRow({
-  title,
-  tone,
-  children,
-}: {
-  title: string;
-  tone: "good" | "watch";
-  children: ReactNode;
-}) {
-  const color = tone === "good" ? "#4ade80" : "#fbbf24";
-  return (
-    <div
-      className="space-y-2 pl-2.5"
-      style={{ borderLeft: `3px solid ${color}` }}
-    >
-      <p className="text-xs font-black tracking-wide" style={{ color }}>
-        <span className="mr-1" aria-hidden>
-          {STATUS_FOCUS_EMOJI[tone]}
-        </span>
-        {title}
-      </p>
-      <div className="grid grid-cols-2 gap-2.5">{children}</div>
     </div>
   );
 }
@@ -428,18 +423,11 @@ export default function TodayStatusCard({
   );
 
   return (
-    <section className="space-y-2" aria-label="최근 나의 상태">
-      <div className="ui-emphasize-head">
-        <WaveText className="ui-emphasize-title">최근 나의 상태</WaveText>
+    <section className="home-section home-section--status" aria-label="최근 나의 상태">
+      <div className="home-section__label">
+        <WaveText className="home-section__title">최근 나의 상태</WaveText>
       </div>
-      <div
-        className="p-4 border-2 space-y-3.5"
-        style={{
-          borderColor: "var(--px-accent)",
-          background: "var(--px-bg2)",
-          boxShadow: "2px 2px 0 #000",
-        }}
-      >
+      <div className="home-section__body p-4 space-y-3.5">
         {loading && !status ? (
           <p
             className="text-sm font-medium"
@@ -461,26 +449,39 @@ export default function TodayStatusCard({
 
             {(hasFocus || (displayWeekTopics && hasTopics)) && (
               <div className="space-y-3">
-                {(status.coreGood || status.domainGood) && (
-                  <FocusToneRow title="힘이 되는 쪽" tone="good">
-                    {status.coreGood && (
-                      <FocusChip item={status.coreGood} tone="good" />
-                    )}
-                    {status.domainGood && (
-                      <FocusChip item={status.domainGood} tone="good" />
-                    )}
-                  </FocusToneRow>
-                )}
-                {(status.coreWatch || status.domainWatch) && (
-                  <FocusToneRow title="살피면 좋은 쪽" tone="watch">
-                    {status.coreWatch && (
-                      <FocusChip item={status.coreWatch} tone="watch" />
-                    )}
-                    {status.domainWatch && (
-                      <FocusChip item={status.domainWatch} tone="watch" />
-                    )}
-                  </FocusToneRow>
-                )}
+                {(() => {
+                  const good = pickTopFocus(
+                    status.coreGood,
+                    status.domainGood,
+                    "high"
+                  );
+                  const watch = pickTopFocus(
+                    status.coreWatch,
+                    status.domainWatch,
+                    "low"
+                  );
+                  if (!good && !watch) return null;
+                  return (
+                    <div
+                      className={`grid gap-2.5 ${good && watch ? "grid-cols-2" : "grid-cols-1"}`}
+                    >
+                      {good ? (
+                        <FocusToneSquare
+                          title="힘이 되는 쪽"
+                          item={good}
+                          tone="good"
+                        />
+                      ) : null}
+                      {watch ? (
+                        <FocusToneSquare
+                          title="살피면 좋은 쪽"
+                          item={watch}
+                          tone="watch"
+                        />
+                      ) : null}
+                    </div>
+                  );
+                })()}
                 {displayWeekTopics && hasTopics && (
                   <WeekTopicsCard
                     summary={displayWeekTopics}
@@ -488,30 +489,6 @@ export default function TodayStatusCard({
                     variant="focus"
                   />
                 )}
-              </div>
-            )}
-
-            {status.advice && (
-              <div
-                className="space-y-1.5 px-3 py-3"
-                style={{
-                  borderLeft: "3px solid var(--px-accent)",
-                  background:
-                    "color-mix(in srgb, var(--px-accent) 10%, var(--px-bg3))",
-                }}
-              >
-                <p
-                  className="text-[11px] font-black tracking-wide"
-                  style={{ color: "var(--px-accent)" }}
-                >
-                  이렇게 해보면 좋아요
-                </p>
-                <p
-                  className="text-sm font-bold leading-relaxed"
-                  style={{ color: "var(--px-text-on-panel)", lineHeight: 1.65 }}
-                >
-                  {status.advice}
-                </p>
               </div>
             )}
           </>

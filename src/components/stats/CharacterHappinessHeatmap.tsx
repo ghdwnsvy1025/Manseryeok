@@ -101,14 +101,14 @@ function HappinessTile({
         className={`block font-black leading-none ${
           compact ? "text-sm" : "text-base"
         }`}
-        style={{ color: "var(--px-text2)" }}
+        style={{ color: "#f0f0f8" }}
       >
         {row.key}
       </span>
       {insufficient || row.average == null ? (
         <span
           className="block mt-1.5 text-sm font-bold"
-          style={{ color: "var(--px-text2)" }}
+          style={{ color: "#c8c8d4" }}
         >
           —
         </span>
@@ -118,7 +118,7 @@ function HappinessTile({
             className={`block mt-1 font-black tabular-nums leading-none ${
               compact ? "text-lg" : "text-xl"
             }`}
-            style={{ color: "var(--px-text)" }}
+            style={{ color: "#fffef8" }}
           >
             {row.average.toFixed(1)}
           </span>
@@ -141,8 +141,8 @@ function HappinessTile({
         </>
       )}
       <span
-        className="absolute bottom-0.5 right-0.5 text-[9px] font-bold"
-        style={{ color: "var(--px-text2)" }}
+        className="absolute bottom-0.5 right-0.5 text-[10px] font-bold"
+        style={{ color: "#b8b8c8" }}
       >
         {row.count}회
       </span>
@@ -244,15 +244,15 @@ function PatternCharSheet({
           </div>
 
           <p
-            className="text-[13px] font-bold leading-snug"
-            style={{ color: "var(--px-text-on-panel)" }}
+            className="text-[15px] font-bold leading-snug"
+            style={{ color: "#fffef8" }}
           >
             {identity.meaningSentence}
           </p>
           {detail.tenGodSentence && (
             <p
-              className="text-[13px] font-bold leading-snug"
-              style={{ color: "var(--px-text2)" }}
+              className="text-[14px] font-semibold leading-snug"
+              style={{ color: "#e4e4ef" }}
             >
               {detail.tenGodSentence}
             </p>
@@ -276,8 +276,8 @@ function PatternCharSheet({
               >
                 <div>
                   <p
-                    className="text-[11px] font-black"
-                    style={{ color: "var(--px-text2)" }}
+                    className="text-[13px] font-black"
+                    style={{ color: "#e8e8f0" }}
                   >
                     평균 행복
                   </p>
@@ -287,22 +287,22 @@ function PatternCharSheet({
                       color:
                         row.average != null
                           ? happinessTone(row.average)
-                          : "var(--px-text)",
+                          : "#fffef8",
                     }}
                   >
                     {row.average != null ? row.average.toFixed(1) : "—"}
                   </p>
                   <p
-                    className="mt-1 text-[11px] font-bold"
-                    style={{ color: "var(--px-text2)" }}
+                    className="mt-1 text-[13px] font-bold"
+                    style={{ color: "#c8c8d4" }}
                   >
                     {row.count}회
                   </p>
                 </div>
                 <div className="text-right">
                   <p
-                    className="text-[11px] font-black"
-                    style={{ color: "var(--px-text2)" }}
+                    className="text-[13px] font-black"
+                    style={{ color: "#e8e8f0" }}
                   >
                     전체 대비
                   </p>
@@ -312,7 +312,7 @@ function PatternCharSheet({
                       color:
                         row.deltaFromOverall != null
                           ? deltaTone(row.deltaFromOverall, 0)
-                          : "var(--px-text2)",
+                          : "#c8c8d4",
                     }}
                   >
                     {row.deltaFromOverall != null
@@ -321,8 +321,8 @@ function PatternCharSheet({
                   </p>
                   {detail.observationLine && (
                     <p
-                      className="mt-1 text-[11px] font-bold"
-                      style={{ color: "var(--px-accent)" }}
+                      className="mt-1 text-[13px] font-bold"
+                      style={{ color: "#fffef8" }}
                     >
                       {detail.observationLine}
                     </p>
@@ -335,8 +335,8 @@ function PatternCharSheet({
                   {detail.topMoods.length > 0 && (
                     <div>
                       <p
-                        className="text-[11px] font-black mb-1.5"
-                        style={{ color: "var(--px-text2)" }}
+                        className="text-[13px] font-black mb-1.5"
+                        style={{ color: "#e8e8f0" }}
                       >
                         기분
                       </p>
@@ -353,14 +353,14 @@ function PatternCharSheet({
                             }}
                           >
                             <span
-                              className="text-[12px] font-black leading-tight"
+                              className="text-[13px] font-black leading-tight"
                               style={{ color: "var(--signal-emotion)" }}
                             >
                               {m.label}
                             </span>
                             <span
-                              className="mt-1 text-[10px] font-bold tabular-nums"
-                              style={{ color: "var(--px-text2)" }}
+                              className="mt-1 text-[11px] font-bold tabular-nums"
+                              style={{ color: "#c8c8d4" }}
                             >
                               {m.count}회
                             </span>
@@ -372,8 +372,8 @@ function PatternCharSheet({
                   {detail.topEvents.length > 0 && (
                     <div>
                       <p
-                        className="text-[11px] font-black mb-1.5"
-                        style={{ color: "var(--px-text2)" }}
+                        className="text-[13px] font-black mb-1.5"
+                        style={{ color: "#e8e8f0" }}
                       >
                         사건
                       </p>
@@ -381,10 +381,10 @@ function PatternCharSheet({
                         {detail.topEvents.map((m) => (
                           <span
                             key={m.label}
-                            className="px-2 py-1 border-2 text-[11px] font-bold"
+                            className="px-2.5 py-1.5 border-2 text-[13px] font-bold"
                             style={{
-                              borderColor: "var(--px-border)",
-                              color: "var(--px-text)",
+                              borderColor: "var(--px-border2)",
+                              color: "#fffef8",
                               background: "var(--px-bg3)",
                               boxShadow: "1px 1px 0 #000",
                             }}
@@ -392,7 +392,7 @@ function PatternCharSheet({
                             {m.label}
                             <span
                               className="ml-1 tabular-nums"
-                              style={{ color: "var(--px-text2)" }}
+                              style={{ color: "#c8c8d4" }}
                             >
                               {m.count}
                             </span>
@@ -407,8 +407,8 @@ function PatternCharSheet({
               {detail.recentDays.length > 0 && (
                 <div>
                   <p
-                    className="text-[11px] font-black mb-1"
-                    style={{ color: "var(--px-text2)" }}
+                    className="text-[13px] font-black mb-1"
+                    style={{ color: "#e8e8f0" }}
                   >
                     최근
                   </p>

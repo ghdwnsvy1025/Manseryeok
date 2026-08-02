@@ -24,9 +24,11 @@ import {
   resolveGatedBlend,
 } from "./insight/recordReflectGate";
 import { PERSONALIZED_FORTUNE_SYSTEM_PROMPT } from "./fortune/personalizedPrompt";
+import { polishFortuneOverallCopy } from "./fortune/polishCopy";
 import {
   buildFortunePresentationMeta,
   buildDataQuality,
+  normalizeFortuneFlow,
   syncDomainCopyFields,
 } from "./fortune/labels";
 import type { FortuneFlow, FortuneConfidenceLabel } from "./insight/types";
@@ -42,13 +44,10 @@ import { buildDayStructureBrief } from "./fortune/dayStructureBrief";
 import { buildFortuneAnalysisFacts } from "./fortune/analysisFacts";
 import type { SajuProfile } from "@/lib/diary/types";
 
-const FLOW_SET = new Set<FortuneFlow>(["원활", "안정", "혼합", "관리"]);
 const CONF_SET = new Set<FortuneConfidenceLabel>(["높음", "보통", "낮음"]);
 
 function parseFlow(raw: unknown): FortuneFlow | null {
-  return typeof raw === "string" && FLOW_SET.has(raw as FortuneFlow)
-    ? (raw as FortuneFlow)
-    : null;
+  return normalizeFortuneFlow(raw);
 }
 
 function parseConfidenceLabel(raw: unknown): FortuneConfidenceLabel | null {
@@ -59,8 +58,8 @@ function parseConfidenceLabel(raw: unknown): FortuneConfidenceLabel | null {
 }
 
 function toneFromFlow(flow: FortuneFlow): FortuneDomainResult["tone"] {
-  if (flow === "원활") return "supportive";
-  if (flow === "관리") return "caution";
+  if (flow === "최고" || flow === "좋음") return "supportive";
+  if (flow === "주의") return "caution";
   return "balanced";
 }
 
@@ -636,7 +635,7 @@ export async function generateTodayFortuneV2(
               : null,
             theoryAssistChunks: theory.chunks.slice(0, 3),
             instruction:
-              "analysisFacts.compressed로 사람·오늘을 잠그고 categoryEvidence로 영역별 근거만 골라, 6영역 각 3~5문장으로 풀어라. domainHooks 반영 필수. 없는 합·충·십신을 만들지 말 것. 만능 문장 금지. 전문용어는 생활어로 번역.",
+              "analysisFacts로 사람·오늘을 잠근다. overall interpretation은 정확히 3문장(마음→주의·보는법→작은 행동). 시스템 '좋은 예(문맥 정리·간결 3문장)' 길이·결을 잠금. '날카로운 표현과 반발'식 추상 나열·'이 기운을 통해…따뜻해질' 만능 마무리 금지. 전문어 나열 금지. action·caution은 본문 마지막과 같은 주제.",
           }),
         },
       ],
@@ -658,9 +657,22 @@ export async function generateTodayFortuneV2(
     const sanitized = patchedDomains.map((d, i) =>
       sanitizeDomainCopy(d, scored[i]!)
     );
+    const polished = await Promise.all(
+      sanitized.map(async (d) => {
+        if (d.domain !== "overall") return d;
+        const body = (d.interpretation || d.summary || "").trim();
+        if (!body) return d;
+        const next = await polishFortuneOverallCopy(body, client);
+        return syncDomainCopyFields({
+          ...d,
+          interpretation: next,
+          summary: next,
+        });
+      })
+    );
     const withTheoryGuard = digestOn
-      ? sanitized
-      : sanitized.map((d) =>
+      ? polished
+      : polished.map((d) =>
           d.confidenceLabel === "높음"
             ? { ...d, confidenceLabel: "낮음" as const }
             : d

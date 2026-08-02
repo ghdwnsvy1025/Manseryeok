@@ -315,64 +315,145 @@ textarea {
   color: #0a0a12;
   background: var(--chip-accent, var(--px-accent));
 }
-/* 핵심 섹션 강조 헤더 (기록·홈·일기 공통) */
+/* 핵심 섹션 헤더 — 홈과 같이 왼쪽 바 (노란 박스 제거) */
 .stats-emphasize-head,
 .ui-emphasize-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem;
-  padding: 0.65rem 0.75rem;
-  border: 2px solid var(--px-accent);
-  background: var(--px-bg3);
-  box-shadow: 3px 3px 0 #4a3a00;
+  padding: 0.25rem 0.15rem 0.25rem 0.75rem;
+  border: none;
+  border-left: 3px solid var(--px-accent);
+  background: transparent;
+  box-shadow: none;
 }
 .stats-emphasize-title,
 .ui-emphasize-title {
+  font-size: 1.05rem;
+  font-weight: 900;
+  line-height: 1.25;
+  color: #ececf6;
+  letter-spacing: 0.05em;
+}
+
+/* 일기 체크인 — 감성 톤: 흰 제목, 절제된 선택 */
+.checkin-ritual .ui-emphasize-head {
+  padding: 0.2rem 0.1rem 0.3rem 0.75rem;
+  border-left-width: 2px;
+  border-left-color: color-mix(in srgb, #fffef8 40%, var(--px-border));
+}
+.checkin-ritual .ui-emphasize-title {
+  font-size: 1.15rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  color: #fffef8;
+}
+.checkin-ritual .checkin-core-card {
+  border-width: 1px;
+  box-shadow: none;
+  background: var(--px-bg2);
+}
+.checkin-ritual .checkin-core-question {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  line-height: 1.5;
+  color: #a8a8b8;
+}
+.checkin-ritual .checkin-core-name {
+  font-size: 0.98rem;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  color: #fffef8;
+}
+
+/* 홈 섹션 — 제목(라벨)과 본문(내용) 역할 분리 */
+.home-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+.home-section__label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.2rem 0.15rem 0.2rem 0.7rem;
+  border-left: 3px solid var(--home-section-bar, var(--px-accent));
+  background: transparent;
+}
+.home-section__title {
+  margin: 0;
   font-size: 1rem;
   font-weight: 900;
-  line-height: 1.2;
-  color: var(--px-accent);
-  letter-spacing: 0.02em;
+  line-height: 1.25;
+  letter-spacing: 0.06em;
+  color: #ececf6;
+}
+.home-section__body {
+  border: 2px solid var(--px-border2);
+  background: var(--px-bg3);
+  box-shadow: 2px 2px 0 #000;
+  /* 본문: 제목보다 한 단계 더 밝은 중립색 (보라 틴트 제거) */
+  --px-text: #f7f7fc;
+  --px-text2: #c8c8d4;
+  --px-text-on-panel: #fafafc;
+  color: var(--px-text-on-panel);
+}
+.home-section--fortune {
+  --home-section-bar: #c8a700;
+}
+.home-section--status {
+  --home-section-bar: #f472b6;
+}
+.home-section--level {
+  --home-section-bar: #60a5fa;
+}
+.home-readable .home-section__title {
+  font-size: 1.05rem;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+  color: #ececf6;
 }
 .stats-category-panel {
   display: flex;
   flex-direction: column;
-  gap: 0.65rem;
-  padding: 0.85rem 0.75rem;
-  border: 2px solid color-mix(in srgb, #f0c14d 72%, var(--px-border2));
-  background: color-mix(in srgb, #f0c14d 11%, var(--px-bg3));
-  box-shadow: 3px 3px 0 color-mix(in srgb, #f0c14d 40%, #000);
+  gap: 0.75rem;
+  padding: 1rem 0.85rem;
+  border: 2px solid var(--px-border2);
+  background: var(--px-bg3);
+  box-shadow: 2px 2px 0 #000;
 }
 .stats-category-title {
-  font-size: 0.8125rem;
+  font-size: 0.95rem;
   font-weight: 900;
   line-height: 1.2;
-  color: #f0c14d;
-  letter-spacing: 0.04em;
+  color: #fffef8;
+  letter-spacing: 0.03em;
 }
 .stats-category-title::before {
-  content: "■ ";
+  content: none;
 }
 .stats-chip-cat {
-  padding: 0.55rem 0.85rem;
-  font-size: 0.875rem;
+  padding: 0.65rem 0.95rem;
+  font-size: 0.9375rem;
   font-weight: 900;
-  border: 2px solid var(--px-border);
-  color: var(--px-text-on-panel);
+  border: 2px solid var(--px-border2);
+  color: #f0f0f8;
   background: var(--px-bg2);
-  min-height: 2.5rem;
+  min-height: 2.75rem;
+  box-shadow: 1px 1px 0 #000;
 }
 .stats-chip-cat.is-on {
-  border-color: var(--chip-accent, #f0c14d);
-  color: var(--chip-accent, #f0c14d);
-  background: color-mix(in srgb, var(--chip-accent, #f0c14d) 20%, var(--px-bg2));
+  border-color: var(--chip-accent, var(--px-accent));
+  color: #111;
+  background: var(--chip-accent, var(--px-accent));
   box-shadow: 2px 2px 0 #000;
 }
 .stats-status-warn {
-  font-size: 0.6875rem;
+  font-size: 0.75rem;
   font-weight: 700;
-  color: #fbbf24;
+  color: #fcd34d;
 }
 .stats-link {
   font-size: 0.6875rem;
@@ -915,9 +996,9 @@ body::before {
  * 픽셀 테마는 유지하면서 홈 안에서만 본문 크기·대비·굵기를 정돈한다.
  */
 .home-readable {
-  --px-text: #e6e6f5;
-  --px-text2: #c4c4e0;
-  --px-text-on-panel: #f0f0fa;
+  --px-text: #f2f2f6;
+  --px-text2: #c8c8d4;
+  --px-text-on-panel: #fafafc;
 }
 
 .home-readable .text-\[10px\] {
@@ -960,9 +1041,31 @@ body::before {
   margin: 0;
   font-size: 0.98rem;
   line-height: 1.85;
-  font-weight: 500;
-  color: var(--px-text2);
+  font-weight: 600;
+  color: #fafafc;
   letter-spacing: -0.01em;
+}
+
+.fortune-readable .fortune-body__lead {
+  position: relative;
+  margin: 0.15rem 0 0.35rem !important;
+  padding: 0.9rem 1.1rem;
+  font-size: 1.12rem !important;
+  font-weight: 800 !important;
+  line-height: 1.7 !important;
+  letter-spacing: -0.02em;
+  text-align: center;
+  color: #fffef8 !important;
+  border-top: 2px solid color-mix(in srgb, var(--px-accent) 55%, transparent);
+  border-bottom: 2px solid color-mix(in srgb, var(--px-accent) 55%, transparent);
+  background: color-mix(in srgb, var(--px-accent) 12%, var(--px-bg3));
+  box-shadow: 2px 2px 0 #000;
+}
+
+.fortune-readable .fortune-body__lead-mark {
+  color: var(--px-accent);
+  font-weight: 900;
+  font-size: 1.15em;
 }
 
 .fortune-readable .fortune-body--compact p {
@@ -1887,16 +1990,13 @@ body::before {
 }
 @keyframes checkin-mood-ink {
   0% {
-    transform: scale(0.94);
-    box-shadow: 0 0 0 0 color-mix(in srgb, var(--px-accent) 45%, transparent);
+    transform: scale(0.97);
   }
-  55% {
-    transform: scale(1.03);
-    box-shadow: 0 0 0 6px color-mix(in srgb, var(--px-accent) 0%, transparent);
+  60% {
+    transform: scale(1.015);
   }
   100% {
     transform: scale(1);
-    box-shadow: 2px 2px 0 #000;
   }
 }
 .checkin-mood-ink {

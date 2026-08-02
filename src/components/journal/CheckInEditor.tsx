@@ -80,6 +80,10 @@ import { requestHomeInstallSheet } from "@/lib/pwa/installState";
 
 const WEEKDAY_KO = ["일", "월", "화", "수", "목", "금", "토"] as const;
 const HAPPINESS_PINK = "#f472b6";
+/** 섹션 제목은 흰 톤, 핵심 항목명·필수는 브랜드 골드 */
+const CHECKIN_SECTION_TITLE = "#fffef8";
+const CHECKIN_CORE_GOLD = "#c8a700";
+const CHECKIN_CORE_GOLD_SOFT = "#dbb40f";
 const FEATURED_TAG_CODES = [
   NONE_SPECIAL_TAG,
   "work_pressure",
@@ -1330,11 +1334,11 @@ export default function CheckInEditor({ initialDate }: Props) {
 
   const requiredBadge = (
     <span
-      className="text-[10px] font-black px-1.5 py-0.5 border"
+      className="text-[13px] font-extrabold px-2.5 py-1 border-2 tracking-wide"
       style={{
-        borderColor: HAPPINESS_PINK,
-        color: HAPPINESS_PINK,
-        background: `color-mix(in srgb, ${HAPPINESS_PINK} 12%, transparent)`,
+        borderColor: CHECKIN_CORE_GOLD,
+        color: "#14120a",
+        background: CHECKIN_CORE_GOLD,
       }}
     >
       필수
@@ -1453,48 +1457,49 @@ export default function CheckInEditor({ initialDate }: Props) {
         <button
           type="button"
           onClick={openDiarySheet}
-          className="w-full text-left px-3 py-3.5 border-2 space-y-1.5"
+          className="w-full text-left px-3.5 py-3.5 border space-y-1.5"
           style={{
-            borderColor: content.trim() ? "var(--px-accent)" : "var(--px-border2)",
-            background: "var(--px-bg2)",
-            boxShadow: "3px 3px 0 #000",
+            borderColor: content.trim()
+              ? "var(--px-accent)"
+              : "var(--px-border)",
+            background: content.trim()
+              ? "color-mix(in srgb, var(--px-accent) 8%, var(--px-bg2))"
+              : "var(--px-bg2)",
           }}
         >
           <div className="flex items-center justify-between gap-2">
             <p
-              className="text-sm font-black"
+              className="text-[1.15rem] font-extrabold tracking-tight"
               style={{ color: "var(--px-accent)" }}
             >
               {content.trim() ? "하루 정리글" : "하루 정리글 쓰기"}
             </p>
             <span
-              className="text-[11px] font-black shrink-0"
-              style={{ color: "var(--px-text2)" }}
+              className="text-[12px] font-semibold shrink-0"
+              style={{ color: content.trim() ? "#a8a8b8" : "var(--px-accent)" }}
             >
               {content.trim() ? "수정 ›" : "열기 ›"}
             </span>
           </div>
           {content.trim() ? (
             <p
-              className="text-[13px] font-bold leading-snug line-clamp-2"
-              style={{ color: "var(--px-text-on-panel)" }}
+              className="text-[15px] font-medium leading-relaxed line-clamp-3"
+              style={{ color: "#ececf4" }}
             >
               {content.trim()}
             </p>
           ) : (
-            <p className="text-[12px] font-bold leading-snug" style={{ color: "var(--px-text2)" }}>
-              선택이에요. 질문을 참고해도 되고, 안 적어도 저장할 수 있어요.
+            <p
+              className="text-[13px] font-medium leading-snug"
+              style={{ color: "#a8a8b8" }}
+            >
+              오늘 있었던 일을 짧게 남겨 보세요
             </p>
           )}
           {content.trim().length > 0 && (
             <p className="ui-hint tabular-nums">{content.trim().length}자</p>
           )}
         </button>
-        <p className="ui-hint">
-          {content.trim().length === 0
-            ? "필수는 행복도·기분·핵심 상태예요. 글은 적으면 운세·문장이 더 잘 맞아요."
-            : "고마워요. 남긴 글로 오늘의 문장과 운세가 더 잘 맞아요."}
-        </p>
       </section>
 
       <DiaryWriteSheet
@@ -1524,16 +1529,20 @@ export default function CheckInEditor({ initialDate }: Props) {
         style={{ ["--ci" as string]: 2 }}
       >
         <div className="ui-emphasize-head">
-          <p className="ui-emphasize-title">행복도 (0~10)</p>
+          <p
+            className="ui-emphasize-title"
+            style={{ color: CHECKIN_SECTION_TITLE }}
+          >
+            행복도 (0~10)
+          </p>
           {requiredBadge}
         </div>
         <div
-          className="space-y-3 p-3 border-2"
+          className="space-y-3 p-3 border"
           style={{
             borderColor:
-              fieldError?.scope === "happiness" ? "#ef4444" : HAPPINESS_PINK,
-            background: `color-mix(in srgb, ${HAPPINESS_PINK} 10%, var(--px-bg2))`,
-            boxShadow: `3px 3px 0 color-mix(in srgb, ${HAPPINESS_PINK} 45%, #000)`,
+              fieldError?.scope === "happiness" ? "#ef4444" : "var(--px-border)",
+            background: `color-mix(in srgb, ${HAPPINESS_PINK} 6%, var(--px-bg2))`,
           }}
         >
         <HappinessSlider
@@ -1542,7 +1551,7 @@ export default function CheckInEditor({ initialDate }: Props) {
           onChange={changeHappiness}
         />
         {fieldError?.scope === "happiness" && (
-          <p className="text-[11px] font-bold" style={{ color: "#ef4444" }}>
+          <p className="text-[11px] font-medium" style={{ color: "#ef4444" }}>
             {fieldError.message}
           </p>
         )}
@@ -1554,14 +1563,22 @@ export default function CheckInEditor({ initialDate }: Props) {
         style={{ ["--ci" as string]: 3 }}
       >
         <div className="ui-emphasize-head">
-          <p className="ui-emphasize-title">기분</p>
-          <p className="ui-hint">
+          <p
+            className="ui-emphasize-title"
+            style={{ color: CHECKIN_SECTION_TITLE }}
+          >
+            기분
+          </p>
+          <p
+            className="text-[12px] font-medium tabular-nums"
+            style={{ color: "#a8a8b8" }}
+          >
             {moods.length === 0
               ? "최소 1개 · 최대 3개"
               : `${moods.length}/3개`}
           </p>
         </div>
-        <div className="grid grid-cols-4 gap-2">
+        <div className="grid grid-cols-4 gap-1.5">
           {MOOD_OPTIONS.map((m) => {
             const on = moods.includes(m);
             return (
@@ -1576,16 +1593,17 @@ export default function CheckInEditor({ initialDate }: Props) {
                     celebrateClick(e, { variant: "mood", label: m });
                   }
                 }}
-                className={`min-h-[3.25rem] px-2 py-2.5 text-sm font-black border-2 leading-tight${
+                className={`min-h-[2.85rem] px-1.5 py-2 text-[13px] font-semibold border leading-snug${
                   on ? " checkin-mood-ink" : ""
                 }`}
                 style={{
-                  borderColor: on ? "var(--px-accent)" : "var(--px-border)",
-                  color: on ? "var(--px-accent)" : "var(--px-text)",
+                  borderColor: on
+                    ? "color-mix(in srgb, #fffef8 55%, var(--px-border))"
+                    : "var(--px-border)",
+                  color: on ? "#fffef8" : "#b8b8c8",
                   background: on
-                    ? "color-mix(in srgb, var(--px-accent) 14%, var(--px-bg3))"
-                    : "var(--px-bg3)",
-                  boxShadow: on ? "2px 2px 0 #000" : "none",
+                    ? "color-mix(in srgb, #fffef8 10%, var(--px-bg3))"
+                    : "var(--px-bg2)",
                 }}
               >
                 {m}
@@ -1596,11 +1614,16 @@ export default function CheckInEditor({ initialDate }: Props) {
       </section>
 
       <section
-        className="checkin-ritual__block js-play-when-visible space-y-3"
+        className="checkin-ritual__block js-play-when-visible space-y-2.5"
         style={{ ["--ci" as string]: 4 }}
       >
         <div className="ui-emphasize-head">
-          <p className="ui-emphasize-title">핵심 상태</p>
+          <p
+            className="ui-emphasize-title"
+            style={{ color: CHECKIN_SECTION_TITLE }}
+          >
+            핵심 상태
+          </p>
           {requiredBadge}
         </div>
         {CORE_STATE_CODES.map((code) => {
@@ -1613,22 +1636,23 @@ export default function CheckInEditor({ initialDate }: Props) {
               ref={(el) => {
                 coreRefs.current[code] = el;
               }}
-              className="p-3 border-2 space-y-2 scroll-mt-4"
+              className="checkin-core-card p-3 border space-y-2 scroll-mt-4"
               style={{
                 borderColor: errored ? "#ef4444" : "var(--px-border)",
                 background: "var(--px-bg2)",
               }}
             >
               <p
-                className="text-sm font-black"
-                style={{ color: "var(--px-accent)" }}
+                className="checkin-core-name"
+                style={{ color: CHECKIN_CORE_GOLD_SOFT }}
               >
                 {cat?.name ?? code}
               </p>
-              <p className="ui-hint">{cat?.question}</p>
+              <p className="checkin-core-question">{cat?.question}</p>
               <OrdinalPicker
                 label={cat?.name ?? code}
                 value={s.ordinal}
+                accent={CHECKIN_CORE_GOLD}
                 onChange={(n) =>
                   setCoreRow(code, { ordinal: n, isNotApplicable: false })
                 }
@@ -1799,8 +1823,8 @@ export default function CheckInEditor({ initialDate }: Props) {
                       )}
                     </div>
                     <p
-                      className="text-sm font-black leading-snug"
-                      style={{ color: "var(--px-text-on-panel)" }}
+                      className="text-[13px] font-medium leading-snug"
+                      style={{ color: "#c8c8d4" }}
                     >
                       {cat?.question}
                     </p>

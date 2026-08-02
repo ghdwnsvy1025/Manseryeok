@@ -19,10 +19,31 @@ export const FORTUNE_NOTICE =
   "이 운세는 학습된 사주 이론과 개인 기록을 바탕으로 오늘의 경향을 해석한 콘텐츠이며, 실제 결과는 환경과 선택에 따라 달라질 수 있습니다.";
 
 export function flowFromScore(score: number): FortuneFlow {
-  if (score >= 0.68) return "원활";
-  if (score >= 0.54) return "안정";
-  if (score >= 0.4) return "혼합";
-  return "관리";
+  if (score >= 0.8) return "최고";
+  if (score >= 0.64) return "좋음";
+  if (score >= 0.48) return "무난";
+  if (score >= 0.34) return "아쉬움";
+  return "주의";
+}
+
+/** 캐시·구버전 → 새 등급 라벨 */
+export function normalizeFortuneFlow(raw: unknown): FortuneFlow | null {
+  if (typeof raw !== "string") return null;
+  const map: Record<string, FortuneFlow> = {
+    원활: "최고",
+    순조: "좋음",
+    안정: "무난",
+    무난: "무난",
+    혼합: "아쉬움",
+    엇갈림: "아쉬움",
+    관리: "주의",
+    조심: "주의",
+    최고: "최고",
+    좋음: "좋음",
+    아쉬움: "아쉬움",
+    주의: "주의",
+  };
+  return map[raw] ?? null;
 }
 
 export function confidenceLabelFromScore(

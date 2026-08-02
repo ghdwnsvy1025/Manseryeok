@@ -17,6 +17,7 @@ import {
 } from "@/lib/analytics/posthog";
 import { enableGuestMode } from "@/lib/auth/guestMode";
 import { activateGuestWorkspace } from "@/lib/diary/profileStorage";
+import CherryBlossomLayer from "@/components/motion/CherryBlossomLayer";
 
 type Props = {
   onGuest: () => void;
@@ -88,17 +89,19 @@ export default function WelcomeAuthGate({
 
   return (
     <div
-      className="max-w-md mx-auto w-full min-h-[calc(100dvh-1.5rem)] flex flex-col px-1 py-4"
+      className="max-w-md mx-auto w-full min-h-[calc(100dvh-1.5rem)] flex flex-col px-1 py-4 relative"
       style={{
         background:
           "radial-gradient(ellipse 80% 50% at 50% 0%, color-mix(in srgb, var(--px-accent) 14%, transparent), transparent 70%)",
       }}
     >
+      <CherryBlossomLayer continuous zIndex={2} />
+      <div className="relative z-[3] flex flex-col flex-1 min-h-0">
       <section className="flex flex-col items-center text-center gap-3 pt-4 pb-2">
         <div
-          className="relative w-[5.5rem] h-[5.5rem] overflow-hidden"
+          className="relative w-[7.25rem] h-[7.25rem] overflow-hidden"
           style={{
-            borderRadius: "1.15rem",
+            borderRadius: "1.35rem",
             boxShadow: "0 10px 28px rgba(0,0,0,0.35), 0 0 0 2px #f5c45155",
           }}
         >
@@ -112,7 +115,7 @@ export default function WelcomeAuthGate({
           />
         </div>
         <p
-          className="text-[11px] font-black tracking-[0.14em]"
+          className="text-[1.05rem] font-black tracking-[0.12em]"
           style={{ color: "var(--px-accent)" }}
         >
           오늘의 사주 일기
@@ -125,14 +128,6 @@ export default function WelcomeAuthGate({
           <br />
           내일의 결을 닮아갑니다
         </h1>
-        <p
-          className="text-[13px] font-bold leading-relaxed max-w-[18rem]"
-          style={{ color: "var(--px-text2)" }}
-        >
-          짧게 적어도 괜찮아요.
-          <br />
-          기록이 쌓일수록, 사주도 당신 곁으로.
-        </p>
         <p
           className="text-[12px] font-bold leading-snug max-w-[20rem] px-3 py-2 border"
           style={{
@@ -171,54 +166,26 @@ export default function WelcomeAuthGate({
         >
           {loading === "google" ? "연결 중…" : "Google로 시작하기"}
         </button>
-        <ul className="space-y-1.5" aria-label="Google 로그인 장점">
-          {(
-            [
-              "확인 메일·비밀번호 없이 바로 시작",
-              "같은 Google 계정에서만 일기 확인",
-              "기기 바꿔도 기록이 이어져요",
-            ] as const
-          ).map((line) => (
-            <li
-              key={line}
-              className="text-[12px] font-bold leading-snug pl-2"
-              style={{
-                color: "var(--px-text2)",
-                borderLeft: "2px solid var(--px-accent)",
-              }}
-            >
-              {line}
-            </li>
-          ))}
-        </ul>
-
-        <div
-          className="h-px w-full"
-          style={{ background: "var(--px-border)" }}
-          aria-hidden
-        />
 
         <button
           type="button"
           disabled={loading !== null}
           onClick={() => void startAsGuest()}
-          className="w-full px-4 py-3.5 text-sm font-black border-2"
+          className="w-full px-4 py-4 text-base font-black border-2"
           style={{
-            background: "var(--px-bg2)",
+            background: "color-mix(in srgb, var(--px-text-on-panel) 12%, var(--px-bg2))",
             borderColor: "#000",
             color: "var(--px-text-on-panel)",
-            boxShadow: "3px 3px 0 #000",
+            boxShadow: "4px 4px 0 #000",
           }}
         >
           {loading === "guest" ? "준비 중…" : "비로그인으로 둘러보기"}
         </button>
         <p
-          className="text-[11px] font-bold text-center leading-snug"
+          className="text-[12px] font-bold text-center leading-snug"
           style={{ color: "var(--px-text2)" }}
         >
-          이 기기에만 저장 · 다른 사람은 볼 수 없어요
-          <br />
-          나중에 Google로 이어갈 수 있어요
+          이 기기에만 저장 · 나중에 Google로 이어갈 수 있어요
         </p>
       </section>
 
@@ -289,6 +256,7 @@ export default function WelcomeAuthGate({
           ))}
         </div>
       </section>
+      </div>
     </div>
   );
 }

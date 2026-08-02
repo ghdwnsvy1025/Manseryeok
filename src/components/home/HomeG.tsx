@@ -1,14 +1,14 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import TodayFortunePanel from "@/components/home/TodayFortunePanel";
 import TodayStatusCard from "@/components/home/TodayStatusCard";
-import TodayRecordPrompt from "@/components/home/TodayRecordPrompt";
 import YesterdayGapPrompt from "@/components/home/YesterdayGapPrompt";
 import HomeInstallSheet from "@/components/home/HomeInstallSheet";
 import HomeInstallCTA from "@/components/home/HomeInstallCTA";
 import HomeEBlock from "@/components/home/HomeEBlock";
+import TenGodChip from "@/components/home/TenGodChip";
 import { getJournalStorage } from "@/lib/journal/getStorage";
 import { getEnabledCodesOrdered } from "@/lib/journal/preferences";
 import { buildHomeEStats } from "@/lib/journal/homeStats";
@@ -18,6 +18,7 @@ import type { CategoryCode, JournalEntry } from "@/lib/journal/types";
 import { todayDateString } from "@/lib/diary/dayPillar";
 import { yesterdayOf, entryDateSet, listRecentEmptyDays } from "@/lib/journal/emptyDays";
 import { getPillarsForDate } from "@/lib/diary/dayPillar";
+import { addDays } from "@/lib/diary/nextGanjiDay";
 import { getPillarTenGods } from "@/lib/diary/currentDaeun";
 import {
   loadLocalSajuProfiles,
@@ -30,7 +31,6 @@ import {
   STEM_META,
   type Element,
 } from "@/lib/saju/constants";
-import { tenGodPlain } from "@/lib/saju/tenGodPlain";
 import WaveText from "@/components/motion/WaveText";
 import { JOURNAL_PROGRESS_CHANGED_EVENT } from "@/lib/journal/streak";
 
@@ -63,81 +63,12 @@ const WEEK_ACCENT = [
   "#60a5fa",
 ] as const;
 
+/** 홈에서 넘길 수 있는 과거 일수 (오늘 포함 7일) */
+const HOME_DAY_LOOKBACK = 6;
+
 function elemOf(hanja: string, kind: "stem" | "branch") {
   const meta = kind === "stem" ? STEM_META[hanja] : BRANCH_META[hanja];
   return meta?.element ? ELEM[meta.element] : null;
-}
-
-function TenGodBox({
-  label,
-  color,
-}: {
-  label: string;
-  color: { text: string; bg: string; border: string } | null;
-}) {
-  const [open, setOpen] = useState(false);
-  const rootRef = useRef<HTMLSpanElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const onDown = (e: MouseEvent) => {
-      if (!rootRef.current?.contains(e.target as Node)) setOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
-    };
-    document.addEventListener("mousedown", onDown);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onDown);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [open]);
-
-  return (
-    <span ref={rootRef} className="relative inline-flex">
-      <button
-        type="button"
-        className="font-bold border leading-none"
-        style={{
-          color: color?.text ?? "var(--px-accent)",
-          borderColor: color?.border ?? "var(--px-border)",
-          background: color?.bg ?? "transparent",
-          fontSize: "11px",
-          padding: "2px 5px",
-        }}
-        aria-expanded={open}
-        aria-label={`${label} 설명`}
-        onClick={() => setOpen((v) => !v)}
-      >
-        {label}
-      </button>
-      {open && (
-        <span
-          role="dialog"
-          className="absolute left-1/2 top-[calc(100%+6px)] z-20 w-44 -translate-x-1/2 p-2 border-2 text-left motion-modal-card"
-          style={{
-            background: "var(--px-bg3)",
-            borderColor: "var(--px-border2)",
-            boxShadow: "3px 3px 0 #000",
-          }}
-        >
-          <span
-            className="block text-[11px] font-black mb-1"
-            style={{ color: "var(--px-accent)" }}
-          >
-            {label}
-          </span>
-          <span
-            className="block text-[10px] leading-relaxed font-bold"
-            style={{ color: "var(--px-text-on-panel)" }}
-          >
-            {tenGodPlain(label)}
-          </span>
-        </span>
-      )}
-    </span>
-  );
 }
 
 /**
@@ -145,6 +76,11 @@ function TenGodBox({
  */
 export default function HomeG() {
   const today = todayDateString();
+  const earliest = useMemo(
+    () => addDays(today, -HOME_DAY_LOOKBACK),
+    [today]
+  );
+  const [viewDate, setViewDate] = useState(today);
   const [entries, setEntries] = useState<JournalEntry[]>([]);
   const [enabledCodes, setEnabledCodes] = useState<CategoryCode[]>([]);
   /** prefs 로드 전에는 카테고리 CTA를 숨겨 깜빡임 방지 */
@@ -159,6 +95,10 @@ export default function HomeG() {
       return null;
     }
   });
+
+  useEffect(() => {
+    setViewDate(today);
+  }, [today]);
 
   useEffect(() => {
     let cancelled = false;
@@ -214,10 +154,17 @@ export default function HomeG() {
     };
   }, []);
 
-  const dayPillar = useMemo(() => getPillarsForDate(today).dayPillar, [today]);
+  const isToday = viewDate === today;
+  const canPrev = viewDate > earliest;
+  const canNext = viewDate < today;
+
+  const dayPillar = useMemo(
+    () => getPillarsForDate(viewDate).dayPillar,
+    [viewDate]
+  );
   const weekdayIndex = useMemo(
-    () => new Date(`${today}T12:00:00+09:00`).getDay(),
-    [today]
+    () => new Date(`${viewDate}T12:00:00+09:00`).getDay(),
+    [viewDate]
   );
   const weekday = WEEK[weekdayIndex] ?? "";
   const weekdayFull = WEEK_FULL[weekdayIndex] ?? `${weekday}요일`;
@@ -226,7 +173,7 @@ export default function HomeG() {
   const branchColor = elemOf(dayPillar.branch.hanja, "branch");
 
   const dayStemHanja = profile?.pillars.day?.stemHanja;
-  const todayGods = useMemo(() => {
+  const viewGods = useMemo(() => {
     if (!dayStemHanja) return null;
     return getPillarTenGods(
       dayStemHanja,
@@ -255,6 +202,10 @@ export default function HomeG() {
     () => buildWeekTopicSupportItems(weekTopics.topics, entries, 3),
     [weekTopics.topics, entries]
   );
+  const viewEntry = useMemo(
+    () => entries.find((e) => e.entryDate === viewDate) ?? null,
+    [entries, viewDate]
+  );
   const todayEntry = useMemo(
     () => entries.find((e) => e.entryDate === today) ?? null,
     [entries, today]
@@ -276,6 +227,12 @@ export default function HomeG() {
     [entries]
   );
 
+  const shiftView = (delta: number) => {
+    const next = addDays(viewDate, delta);
+    if (next < earliest || next > today) return;
+    setViewDate(next);
+  };
+
   return (
     <div className="home-readable space-y-4 pb-8">
       {!profile && (
@@ -293,52 +250,105 @@ export default function HomeG() {
         </Link>
       )}
       <section
-        className="border-2 overflow-hidden"
+        className="border-2"
         style={{
           background: "var(--px-bg2)",
           borderColor: "var(--px-border2)",
           boxShadow: "3px 3px 0 #000",
         }}
-        aria-label="오늘"
+        aria-label={isToday ? "오늘" : "선택한 날"}
       >
         <div className="grid grid-cols-[1.2fr_0.9fr] items-stretch">
           <div className="px-3.5 py-3 flex flex-col justify-center gap-2 min-w-0">
-            <div className="flex items-baseline gap-2 flex-wrap">
-              <WaveText
-                className="text-xl font-black tabular-nums leading-none"
-                style={{ color: "var(--px-text-on-panel)" }}
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                disabled={!canPrev}
+                onClick={() => shiftView(-1)}
+                className="shrink-0 w-8 h-8 text-sm font-black border-2 disabled:opacity-35"
+                style={{
+                  borderColor: "var(--px-border)",
+                  background: "var(--px-bg3)",
+                  color: "var(--px-text-on-panel)",
+                }}
+                aria-label="하루 전"
               >
-                {today.replaceAll("-", ".")}
-              </WaveText>
-              <WaveText
-                className="text-xl font-black leading-none"
-                style={{ color: weekdayAccent }}
+                ‹
+              </button>
+              <div className="min-w-0 flex-1 flex items-baseline gap-2 flex-wrap justify-center">
+                <WaveText
+                  className="text-xl font-black tabular-nums leading-none"
+                  style={{ color: "var(--px-text-on-panel)" }}
+                >
+                  {viewDate.replaceAll("-", ".")}
+                </WaveText>
+                <WaveText
+                  className="text-xl font-black leading-none"
+                  style={{ color: weekdayAccent }}
+                >
+                  {weekdayFull}
+                </WaveText>
+              </div>
+              <button
+                type="button"
+                disabled={!canNext}
+                onClick={() => shiftView(1)}
+                className="shrink-0 w-8 h-8 text-sm font-black border-2 disabled:opacity-35"
+                style={{
+                  borderColor: "var(--px-border)",
+                  background: "var(--px-bg3)",
+                  color: "var(--px-text-on-panel)",
+                }}
+                aria-label="하루 뒤"
               >
-                {weekdayFull}
-              </WaveText>
+                ›
+              </button>
             </div>
+            {!isToday && (
+              <button
+                type="button"
+                onClick={() => setViewDate(today)}
+                className="text-[11px] font-bold underline self-center"
+                style={{ color: "var(--px-text2)" }}
+              >
+                오늘로 돌아가기
+              </button>
+            )}
             <div
               className="flex items-center gap-1 pt-0.5"
-              aria-label="이번 주 요일"
+              aria-label="최근 요일"
             >
-              {WEEK.map((d, i) => {
-                const active = i === weekdayIndex;
+              {Array.from({ length: HOME_DAY_LOOKBACK + 1 }, (_, i) => {
+                const d = addDays(earliest, i);
+                const idx = new Date(`${d}T12:00:00+09:00`).getDay();
+                const label = WEEK[idx] ?? "";
+                const active = d === viewDate;
+                const isViewToday = d === today;
                 return (
-                  <span
+                  <button
                     key={d}
+                    type="button"
+                    onClick={() => setViewDate(d)}
                     className="flex-1 min-w-0 text-center text-[10px] font-black leading-none py-1 border"
                     style={{
                       color: active ? "#0b0b12" : "var(--px-text2)",
-                      background: active ? weekdayAccent : "transparent",
+                      background: active
+                        ? isViewToday
+                          ? weekdayAccent
+                          : "var(--px-accent)"
+                        : "transparent",
                       borderColor: active
-                        ? weekdayAccent
+                        ? isViewToday
+                          ? weekdayAccent
+                          : "var(--px-accent)"
                         : "var(--px-border)",
                       opacity: active ? 1 : 0.72,
                     }}
                     aria-current={active ? "date" : undefined}
+                    aria-label={`${d} ${label}요일`}
                   >
-                    {d}
-                  </span>
+                    {label}
+                  </button>
                 );
               })}
             </div>
@@ -350,7 +360,7 @@ export default function HomeG() {
               background: "var(--px-bg3)",
               borderLeft: "2px solid var(--px-border)",
             }}
-            title={`오늘 ${dayPillar.ganjiKo}`}
+            title={`${isToday ? "오늘" : "이날"} ${dayPillar.ganjiKo}`}
           >
             <div className="flex items-end gap-2">
               <div className="flex flex-col items-center gap-0.5">
@@ -388,26 +398,29 @@ export default function HomeG() {
                 </span>
               </div>
             </div>
-            {todayGods && (todayGods.stemTenGod || todayGods.branchTenGod) && (
+            {viewGods && (viewGods.stemTenGod || viewGods.branchTenGod) && (
               <div className="flex flex-wrap items-center justify-center gap-1 pt-0.5">
-                {todayGods.stemTenGod && (
-                  <TenGodBox label={todayGods.stemTenGod} color={stemColor} />
+                {viewGods.stemTenGod && (
+                  <TenGodChip label={viewGods.stemTenGod} color={stemColor} />
                 )}
-                {todayGods.branchTenGod && (
-                  <TenGodBox label={todayGods.branchTenGod} color={branchColor} />
+                {viewGods.branchTenGod && (
+                  <TenGodChip
+                    label={viewGods.branchTenGod}
+                    color={branchColor}
+                  />
                 )}
               </div>
             )}
           </div>
         </div>
         <Link
-            href={`/journal?date=${today}`}
-            className="flex items-center justify-between gap-2 px-3.5 py-2.5 border-t"
+          href={`/journal?date=${viewDate}`}
+          className="flex items-center justify-between gap-2 px-4 py-4 border-t"
           style={{
             borderColor: "var(--px-border)",
-            background: todayEntry
-              ? "color-mix(in srgb, #4ade80 10%, var(--px-bg2))"
-              : "color-mix(in srgb, var(--px-accent) 10%, var(--px-bg2))",
+            background: viewEntry
+              ? "color-mix(in srgb, #4ade80 12%, var(--px-bg2))"
+              : "color-mix(in srgb, var(--px-accent) 16%, var(--px-bg2))",
           }}
           onClick={() => {
             void import("@/lib/analytics/posthog").then(
@@ -415,60 +428,63 @@ export default function HomeG() {
                 captureUiClick(
                   ANALYTICS_EVENTS.homeTodayEntryClicked,
                   "home_today_entry",
-                  { mode: todayEntry ? "edit" : "write" }
+                  {
+                    mode: viewEntry ? "edit" : "write",
+                    target_date: viewDate,
+                    is_today: isToday,
+                  }
                 );
               }
             );
           }}
         >
-          {todayEntry ? (
+          {viewEntry ? (
             <span className="min-w-0 flex items-center gap-2 flex-wrap">
               <span
-                className="text-sm font-black shrink-0"
+                className="text-[1.2rem] font-black shrink-0"
                 style={{ color: "#4ade80" }}
               >
-                오늘 기록 완료
+                {isToday ? "오늘 기록 완료" : "이날 기록 있음"}
               </span>
-              {(todayEntry.happinessScore != null ||
-                todayEntry.overallSatisfaction != null) && (
+              {(viewEntry.happinessScore != null ||
+                viewEntry.overallSatisfaction != null) && (
                 <span
-                  className="text-[11px] font-bold px-1.5 py-0.5 border tabular-nums"
+                  className="text-[14px] font-bold px-2 py-0.5 border tabular-nums"
                   style={{
-                    color: "var(--px-text2)",
-                    borderColor: "var(--px-border)",
+                    color: "#e8e8f4",
+                    borderColor: "var(--px-border2)",
                   }}
                 >
                   행복{" "}
-                  {todayEntry.happinessScore ??
-                    todayEntry.overallSatisfaction}
+                  {viewEntry.happinessScore ?? viewEntry.overallSatisfaction}
                   /10
                 </span>
               )}
-              {todayEntry.xpAwarded > 0 && (
+              {viewEntry.xpAwarded > 0 && (
                 <span
-                  className="text-[11px] font-bold px-1.5 py-0.5 border tabular-nums"
+                  className="text-[14px] font-bold px-2 py-0.5 border tabular-nums"
                   style={{
-                    color: "var(--px-text2)",
-                    borderColor: "var(--px-border)",
+                    color: "#e8e8f4",
+                    borderColor: "var(--px-border2)",
                   }}
                 >
-                  +{todayEntry.xpAwarded} XP
+                  +{viewEntry.xpAwarded} XP
                 </span>
               )}
             </span>
           ) : (
             <span
-              className="text-sm font-black"
+              className="text-[1.2rem] font-black"
               style={{ color: "var(--px-accent)" }}
             >
-              아직 오늘 기록이 없어요
+              {isToday ? "아직 오늘 기록이 없어요" : "이날 기록이 없어요"}
             </span>
           )}
           <span
-            className="text-xs font-bold shrink-0 flex items-center gap-0.5"
-            style={{ color: todayEntry ? "#4ade80" : "var(--px-accent)" }}
+            className="text-[1.1rem] font-black shrink-0 flex items-center gap-0.5"
+            style={{ color: viewEntry ? "#4ade80" : "var(--px-accent)" }}
           >
-            {todayEntry ? "수정" : "지금 쓰기"}
+            {viewEntry ? "수정" : isToday ? "지금 쓰기" : "쓰기"}
             <span aria-hidden>→</span>
           </span>
         </Link>
@@ -491,19 +507,37 @@ export default function HomeG() {
         </div>
       )}
 
-      <TodayFortunePanel
-        todayDate={today}
-        sajuProfile={profile}
-        entries={entries}
-        enabledCodes={enabledCodes}
-      />
+      {isToday ? (
+        <>
+          <TodayFortunePanel
+            todayDate={today}
+            sajuProfile={profile}
+            entries={entries}
+            enabledCodes={enabledCodes}
+          />
 
-      {!todayEntry && (
-        <TodayRecordPrompt todayDate={today} entryDates={entryDates} />
-      )}
-
-      {yesterdayMissing && entries.length > 0 && (
-        <YesterdayGapPrompt todayDate={today} entryDates={entryDates} />
+          {yesterdayMissing && entries.length > 0 && (
+            <YesterdayGapPrompt todayDate={today} entryDates={entryDates} />
+          )}
+        </>
+      ) : (
+        <div
+          className="p-3 border-2 space-y-1"
+          style={{
+            borderColor: "var(--px-border)",
+            background: "var(--px-bg2)",
+          }}
+        >
+          <p
+            className="text-[13px] font-black"
+            style={{ color: "var(--px-accent)" }}
+          >
+            과거 날 보기
+          </p>
+          <p className="text-[12px] font-bold" style={{ color: "var(--px-text2)" }}>
+            간지·기록만 볼 수 있어요. 운세는 오늘만 확인해요.
+          </p>
+        </div>
       )}
 
       <HomeInstallSheet />
@@ -518,11 +552,13 @@ export default function HomeG() {
 
       <Link
         href={
-          todayEntry
-            ? `/journal?date=${previousWriteDate}`
-            : `/journal?date=${today}`
+          isToday
+            ? todayEntry
+              ? `/journal?date=${previousWriteDate}`
+              : `/journal?date=${today}`
+            : `/journal?date=${viewDate}`
         }
-        className="ui-primary-btn block w-full py-3.5 text-center text-sm font-black"
+        className="ui-primary-btn block w-full py-4 text-center text-[1.05rem] font-black"
         onClick={() => {
           void import("@/lib/analytics/posthog").then(
             ({ ANALYTICS_EVENTS, captureUiClick }) => {
@@ -530,15 +566,31 @@ export default function HomeG() {
                 ANALYTICS_EVENTS.homeTodayEntryClicked,
                 "home_today_entry",
                 {
-                  mode: todayEntry ? "previous_write" : "write",
-                  target_date: todayEntry ? previousWriteDate : today,
+                  mode: isToday
+                    ? todayEntry
+                      ? "previous_write"
+                      : "write"
+                    : viewEntry
+                      ? "edit"
+                      : "write",
+                  target_date: isToday
+                    ? todayEntry
+                      ? previousWriteDate
+                      : today
+                    : viewDate,
                 }
               );
             }
           );
         }}
       >
-        {todayEntry ? "이전 일기 작성" : "일기 쓰기"}
+        {isToday
+          ? todayEntry
+            ? "이전 일기 작성"
+            : "일기 쓰기"
+          : viewEntry
+            ? "이날 기록 수정"
+            : "이날 일기 쓰기"}
       </Link>
 
       <HomeInstallCTA />

@@ -220,7 +220,7 @@ const TOPIC_LINES: Record<
     advice: {
       low: "내일은 회복을 위한 작은 휴식부터 일정에 넣어 보세요",
       mid: "다음엔 수면이나 움직임 중 하나만 부드럽게 챙겨 보세요",
-      high: "컨디션이 좋을 때도 무리한 확장은 반 박자 늦춰 보세요",
+      high: "그 섬세함을 이어가되, 오늘도 몸 신호에 맞춰 속도를 정해 보세요",
     },
   },
   rest: {
@@ -390,14 +390,12 @@ export function buildCombinedAdviceFallback(
   items: Array<{ label: string; fallbackLine?: string }>
 ): string {
   if (items.length === 0) return "";
+  const first = items[0]!;
+  if (first.fallbackLine?.trim()) return first.fallbackLine.trim();
   if (items.length === 1) {
-    return (
-      items[0]!.fallbackLine ||
-      `「${items[0]!.label}」이(가) 요즘 이야기의 축이었어요. 오늘은 그 마음을 한 호흡만 부드럽게 안아 주세요.`
-    );
+    return `「${first.label}」이(가) 마음에 자주 남았다면, 오늘은 그 결을 한 호흡만 부드럽게 안아 주세요.`;
   }
-  const joined = items.map((t) => t.label).join(" · ");
-  return `요즘 「${joined}」이(가) 이야기의 축이었어요. 한 가지만 붙잡지 말고, 그중 가장 가벼운 것부터 짧게 돌봐 보세요.`;
+  return `요즘 마음에 맴도는 이야기들이 있다면, 그중 가장 가벼운 것부터 짧게 돌봐 주세요.`;
 }
 
 export function weekTopicSupportFingerprint(

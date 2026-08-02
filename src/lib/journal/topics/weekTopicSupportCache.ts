@@ -1,9 +1,9 @@
 /**
- * 홈 「지난 30일 화제」 본문 기반 위로·조언 캐시
+ * 홈 「지난 30일 화제」 합쳐 조언 캐시 (템플릿+빠른 polish)
  */
 import type { OpenAiCallStatus } from "@/lib/journal/openaiStatus";
 
-const CACHE_KEY = "manseryeok:week-topic-support:v2";
+const CACHE_KEY = "manseryeok:week-topic-support:v4";
 
 export type WeekTopicSupportCacheEntry = {
   date: string;

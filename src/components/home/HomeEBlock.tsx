@@ -22,9 +22,9 @@ export default function HomeEBlock({ stats }: Props) {
   );
 
   return (
-    <section className="space-y-3">
-      <div className="ui-emphasize-head">
-        <WaveText className="ui-emphasize-title">맞춤 레벨</WaveText>
+    <section className="home-section home-section--level">
+      <div className="home-section__label">
+        <WaveText className="home-section__title">맞춤 레벨</WaveText>
         <Link
           href="/stats"
           className="text-xs font-bold underline shrink-0"
@@ -46,12 +46,7 @@ export default function HomeEBlock({ stats }: Props) {
 
       <button
         type="button"
-        className="w-full text-left p-3 border-2 space-y-1.5"
-        style={{
-          borderColor: "var(--px-accent)",
-          background: "var(--px-bg2)",
-          boxShadow: "2px 2px 0 #000",
-        }}
+        className="home-section__body w-full text-left p-3 space-y-1.5"
         aria-label={`맞춤 레벨 ${formatPersonalizationLevel(lv.level)}, 상세 보기`}
         onClick={() => {
           notifyOpenPersonalizationLevel();

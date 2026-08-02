@@ -59,7 +59,7 @@ describe("P0 account/cache isolation", () => {
 
   test("clearUiSessionCaches removes fortune drafts and home sentence", () => {
     local.setItem(
-      "manseryeok:today-fortune-v2.5:2026-08-02:guest:fp",
+      "manseryeok:today-fortune-v2.10:2026-08-02:guest:fp",
       JSON.stringify({ version: "v2", overall: { title: "x" } })
     );
     local.setItem(
@@ -83,7 +83,7 @@ describe("P0 account/cache isolation", () => {
     clearUiSessionCaches();
 
     expect(
-      local.getItem("manseryeok:today-fortune-v2.5:2026-08-02:guest:fp")
+      local.getItem("manseryeok:today-fortune-v2.10:2026-08-02:guest:fp")
     ).toBeNull();
     expect(local.getItem("manseryeok:checkin-draft:v1:2026-08-02")).toBeNull();
     expect(local.getItem("manseryeok:home-sentence-cache:v1")).toBeNull();
@@ -116,7 +116,7 @@ describe("P0 account/cache isolation", () => {
   test("peekFortuneEvidenceForDate ignores other workspace cache", () => {
     local.setItem("manseryeok_guest_mode", "1");
     local.setItem(
-      "manseryeok:today-fortune-v2.5:2026-08-02:account:fp",
+      "manseryeok:today-fortune-v2.10:2026-08-02:account:fp",
       JSON.stringify({
         version: "v2",
         overall: { title: "account" },
@@ -129,7 +129,7 @@ describe("P0 account/cache isolation", () => {
     expect(peekFortuneEvidenceForDate("2026-08-02")).toBeNull();
 
     local.setItem(
-      "manseryeok:today-fortune-v2.5:2026-08-02:guest:fp",
+      "manseryeok:today-fortune-v2.10:2026-08-02:guest:fp",
       JSON.stringify({
         version: "v2",
         overall: { title: "guest" },

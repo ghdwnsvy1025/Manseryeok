@@ -17,7 +17,7 @@ export type FortuneDomainCode =
   | "money"
   | "health";
 
-export type FortuneFlow = "원활" | "안정" | "혼합" | "관리";
+export type FortuneFlow = "최고" | "좋음" | "무난" | "아쉬움" | "주의";
 export type FortuneConfidenceLabel = "높음" | "보통" | "낮음";
 export type FortuneDataQuality = "충분" | "일부 누락" | "부족" | "축적 부족" | "없음";
 

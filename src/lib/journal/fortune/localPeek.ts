@@ -28,7 +28,7 @@ export function peekFortuneEvidenceForDate(
 ): FortuneEvidence | null {
   if (typeof window === "undefined") return null;
   const workspace: "guest" | "account" = isGuestMode() ? "guest" : "account";
-  const prefix = `manseryeok:today-fortune-v2.5:${date}:`;
+  const prefix = `manseryeok:today-fortune-v2.10:${date}:`;
   const preferred: string[] = [];
   try {
     for (let i = 0; i < window.localStorage.length; i++) {

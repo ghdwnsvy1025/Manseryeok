@@ -247,7 +247,7 @@ export default function JournalSaveCompleteModal({
             </p>
 
             {showQuoteLoading ? (
-              <EmotionalLoadingHint status="오늘의 한 줄을 고르는 중…" intervalMs={4200} />
+              <EmotionalLoadingHint status="오늘의 한 줄을 고르는 중…" intervalMs={6800} />
             ) : (
               <>
                 <blockquote className="save-quote-reveal relative m-0 space-y-2">
@@ -292,21 +292,6 @@ export default function JournalSaveCompleteModal({
               </>
             )}
           </section>
-
-          {!showQuoteLoading && (
-            <section
-              className="pt-1"
-              style={{ borderTop: "1px solid var(--px-border)" }}
-            >
-              <ContentFeedbackButtons
-                eventDate={entry.entryDate}
-                contentType={contentType ?? "app_original_sentence"}
-                contentId={deliveryId}
-                mode="help"
-                prompt="이 문장이 도움이 되었나요?"
-              />
-            </section>
-          )}
 
           <section
             className="p-3 border-2 space-y-2"
@@ -397,19 +382,20 @@ export default function JournalSaveCompleteModal({
             )
           )}
 
-          <section className="space-y-1.5">
+          <section className="space-y-2">
             <button
               type="button"
-              className="w-full flex items-center justify-between gap-2 py-0.5"
-              style={{ color: "var(--px-text2)" }}
+              className="w-full flex items-center justify-between gap-2 py-1"
+              style={{ color: "var(--px-text-on-panel)" }}
               onClick={() => setShowDetail((v) => !v)}
               aria-expanded={showDetail}
             >
-              <span className="text-[11px] font-bold tracking-tight">
+              <span className="text-[15px] font-black tracking-tight">
                 오늘 상태 자세히 보기
               </span>
               <span
-                className="text-[10px] tabular-nums opacity-80"
+                className="text-[13px] font-bold tabular-nums opacity-80"
+                style={{ color: "var(--px-text2)" }}
                 aria-hidden
               >
                 {showDetail ? "접기 ▲" : "펼치기 ▼"}
@@ -417,9 +403,9 @@ export default function JournalSaveCompleteModal({
             </button>
             {showDetail && (
               <div
-                className="rounded-sm border px-2.5 py-2 space-y-2"
+                className="rounded-sm border-2 px-3 py-3 space-y-3"
                 style={{
-                  borderColor: "var(--px-border)",
+                  borderColor: "var(--px-border2)",
                   background:
                     "color-mix(in srgb, var(--px-bg3) 70%, var(--px-bg2))",
                 }}
@@ -427,27 +413,29 @@ export default function JournalSaveCompleteModal({
                 {(entry.overallSatisfaction != null ||
                   moodChip ||
                   tagChips.length > 0) && (
-                  <div className="flex flex-wrap gap-1">
+                  <div className="flex flex-wrap gap-1.5">
                     {entry.overallSatisfaction != null && (
                       <span
-                        className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold leading-none"
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[14px] font-black leading-none"
                         style={{
                           color: "var(--px-accent)",
                           background:
-                            "color-mix(in srgb, var(--px-accent) 12%, transparent)",
+                            "color-mix(in srgb, var(--px-accent) 14%, transparent)",
+                          border: "1px solid color-mix(in srgb, var(--px-accent) 40%, transparent)",
                         }}
                       >
-                        <span className="opacity-70 font-medium">행복</span>
+                        <span className="opacity-80 font-bold text-[13px]">행복</span>
                         {entry.overallSatisfaction}
-                        <span className="opacity-50">/10</span>
+                        <span className="opacity-55 text-[12px]">/10</span>
                       </span>
                     )}
                     {moodChip && (
                       <span
-                        className="px-1.5 py-0.5 text-[10px] font-bold leading-none"
+                        className="px-2.5 py-1.5 text-[14px] font-black leading-none"
                         style={{
                           color: "var(--px-text-on-panel)",
                           background: "var(--px-bg2)",
+                          border: "1px solid var(--px-border)",
                         }}
                       >
                         {moodChip}
@@ -456,10 +444,11 @@ export default function JournalSaveCompleteModal({
                     {tagChips.slice(0, 6).map((name) => (
                       <span
                         key={name}
-                        className="px-1.5 py-0.5 text-[10px] font-medium leading-none"
+                        className="px-2.5 py-1.5 text-[13px] font-bold leading-none"
                         style={{
-                          color: "var(--px-text2)",
+                          color: "var(--px-text-on-panel)",
                           background: "var(--px-bg2)",
+                          border: "1px solid var(--px-border)",
                         }}
                       >
                         {name}
@@ -468,7 +457,7 @@ export default function JournalSaveCompleteModal({
                   </div>
                 )}
 
-                <div className="grid grid-cols-2 gap-x-3 gap-y-1.5">
+                <div className="grid grid-cols-2 gap-x-3 gap-y-2.5">
                   {entry.scores.slice(0, 6).map((s) => {
                     const name =
                       getCategoryByCode(s.categoryCode)?.name ?? s.categoryCode;
@@ -479,17 +468,17 @@ export default function JournalSaveCompleteModal({
                         : null;
                     const pct = val != null ? (val / 10) * 100 : 0;
                     return (
-                      <div key={s.categoryCode} className="min-w-0 space-y-0.5">
+                      <div key={s.categoryCode} className="min-w-0 space-y-1">
                         <div className="flex items-baseline justify-between gap-1">
                           <span
-                            className="text-[10px] font-medium truncate"
+                            className="text-[13px] font-bold truncate"
                             style={{ color: "var(--px-text2)" }}
                             title={name}
                           >
                             {name}
                           </span>
                           <span
-                            className="text-[10px] font-bold tabular-nums shrink-0"
+                            className="text-[15px] font-black tabular-nums shrink-0"
                             style={{
                               color: na
                                 ? "var(--px-text2)"
@@ -500,8 +489,11 @@ export default function JournalSaveCompleteModal({
                           </span>
                         </div>
                         <div
-                          className="h-[3px] w-full overflow-hidden"
-                          style={{ background: "var(--px-bg2)" }}
+                          className="h-1.5 w-full overflow-hidden border"
+                          style={{
+                            background: "var(--px-bg2)",
+                            borderColor: "var(--px-border)",
+                          }}
                           aria-hidden
                         >
                           <div
@@ -534,6 +526,15 @@ export default function JournalSaveCompleteModal({
             background: "var(--px-bg2)",
           }}
         >
+          {!showQuoteLoading && (
+            <ContentFeedbackButtons
+              eventDate={entry.entryDate}
+              contentType={contentType ?? "app_original_sentence"}
+              contentId={deliveryId}
+              mode="thumbs"
+              prompt="도움이 되었나요?"
+            />
+          )}
           <button
             ref={closeRef}
             type="button"

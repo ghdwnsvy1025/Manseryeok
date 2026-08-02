@@ -185,9 +185,7 @@ function buildPlainLine(
     return `${period} 일기에서 반복된 화제는 아직 잘 안 보여요.`;
   }
   const top = topics[0]!;
-  if (topics.length === 1) {
-    return `${period}에는 「${top.label}」이(가) 등장했어요 (${top.dayCount}일).`;
-  }
-  const second = topics[1]!;
-  return `${period} 화제는 「${top.label}」, 그다음 「${second.label}」이었어요.`;
+  const support = top.supportLine?.trim();
+  if (support) return support;
+  return `「${top.label}」이(가) 마음에 자주 남았다면, 오늘은 그 결을 한 호흡만 부드럽게 안아 주세요.`;
 }

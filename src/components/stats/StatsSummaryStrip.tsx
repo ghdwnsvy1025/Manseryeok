@@ -1,25 +1,21 @@
 "use client";
 
-import WeekTopicsCard from "@/components/journal/WeekTopicsCard";
 import { usePlayWhenVisible } from "@/hooks/usePlayWhenVisible";
 import { happinessTone } from "@/lib/journal/statsTone";
-import type { WeekTopicSummary } from "@/lib/journal/topics/weekTopics";
 
 type Props = {
   avg30: number | null;
   monthRecordedDays: number;
   streakDays: number;
   recordedToday: boolean;
-  weekTopics?: WeekTopicSummary | null;
 };
 
-/** 기록 탭 상단 — 요약 숫자 + 지난 30일 화제 */
+/** 기록 탭 상단 — 요약 숫자 */
 export default function StatsSummaryStrip({
   avg30,
   monthRecordedDays,
   streakDays,
   recordedToday,
-  weekTopics,
 }: Props) {
   const rootRef = usePlayWhenVisible<HTMLElement>();
 
@@ -89,15 +85,6 @@ export default function StatsSummaryStrip({
           </div>
         ))}
       </div>
-
-      {weekTopics && weekTopics.entryDays > 0 && (
-        <div
-          className="mt-3 stats-reveal-block js-play-when-visible"
-          style={{ ["--si" as string]: 4 }}
-        >
-          <WeekTopicsCard summary={weekTopics} variant="nested" />
-        </div>
-      )}
     </section>
   );
 }

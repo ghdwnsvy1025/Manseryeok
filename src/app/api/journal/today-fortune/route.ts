@@ -45,6 +45,8 @@ type Body = {
   skipLlm?: boolean;
   /** true면 당일 캐시만 조회. 없으면 생성하지 않음 */
   cacheOnly?: boolean;
+  /** true면 서버 당일 캐시를 무시하고 LLM 재생성 */
+  forceRefresh?: boolean;
 };
 
 function withNatalDay(
@@ -100,6 +102,7 @@ async function handleTodayFortune(
   const entries = Array.isArray(b.entries) ? b.entries : [];
   const skipLlm = Boolean(b.skipLlm);
   const cacheOnly = Boolean(b.cacheOnly);
+  const forceRefresh = Boolean(b.forceRefresh);
   const totalXp = totalJournalXp(entries);
 
   if (isDailyFortuneV2Enabled()) {
@@ -127,6 +130,7 @@ async function handleTodayFortune(
         const profileFp = sajuProfileFortuneFingerprint(b.sajuProfile);
         // 점수 엔진·사주 생일/일주가 바뀌면 캐시 무시
         const cacheUsable =
+          !forceRefresh &&
           cached &&
           cached.sections.length > 0 &&
           cached.scoringVersion === FORTUNE_SCORE_VERSION &&
@@ -260,6 +264,22 @@ async function handleTodayFortune(
         if (resolved) {
           insight = resolved.ctx;
           contextId = resolved.id;
+        }
+      }
+      // forceRefresh면 같은 scoring_version이어도 문장 재저장을 위해 기존 행 삭제
+      if (forceRefresh) {
+        const existing = await loadPersistedFortune(
+          sb,
+          userId,
+          b.todayDate,
+          sajuProfileId
+        );
+        if (existing?.id) {
+          await sb
+            .from("daily_fortune_sections")
+            .delete()
+            .eq("daily_fortune_id", existing.id);
+          await sb.from("daily_fortunes").delete().eq("id", existing.id);
         }
       }
       await persistFortune(sb, {

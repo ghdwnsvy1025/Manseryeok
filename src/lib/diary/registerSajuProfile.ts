@@ -16,6 +16,8 @@ import {
   saveSajuProfile,
 } from "@/lib/diary/profileStorage";
 import { loadSajuSettings, saveSajuSettings } from "@/lib/diary/sajuSettings";
+import { clearUiSessionCaches } from "@/lib/app/clearUiSessionCaches";
+import { sajuProfileFortuneFingerprint } from "@/lib/journal/fortune/profileFingerprint";
 
 function isSupportedGender(
   value: unknown
@@ -137,6 +139,10 @@ export async function updateSajuProfileFromResult(
     isPrimary: existing.isPrimary,
   });
 
+  const birthChanged =
+    sajuProfileFortuneFingerprint(existing) !==
+    sajuProfileFortuneFingerprint(built);
+
   let profile = {
     ...built,
     createdAt: existing.createdAt,
@@ -145,6 +151,11 @@ export async function updateSajuProfileFromResult(
     profile = await saveSajuProfile(profile);
   } catch {
     /* local already written inside saveSajuProfile when possible */
+  }
+
+  // 생년·시간·일주가 바뀌면 옛 운세/질문 캐시를 비워 다시 계산하게 한다
+  if (birthChanged) {
+    clearUiSessionCaches();
   }
   notifySajuProfileChanged();
   return profile;

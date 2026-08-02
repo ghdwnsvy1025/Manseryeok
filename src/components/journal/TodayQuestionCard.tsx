@@ -153,10 +153,10 @@ function readLocalFortuneSnapshot(
         : "account";
     // TodayFortunePanel 과 동일한 우선순위 키
     const keys = [
-      `manseryeok:today-fortune-v2.5:${date}:${workspace}:${fp}`,
-      `manseryeok:today-fortune-v2.5:${date}:${profileId}:${fp}`,
-      `manseryeok:today-fortune-v2.5:${date}:none:${fp}`,
-      `manseryeok:today-fortune-v2.5:${date}:${fp}`,
+      `manseryeok:today-fortune-v2.10:${date}:${workspace}:${fp}`,
+      `manseryeok:today-fortune-v2.10:${date}:${profileId}:${fp}`,
+      `manseryeok:today-fortune-v2.10:${date}:none:${fp}`,
+      `manseryeok:today-fortune-v2.10:${date}:${fp}`,
     ];
     let raw: string | null = null;
     for (const key of keys) {
