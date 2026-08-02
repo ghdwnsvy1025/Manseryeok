@@ -7,6 +7,7 @@ import WaveText from "@/components/motion/WaveText";
 import { personalizationFromXp } from "@/lib/journal/personalization";
 import { formatPersonalizationLevel } from "@/lib/product/personalizationLevel";
 import { XP_GAUGE_FILL } from "@/lib/ui/xpGauge";
+import { notifyOpenPersonalizationLevel } from "@/lib/ui/motionEvents";
 
 type Props = {
   stats: HomeEStats;
@@ -43,12 +44,17 @@ export default function HomeEBlock({ stats }: Props) {
         </Link>
       </div>
 
-      <div
-        className="p-3 border-2 space-y-1.5"
+      <button
+        type="button"
+        className="w-full text-left p-3 border-2 space-y-1.5"
         style={{
           borderColor: "var(--px-accent)",
           background: "var(--px-bg2)",
           boxShadow: "2px 2px 0 #000",
+        }}
+        aria-label={`맞춤 레벨 ${formatPersonalizationLevel(lv.level)}, 상세 보기`}
+        onClick={() => {
+          notifyOpenPersonalizationLevel();
         }}
       >
         <div className="flex items-center justify-between gap-2">
@@ -95,7 +101,13 @@ export default function HomeEBlock({ stats }: Props) {
             ? "맞춤 완료 · 레벨이 오를수록 운세가 더 정확해져요"
             : "레벨이 높아질수록 운세가 더 정확해져요"}
         </p>
-      </div>
+        <p
+          className="text-[10px] font-bold"
+          style={{ color: "var(--px-text2)" }}
+        >
+          눌러서 XP·운세 맞춤 근거 보기
+        </p>
+      </button>
     </section>
   );
 }

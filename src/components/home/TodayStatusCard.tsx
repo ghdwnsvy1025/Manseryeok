@@ -22,6 +22,7 @@ import WaveText from "@/components/motion/WaveText";
 import WeekTopicsCard from "@/components/journal/WeekTopicsCard";
 import type { WeekTopicSummary } from "@/lib/journal/topics/weekTopics";
 import {
+  buildCombinedAdviceFallback,
   weekTopicSupportFingerprint,
   type WeekTopicSupportItem,
 } from "@/lib/journal/topics/topicSupport";
@@ -264,10 +265,14 @@ export default function TodayStatusCard({
   const [loading, setLoading] = useState(true);
   const [cacheReady, setCacheReady] = useState(false);
   const [topicLines, setTopicLines] = useState<Record<string, string>>({});
+  const [combinedAdvice, setCombinedAdvice] = useState<string | null>(null);
 
   const fingerprint = recentStatusFingerprint(stats);
   const cacheDate = todayDateString();
-  const hasTopics = Boolean(weekTopics && weekTopics.entryDays > 0);
+  const hasTopics = Boolean(
+    weekTopics &&
+      (weekTopics.topics.length > 0 || weekTopics.entryDays > 0)
+  );
   const topicFp = weekTopicSupportFingerprint(weekTopicSupportItems);
 
   const displayWeekTopics = (() => {
@@ -336,15 +341,17 @@ export default function TodayStatusCard({
     };
   }, [cacheReady, cacheDate, fingerprint, stats]);
 
-  // 화제별 일기 본문 종합 → 위로·조언 한 문장
+  // 상위 화제 합쳐 조언 (+ 화제별 보조 문장)
   useLayoutEffect(() => {
     if (weekTopicSupportItems.length === 0) {
       setTopicLines({});
+      setCombinedAdvice(null);
       return;
     }
     const cached = loadWeekTopicSupportCache(cacheDate, topicFp);
     if (cached) {
       setTopicLines(cached.lines);
+      setCombinedAdvice(cached.combinedAdvice);
       return;
     }
     const fallback: Record<string, string> = {};
@@ -352,6 +359,7 @@ export default function TodayStatusCard({
       fallback[it.topicId] = it.fallbackLine;
     }
     setTopicLines(fallback);
+    setCombinedAdvice(buildCombinedAdviceFallback(weekTopicSupportItems));
   }, [cacheDate, topicFp, weekTopicSupportItems]);
 
   useEffect(() => {
@@ -373,15 +381,22 @@ export default function TodayStatusCard({
         if (!res.ok) return;
         const data = (await res.json()) as {
           lines?: Record<string, string>;
+          combinedAdvice?: string;
           openAi?: OpenAiCallStatus;
         };
         if (cancelled || !data.lines) return;
         setTopicLines(data.lines);
+        const combined =
+          typeof data.combinedAdvice === "string" && data.combinedAdvice.trim()
+            ? data.combinedAdvice.trim()
+            : buildCombinedAdviceFallback(weekTopicSupportItems);
+        setCombinedAdvice(combined);
         saveWeekTopicSupportCache(
           cacheDate,
           topicFp,
           data.lines,
-          data.openAi ?? null
+          data.openAi ?? null,
+          combined
         );
       } catch {
         /* 템플릿 폴백 유지 */
@@ -456,7 +471,11 @@ export default function TodayStatusCard({
                   </FocusToneRow>
                 )}
                 {displayWeekTopics && hasTopics && (
-                  <WeekTopicsCard summary={displayWeekTopics} variant="focus" />
+                  <WeekTopicsCard
+                    summary={displayWeekTopics}
+                    combinedAdvice={combinedAdvice}
+                    variant="focus"
+                  />
                 )}
               </div>
             )}
@@ -486,7 +505,11 @@ export default function TodayStatusCard({
             )}
           </>
         ) : displayWeekTopics && hasTopics ? (
-          <WeekTopicsCard summary={displayWeekTopics} variant="focus" />
+          <WeekTopicsCard
+            summary={displayWeekTopics}
+            combinedAdvice={combinedAdvice}
+            variant="focus"
+          />
         ) : null}
 
         <OpenAiOriginHint status={openAi} className="text-[10px] leading-relaxed" />

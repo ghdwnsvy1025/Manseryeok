@@ -582,7 +582,11 @@ export default function CheckInEditor({ initialDate }: Props) {
     let cancelled = false;
     const dateChanged = loadedDateRef.current !== date;
     const reloadChanged = prevReloadTokenRef.current !== reloadToken;
-    const isFirst = loadedDateRef.current === null;
+    // Strict Mode(effect cleanup→재실행)에서도 ref는 유지된다.
+    // loadedDateRef===null 로 "첫 로드"를 보면 두 번째 실행이 폼 적용을 건너뛰어
+    // 기록(홈/통계)에는 있는데 수정 화면은 비는 버그가 난다.
+    // bootstrapped 여부로 첫 로드를 판별한다.
+    const needsBootstrapApply = !bootstrappedRef.current;
     loadedDateRef.current = date;
     prevReloadTokenRef.current = reloadToken;
 
@@ -605,7 +609,7 @@ export default function CheckInEditor({ initialDate }: Props) {
 
     // 날짜만 바뀐 경우: 이미 받아 둔 목록으로 즉시 폼 전환 (네트워크 없음)
     if (
-      !isFirst &&
+      !needsBootstrapApply &&
       bootstrappedRef.current &&
       dateChanged &&
       !reloadChanged
@@ -617,7 +621,7 @@ export default function CheckInEditor({ initialDate }: Props) {
 
     (async () => {
       // 첫 진입/외부 갱신만 로딩. 날짜 전환은 위에서 즉시 처리.
-      if (!bootstrappedRef.current) setStatus("loading");
+      if (needsBootstrapApply) setStatus("loading");
       try {
         const storage = await getJournalStorage();
 
@@ -669,17 +673,17 @@ export default function CheckInEditor({ initialDate }: Props) {
           setPersonalImportance(importance);
         }
         metaLoadedRef.current = true;
-        bootstrappedRef.current = true;
         // 목록만 갱신되는 경우(시드·다른 탭 저장 등) 작성 중인 선택을 덮어쓰지 않는다.
         // 다만 저장 직후 progress 이벤트로 재로드될 때는 스냅샷/byDate로 복구한다.
         if (
-          isFirst ||
+          needsBootstrapApply ||
           dateChanged ||
           (reloadChanged &&
             (Boolean(byDate) || isSavedFormComplete(peekLastSavedForm(date))))
         ) {
           applyDayFromListRef.current(date, merged);
         }
+        bootstrappedRef.current = true;
       } catch (e) {
         if (!cancelled) {
           setMessage(e instanceof Error ? e.message : "불러오기 실패");
@@ -763,6 +767,7 @@ export default function CheckInEditor({ initialDate }: Props) {
   const toggleMood = (m: string) => {
     setMoods((prev) => {
       if (prev.includes(m)) return prev.filter((x) => x !== m);
+      if (prev.length >= MAX_MOODS) return prev;
       return [...prev, m];
     });
   };
@@ -1532,7 +1537,9 @@ export default function CheckInEditor({ initialDate }: Props) {
         <div className="ui-emphasize-head">
           <p className="ui-emphasize-title">기분</p>
           <p className="ui-hint">
-            {moods.length === 0 ? "최소 1개" : `${moods.length}개`}
+            {moods.length === 0
+              ? "최소 1개 · 최대 3개"
+              : `${moods.length}/3개`}
           </p>
         </div>
         <div className="grid grid-cols-4 gap-2">

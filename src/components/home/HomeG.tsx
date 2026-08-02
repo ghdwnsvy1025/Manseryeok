@@ -16,7 +16,7 @@ import { buildWeekTopicSummary } from "@/lib/journal/topics/weekTopics";
 import { buildWeekTopicSupportItems } from "@/lib/journal/topics/topicSupport";
 import type { CategoryCode, JournalEntry } from "@/lib/journal/types";
 import { todayDateString } from "@/lib/diary/dayPillar";
-import { yesterdayOf } from "@/lib/journal/emptyDays";
+import { yesterdayOf, entryDateSet, listRecentEmptyDays } from "@/lib/journal/emptyDays";
 import { getPillarsForDate } from "@/lib/diary/dayPillar";
 import { getPillarTenGods } from "@/lib/diary/currentDaeun";
 import {
@@ -149,6 +149,7 @@ export default function HomeG() {
   const [enabledCodes, setEnabledCodes] = useState<CategoryCode[]>([]);
   /** prefs 로드 전에는 카테고리 CTA를 숨겨 깜빡임 방지 */
   const [prefsReady, setPrefsReady] = useState(false);
+  /** 전체 화면을 막지 않음 — 운세 캐시가 첫 페인트에 바로 보이게 */
   const [profile, setProfile] = useState<SajuProfile | null>(() => {
     if (typeof window === "undefined") return null;
     try {
@@ -158,33 +159,6 @@ export default function HomeG() {
       return null;
     }
   });
-  /** 전체 화면을 막지 않음 — 운세 캐시가 첫 페인트에 바로 보이게 */
-  const [showTenGods, setShowTenGods] = useState(false);
-
-  useEffect(() => {
-    try {
-      setShowTenGods(
-        window.localStorage.getItem("manseryeok:show_ten_gods_v1") === "1"
-      );
-    } catch {
-      /* ignore */
-    }
-  }, []);
-
-  const toggleTenGods = () => {
-    setShowTenGods((v) => {
-      const next = !v;
-      try {
-        window.localStorage.setItem(
-          "manseryeok:show_ten_gods_v1",
-          next ? "1" : "0"
-        );
-      } catch {
-        /* ignore */
-      }
-      return next;
-    });
-  };
 
   useEffect(() => {
     let cancelled = false;
@@ -270,21 +244,29 @@ export default function HomeG() {
     () =>
       buildWeekTopicSummary(entries, {
         asOf: today,
-        windowDays: 7,
-        topN: 2,
+        windowDays: 30,
+        topN: 5,
         withSupport: true,
       }),
     [entries, today]
   );
 
   const weekTopicSupportItems = useMemo(
-    () => buildWeekTopicSupportItems(weekTopics.topics, entries),
+    () => buildWeekTopicSupportItems(weekTopics.topics, entries, 3),
     [weekTopics.topics, entries]
   );
   const todayEntry = useMemo(
     () => entries.find((e) => e.entryDate === today) ?? null,
     [entries, today]
   );
+  const previousWriteDate = useMemo(() => {
+    const empties = listRecentEmptyDays({
+      todayIso: today,
+      dates: entryDateSet(entries),
+      lookback: 30,
+    });
+    return empties[0] ?? yesterdayOf(today);
+  }, [entries, today]);
   const yesterdayMissing = useMemo(() => {
     const y = yesterdayOf(today);
     return !entries.some((e) => e.entryDate === y);
@@ -407,17 +389,6 @@ export default function HomeG() {
               </div>
             </div>
             {todayGods && (todayGods.stemTenGod || todayGods.branchTenGod) && (
-              <button
-                type="button"
-                className="mt-0.5 text-[10px] font-bold underline"
-                style={{ color: "var(--px-text2)" }}
-                onClick={toggleTenGods}
-                aria-expanded={showTenGods}
-              >
-                {showTenGods ? "기운 접기" : "오늘의 기운 보기"}
-              </button>
-            )}
-            {showTenGods && todayGods && (
               <div className="flex flex-wrap items-center justify-center gap-1 pt-0.5">
                 {todayGods.stemTenGod && (
                   <TenGodBox label={todayGods.stemTenGod} color={stemColor} />
@@ -546,7 +517,11 @@ export default function HomeG() {
       <HomeEBlock stats={eStats} />
 
       <Link
-        href={`/journal?date=${today}`}
+        href={
+          todayEntry
+            ? `/journal?date=${previousWriteDate}`
+            : `/journal?date=${today}`
+        }
         className="ui-primary-btn block w-full py-3.5 text-center text-sm font-black"
         onClick={() => {
           void import("@/lib/analytics/posthog").then(
@@ -554,13 +529,16 @@ export default function HomeG() {
               captureUiClick(
                 ANALYTICS_EVENTS.homeTodayEntryClicked,
                 "home_today_entry",
-                { mode: todayEntry ? "edit" : "write" }
+                {
+                  mode: todayEntry ? "previous_write" : "write",
+                  target_date: todayEntry ? previousWriteDate : today,
+                }
               );
             }
           );
         }}
       >
-        {todayEntry ? "오늘 일기 수정" : "일기 쓰기"}
+        {todayEntry ? "이전 일기 작성" : "일기 쓰기"}
       </Link>
 
       <HomeInstallCTA />

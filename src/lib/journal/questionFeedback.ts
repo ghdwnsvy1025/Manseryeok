@@ -19,13 +19,13 @@ export type QuestionFeedbackEventType =
 export type FitLevel = "good" | "neutral" | "bad";
 
 /**
- * 적합도 3단계.
- * 2단계(맞아요/별로예요)는 "그저 그래요"를 표현할 수 없어서
- * 애매한 경우 응답을 아예 안 하거나 한쪽으로 쏠린다.
+ * 적합도 옵션(학습·API용). UI는 굿/배드 2개만 노출한다.
  */
 export const QUESTION_FIT_LEVELS: Array<{
   level: FitLevel;
   label: string;
+  /** 짧은 버튼 라벨 */
+  shortLabel: string;
   eventType: QuestionFeedbackEventType;
   rating: number;
   /** 선택 후 안내 문구 */
@@ -34,6 +34,7 @@ export const QUESTION_FIT_LEVELS: Array<{
   {
     level: "good",
     label: "도움이 됐어요",
+    shortLabel: "굿",
     eventType: "fit_good",
     rating: 5,
     ack: "도움이 됐다니 다행이에요 — 다음 질문에 반영할게요.",
@@ -41,6 +42,7 @@ export const QUESTION_FIT_LEVELS: Array<{
   {
     level: "neutral",
     label: "그저 그래요",
+    shortLabel: "보통",
     eventType: "fit_neutral",
     rating: 3,
     ack: "그저 그래요 — 방향을 조금 바꿔볼게요.",
@@ -48,11 +50,17 @@ export const QUESTION_FIT_LEVELS: Array<{
   {
     level: "bad",
     label: "별로예요",
+    shortLabel: "배드",
     eventType: "fit_bad",
     rating: 1,
     ack: "별로였군요 — 다음 질문에 참고할게요.",
   },
 ];
+
+/** 질문 옆 인라인 — 굿 / 배드만 */
+export const QUESTION_FIT_THUMBS = QUESTION_FIT_LEVELS.filter(
+  (l) => l.level === "good" || l.level === "bad"
+);
 
 export function isFitEventType(value: string): boolean {
   return QUESTION_FIT_LEVELS.some((l) => l.eventType === value);
@@ -143,14 +151,28 @@ export function hasLocalFitFeedback(
   questionDate: string,
   userHint = "anon"
 ): boolean {
-  if (typeof window === "undefined") return false;
+  return peekLocalFitLevel(questionDate, userHint) != null;
+}
+
+/** 로컬에 남긴 마지막 굿/배드(중립 포함) */
+export function peekLocalFitLevel(
+  questionDate: string,
+  userHint = "anon"
+): FitLevel | null {
+  if (typeof window === "undefined") return null;
   try {
     const raw = window.localStorage.getItem(localKey(userHint, questionDate));
-    if (!raw) return false;
+    if (!raw) return null;
     const log = JSON.parse(raw) as LocalFeedbackLog;
-    return log.events.some((e) => isFitEventType(e.eventType));
+    for (let i = log.events.length - 1; i >= 0; i -= 1) {
+      const t = log.events[i]?.eventType;
+      if (t === "fit_good") return "good";
+      if (t === "fit_neutral") return "neutral";
+      if (t === "fit_bad") return "bad";
+    }
+    return null;
   } catch {
-    return false;
+    return null;
   }
 }
 

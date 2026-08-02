@@ -372,8 +372,9 @@ class SupabaseJournalStorage implements JournalStorage {
       allEntries,
     });
 
-    const moodLabels =
-      input.moodLabels ?? (input.moodLabel ? [input.moodLabel] : []);
+    const moodLabels = (
+      input.moodLabels ?? (input.moodLabel ? [input.moodLabel] : [])
+    ).slice(0, 3);
 
     if (
       input.checkinVersion === 2 ||

@@ -4,6 +4,7 @@
  * — withSupport 시 화제 등장일의 행복도·핵심·선택으로 응원 문구 부착
  */
 import type { JournalEntry } from "@/lib/journal/types";
+import { getTagName } from "@/lib/journal/eventTagCatalog";
 import { TOPIC_LEXICON, type TopicDefinition } from "./lexicon";
 import {
   enrichTopicsWithSupport,
@@ -72,7 +73,10 @@ export function extractTopicsFromText(
 }
 
 function entryBlob(entry: JournalEntry): string {
-  const tagBits = entry.tags.map((t) => t.tagCode).join(" ");
+  const tagBits = (entry.tags ?? [])
+    .map((t) => getTagName(t.tagCode))
+    .filter(Boolean)
+    .join(" ");
   return [entry.content, entry.mainEventText ?? "", tagBits]
     .filter(Boolean)
     .join("\n");
@@ -102,7 +106,7 @@ export function buildWeekTopicSummary(
     withSupport?: boolean;
   }
 ): WeekTopicSummary {
-  const windowDays = opts.windowDays ?? 7;
+  const windowDays = opts.windowDays ?? 30;
   const topN = opts.topN ?? 5;
   const to = opts.asOf;
   const from = addDaysIso(to, -(windowDays - 1));
@@ -162,22 +166,28 @@ export function buildWeekTopicSummary(
   }
 
   const entryDays = new Set(inRange.map((e) => e.entryDate)).size;
-  const plainLine = buildPlainLine(topics, entryDays);
+  const plainLine = buildPlainLine(topics, entryDays, windowDays);
 
   return { from, to, entryDays, topics, plainLine };
 }
 
-function buildPlainLine(topics: WeekTopicHit[], entryDays: number): string {
+function buildPlainLine(
+  topics: WeekTopicHit[],
+  entryDays: number,
+  windowDays: number
+): string {
+  const period =
+    windowDays >= 30 ? "지난 30일" : windowDays === 7 ? "이번 주" : `최근 ${windowDays}일`;
   if (entryDays === 0) {
-    return "최근 일주일 기록이 아직 없어, 화제를 읽기 어려워요.";
+    return `${period} 기록이 아직 없어, 화제를 읽기 어려워요.`;
   }
   if (topics.length === 0) {
-    return "이번 주 일기에서 뚜렷한 반복 화제는 아직 잘 안 보여요.";
+    return `${period} 일기에서 반복된 화제는 아직 잘 안 보여요.`;
   }
   const top = topics[0]!;
   if (topics.length === 1) {
-    return `이번 주에는 「${top.label}」이(가) 자주 등장했어요 (${top.dayCount}일).`;
+    return `${period}에는 「${top.label}」이(가) 등장했어요 (${top.dayCount}일).`;
   }
   const second = topics[1]!;
-  return `이번 주 화제는 「${top.label}」, 그다음 「${second.label}」이었어요.`;
+  return `${period} 화제는 「${top.label}」, 그다음 「${second.label}」이었어요.`;
 }

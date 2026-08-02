@@ -1,15 +1,17 @@
 /**
- * 홈 「이번 주 화제」 본문 기반 위로·조언 캐시
+ * 홈 「지난 30일 화제」 본문 기반 위로·조언 캐시
  */
 import type { OpenAiCallStatus } from "@/lib/journal/openaiStatus";
 
-const CACHE_KEY = "manseryeok:week-topic-support:v1";
+const CACHE_KEY = "manseryeok:week-topic-support:v2";
 
 export type WeekTopicSupportCacheEntry = {
   date: string;
   fingerprint: string;
   /** topicId → 한 문장 */
   lines: Record<string, string>;
+  /** 상위 화제를 묶은 합쳐 조언 */
+  combinedAdvice: string | null;
   openAi: OpenAiCallStatus | null;
   savedAt: string;
 };
@@ -29,7 +31,13 @@ export function loadWeekTopicSupportCache(
       parsed?.lines &&
       typeof parsed.lines === "object"
     ) {
-      return parsed;
+      return {
+        ...parsed,
+        combinedAdvice:
+          typeof parsed.combinedAdvice === "string"
+            ? parsed.combinedAdvice
+            : null,
+      };
     }
   } catch {
     /* ignore */
@@ -41,7 +49,8 @@ export function saveWeekTopicSupportCache(
   date: string,
   fingerprint: string,
   lines: Record<string, string>,
-  openAi: OpenAiCallStatus | null
+  openAi: OpenAiCallStatus | null,
+  combinedAdvice?: string | null
 ): void {
   if (typeof window === "undefined") return;
   try {
@@ -49,6 +58,7 @@ export function saveWeekTopicSupportCache(
       date,
       fingerprint,
       lines,
+      combinedAdvice: combinedAdvice ?? null,
       openAi,
       savedAt: new Date().toISOString(),
     };

@@ -16,6 +16,7 @@ export const TOPIC_LEXICON: TopicDefinition[] = [
     id: "boss_relation",
     label: "상사와의 관계",
     aliases: [
+      "갈등",
       "상사",
       "팀장",
       "부장",
@@ -48,6 +49,7 @@ export const TOPIC_LEXICON: TopicDefinition[] = [
       "와이프",
       "배우자",
       "데이트",
+      "소개·만남",
     ],
   },
   {
@@ -93,6 +95,7 @@ export const TOPIC_LEXICON: TopicDefinition[] = [
       "업무량",
       "과제",
       "발표",
+      "업무 압박",
     ],
   },
   {
@@ -110,6 +113,8 @@ export const TOPIC_LEXICON: TopicDefinition[] = [
       "저축",
       "투자",
       "용돈",
+      "수입",
+      "큰 지출",
     ],
   },
   {
@@ -127,12 +132,23 @@ export const TOPIC_LEXICON: TopicDefinition[] = [
       "몸살",
       "수면",
       "불면증",
+      "질병·통증",
     ],
   },
   {
     id: "rest",
     label: "휴식·여유",
-    aliases: ["휴식", "쉬고", "쉬었", "여행", "휴가", "여유", "힐링", "산책"],
+    aliases: [
+      "휴식",
+      "쉬고",
+      "쉬었",
+      "여행",
+      "휴가",
+      "여유",
+      "힐링",
+      "산책",
+      "여행·이동",
+    ],
   },
   {
     id: "self",
@@ -152,11 +168,30 @@ export const TOPIC_LEXICON: TopicDefinition[] = [
   {
     id: "decision",
     label: "선택·결정",
-    aliases: ["결정", "선택", "고민", "이직", "퇴사", "진로", "전환"],
+    aliases: [
+      "결정",
+      "선택",
+      "고민",
+      "이직",
+      "퇴사",
+      "진로",
+      "전환",
+      "계약·결정",
+      "새로운 시작",
+    ],
   },
   {
     id: "study",
     label: "공부·성장",
-    aliases: ["공부", "시험", "자격증", "강의", "수업", "과제", "학습"],
+    aliases: [
+      "공부",
+      "시험",
+      "자격증",
+      "강의",
+      "수업",
+      "과제",
+      "학습",
+      "성과·칭찬",
+    ],
   },
 ];

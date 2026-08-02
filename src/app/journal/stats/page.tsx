@@ -127,7 +127,7 @@ function JournalStatsInner() {
     () =>
       buildWeekTopicSummary(entries, {
         asOf: todayDateString(),
-        windowDays: 7,
+        windowDays: 30,
         topN: 5,
       }),
     [entries]

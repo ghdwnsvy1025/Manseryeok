@@ -6,8 +6,9 @@ import {
 } from "@/lib/journal/openaiStatus";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
 import {
-  hasLocalFitFeedback,
+  peekLocalFitLevel,
   QUESTION_FIT_LEVELS,
+  QUESTION_FIT_THUMBS,
   type FitLevel,
 } from "@/lib/journal/questionFeedback";
 import { reportQuestionFeedback } from "@/lib/journal/reportQuestionFeedback";
@@ -289,7 +290,6 @@ export default function TodayQuestionCard({
   const [keywords, setKeywords] = useState<string[]>([]);
   const [keywordCodes, setKeywordCodes] = useState<string[]>([]);
   const [fit, setFit] = useState<FitLevel | null>(null);
-  const [skipped, setSkipped] = useState(false);
   const [feedbackMsg, setFeedbackMsg] = useState("");
   const [debug, setDebug] = useState<DebugInfo | null>(null);
   const [debugOpen, setDebugOpen] = useState(false);
@@ -314,7 +314,6 @@ export default function TodayQuestionCard({
   useEffect(() => {
     requestIdRef.current += 1;
     setFit(null);
-    setSkipped(false);
     setFeedbackMsg("");
     setDebugOpen(false);
     setPanelOpen(isSheet);
@@ -338,10 +337,11 @@ export default function TodayQuestionCard({
             : cached.keywords ?? [],
       };
       shownSent.current = true;
-      if (hasLocalFitFeedback(todayDate)) {
-        setFit("good");
+      const prevFit = peekLocalFitLevel(todayDate);
+      if (prevFit) {
+        setFit(prevFit);
         answeredRef.current = true;
-        setFeedbackMsg("오늘 피드백을 남겨주셨어요.");
+        setFeedbackMsg("오늘 피드백을 남겨주셨어요. 바꿀 수 있어요.");
       }
       setPhase("ready");
       return;
@@ -405,10 +405,11 @@ export default function TodayQuestionCard({
               ? data.keywordCodes
               : data.keywords ?? [],
         };
-        if (hasLocalFitFeedback(todayDate)) {
-          setFit("good");
+        const prevFit = peekLocalFitLevel(todayDate);
+        if (prevFit) {
+          setFit(prevFit);
           answeredRef.current = true;
-          setFeedbackMsg("오늘 피드백을 남겨주셨어요.");
+          setFeedbackMsg("오늘 피드백을 남겨주셨어요. 바꿀 수 있어요.");
         }
       }
       setPhase("ready");
@@ -420,7 +421,6 @@ export default function TodayQuestionCard({
     setPhase("loading");
     setPanelOpen(true);
     setFit(null);
-    setSkipped(false);
     setFeedbackMsg("");
     setDebug(null);
     shownSent.current = false;
@@ -536,10 +536,11 @@ export default function TodayQuestionCard({
         });
       }
 
-      if (hasLocalFitFeedback(todayDate)) {
-        setFit("good");
+      const prevFit = peekLocalFitLevel(todayDate);
+      if (prevFit) {
+        setFit(prevFit);
         answeredRef.current = true;
-        setFeedbackMsg("오늘 피드백을 남겨주셨어요.");
+        setFeedbackMsg("오늘 피드백을 남겨주셨어요. 바꿀 수 있어요.");
       }
 
       if (q && !shownSent.current) {
@@ -586,11 +587,11 @@ export default function TodayQuestionCard({
     }
   }, [phase, question, todayDate, enabledCodes, entries, sajuProfile]);
 
-  const answered = fit != null || skipped;
-
   const sendFit = async (level: FitLevel) => {
     const option = QUESTION_FIT_LEVELS.find((l) => l.level === level);
-    if (!question || answered || !option) return;
+    if (!question || !option) return;
+    // 같은 선택 재클릭은 무시, 굿↔배드는 언제든 바꿀 수 있음
+    if (fit === level) return;
     setFit(level);
     answeredRef.current = true;
     setFeedbackMsg(option.ack);
@@ -601,21 +602,7 @@ export default function TodayQuestionCard({
       rating: option.rating,
       payload: {
         keywords: keywordCodes.length > 0 ? keywordCodes : keywords,
-      },
-    });
-  };
-
-  const sendSkip = async () => {
-    if (!question || answered) return;
-    setSkipped(true);
-    answeredRef.current = true;
-    setFeedbackMsg("건너뛰었어요 — 다음엔 다른 질문을 드릴게요.");
-    await reportQuestionFeedback({
-      questionDate: todayDate,
-      eventType: "skipped",
-      questionText: question,
-      payload: {
-        keywords: keywordCodes.length > 0 ? keywordCodes : keywords,
+        changed: fit != null,
       },
     });
   };
@@ -680,26 +667,61 @@ export default function TodayQuestionCard({
     );
   }
 
-  // 시트: 질문 문장만 (피드백·힌트는 완료 직후 시트로)
+  // 시트: 질문 + 옆 굿/배드 (별도 피드백 팝업 없음)
   // 로딩 칸과 같은 최소 높이로 점프를 막는다.
   if (isSheet && question) {
     return (
       <>
         <CherryBlossomLayer playToken={blossomToken} />
         <section className="px-3 py-2.5 space-y-1.5 fortune-readable min-h-[4.75rem] flex flex-col justify-center">
-        <p
-          className="text-[11px] font-black tracking-wider text-center"
-          style={{ color: "var(--px-accent)" }}
-        >
-          오늘의 질문
-        </p>
-        <p
-          className="text-[14px] font-bold leading-relaxed text-center"
-          style={{ color: "var(--px-text-on-panel)", lineHeight: 1.55 }}
-        >
-          {question}
-        </p>
-      </section>
+          <div className="flex items-center justify-center gap-2">
+            <p
+              className="text-[11px] font-black tracking-wider"
+              style={{ color: "var(--px-accent)" }}
+            >
+              오늘의 질문
+            </p>
+            <div className="flex items-center gap-1" role="group" aria-label="질문 피드백">
+              {QUESTION_FIT_THUMBS.map((option) => (
+                <button
+                  key={option.level}
+                  type="button"
+                  aria-label={option.label}
+                  aria-pressed={fit === option.level}
+                  onClick={() => void sendFit(option.level)}
+                  className="min-w-[2.25rem] px-1.5 py-0.5 text-[10px] font-black border-2"
+                  style={{
+                    borderColor:
+                      fit === option.level
+                        ? "var(--px-accent)"
+                        : "var(--px-border2)",
+                    color:
+                      fit === option.level
+                        ? "var(--px-accent)"
+                        : "var(--px-text2)",
+                    background: "var(--px-bg3)",
+                  }}
+                >
+                  {option.shortLabel}
+                </button>
+              ))}
+            </div>
+          </div>
+          <p
+            className="text-[14px] font-bold leading-relaxed text-center"
+            style={{ color: "var(--px-text-on-panel)", lineHeight: 1.55 }}
+          >
+            {question}
+          </p>
+          {feedbackMsg && (
+            <p
+              className="text-[10px] text-center font-bold"
+              style={{ color: "var(--px-text2)" }}
+            >
+              {feedbackMsg}
+            </p>
+          )}
+        </section>
       </>
     );
   }
@@ -754,40 +776,39 @@ export default function TodayQuestionCard({
             borderColor: "var(--px-border)",
           }}
         >
-          <span
-            className="text-[10px] font-bold w-full text-center leading-snug"
-            style={{ color: "var(--px-text2)" }}
-          >
-            이 질문이 도움이 되었나요?
-          </span>
-          {QUESTION_FIT_LEVELS.map((option) => (
-            <button
-              key={option.level}
-              type="button"
-              disabled={answered}
-              aria-pressed={fit === option.level}
-              onClick={() => void sendFit(option.level)}
-              className="px-2.5 py-1.5 text-[10px] font-bold border-2 disabled:opacity-50"
-              style={{
-                borderColor:
-                  fit === option.level ? "var(--px-accent)" : "var(--px-border2)",
-                color:
-                  fit === option.level ? "var(--px-accent)" : "var(--px-text2)",
-                background: "var(--px-bg3)",
-              }}
+          <div className="flex items-center justify-center gap-2 w-full">
+            <span
+              className="text-[10px] font-bold leading-snug"
+              style={{ color: "var(--px-text2)" }}
             >
-              {option.label}
-            </button>
-          ))}
-          <button
-            type="button"
-            disabled={answered}
-            onClick={() => void sendSkip()}
-            className="text-[10px] font-medium underline disabled:opacity-50 px-1"
-            style={{ color: "var(--px-text2)" }}
-          >
-            건너뛰기
-          </button>
+              이 질문
+            </span>
+            <div className="flex items-center gap-1" role="group" aria-label="질문 피드백">
+              {QUESTION_FIT_THUMBS.map((option) => (
+                <button
+                  key={option.level}
+                  type="button"
+                  aria-label={option.label}
+                  aria-pressed={fit === option.level}
+                  onClick={() => void sendFit(option.level)}
+                  className="min-w-[2.5rem] px-2 py-1 text-[10px] font-black border-2"
+                  style={{
+                    borderColor:
+                      fit === option.level
+                        ? "var(--px-accent)"
+                        : "var(--px-border2)",
+                    color:
+                      fit === option.level
+                        ? "var(--px-accent)"
+                        : "var(--px-text2)",
+                    background: "var(--px-bg3)",
+                  }}
+                >
+                  {option.shortLabel}
+                </button>
+              ))}
+            </div>
+          </div>
           {feedbackMsg && (
             <p className="text-[10px] w-full text-center font-bold" style={{ color: "var(--px-text2)" }}>
               {feedbackMsg}

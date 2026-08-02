@@ -93,7 +93,7 @@ describe("checkin v2 contract (step 3)", () => {
       "후회스러움",
     ]);
     expect(MOOD_OPTIONS).toContain("답답함");
-    expect(MAX_MOODS).toBe(99);
+    expect(MAX_MOODS).toBe(3);
     expect(MIN_MOODS).toBe(1);
   });
 
@@ -144,16 +144,25 @@ describe("checkin v2 contract (step 3)", () => {
     ).toBe(true);
   });
 
-  test("allows selecting all mood options at once (no low max)", () => {
+  test("allows up to 3 moods; rejects more", () => {
     expect(
       validateCheckInSave({
         happiness: 5,
-        moods: [...MOOD_OPTIONS],
+        moods: ["기쁨", "평온", "설렘"],
         tagCodes: [],
         core: validCore(),
         domains: [],
       }).ok
     ).toBe(true);
+    expect(
+      validateCheckInSave({
+        happiness: 5,
+        moods: ["기쁨", "평온", "설렘", "지침"],
+        tagCodes: [],
+        core: validCore(),
+        domains: [],
+      }).ok
+    ).toBe(false);
   });
 
   test("rejects empty moods (min 1 required)", () => {

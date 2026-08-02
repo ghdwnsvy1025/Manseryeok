@@ -17,8 +17,12 @@ export const metadata: Metadata = {
   applicationName: "오늘의 사주 일기",
   manifest: "/manifest.webmanifest",
   icons: {
-    icon: "/icons/app-icon.svg",
-    apple: "/icons/app-icon.svg",
+    icon: [
+      { url: "/icons/favicon-48.png", sizes: "48x48", type: "image/png" },
+      { url: "/icons/app-icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icons/app-icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: [{ url: "/icons/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
   },
   appleWebApp: {
     capable: true,

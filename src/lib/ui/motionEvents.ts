@@ -4,6 +4,9 @@
 
 export const PROGRESS_CELEBRATION_EVENT = "manseryeok_progress_celebration";
 export const HEADER_BADGE_PULSE_EVENT = "manseryeok_header_badge_pulse";
+/** 홈 Lv 칸 등 → 헤더와 동일한 맞춤 레벨 팝업 열기 */
+export const OPEN_PERSONALIZATION_LEVEL_EVENT =
+  "manseryeok_open_personalization_level";
 
 export type ProgressCelebrationDetail = {
   gainedXp: number;
@@ -39,6 +42,11 @@ export function notifyHeaderBadgePulse(
 ): void {
   if (typeof window === "undefined") return;
   window.dispatchEvent(new CustomEvent(HEADER_BADGE_PULSE_EVENT, { detail }));
+}
+
+export function notifyOpenPersonalizationLevel(): void {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent(OPEN_PERSONALIZATION_LEVEL_EVENT));
 }
 
 const MILESTONE_KEY = "manseryeok:level_milestones_seen_v1";

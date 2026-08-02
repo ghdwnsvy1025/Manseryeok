@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useState, type ReactNode } from "react";
 import WelcomeAuthGate from "@/components/auth/WelcomeAuthGate";
 import SajuProfileSetup from "@/components/home/SajuProfileSetup";
 import HomeHub from "@/components/home/HomeHub";
@@ -10,7 +10,12 @@ import { useUserAppState } from "@/hooks/useUserAppState";
 import { isNewDiaryEnabled } from "@/lib/app/featureFlags";
 import { isAnonymousUser } from "@/lib/auth/anonymousSession";
 import { autoMigrateLocalJournalToAccount } from "@/lib/auth/autoMigrateLocalJournal";
-import { isEntryUnlocked, unlockEntry, hideShellChrome, showShellChrome } from "@/lib/auth/entryGate";
+import {
+  isEntryUnlocked,
+  unlockEntry,
+  hideShellChrome,
+  showShellChrome,
+} from "@/lib/auth/entryGate";
 import {
   disableGuestMode,
   enableGuestMode,
@@ -40,6 +45,29 @@ function localHasSajuProfile(): boolean {
   }
 }
 
+function phaseFromLocal(): "login" | "saju" | "home" {
+  if (isEntryUnlocked() || isGuestMode()) {
+    return localHasSajuProfile() ? "home" : "saju";
+  }
+  return "login";
+}
+
+async function getSessionWithTimeout(
+  ms = 2000
+): Promise<{ user: import("@supabase/supabase-js").User | null }> {
+  const supabase = getSupabaseBrowserClient();
+  if (!supabase) return { user: null };
+  try {
+    const result = await Promise.race([
+      supabase.auth.getSession().then((r) => r.data.session?.user ?? null),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), ms)),
+    ]);
+    return { user: result };
+  } catch {
+    return { user: null };
+  }
+}
+
 type Phase = "loading" | "login" | "saju" | "home";
 
 export default function HomePage() {
@@ -50,14 +78,23 @@ export default function HomePage() {
   const [loginError, setLoginError] = useState("");
   const newDiary = isNewDiaryEnabled();
 
+  // 첫 페인트 전에 로컬 잠금/게스트로 바로 결정 — getSession 대기 없이
+  useLayoutEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("oauth") === "success") {
+      // OAuth 직후는 세션 확인이 필요 — loading 유지하되 곧바로 async에서 처리
+      return;
+    }
+    if (params.get("authError")) return;
+    setPhase(phaseFromLocal());
+  }, []);
+
   useEffect(() => {
     const syncLocal = () => setLocalProfileHint(localHasSajuProfile());
     syncLocal();
     window.addEventListener(SAJU_PROFILE_CHANGED_EVENT, syncLocal);
-    const t = window.setTimeout(syncLocal, 600);
     return () => {
       window.removeEventListener(SAJU_PROFILE_CHANGED_EVENT, syncLocal);
-      window.clearTimeout(t);
     };
   }, [state]);
 
@@ -71,22 +108,34 @@ export default function HomePage() {
     };
 
     const resolvePhase = async () => {
-      // OAuth 성공 복귀
       const params = new URLSearchParams(window.location.search);
-      if (params.get("oauth") === "success") {
+      const oauthOk = params.get("oauth") === "success";
+
+      if (oauthOk) {
         unlockEntry();
         disableGuestMode();
         try {
           const { syncLocalSajuProfileToAccount } = await import(
             "@/lib/diary/profileStorage"
           );
-          await syncLocalSajuProfileToAccount();
+          // 프로필 동기화는 홈 진입을 막지 않음
+          void syncLocalSajuProfileToAccount();
         } catch {
           /* ignore */
         }
         void autoMigrateLocalJournalToAccount();
         window.history.replaceState({}, "", "/");
+
+        const { user } = await getSessionWithTimeout(2500);
+        if (cancelled) return;
+        if (user && !isAnonymousUser(user)) {
+          goAfterAuth();
+          return;
+        }
+        goAfterAuth();
+        return;
       }
+
       const authError = params.get("authError");
       if (authError) {
         const messages: Record<string, string> = {
@@ -98,22 +147,17 @@ export default function HomePage() {
         };
         setLoginError(messages[authError] ?? "로그인에 실패했습니다.");
         window.history.replaceState({}, "", "/");
+        if (!cancelled) setPhase("login");
       }
 
       if (!supabase) {
-        if (isEntryUnlocked() || isGuestMode()) {
-          if (isGuestMode()) unlockEntry();
-          goAfterAuth();
-        } else {
-          setPhase("login");
-        }
+        if (!cancelled) setPhase(phaseFromLocal());
         return;
       }
 
       try {
-        const { data } = await supabase.auth.getSession();
+        const { user } = await getSessionWithTimeout(2000);
         if (cancelled) return;
-        const user = data.session?.user ?? null;
 
         if (user && !isAnonymousUser(user)) {
           unlockEntry();
@@ -128,24 +172,34 @@ export default function HomePage() {
           (isGuestMode() || (user && isAnonymousUser(user)))
         ) {
           if (user && isAnonymousUser(user)) enableGuestMode();
-          // 비로그인은 기기 로컬이 소스 — 원격 이관/덮어쓰기 하지 않음
           goAfterAuth();
           return;
         }
 
         setPhase("login");
       } catch {
-        if (!cancelled) setPhase("login");
+        if (!cancelled) setPhase(phaseFromLocal());
       }
     };
 
     void resolvePhase();
 
-    if (!supabase) return;
+    // 최후 안전망: 어떤 이유로든 loading이면 로컬 기준으로 탈출
+    const safety = window.setTimeout(() => {
+      if (cancelled) return;
+      setPhase((prev) => (prev === "loading" ? phaseFromLocal() : prev));
+    }, 3000);
+
+    if (!supabase) {
+      return () => {
+        cancelled = true;
+        window.clearTimeout(safety);
+      };
+    }
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange((event, session) => {
       if (cancelled) return;
       const user = session?.user;
       if (user && !isAnonymousUser(user)) {
@@ -153,7 +207,12 @@ export default function HomePage() {
         disableGuestMode();
         void autoMigrateLocalJournalToAccount();
         setPhase((prev) => {
-          if (prev === "login" || prev === "loading") {
+          if (
+            prev === "login" ||
+            prev === "loading" ||
+            event === "SIGNED_IN" ||
+            event === "INITIAL_SESSION"
+          ) {
             return localHasSajuProfile() || sajuDone ? "home" : "saju";
           }
           return prev;
@@ -163,6 +222,7 @@ export default function HomePage() {
 
     return () => {
       cancelled = true;
+      window.clearTimeout(safety);
       subscription.unsubscribe();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps

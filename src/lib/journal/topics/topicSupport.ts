@@ -130,7 +130,7 @@ const TOPIC_LINES: Record<
   boss_relation: {
     comfort: {
       low: "상사와의 사이에서 마음이 자주 무거웠던 주였어요",
-      mid: "상사와의 관계가 이번 주 마음에 계속 남았어요",
+      mid: "상사와의 관계가 요즘 마음에 계속 남았어요",
       high: "상사와의 사이에서도 스스로를 지키며 지나온 주였어요",
     },
     advice: {
@@ -142,7 +142,7 @@ const TOPIC_LINES: Record<
   coworker: {
     comfort: {
       low: "동료와의 호흡에서 피로가 쌓인 주였어요",
-      mid: "동료와의 관계가 이번 주 이야기의 중심이었어요",
+      mid: "동료와의 관계가 요즘 이야기의 중심이었어요",
       high: "동료와의 연결이 비교적 든든했던 주였어요",
     },
     advice: {
@@ -155,7 +155,7 @@ const TOPIC_LINES: Record<
     comfort: {
       low: "가까운 사람과의 마음이 흔들렸던 주였어요",
       mid: "연인·파트너와의 결이 일기 속에 자주 남았어요",
-      high: "가까운 사람과의 온기가 이번 주를 밝혀 준 편이었어요",
+      high: "가까운 사람과의 온기가 요즘을 밝혀 준 편이었어요",
     },
     advice: {
       low: "오늘은 상대보다 먼저 내 기분을 한 줄로만 적어 두세요",
@@ -166,7 +166,7 @@ const TOPIC_LINES: Record<
   family: {
     comfort: {
       low: "가족 사이에서 마음이 답답했던 순간이 많았어요",
-      mid: "가족 이야기가 이번 주를 자주 채웠어요",
+      mid: "가족 이야기가 요즘을 자주 채웠어요",
       high: "가족과 나 사이에서 온기를 찾은 주였어요",
     },
     advice: {
@@ -178,8 +178,8 @@ const TOPIC_LINES: Record<
   friend: {
     comfort: {
       low: "친구와의 사이에서 외로움이 스며든 주였어요",
-      mid: "친구 이야기가 이번 주 마음에 자주 닿았어요",
-      high: "우정이 이번 주를 부드럽게 받쳐 준 편이었어요",
+      mid: "친구 이야기가 요즘 마음에 자주 닿았어요",
+      high: "우정이 요즘을 부드럽게 받쳐 준 편이었어요",
     },
     advice: {
       low: "먼저 안부를 묻기보다, 내가 편한 방식으로 연결을 이어 보세요",
@@ -190,7 +190,7 @@ const TOPIC_LINES: Record<
   work_pressure: {
     comfort: {
       low: "일과 부담이 어깨를 눌렀던 주였어요",
-      mid: "업무 리듬이 이번 주 이야기의 중심이었어요",
+      mid: "업무 리듬이 요즘 이야기의 중심이었어요",
       high: "바쁜 속에서도 버텨 낸 하루들이 쌓인 주였어요",
     },
     advice: {
@@ -202,7 +202,7 @@ const TOPIC_LINES: Record<
   money: {
     comfort: {
       low: "돈·생활비 걱정이 마음을 조이던 주였어요",
-      mid: "돈의 흐름이 이번 주 화제로 자주 올라왔어요",
+      mid: "돈의 흐름이 요즘 화제로 자주 올라왔어요",
       high: "자원을 의식하며 하루를 조율한 주였어요",
     },
     advice: {
@@ -214,7 +214,7 @@ const TOPIC_LINES: Record<
   health: {
     comfort: {
       low: "몸과 컨디션이 힘들었던 흔적이 남은 주였어요",
-      mid: "몸의 신호가 이번 주 이야기의 중심이었어요",
+      mid: "몸의 신호가 요즘 이야기의 중심이었어요",
       high: "몸의 리듬을 살피며 지나온 주였어요",
     },
     advice: {
@@ -238,7 +238,7 @@ const TOPIC_LINES: Record<
   self: {
     comfort: {
       low: "나 자신의 마음이 많이 흔들렸던 주였어요",
-      mid: "내면의 이야기가 이번 주 화제의 중심이었어요",
+      mid: "내면의 이야기가 요즘 화제의 중심이었어요",
       high: "스스로를 들여다본 용기가 남은 주였어요",
     },
     advice: {
@@ -250,7 +250,7 @@ const TOPIC_LINES: Record<
   decision: {
     comfort: {
       low: "선택 앞에서 마음이 무거웠던 주였어요",
-      mid: "고민과 결정이 이번 주를 이끌었어요",
+      mid: "고민과 결정이 요즘을 이끌었어요",
       high: "서두르지 않고 머무른 용기가 보인 주였어요",
     },
     advice: {
@@ -277,7 +277,7 @@ function defaultLines(label: string) {
   return {
     comfort: {
       low: `「${label}」이(가) 마음에 무겁게 남았던 주였어요`,
-      mid: `「${label}」이(가) 이번 주 이야기의 중심이었어요`,
+      mid: `「${label}」이(가) 요즘 이야기의 중심이었어요`,
       high: `「${label}」을(를) 비교적 잘 다뤄 온 주였어요`,
     },
     advice: {
@@ -371,9 +371,10 @@ export function collectTopicExcerpts(
 /** LLM 요청용 페이로드 — 홈 상위 화제 각각에 등장 횟수만큼의 글 */
 export function buildWeekTopicSupportItems(
   topics: WeekTopicHit[],
-  entries: JournalEntry[]
+  entries: JournalEntry[],
+  topN = 3
 ): WeekTopicSupportItem[] {
-  return topics.map((t) => {
+  return topics.slice(0, topN).map((t) => {
     const state = t.state ?? snapshotTopicState(t, entries);
     return {
       topicId: t.topicId,
@@ -383,6 +384,20 @@ export function buildWeekTopicSupportItems(
       fallbackLine: t.supportLine ?? buildTopicSupportLine(t, state),
     };
   });
+}
+
+export function buildCombinedAdviceFallback(
+  items: Array<{ label: string; fallbackLine?: string }>
+): string {
+  if (items.length === 0) return "";
+  if (items.length === 1) {
+    return (
+      items[0]!.fallbackLine ||
+      `「${items[0]!.label}」이(가) 요즘 이야기의 축이었어요. 오늘은 그 마음을 한 호흡만 부드럽게 안아 주세요.`
+    );
+  }
+  const joined = items.map((t) => t.label).join(" · ");
+  return `요즘 「${joined}」이(가) 이야기의 축이었어요. 한 가지만 붙잡지 말고, 그중 가장 가벼운 것부터 짧게 돌봐 보세요.`;
 }
 
 export function weekTopicSupportFingerprint(

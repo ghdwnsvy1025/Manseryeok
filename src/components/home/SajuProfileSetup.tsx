@@ -72,12 +72,27 @@ export default function SajuProfileSetup({ onCompleted }: Props) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const yearRef = useRef<HTMLInputElement>(null);
   const monthRef = useRef<HTMLInputElement>(null);
   const dayRef = useRef<HTMLInputElement>(null);
   const hourRef = useRef<HTMLInputElement>(null);
   const minuteRef = useRef<HTMLInputElement>(null);
   const profileStartedAtRef = useRef(Date.now());
   const profileStartedSentRef = useRef(false);
+
+  /** 칸 누르면 비운 뒤 입력 (모바일에서 커서만 움직이는 문제 방지) */
+  const clearOnFocus =
+    (setter: (v: string) => void) =>
+    (_e: React.FocusEvent<HTMLInputElement>) => {
+      setter("");
+      setError(null);
+    };
+  const clearOnPointerDown =
+    (setter: (v: string) => void) =>
+    () => {
+      setter("");
+      setError(null);
+    };
 
   useEffect(() => {
     if (profileStartedSentRef.current) return;
@@ -228,12 +243,16 @@ export default function SajuProfileSetup({ onCompleted }: Props) {
               년
             </span>
             <input
+              ref={yearRef}
               type="text"
               inputMode="numeric"
+              autoComplete="off"
               required
               maxLength={4}
               placeholder="1990"
               value={year}
+              onFocus={clearOnFocus(setYear)}
+              onPointerDown={clearOnPointerDown(setYear)}
               onChange={(e) => {
                 const next = digitsOnly(e.target.value, 4);
                 setYear(next);
@@ -254,10 +273,13 @@ export default function SajuProfileSetup({ onCompleted }: Props) {
               ref={monthRef}
               type="text"
               inputMode="numeric"
+              autoComplete="off"
               required
               maxLength={2}
               placeholder="1"
               value={month}
+              onFocus={clearOnFocus(setMonth)}
+              onPointerDown={clearOnPointerDown(setMonth)}
               onChange={(e) => {
                 const next = digitsOnly(e.target.value, 2);
                 if (next && Number(next) > 12) return;
@@ -278,10 +300,13 @@ export default function SajuProfileSetup({ onCompleted }: Props) {
               ref={dayRef}
               type="text"
               inputMode="numeric"
+              autoComplete="off"
               required
               maxLength={2}
               placeholder="1"
               value={day}
+              onFocus={clearOnFocus(setDay)}
+              onPointerDown={clearOnPointerDown(setDay)}
               onChange={(e) => {
                 const next = digitsOnly(e.target.value, 2);
                 if (next && Number(next) > 31) return;
@@ -308,10 +333,13 @@ export default function SajuProfileSetup({ onCompleted }: Props) {
                 ref={hourRef}
                 type="text"
                 inputMode="numeric"
+                autoComplete="off"
                 required
                 maxLength={2}
                 placeholder="12"
                 value={hour}
+                onFocus={clearOnFocus(setHour)}
+                onPointerDown={clearOnPointerDown(setHour)}
                 onChange={(e) => {
                   const next = digitsOnly(e.target.value, 2);
                   if (next && Number(next) > 23) return;
@@ -332,9 +360,12 @@ export default function SajuProfileSetup({ onCompleted }: Props) {
                 ref={minuteRef}
                 type="text"
                 inputMode="numeric"
+                autoComplete="off"
                 maxLength={2}
                 placeholder="0"
                 value={minute}
+                onFocus={clearOnFocus(setMinute)}
+                onPointerDown={clearOnPointerDown(setMinute)}
                 onChange={(e) => {
                   const next = digitsOnly(e.target.value, 2);
                   if (next && Number(next) > 59) return;

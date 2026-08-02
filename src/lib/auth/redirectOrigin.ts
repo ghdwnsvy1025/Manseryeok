@@ -1,12 +1,10 @@
 /**
  * OAuth / 매직링크 후 돌아올 앱 origin.
- * 로컬에서 Vercel Site URL로 튕기는 경우 .env.local에 명시:
- *   NEXT_PUBLIC_AUTH_REDIRECT_ORIGIN=http://localhost:3001
+ * 브라우저에서는 항상 현재 origin을 쓴다.
+ * (env에 3001이 박혀 있어도 localhost:3000에서 로그인하면 3000으로 복귀)
  */
 export function getAuthRedirectOrigin(): string {
   if (typeof window !== "undefined") {
-    const fromEnv = process.env.NEXT_PUBLIC_AUTH_REDIRECT_ORIGIN?.trim();
-    if (fromEnv) return fromEnv.replace(/\/$/, "");
     return window.location.origin;
   }
   const fromEnv = process.env.NEXT_PUBLIC_AUTH_REDIRECT_ORIGIN?.trim();

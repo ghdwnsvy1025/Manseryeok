@@ -102,7 +102,7 @@ export type JournalEntry = {
   /** 체크인 v2 행복도 0~10 */
   happinessScore: number | null;
   moodLabel: string | null;
-  /** 체크인 v2 복수 기분 (≤3) */
+  /** 체크인 v2 복수 기분 (1~3개) */
   moodLabels: string[];
   mainEventText: string | null;
   source: "new_diary" | "legacy_import";
@@ -146,7 +146,7 @@ export const RECOMMENDED_ENABLED_CATEGORIES = 6;
 export { JOURNAL_SCORE_LABELS as SCORE_LABELS } from "./scoreScale";
 export type { JournalScore } from "./scoreScale";
 
-/** 체크인 v2 기분 (최소 1개, 개수 제한 없음) — 키워드 랭킹·문장 안전필터와 연동 */
+/** 체크인 v2 기분 (최소 1개, 최대 3개) — 키워드 랭킹·문장 안전필터와 연동 */
 export const MOOD_OPTIONS = [
   "기쁨",
   "뿌듯함",

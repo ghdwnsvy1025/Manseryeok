@@ -53,6 +53,7 @@ export const ANALYTICS_EVENTS = {
   entryListSelected: "entry_list_selected",
   entryListEditClicked: "entry_list_edit_clicked",
   patternTabSelected: "pattern_tab_selected",
+  patternCharOpened: "pattern_char_opened",
   ganjiCollectionOpened: "ganji_collection_opened",
   menuOpened: "menu_opened",
   menuItemClicked: "menu_item_clicked",

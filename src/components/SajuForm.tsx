@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import type { SajuInput, SajuOptions, CalendarType, DayChangeRule, TimeCorrection } from "@/lib/saju/types";
 import type { Gender } from "@/lib/saju/daeun";
 import { getBirthPrefillForForm } from "@/lib/diary/sajuSettings";
@@ -34,15 +34,6 @@ const LOCATION_PRESETS = [
   { id: "jeju", name: "대한민국, 제주", longitude: 126.53, latitude: 33.50 },
   { id: "custom", name: "직접 입력", longitude: 126.98, latitude: 37.57 },
 ] as const;
-
-const YEAR_OPTIONS: string[] = (() => {
-  const currentYear = new Date().getFullYear();
-  const years: string[] = [];
-  for (let y = currentYear; y >= 1920; y--) {
-    years.push(String(y));
-  }
-  return years;
-})();
 
 function getCurrentDateTimeParts() {
   const now = new Date();
@@ -143,13 +134,6 @@ export default function SajuForm({
     () => seedProfile?.label?.trim() ?? ""
   );
   const [year, setYear] = useState(initialDateTime.year);
-  const yearOptions = useMemo(() => {
-    const y = parseInt(initialDateTime.year, 10);
-    if (Number.isFinite(y) && y > 0 && y < 1920) {
-      return [String(y), ...YEAR_OPTIONS];
-    }
-    return YEAR_OPTIONS;
-  }, [initialDateTime.year]);
   const [month, setMonth] = useState(initialDateTime.month);
   const [day, setDay] = useState(initialDateTime.day);
   const [hour, setHour] = useState(initialDateTime.hour);
@@ -188,10 +172,34 @@ export default function SajuForm({
     () => seedProfile?.latitude ?? 37.57
   );
   const [fieldHint, setFieldHint] = useState<string | null>(null);
+  const yearRef = useRef<HTMLInputElement>(null);
   const monthRef = useRef<HTMLInputElement>(null);
   const dayRef = useRef<HTMLInputElement>(null);
   const hourRef = useRef<HTMLInputElement>(null);
   const minuteRef = useRef<HTMLInputElement>(null);
+
+  /** 칸을 누르면 비운 뒤 바로 입력 (모바일에서 select()는 커서만 움직이는 경우가 많음) */
+  const clearFieldOnFocus =
+    (setter: (v: string) => void) =>
+    (e: React.FocusEvent<HTMLInputElement>) => {
+      setter("");
+      setFieldHint(null);
+      const el = e.currentTarget;
+      requestAnimationFrame(() => {
+        try {
+          el.setSelectionRange(0, 0);
+        } catch {
+          /* ignore */
+        }
+      });
+    };
+
+  const clearFieldOnPointerDown =
+    (setter: (v: string) => void) =>
+    () => {
+      setter("");
+      setFieldHint(null);
+    };
 
   const isCompleteMonth = (raw: string) => {
     if (!raw) return false;
@@ -301,14 +309,26 @@ export default function SajuForm({
     setFieldHint(null);
   };
 
-  const handleYearChange = (nextYear: string) => {
-    setYear(nextYear);
-    const clamped = clampDayForMonth(day, nextYear, month);
+  const handleYearChange = (raw: string) => {
+    const digits = raw.replace(/\D/g, "").slice(0, 4);
+    setYear(digits);
+    if (!digits) {
+      setFieldHint(null);
+      return;
+    }
+    const clamped = clampDayForMonth(day, digits, month);
     if (clamped.value !== day) {
       setDay(clamped.value);
       setFieldHint(clamped.hint);
     } else {
       setFieldHint(null);
+    }
+    if (digits.length === 4) {
+      const y = parseInt(digits, 10);
+      if (y >= 1000 && y <= new Date().getFullYear() + 1) {
+        setMonth("");
+        requestAnimationFrame(() => monthRef.current?.focus());
+      }
     }
   };
 
@@ -440,19 +460,19 @@ export default function SajuForm({
         <div className="flex flex-wrap gap-2 items-end">
           <div className="flex flex-col gap-1">
             <label style={LABEL_STYLE}>년</label>
-            <select
+            <input
+              ref={yearRef}
+              type="text"
+              inputMode="numeric"
+              autoComplete="off"
+              enterKeyHint="next"
               value={year}
+              onFocus={clearFieldOnFocus(setYear)}
+              onPointerDown={clearFieldOnPointerDown(setYear)}
               onChange={(e) => handleYearChange(e.target.value)}
-              className="px-select px-3 py-2 text-sm w-28"
+              className="px-input px-3 py-2 text-sm w-24"
               required
-            >
-              {!year && <option value="">선택</option>}
-              {yearOptions.map((y) => (
-                <option key={y} value={y}>
-                  {y}
-                </option>
-              ))}
-            </select>
+            />
           </div>
           <div className="flex flex-col gap-1">
             <label style={LABEL_STYLE}>월</label>
@@ -460,7 +480,11 @@ export default function SajuForm({
               ref={monthRef}
               type="text"
               inputMode="numeric"
+              autoComplete="off"
+              enterKeyHint="next"
               value={month}
+              onFocus={clearFieldOnFocus(setMonth)}
+              onPointerDown={clearFieldOnPointerDown(setMonth)}
               onChange={(e) => handleMonthChange(e.target.value)}
               className="px-input px-3 py-2 text-sm w-20"
               required
@@ -472,7 +496,11 @@ export default function SajuForm({
               ref={dayRef}
               type="text"
               inputMode="numeric"
+              autoComplete="off"
+              enterKeyHint="next"
               value={day}
+              onFocus={clearFieldOnFocus(setDay)}
+              onPointerDown={clearFieldOnPointerDown(setDay)}
               onChange={(e) => handleDigitChange("day", e.target.value, setDay, { year, month })}
               className="px-input px-3 py-2 text-sm w-20"
               required
@@ -497,7 +525,11 @@ export default function SajuForm({
                 ref={hourRef}
                 type="text"
                 inputMode="numeric"
+                autoComplete="off"
+                enterKeyHint="next"
                 value={hour}
+                onFocus={clearFieldOnFocus(setHour)}
+                onPointerDown={clearFieldOnPointerDown(setHour)}
                 onChange={(e) => handleDigitChange("hour", e.target.value, setHour)}
                 required
                 className="px-input px-3 py-2 text-sm w-20"
@@ -509,7 +541,11 @@ export default function SajuForm({
                 ref={minuteRef}
                 type="text"
                 inputMode="numeric"
+                autoComplete="off"
+                enterKeyHint="done"
                 value={minute}
+                onFocus={clearFieldOnFocus(setMinute)}
+                onPointerDown={clearFieldOnPointerDown(setMinute)}
                 onChange={(e) => handleDigitChange("minute", e.target.value, setMinute)}
                 required
                 className="px-input px-3 py-2 text-sm w-20"

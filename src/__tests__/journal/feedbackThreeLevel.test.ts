@@ -4,6 +4,7 @@ import { join } from "node:path";
 import {
   QUESTION_FEEDBACK_EVENT_TYPES,
   QUESTION_FIT_LEVELS,
+  QUESTION_FIT_THUMBS,
   isQuestionFeedbackEventType,
   isFitEventType,
   validateQuestionFeedbackInput,
@@ -33,6 +34,11 @@ describe("three-level question fit feedback", () => {
       "그저 그래요",
       "별로예요",
     ]);
+    expect(QUESTION_FIT_LEVELS.map((l) => l.shortLabel)).toEqual([
+      "굿",
+      "보통",
+      "배드",
+    ]);
     const ratings = QUESTION_FIT_LEVELS.map((l) => l.rating);
     expect(new Set(ratings).size).toBe(3);
     // rating은 1~5 제약을 지켜야 저장된다
@@ -43,6 +49,10 @@ describe("three-level question fit feedback", () => {
     // 좋음 > 중립 > 나쁨 순서
     expect(ratings[0]!).toBeGreaterThan(ratings[1]!);
     expect(ratings[1]!).toBeGreaterThan(ratings[2]!);
+  });
+
+  test("UI exposes only good/bad thumbs", () => {
+    expect(QUESTION_FIT_THUMBS.map((l) => l.level)).toEqual(["good", "bad"]);
   });
 
   test("every fit level is a valid event type", () => {
@@ -95,13 +105,14 @@ describe("feedback events are actually emitted", () => {
   const questionRoute = read("src/app/api/journal/today-question/route.ts");
   const editor = read("src/components/journal/CheckInEditor.tsx");
 
-  test("the question card emits shown, all three fit levels, skipped and dismissed", () => {
+  test("the question card emits shown, thumbs (good/bad), and dismissed", () => {
     expect(card).toContain('eventType: "shown"');
-    expect(card).toContain('eventType: "skipped"');
     expect(card).toContain('eventType: "dismissed"');
-    // 세 단계는 QUESTION_FIT_LEVELS를 통해 발화된다
+    expect(card).toContain("QUESTION_FIT_THUMBS");
     expect(card).toContain("QUESTION_FIT_LEVELS");
     expect(card).toContain("option.eventType");
+    // 건너뛰기·완료 후 팝업 피드백은 제거됨
+    expect(card).not.toContain('eventType: "skipped"');
   });
 
   test("writing an entry emits led_to_write", () => {

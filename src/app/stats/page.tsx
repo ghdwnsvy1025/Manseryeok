@@ -178,7 +178,7 @@ export default function StatsPage() {
     () =>
       buildWeekTopicSummary(journalEntries, {
         asOf: today,
-        windowDays: 7,
+        windowDays: 30,
         topN: 5,
       }),
     [journalEntries, today]

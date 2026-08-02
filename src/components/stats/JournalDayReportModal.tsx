@@ -19,6 +19,11 @@ import type { JournalEntry } from "@/lib/journal/types";
 type Props = {
   entry: JournalEntry;
   onClose: () => void;
+  /**
+   * 있으면 「이전 일기 작성」 CTA 표시 (헤더 완료 팝업 등).
+   * 미기록 중 가장 최근 날짜 ISO.
+   */
+  previousWriteDate?: string | null;
 };
 
 function resolveOrdinal(opts: {
@@ -80,7 +85,11 @@ function ScoreRow({
  * 기록 캘린더용 하루 보고서 — 읽기 전용.
  * 수정은 「수정하기」로 체크인 에디터 이동.
  */
-export default function JournalDayReportModal({ entry, onClose }: Props) {
+export default function JournalDayReportModal({
+  entry,
+  onClose,
+  previousWriteDate,
+}: Props) {
   const happiness = dayHappiness(entry);
   const ganji = getPillarsForDate(entry.entryDate).dayPillar.ganjiKo;
   const moods =
@@ -123,7 +132,7 @@ export default function JournalDayReportModal({ entry, onClose }: Props) {
 
   return (
     <div
-      className="fixed inset-0 z-[80] flex items-end sm:items-center justify-center p-3"
+      className="fixed inset-0 z-[10050] flex items-end sm:items-center justify-center p-3"
       style={{ background: "rgba(0,0,0,0.55)" }}
       role="dialog"
       aria-modal="true"
@@ -303,39 +312,80 @@ export default function JournalDayReportModal({ entry, onClose }: Props) {
             <p className="ui-hint text-center py-4">표시할 내용이 거의 없어요.</p>
           )}
 
-        <div className="flex gap-2 pt-1 sticky bottom-0 pb-1" style={{ background: "var(--px-bg2)" }}>
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex-1 py-2.5 text-sm font-bold border-2"
-            style={{
-              borderColor: "var(--px-border)",
-              color: "var(--px-text2)",
-              background: "var(--px-bg3)",
-            }}
-          >
-            닫기
-          </button>
-          <Link
-            href={`/journal?date=${entry.entryDate}`}
-            className="ui-primary-btn flex-1 py-2.5 text-sm text-center"
-            onClick={() => {
-              void import("@/lib/analytics/posthog").then(
-                ({ ANALYTICS_EVENTS, captureEvent, captureUiClick }) => {
-                  captureEvent(ANALYTICS_EVENTS.pastEntryOpened, {
-                    source: "day_report_edit",
-                    has_entry: true,
-                  });
-                  captureUiClick(
-                    ANALYTICS_EVENTS.entryListEditClicked,
-                    "entry_list_edit"
-                  );
-                }
-              );
-            }}
-          >
-            수정하기
-          </Link>
+        <div
+          className="flex flex-col gap-2 pt-1 sticky bottom-0 pb-1"
+          style={{ background: "var(--px-bg2)" }}
+        >
+          {previousWriteDate && (
+            <Link
+              href={`/journal?date=${previousWriteDate}`}
+              className="w-full py-2.5 text-sm font-black text-center border-2"
+              style={{
+                borderColor: "var(--px-accent)",
+                color: "var(--px-accent)",
+                background:
+                  "color-mix(in srgb, var(--px-accent) 14%, var(--px-bg3))",
+                boxShadow: "2px 2px 0 #000",
+              }}
+              onClick={() => {
+                onClose();
+                void import("@/lib/analytics/posthog").then(
+                  ({ ANALYTICS_EVENTS, captureUiClick }) => {
+                    captureUiClick(
+                      ANALYTICS_EVENTS.homeTodayEntryClicked,
+                      "day_report_previous_write",
+                      {
+                        mode: "previous_write",
+                        target_date: previousWriteDate,
+                      }
+                    );
+                  }
+                );
+              }}
+            >
+              이전 일기 작성
+              <span
+                className="ml-1.5 text-[11px] font-bold tabular-nums"
+                style={{ color: "var(--px-text2)" }}
+              >
+                {previousWriteDate.replace(/-/g, ".")}
+              </span>
+            </Link>
+          )}
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 py-2.5 text-sm font-bold border-2"
+              style={{
+                borderColor: "var(--px-border)",
+                color: "var(--px-text2)",
+                background: "var(--px-bg3)",
+              }}
+            >
+              닫기
+            </button>
+            <Link
+              href={`/journal?date=${entry.entryDate}`}
+              className="ui-primary-btn flex-1 py-2.5 text-sm text-center"
+              onClick={() => {
+                void import("@/lib/analytics/posthog").then(
+                  ({ ANALYTICS_EVENTS, captureEvent, captureUiClick }) => {
+                    captureEvent(ANALYTICS_EVENTS.pastEntryOpened, {
+                      source: "day_report_edit",
+                      has_entry: true,
+                    });
+                    captureUiClick(
+                      ANALYTICS_EVENTS.entryListEditClicked,
+                      "entry_list_edit"
+                    );
+                  }
+                );
+              }}
+            >
+              수정하기
+            </Link>
+          </div>
         </div>
       </div>
     </div>

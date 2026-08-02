@@ -23,6 +23,9 @@ import type { SajuProfile } from "@/lib/diary/types";
 import { isGuestMode } from "@/lib/auth/guestMode";
 import EmotionalLoadingHint from "@/components/ui/EmotionalLoadingHint";
 import CherryBlossomLayer from "@/components/motion/CherryBlossomLayer";
+import FortuneEvidencePanel, {
+  FortuneEvidenceSummary,
+} from "@/components/home/FortuneEvidenceView";
 
 type Props = {
   todayDate: string;
@@ -314,22 +317,6 @@ function FortuneReadingBlock({
   );
 }
 
-/** 확신도를 숫자 대신 쉬운 말로 */
-function confidencePlain(
-  confidence: number | null | undefined,
-  label?: string | null
-): string {
-  if (label === "높음" || label === "보통" || label === "낮음") {
-    if (label === "높음") return "꽤 확실해요";
-    if (label === "보통") return "참고해도 좋아요";
-    return "참고용";
-  }
-  const c = confidence ?? 0;
-  if (c >= 0.7) return "꽤 확실해요";
-  if (c >= 0.45) return "참고해도 좋아요";
-  return "참고용";
-}
-
 function domainBodyText(d: FortuneDomainResult): string {
   return d.interpretation || d.summary || "";
 }
@@ -541,195 +528,6 @@ function writeLocalFortune(
       /* ignore quota */
     }
   }
-}
-
-/** 0~1 값을 가로 막대로 표시 */
-function MeterBar({
-  value,
-  color,
-}: {
-  value: number;
-  color?: string;
-}) {
-  const pct = Math.round(Math.max(0, Math.min(1, value)) * 100);
-  return (
-    <div
-      className="h-1.5 w-full border"
-      style={{ borderColor: "var(--px-border2)", background: "var(--px-bg3)" }}
-    >
-      <div
-        className="h-full"
-        style={{
-          width: `${pct}%`,
-          background: color ?? "var(--px-accent)",
-        }}
-      />
-    </div>
-  );
-}
-
-function WeightRow({
-  label,
-  value,
-  color,
-  hint,
-}: {
-  label: string;
-  value: number;
-  color?: string;
-  hint: string;
-}) {
-  const pct = Math.round(value * 100);
-  return (
-    <div className="space-y-0.5">
-      <div className="flex items-baseline justify-between gap-2">
-        <span
-          className="text-[11px] font-black"
-          style={{ color: "var(--px-text)" }}
-        >
-          {label}
-        </span>
-        <span
-          className="text-[11px] font-black tabular-nums"
-          style={{ color: "var(--px-accent)" }}
-        >
-          {pct}%
-        </span>
-      </div>
-      <MeterBar value={value} color={color} />
-      <p className="text-[10px] leading-tight" style={{ color: "var(--px-text2)" }}>
-        {hint}
-      </p>
-    </div>
-  );
-}
-
-function FortuneEvidencePanel({ evidence }: { evidence: FortuneEvidence }) {
-  const maturityPct = Math.round(evidence.maturity * 100);
-  return (
-    <div
-      className="mt-1 p-2.5 space-y-3 border"
-      style={{ borderColor: "var(--px-border2)", background: "var(--px-bg3)" }}
-    >
-      <div
-        className="p-2 border-2 flex items-center justify-center gap-1 text-center"
-        style={{ borderColor: "var(--px-accent)", background: "var(--px-bg2)" }}
-      >
-        <span className="text-sm font-black" style={{ color: "var(--px-accent)" }}>
-          지금 운세 = 내 기록 반영{" "}
-          {Math.round(
-            evidence.weights.recent * 100 + evidence.weights.keyword * 100
-          )}
-          %
-        </span>
-        <span className="text-sm font-black" style={{ color: "var(--px-text2)" }}>
-          + 사주 {Math.round(evidence.weights.natal * 100)}%
-        </span>
-      </div>
-      <p className="text-[10px] leading-relaxed text-center" style={{ color: "var(--px-text2)" }}>
-        {evidence.dayPhaseLabel} · 기록 {evidence.priorUniqueDays}일
-        {evidence.journalShareCap < 1
-          ? ` · 일수 상한 ${Math.round(evidence.journalShareCap * 100)}%`
-          : ""}
-      </p>
-
-      <div className="space-y-1.5">
-        <div className="flex items-baseline justify-between gap-2">
-          <span className="text-[11px] font-black" style={{ color: "var(--px-text)" }}>
-            운세 맞춤 · {evidence.tierLabel}
-          </span>
-          <span
-            className="text-[11px] font-black tabular-nums"
-            style={{ color: "var(--px-accent)" }}
-          >
-            {maturityPct}%
-          </span>
-        </div>
-        <MeterBar value={evidence.maturity} />
-        <p className="text-[10px] leading-relaxed" style={{ color: "var(--px-text2)" }}>
-          Lv{evidence.level} · XP {evidence.effectiveXp}
-          {evidence.onboardingCompleted ? " (온보딩 보정 포함)" : ""}.{" "}
-          {evidence.guideKo}
-        </p>
-      </div>
-
-      <div className="space-y-2">
-        <p className="text-[11px] font-black" style={{ color: "var(--px-accent)" }}>
-          신호 혼합 비율
-        </p>
-        <WeightRow
-          label="최근 상태(내 기록)"
-          value={evidence.weights.recent}
-          color="var(--px-accent)"
-          hint="일기·체크인에서 뽑은 최근 카테고리 점수"
-        />
-        <WeightRow
-          label="키워드 흐름"
-          value={evidence.weights.keyword}
-          color="var(--px-text)"
-          hint="요즘 자주 올라오는 주제(현저성)"
-        />
-        <WeightRow
-          label="사주×오늘 일진"
-          value={evidence.weights.natal}
-          color="var(--px-text2)"
-          hint="원국 특징과 오늘 간지를 엮은 이론 신호"
-        />
-      </div>
-
-      {evidence.natalDay && (
-        <div className="space-y-1.5">
-          <p className="text-[11px] font-black" style={{ color: "var(--px-accent)" }}>
-            원국 × 오늘 ({evidence.natalDay.ganjiKo})
-          </p>
-          <p className="text-[10px] leading-relaxed" style={{ color: "var(--px-text)" }}>
-            {evidence.natalDay.overallTraitPlain}
-          </p>
-          {evidence.natalDay.domains.map((d) => (
-            <div key={d.domain} className="space-y-0.5">
-              <p className="text-[10px] font-black" style={{ color: "var(--px-text2)" }}>
-                {d.domain} · {d.tensionKind}
-                {d.keywordLabels.length > 0
-                  ? ` · ${d.keywordLabels.join("·")}`
-                  : ""}
-              </p>
-              <p className="text-[10px] leading-relaxed" style={{ color: "var(--px-text2)" }}>
-                {d.tensionPlain}
-              </p>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {evidence.topKeywords.length > 0 && (
-        <div className="space-y-1">
-          <p className="text-[11px] font-black" style={{ color: "var(--px-accent)" }}>
-            지금 뜨는 키워드
-          </p>
-          <div className="space-y-1">
-            {evidence.topKeywords.map((k) => (
-              <div key={k.code} className="flex items-center gap-2">
-                <span
-                  className="text-[10px] font-bold shrink-0 w-16 truncate"
-                  style={{ color: "var(--px-text)" }}
-                >
-                  {k.plainLabel}
-                </span>
-                <div className="flex-1">
-                  <MeterBar value={Math.min(1, k.score / 6)} />
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      <p className="text-[10px] leading-relaxed" style={{ color: "var(--px-text2)" }}>
-        {confidencePlain(evidence.overallConfidence)} · 표본이 적으면 해석이
-        가운데(균형) 쪽으로 당겨집니다.
-      </p>
-    </div>
-  );
 }
 
 export default function TodayFortunePanel({
@@ -1285,11 +1083,9 @@ export default function TodayFortunePanel({
               </div>
 
               {evidence && (
-                <button
-                  type="button"
-                  className="block w-full text-center text-[11px] font-medium underline"
-                  style={{ color: "var(--px-text2)", opacity: 0.8 }}
-                  onClick={() => {
+                <FortuneEvidenceSummary
+                  evidence={evidence}
+                  onDetailClick={() => {
                     setShowEvidence(true);
                     void trackContentExposure({
                       eventDate: todayDate,
@@ -1298,10 +1094,7 @@ export default function TodayFortunePanel({
                       eventType: "fortune_evidence_opened",
                     });
                   }}
-                  aria-expanded={showEvidence}
-                >
-                  근거 보기
-                </button>
+                />
               )}
             </div>
           )}

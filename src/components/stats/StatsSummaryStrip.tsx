@@ -12,7 +12,7 @@ type Props = {
   weekTopics?: WeekTopicSummary | null;
 };
 
-/** 기록 탭 상단 — 요약 숫자 + 이번 주 화제 */
+/** 기록 탭 상단 — 요약 숫자 + 지난 30일 화제 */
 export default function StatsSummaryStrip({
   avg30,
   monthRecordedDays,
@@ -79,7 +79,7 @@ export default function StatsSummaryStrip({
         ))}
       </div>
 
-      {weekTopics && (
+      {weekTopics && weekTopics.entryDays > 0 && (
         <div className="mt-3">
           <WeekTopicsCard summary={weekTopics} variant="nested" />
         </div>
