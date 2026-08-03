@@ -37,6 +37,15 @@ export function ensureInstallPromptCapture(): void {
     deferred = null;
     markPwaInstalled();
     notify();
+    // 브라우저「홈 화면에 추가」완료 — Chrome/Android·일부 Safari
+    void import("@/lib/analytics/posthog").then(
+      ({ ANALYTICS_EVENTS, captureEvent }) => {
+        captureEvent(ANALYTICS_EVENTS.installCompleted, {
+          surface: "browser_appinstalled",
+          source: "appinstalled",
+        });
+      }
+    );
   });
 }
 

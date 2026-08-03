@@ -5,12 +5,27 @@ import { usePathname } from "next/navigation";
 import { isNewDiaryEnabled } from "@/lib/app/featureFlags";
 import { ANALYTICS_EVENTS, captureEvent } from "@/lib/analytics/posthog";
 
+type NavTab = "journal" | "home" | "stats";
+
 type NavItem = {
   href: string;
   label: string;
-  tab: "journal" | "home" | "stats";
+  tab: NavTab;
+  event:
+    | typeof ANALYTICS_EVENTS.navTabJournalClicked
+    | typeof ANALYTICS_EVENTS.navTabHomeClicked
+    | typeof ANALYTICS_EVENTS.navTabStatsClicked;
   isActive: (path: string) => boolean;
 };
+
+function fromPathBucket(pathname: string): "home" | "journal" | "stats" | "other" {
+  if (pathname === "/") return "home";
+  if (pathname.startsWith("/journal") || pathname.startsWith("/diary")) {
+    return "journal";
+  }
+  if (pathname.startsWith("/stats")) return "stats";
+  return "other";
+}
 
 /**
  * 하단 탭: 일기 → 홈 → 기록 (홈이 가운데)
@@ -25,6 +40,7 @@ export default function AppNav() {
       href: diaryHref,
       label: "일기",
       tab: "journal",
+      event: ANALYTICS_EVENTS.navTabJournalClicked,
       isActive: (path) =>
         path === "/diary" ||
         path.startsWith("/diary/history") ||
@@ -36,12 +52,14 @@ export default function AppNav() {
       href: "/",
       label: "홈",
       tab: "home",
+      event: ANALYTICS_EVENTS.navTabHomeClicked,
       isActive: (path) => path === "/",
     },
     {
       href: "/stats",
       label: "기록",
       tab: "stats",
+      event: ANALYTICS_EVENTS.navTabStatsClicked,
       isActive: (path) =>
         path === "/stats" ||
         path.startsWith("/stats/") ||
@@ -71,16 +89,15 @@ export default function AppNav() {
               href={item.href}
               replace
               onClick={() => {
+                const from = fromPathBucket(pathname);
+                captureEvent(item.event, {
+                  tab: item.tab,
+                  from_path: from,
+                });
+                // 하위 호환 — 기존 Trends breakdown용
                 captureEvent(ANALYTICS_EVENTS.navTabClicked, {
                   tab: item.tab,
-                  from_path:
-                    pathname === "/"
-                      ? "home"
-                      : pathname.startsWith("/journal")
-                        ? "journal"
-                        : pathname.startsWith("/stats")
-                          ? "stats"
-                          : "other",
+                  from_path: from,
                 });
               }}
               className="flex-1 flex items-center justify-center py-3.5 border-r last:border-r-0 transition-colors"

@@ -36,6 +36,9 @@ export const ANALYTICS_EVENTS = {
   flowError: "flow_error",
   /** 기능 인기 / 탐색 */
   navTabClicked: "nav_tab_clicked",
+  navTabJournalClicked: "nav_tab_journal_clicked",
+  navTabHomeClicked: "nav_tab_home_clicked",
+  navTabStatsClicked: "nav_tab_stats_clicked",
   statsOpened: "stats_opened",
   pastEntryOpened: "past_entry_opened",
   sajuOpened: "saju_opened",

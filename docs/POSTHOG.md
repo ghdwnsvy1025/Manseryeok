@@ -62,7 +62,7 @@ PostHog Live/Insight에 영어로 보이면 이 표를 보면 됩니다.
 | `fortune_collapsed` | 오늘의 운세 **접기** |
 | `question_tease_clicked` | 오늘의 질문 **첫 클릭**(세션당 1회 · 재노출 re 없음) |
 | `question_shown` | **오늘의 질문**이 API로 처음 로드됨 (캐시 재펼침은 안 감) |
-| `journal_started` | 체크인·일기 **작성을 처음 시작** (탭/입력) |
+| `journal_started` | 체크인·일기 **그날 세션 첫 입력** (아래 트리거 참고) |
 | `journal_saved` | 저장 성공 · `save_kind`=`create`\|`edit` · `has_text` |
 | `quote_shown` | 저장 후 **명언/문장** (재노출 re 없음) |
 | `event_tags_expanded` | 「무슨 일이 있었나요」 **펼치기** (`is_repeat`) |
@@ -84,7 +84,10 @@ PostHog Live/Insight에 영어로 보이면 이 표를 보면 됩니다.
 ### 기록 탭 · 사주 화면
 | 이벤트 | 의미 |
 |--------|------|
-| `nav_tab_clicked` | 하단 탭 · `tab`=journal\|home\|stats |
+| `nav_tab_clicked` | 하단 탭 (공통 · `tab`=journal\|home\|stats) — 하위 호환 |
+| `nav_tab_journal_clicked` | 하단 **일기** 탭 |
+| `nav_tab_home_clicked` | 하단 **홈** 탭 |
+| `nav_tab_stats_clicked` | 하단 **기록** 탭 |
 | `stats_opened` | 통계/기록 화면 열림 |
 | `stats_period_selected` | 기록 탭 **주/월** · `period` · `is_repeat` |
 | `stats_categories_menu_clicked` | **카테고리 메뉴** · `is_repeat` |
@@ -102,7 +105,27 @@ PostHog Live/Insight에 영어로 보이면 이 표를 보면 됩니다.
 | `saju_sewoon_clicked` | **세운** 클릭 · `is_repeat` |
 | `natal_reading_opened` | **사주 종합풀이** · `is_repeat` |
 | `diary_sheet_opened` | 자유 일기 시트 |
-| `checkin_step` | 체크인 단계 |
+| `checkin_step` | 체크인 **세부 단계** (아래 참고) |
+
+#### `journal_started` — 언제 나가나
+`CheckInEditor`에서 **해당 날짜·세션당 1회**만 나갑니다 (`sessionStorage` 키).
+
+| 트리거 | `start_action` |
+|--------|----------------|
+| 행복도 슬라이더를 처음 움직임 | `checkin_select` |
+| 핵심 상태(에너지 등)를 처음 고름 | `checkin_select` |
+| 「무슨 일이…」 시트/일기 입력을 처음 염 | `text_focus` |
+
+속성: `entry_type`=`checkin`, `source`=`home`, `question_id`(날짜 버킷), `start_action`.
+
+#### `checkin_step` — 무엇인가
+체크인 **어느 칸을 건드렸는지**를 보는 보조 이벤트입니다. 퍼널 본선이 아니라 단계 이탈 확인용.
+
+| `step` | 의미 |
+|--------|------|
+| `happiness` | 행복도 선택 (날짜당 세션 1회) |
+| `happiness_or_core` | 핵심 상태 선택과 함께 `journal_started`가 뜬 직후 |
+| `diary` | 일기 시트를 열어 `journal_started`가 뜬 직후 |
 
 ### `is_repeat` (re) 보는 법
 같은 세션에서 **두 번째부터** `is_repeat=true`.  
@@ -116,10 +139,16 @@ PostHog Live/Insight에 영어로 보이면 이 표를 보면 됩니다.
 | `install_clicked` | 설치/추가 **버튼 누름** |
 | `install_dismissed` | 설치 안내 **닫음/나중에** |
 | `install_accepted` | Android에서 설치 다이얼로그 **수락** (드묾) |
-| `install_completed` | 이름만 있음 · **아직 안 보냄** |
+| `install_completed` | 브라우저가 설치 완료를 알림 (`appinstalled`) · `source`=`appinstalled` |
 | `flow_error` | 핵심 흐름 **실패** (`step`으로 어디가 깨졌는지) |
 
 `flow_error`의 `step` 예: `auth_guest` · `auth_google` · `profile_create` · `fortune_load` · `question_load` · `journal_save` · `quote_load` · `install`
+
+**홈 화면에 추가 추적**
+- **가능:** Chrome/Edge(Android)·일부 데스크톱에서 `beforeinstallprompt` → 우리 CTA → `install_clicked` / `install_accepted`, 완료 시 `install_completed`(`appinstalled`).
+- **가능(제한):** 브라우저 메뉴「현재 페이지를 홈 화면에 추가」도 완료되면 보통 `appinstalled` → `install_completed` (브라우저·OS에 따라 다름).
+- **어렵거나 안 됨:** iOS Safari 공유 시트 수동 추가(완료 이벤트가 약함/없음), 카톡 인앱 WebView(설치 자체가 불가 → 외부 브라우저 유도).
+- 앱처럼 이미 열려 있으면 공통 속성 `is_pwa_standalone=true`.
 
 ### 같이 붙는 속성 (거의 모든 이벤트)
 | 속성 | 의미 |
@@ -177,9 +206,11 @@ PostHog Live/Insight에 영어로 보이면 이 표를 보면 됩니다.
 **시리즈 (Unique):**
 | 이벤트 | 한글 |
 |--------|------|
-| `nav_tab_clicked` | 하단 탭 클릭 |
+| `nav_tab_home_clicked` | 홈 탭 |
+| `nav_tab_journal_clicked` | 일기 탭 |
+| `nav_tab_stats_clicked` | 기록 탭 |
 
-**Breakdown:** `tab` → `home` / `journal` / `stats`  
+(하위 호환) 한 줄로 보려면 `nav_tab_clicked` + Breakdown `tab`  
 ☐ 만들었음
 
 ---
@@ -407,14 +438,13 @@ Day2·Day3를 새로 만들지 않고, **같은 보드를 기간만 바꿔** 보
 | | |
 |--|--|
 | **종류** | Funnel + (선택) Trends |
-| **설치 퍼널** | `install_prompt_shown` → `install_clicked` |
+| **설치 퍼널** | `install_prompt_shown` → `install_clicked` → (선택) `install_completed` |
 | **함께** | Trends: `feedback_submitted` · Unique users · (선택) `install_dismissed` |
 | **목적** | 설치·피드백은 **보조 신호**. 일기 재저장(06)이 더 중요 |
 | ☐ | 설치 퍼널 / ☐ feedback Trends |
 
-실제로 자주 보이는 이벤트는 **`install_prompt_shown` / `install_clicked` / `install_dismissed`** 뿐.  
-`install_accepted`는 Android 네이티브 설치 다이얼로그에서 “추가”를 눌렀을 때만 나가고, iOS·카톡·수동 가이드 경로에서는 **안 나옴**.  
-`install_completed`는 코드에 이름만 있고 **아직 발화하지 않음** → 퍼널에 넣지 말 것.
+- `install_accepted`: Android 네이티브 다이얼로그에서 “추가”를 눌렀을 때 (드묾).
+- `install_completed`: 브라우저 `appinstalled` — CTA 경로·메뉴「홈 화면에 추가」완료 시(지원 브라우저). iOS/카톡은 약하거나 없음.
 
 ---
 
@@ -423,7 +453,7 @@ Day2·Day3를 새로 만들지 않고, **같은 보드를 기간만 바꿔** 보
 |--|--|
 | **종류** | Trends |
 | **시리즈** (각각 Unique users) | `fortune_opened`, `question_shown`, `diary_sheet_opened`, `stats_opened`, `past_entry_opened`, `saju_opened`, `natal_reading_opened` |
-| **선택** | `nav_tab_clicked` + breakdown `tab` |
+| **선택** | `nav_tab_home_clicked` / `nav_tab_journal_clicked` / `nav_tab_stats_clicked` (또는 `nav_tab_clicked` + `tab`) |
 | **목적** | 어떤 기능이 많이/적게 열리는지 |
 | ☐ | 만들었음 |
 
