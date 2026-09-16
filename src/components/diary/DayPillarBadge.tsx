@@ -15,7 +15,7 @@ export default function DayPillarBadge({ dayPillar, monthPillarKo, yearPillarKo 
       style={{
         background: "var(--px-bg3)",
         borderColor: "var(--px-accent)",
-        boxShadow: "3px 3px 0 #000",
+        boxShadow: "var(--sh-3)",
       }}
     >
       {yearPillarKo && (

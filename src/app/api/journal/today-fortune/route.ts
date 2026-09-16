@@ -33,6 +33,11 @@ import { getOptionalAuthUser } from "@/lib/api/requireAuth";
 import { checkLlmRateLimit, clientIpFromRequest } from "@/lib/api/rateLimit";
 import type { DailyInsightContext } from "@/lib/journal/insight/types";
 import { sajuProfileFortuneFingerprint } from "@/lib/journal/fortune/profileFingerprint";
+import {
+  buildTodayPatternsFromEntries,
+  toFortuneFacts,
+} from "@/lib/hypothesis/todayPattern";
+import { buildTodayYongsin } from "@/lib/hypothesis/todayYongsin";
 
 export const runtime = "nodejs";
 
@@ -239,11 +244,29 @@ async function handleTodayFortune(
       }
     }
 
+    // 이 사람 기록으로 확인된 오늘의 패턴 — 있으면 이론보다 우선한다.
+    // 확인된 게 없으면 빈 배열이라 프롬프트에서 통째로 빠진다(기존과 동일).
+    const verifiedDayFacts = toFortuneFacts(
+      buildTodayPatternsFromEntries({
+        pillars: b.sajuProfile?.pillars,
+        entries,
+        date: insight.eventDate,
+      })
+    );
+
+    // 오늘이 용신일인가 — 기록이 없어도 아는 사주 사실이라 위와 층을 나눠 넘긴다.
+    const todayYongsin = buildTodayYongsin({
+      pillars: b.sajuProfile?.pillars,
+      date: insight.eventDate,
+    });
+
     const result = await generateTodayFortuneV2(insight, {
       skipLlm,
       onboardingCompleted,
       totalXp,
       sajuProfile: b.sajuProfile ?? null,
+      verifiedDayFacts,
+      todayYongsinFact: todayYongsin?.fact ?? null,
     });
     const blendWeights = resolveGatedBlend({
       totalXp,

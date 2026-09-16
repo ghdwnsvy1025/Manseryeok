@@ -106,7 +106,7 @@ export default function DiaryWriteSheet({
           style={{
             borderColor: "var(--px-accent)",
             background: "var(--px-bg2)",
-            boxShadow: "3px 3px 0 #000",
+            boxShadow: "var(--sh-3)",
           }}
         >
           <TodayQuestionCard
@@ -136,7 +136,7 @@ export default function DiaryWriteSheet({
               borderColor: "#000",
               background: "var(--px-accent)",
               color: "#111",
-              boxShadow: "2px 2px 0 #000",
+              boxShadow: "var(--sh-2)",
             }}
           >
             완료
@@ -161,7 +161,7 @@ export default function DiaryWriteSheet({
             borderColor:
               previewLen > 0 ? "var(--px-accent)" : "var(--px-border2)",
             color: "var(--px-text-on-panel)",
-            boxShadow: "2px 2px 0 #000",
+            boxShadow: "var(--sh-2)",
           }}
           enterKeyHint="done"
         />

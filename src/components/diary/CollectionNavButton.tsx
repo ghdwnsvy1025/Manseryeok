@@ -22,7 +22,7 @@ export default function CollectionNavButton({ entries }: Props) {
       style={{
         background: "var(--px-bg2)",
         borderColor: "var(--px-accent)",
-        boxShadow: "3px 3px 0 #4a3a00",
+        boxShadow: "var(--sh-3g)",
       }}
       aria-label={`간지 도감 ${summary.ganjiCollected}/${summary.ganjiTotal}`}
     >
@@ -33,7 +33,7 @@ export default function CollectionNavButton({ entries }: Props) {
           background: "var(--px-bg3)",
           color: "var(--px-accent)",
           fontSize: "12px",
-          boxShadow: "2px 2px 0 #000",
+          boxShadow: "var(--sh-2)",
         }}
       >
         曆

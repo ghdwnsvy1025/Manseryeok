@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import type { CalendarType, SajuInput } from "@/lib/saju/types";
 import type { Gender } from "@/lib/saju/daeun";
 import { completeOnboarding } from "@/lib/app/experienceMode";
+import type { SajuProfile } from "@/lib/diary/types";
 import { registerSajuProfile } from "@/lib/diary/registerSajuProfile";
 import {
   ANALYTICS_EVENTS,
@@ -12,7 +13,8 @@ import {
 } from "@/lib/analytics/posthog";
 
 type Props = {
-  onCompleted: () => void;
+  /** 저장된 프로필을 넘긴다. 건너뛰기(skip)면 없이 호출된다. */
+  onCompleted: (profile?: SajuProfile) => void;
 };
 
 const LOCATION_PRESETS = [
@@ -150,13 +152,13 @@ export default function SajuProfileSetup({ onCompleted }: Props) {
           },
         },
       };
-      await registerSajuProfile(input, {
+      const profile = await registerSajuProfile(input, {
         label: displayName.trim(),
         makePrimary: true,
         analyticsSource: "onboarding",
         analyticsStartedAt: profileStartedAtRef.current,
       });
-      onCompleted();
+      onCompleted(profile);
     } catch (err) {
       setError(err instanceof Error ? err.message : "프로필을 만들지 못했어요.");
       captureFlowError({
@@ -415,7 +417,7 @@ export default function SajuProfileSetup({ onCompleted }: Props) {
                 display: "inline-block",
                 width: "auto",
                 border: "2px solid #000",
-                boxShadow: "2px 2px 0 #000",
+                boxShadow: "var(--sh-2)",
                 borderRight: "2px solid #000",
               }}
             >
@@ -455,7 +457,7 @@ export default function SajuProfileSetup({ onCompleted }: Props) {
           type="submit"
           disabled={saving}
           className="ui-primary-btn w-full py-4 text-base"
-          style={{ boxShadow: "4px 4px 0 #000" }}
+          style={{ boxShadow: "var(--sh-4)" }}
         >
           {saving ? "저장 중..." : "저장하기"}
         </button>

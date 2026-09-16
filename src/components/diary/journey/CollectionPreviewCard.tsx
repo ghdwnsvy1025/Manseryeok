@@ -18,7 +18,7 @@ export default function CollectionPreviewCard({ summary, nextUncollected }: Prop
       style={{
         background: "var(--px-bg2)",
         borderColor: "var(--px-accent)",
-        boxShadow: "4px 4px 0 #000",
+        boxShadow: "var(--sh-4)",
       }}
     >
       <div className="flex items-center justify-between gap-2">

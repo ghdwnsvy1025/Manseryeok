@@ -144,7 +144,7 @@ export default function JournalDayReportModal({
         style={{
           borderColor: "var(--px-accent)",
           background: "var(--px-bg2)",
-          boxShadow: "4px 4px 0 #000",
+          boxShadow: "var(--sh-4)",
         }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -325,7 +325,7 @@ export default function JournalDayReportModal({
                 color: "var(--px-accent)",
                 background:
                   "color-mix(in srgb, var(--px-accent) 14%, var(--px-bg3))",
-                boxShadow: "2px 2px 0 #000",
+                boxShadow: "var(--sh-2)",
               }}
               onClick={() => {
                 onClose();

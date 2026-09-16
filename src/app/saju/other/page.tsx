@@ -51,7 +51,7 @@ export default function OtherSajuPage() {
             color: "var(--px-accent)",
             borderColor: "var(--px-accent)",
             background: "var(--px-bg3)",
-            boxShadow: "4px 4px 0 #4a3a00",
+            boxShadow: "var(--sh-4g)",
             letterSpacing: "0.1em",
           }}
         >
@@ -89,7 +89,7 @@ export default function OtherSajuPage() {
           style={{
             borderColor: "#f87171",
             background: "#1a0a0a",
-            boxShadow: "4px 4px 0 #7f1d1d",
+            boxShadow: "var(--sh-4r)",
             color: "#f87171",
           }}
         >

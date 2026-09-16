@@ -639,7 +639,7 @@ export default function TodayQuestionCard({
             : {
                 borderColor: "var(--px-border2)",
                 background: "var(--px-bg2)",
-                boxShadow: "2px 2px 0 #000",
+                boxShadow: "var(--sh-2)",
               }
         }
       >
@@ -740,7 +740,7 @@ export default function TodayQuestionCard({
       style={{
         borderColor: "var(--px-border2)",
         background: "var(--px-bg2)",
-        boxShadow: "2px 2px 0 #000",
+        boxShadow: "var(--sh-2)",
       }}
     >
       <button

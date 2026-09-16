@@ -297,7 +297,7 @@ export default function AdminPage() {
         style={{
           background: "var(--px-bg3)",
           borderColor: "var(--px-accent)",
-          boxShadow: "4px 4px 0 #4a3a00",
+          boxShadow: "var(--sh-4g)",
         }}
       >
         <h1 className="font-black text-lg" style={{ color: "var(--px-accent)" }}>

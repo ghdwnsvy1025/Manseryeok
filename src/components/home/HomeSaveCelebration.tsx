@@ -171,7 +171,7 @@ export default function HomeSaveCelebration() {
         style={{
           borderColor: "var(--px-accent)",
           background: "color-mix(in srgb, var(--px-bg2) 92%, #000)",
-          boxShadow: "4px 4px 0 #000",
+          boxShadow: "var(--sh-4)",
         }}
       >
         <p className="text-lg font-black" style={{ color: "var(--px-accent)" }}>

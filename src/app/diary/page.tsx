@@ -13,7 +13,7 @@ function DiaryPageContent() {
   return (
     <div
       className="p-2 sm:p-4 border-2"
-      style={{ background: "var(--px-bg3)", borderColor: "var(--px-border)", boxShadow: "4px 4px 0 #000" }}
+      style={{ background: "var(--px-bg3)", borderColor: "var(--px-border)", boxShadow: "var(--sh-4)" }}
     >
       <DiaryEditor initialDate={initialDate} />
     </div>

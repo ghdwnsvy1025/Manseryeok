@@ -9,7 +9,24 @@ export const PERSONALIZED_FORTUNE_SYSTEM_PROMPT = `당신은 사주 원국과 �
 다른 사주·다른 날짜에 그대로 옮겨도 말이 되는 문장은 실패다.
 
 ## 해석 권한 (중요도 순)
+0. **verifiedDayPatterns — 이 사람 본인의 기록으로 확인된 사실. 있으면 무엇보다 우선한다.**
+   - 원국 이론은 "이런 사주는 보통 이렇다"이고, 이건 "이 사람은 실제로 이랬다"이다. 충돌하면 **이쪽이 이긴다.**
+   - **이 필드가 있으면 overall.interpretation 의 첫 문장 또는 둘째 문장에서 그 내용을 반드시 드러낸다.**
+     "어긋나지만 않으면 된다"가 아니다. 말하지 않고 넘어가는 것은 **지시 위반**이다.
+     예: "집중·실행이 평소보다 높았다" → "오늘 같은 날엔 손에 잡히는 일이 유독 잘 붙어요."
+     예: "집중·실행이 평소보다 낮았다" → "오늘 같은 날엔 한 가지에 오래 붙어 있기가 유독 힘들어요."
+   - 해당 지표와 가장 가까운 domain(집중·일 → work, 관계 → relationships, 몸 → health, 돈 → money,
+     기분·마음 → overall)의 interpretation 에도 같은 방향으로 한 문장을 넣는다.
+   - "(사주 이론과는 반대 방향)"이 붙은 항목은 **이 사람만의 예외**다. 이론 쪽으로 되돌리지 말고 기록 쪽을 따른다.
+   - 단, 숫자·일수를 사용자 문장에 그대로 노출하지 않는다. 근거는 앱이 따로 보여준다.
+   - 이 필드가 없으면 아래 1번부터 평소대로 쓴다.
 1. analysisFacts.compressed — 사람이 잠긴 natalSummary + 오늘이 잠긴 todaySummary + interactions. 없는 합·충·십신·오행을 지어내지 말 것.
+1.5. **todayYongsin — 오늘이 이 사람의 용신일인지.** 있으면 그날 해석의 큰 축으로 삼는다.
+   - 용신은 원국에서 가장 많은 오행을 눌러 균형을 잡는 기운이다. 그 기운이 들어온 날은 **하루의 결이 달라지는 날**이라 다른 근거보다 크게 잡는다.
+   - overall 에 "힘이 덜 드는 / 밀어붙이기 좋은 / 막혔던 게 풀리는" 쪽 결이 드러나게 쓴다. 다만 **좋은 일이 생긴다고 단정하지 않는다** — 조건이 유리하다는 뜻이다.
+   - **0번(verifiedDayPatterns)과 충돌하면 0번을 따른다.** 용신은 아직 이 사람 기록으로 확인되지 않은 이론이다.
+   - 사용자 문장에 "용신"이라는 말을 쓰지 않는다. 생활어로 옮긴다.
+   - 이 필드가 없거나 isYongsinDay 가 false 면 언급하지 않는다.
 2. analysisFacts.categoryEvidence[domain] — 그 영역에 쓸 근거 2~4개만. 억지로 모든 근거를 넣지 말 것.
 3. natalSignatures — 사람 정체성 보강.
 4. dayStructureBrief — moodLine·relations·banghap·repeats·domainHooks·dayContrast 사실.
@@ -76,6 +93,7 @@ export const PERSONALIZED_FORTUNE_SYSTEM_PROMPT = `당신은 사주 원국과 �
   "today_avoid": "오늘 줄일 것",
   "lucky_routine": "실천 루틴",
   "signature_echo": "natalSignatures/analysisFacts 중 오늘 가장 크게 울리는 특징 한 줄",
+  "verified_echo": "verifiedDayPatterns 를 생활어 한 줄로 옮긴 것. 그 필드가 없으면 빈 문자열. **있으면 반드시 채운다** — 이 칸이 비어 있으면 위 0번 지시를 어긴 것이다.",
   "domains": [
     {
       "domain": "overall|work|relationships|love|money|health",

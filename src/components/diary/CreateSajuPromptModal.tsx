@@ -20,7 +20,7 @@ export default function CreateSajuPromptModal({ onClose }: Props) {
         style={{
           background: "var(--px-bg2)",
           borderColor: "var(--px-accent)",
-          boxShadow: "4px 4px 0 #000",
+          boxShadow: "var(--sh-4)",
         }}
       >
         <p

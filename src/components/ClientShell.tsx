@@ -8,9 +8,13 @@ import ProfileHeader from "@/components/ProfileHeader";
 import ProgressCelebrationHost from "@/components/motion/ProgressCelebrationHost";
 import ClickBurstHost from "@/components/motion/ClickBurstHost";
 import PostHogInit from "@/components/analytics/PostHogInit";
+import SoftThemeGate from "@/components/hypothesis/SoftThemeGate";
 import FirstVisitWelcome from "@/components/onboarding/FirstVisitWelcome";
 import BetaFeedbackHost from "@/components/feedback/BetaFeedbackHost";
 import InstallGuideModal from "@/components/pwa/InstallGuideModal";
+import SealedRouteNotice from "@/components/app/SealedRouteNotice";
+import { findSealedRoute } from "@/lib/app/sealedRoutes";
+import { isSealLegacyRoutesEnabled } from "@/lib/app/featureFlags";
 import { reconcileLocalStateWithAuthUser } from "@/lib/diary/profileStorage";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { resetDiaryStorageCache } from "@/lib/diary/getStorage";
@@ -42,6 +46,14 @@ function computeShowChrome(): boolean {
 export default function ClientShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
+
+  /**
+   * 접힌 화면이면 페이지 대신 안내를 그린다.
+   * 플래그는 빌드에 박히는 값이라 서버·브라우저가 같은 판단을 하고,
+   * 그래서 하이드레이션이 어긋나지 않는다 — 두 갈래 모두에서 같이 쓴다.
+   */
+  const sealed = isSealLegacyRoutesEnabled() ? findSealedRoute(pathname) : null;
+  const body = sealed ? <SealedRouteNotice route={sealed} /> : children;
   const [mounted, setMounted] = useState(false);
   const [unlocked, setUnlocked] = useState(false);
   const [showChrome, setShowChrome] = useState(false);
@@ -144,7 +156,7 @@ export default function ClientShell({ children }: { children: React.ReactNode })
                 data-view-mode="mobile"
                 data-compact="true"
               >
-                {children}
+                {body}
               </div>
             </div>
           </div>
@@ -159,13 +171,14 @@ export default function ClientShell({ children }: { children: React.ReactNode })
         <div className="app-mobile-device" suppressHydrationWarning>
           <div className="flex flex-col min-h-0 h-full flex-1">
             <PostHogInit />
+            <SoftThemeGate />
             {showChromeUi && <ProfileHeader />}
             <main
               className={CONTENT_CLASS}
               data-view-mode="mobile"
               data-compact="true"
             >
-              {children}
+              {body}
             </main>
             {showChromeUi && (
               <div className="w-full shrink-0">

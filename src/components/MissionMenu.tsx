@@ -64,7 +64,7 @@ export default function MissionMenu({ variant = "button" }: MissionMenuProps) {
           borderColor: open ? "var(--px-accent)" : "var(--px-border)",
           background: open ? "var(--px-bg3)" : "var(--px-bg2)",
           color: "var(--px-accent)",
-          boxShadow: "2px 2px 0 #000",
+          boxShadow: "var(--sh-2)",
         }}
         aria-expanded={open}
         aria-haspopup="dialog"
@@ -94,7 +94,7 @@ export default function MissionMenu({ variant = "button" }: MissionMenuProps) {
               bottom: "calc(4.5rem + env(safe-area-inset-bottom, 0px))",
               background: "var(--px-bg2)",
               borderColor: "var(--px-accent)",
-              boxShadow: "4px 4px 0 #000",
+              boxShadow: "var(--sh-4)",
             }}
             role="dialog"
             aria-label="미션 메뉴"

@@ -132,7 +132,7 @@ export default function ProfileHeader() {
       style={{
         background: "var(--px-bg2)",
         borderColor: "var(--px-accent)",
-        boxShadow: "0 4px 0 #4a3a00",
+        boxShadow: "var(--sh-under)",
       }}
     >
       <div ref={menuRef} className="relative shrink-0">
@@ -168,7 +168,7 @@ export default function ProfileHeader() {
             style={{
               background: "var(--px-bg3)",
               borderColor: "var(--px-border2)",
-              boxShadow: "4px 4px 0 #000",
+              boxShadow: "var(--sh-4)",
               maxHeight: "min(70vh, calc(100dvh - 5.5rem))",
               zIndex: 60,
             }}

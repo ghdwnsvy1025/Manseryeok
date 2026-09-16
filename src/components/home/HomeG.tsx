@@ -8,6 +8,17 @@ import YesterdayGapPrompt from "@/components/home/YesterdayGapPrompt";
 import HomeInstallSheet from "@/components/home/HomeInstallSheet";
 import HomeInstallCTA from "@/components/home/HomeInstallCTA";
 import HomeEBlock from "@/components/home/HomeEBlock";
+import FortuneFitBlock from "@/components/hypothesis/FortuneFitBlock";
+import TodayPatternLine from "@/components/hypothesis/TodayPatternLine";
+import CalmHome from "@/components/hypothesis/CalmHome";
+import HypothesisDeckSheet from "@/components/hypothesis/HypothesisDeckSheet";
+import TodayEvidenceNote from "@/components/hypothesis/TodayEvidenceNote";
+import { buildHomeCompletion } from "@/lib/hypothesis/homeCompletion";
+import {
+  loadDay0Answers,
+  type Day0Answers,
+} from "@/lib/hypothesis/day0Answers";
+import { isCalmHomeEnabled, isHypothesisCardsEnabled } from "@/lib/app/featureFlags";
 import TenGodChip from "@/components/home/TenGodChip";
 import { getJournalStorage } from "@/lib/journal/getStorage";
 import { getEnabledCodesOrdered } from "@/lib/journal/preferences";
@@ -187,6 +198,25 @@ export default function HomeG() {
     [entries, today, enabledCodes]
   );
 
+  // 운세 맞춤도 — 저장하지 않고 매번 계산한다
+  const cardsOn = isHypothesisCardsEnabled();
+  const [deckOpen, setDeckOpen] = useState(false);
+  // 첫날 짐작 — localStorage 라 화면이 뜬 뒤에 읽는다 (서버 화면과 어긋나지 않게)
+  const [day0, setDay0] = useState<Day0Answers | null>(null);
+  useEffect(() => {
+    setDay0(loadDay0Answers(profile?.id));
+  }, [profile?.id]);
+
+  const calmHome = isCalmHomeEnabled();
+  const [fortuneOpen, setFortuneOpen] = useState(false);
+  const fortuneFit = useMemo(
+    () =>
+      cardsOn
+        ? buildHomeCompletion({ pillars: profile?.pillars, entries })
+        : null,
+    [cardsOn, profile?.pillars, entries]
+  );
+
   const weekTopics = useMemo(
     () =>
       buildWeekTopicSummary(entries, {
@@ -233,6 +263,58 @@ export default function HomeG() {
     setViewDate(next);
   };
 
+  if (calmHome && isToday) {
+    return (
+      <div className="home-readable space-y-4 pb-8">
+        <CalmHome
+          hour={new Date().getHours()}
+          hasTodayEntry={Boolean(todayEntry)}
+          fortuneFit={fortuneFit}
+          ganjiKo={dayPillar.ganjiKo}
+          stemHanja={dayPillar.stem.hanja}
+          branchHanja={dayPillar.branch.hanja}
+          tenGods={
+            viewGods
+              ? [viewGods.stemTenGod, viewGods.branchTenGod]
+                  .filter(Boolean)
+                  .map(String)
+              : []
+          }
+          writeHref={`/journal?date=${today}`}
+          onOpenFortune={() => setFortuneOpen((v) => !v)}
+          onOpenCards={() => setDeckOpen(true)}
+          fortuneOpen={fortuneOpen}
+        />
+
+        {fortuneOpen && (
+          <>
+            {/* 확인된 패턴·용신 모두 LLM 이 안 따라가므로 앱이 직접 쓴다 (컴포넌트 주석 참고) */}
+            <TodayEvidenceNote fit={fortuneFit} />
+            <TodayFortunePanel
+              todayDate={today}
+              sajuProfile={profile}
+              entries={entries}
+              enabledCodes={enabledCodes}
+            />
+          </>
+        )}
+
+        {deckOpen && fortuneFit && (
+          <HypothesisDeckSheet
+            cards={fortuneFit.cards}
+            percent={fortuneFit.completion.percent}
+            pillars={profile?.pillars}
+            day0={day0}
+            onClose={() => setDeckOpen(false)}
+          />
+        )}
+
+        <HomeInstallSheet />
+        <HomeInstallCTA />
+      </div>
+    );
+  }
+
   return (
     <div className="home-readable space-y-4 pb-8">
       {!profile && (
@@ -243,7 +325,7 @@ export default function HomeG() {
             borderColor: "var(--px-accent)",
             background: "color-mix(in srgb, var(--px-accent) 12%, var(--px-bg2))",
             color: "var(--px-text-on-panel)",
-            boxShadow: "2px 2px 0 #000",
+            boxShadow: "var(--sh-2)",
           }}
         >
           사주 프로필을 등록하면 운세·오늘의 문장이 더 잘 맞아요 →
@@ -254,7 +336,7 @@ export default function HomeG() {
         style={{
           background: "var(--px-bg2)",
           borderColor: "var(--px-border2)",
-          boxShadow: "3px 3px 0 #000",
+          boxShadow: "var(--sh-3)",
         }}
         aria-label={isToday ? "오늘" : "선택한 날"}
       >
@@ -509,6 +591,15 @@ export default function HomeG() {
 
       {isToday ? (
         <>
+          {/* 내 기록으로 확인된 "오늘 같은 날"이 있으면 운세 위에 먼저 보여준다 */}
+          {fortuneFit && (
+            <TodayPatternLine
+              line={fortuneFit.todayLine}
+              patterns={fortuneFit.todayPatterns}
+              onOpenCards={() => setDeckOpen(true)}
+            />
+          )}
+
           <TodayFortunePanel
             todayDate={today}
             sajuProfile={profile}
@@ -548,7 +639,24 @@ export default function HomeG() {
         weekTopicSupportItems={weekTopicSupportItems}
       />
 
-      <HomeEBlock stats={eStats} />
+      {fortuneFit ? (
+        <FortuneFitBlock
+          data={fortuneFit}
+          onOpenCards={() => setDeckOpen(true)}
+        />
+      ) : (
+        <HomeEBlock stats={eStats} />
+      )}
+
+      {deckOpen && fortuneFit && (
+        <HypothesisDeckSheet
+          cards={fortuneFit.cards}
+          percent={fortuneFit.completion.percent}
+          pillars={profile?.pillars}
+          day0={day0}
+          onClose={() => setDeckOpen(false)}
+        />
+      )}
 
       <Link
         href={

@@ -250,7 +250,7 @@ export default function SajuNatalReadingPanel({ profile }: Props) {
         style={{
           borderColor: "var(--px-border)",
           background: "var(--px-bg2)",
-          boxShadow: "2px 2px 0 #000",
+          boxShadow: "var(--sh-2)",
         }}
       >
         {idle && <NatalTeaseButton onClick={openPanel} />}

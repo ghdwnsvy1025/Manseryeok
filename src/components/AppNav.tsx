@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { isNewDiaryEnabled } from "@/lib/app/featureFlags";
+import { isCalmHomeEnabled, isNewDiaryEnabled } from "@/lib/app/featureFlags";
 import { ANALYTICS_EVENTS, captureEvent } from "@/lib/analytics/posthog";
 
 type NavTab = "journal" | "home" | "stats";
@@ -28,29 +28,44 @@ function fromPathBucket(pathname: string): "home" | "journal" | "stats" | "other
 }
 
 /**
- * 하단 탭: 일기 → 홈 → 기록 (홈이 가운데)
+ * 하단 탭
+ *   기본:            일기 → 홈 → 기록
+ *   새 홈(플래그 ON): 나 → 오늘 → 기록
  * 선택된 탭만 강조
  */
 export default function AppNav() {
   const pathname = usePathname();
   const diaryHref = isNewDiaryEnabled() ? "/journal" : "/diary";
 
+  // 새 홈에서는 "기록하기"가 이미 홈의 주인공 버튼이라 일기 탭이 같은 말을 반복한다.
+  // 그 자리를 "나"로 바꾸면, 지금까지 갈 길이 없던 화면들(원국·프로필·다른 사람 사주)에
+  // 통로가 생긴다. 플래그를 끄면 예전 일기 탭으로 그대로 돌아온다.
+  const meTab = isCalmHomeEnabled();
+
   const items: NavItem[] = [
-    {
-      href: diaryHref,
-      label: "일기",
-      tab: "journal",
-      event: ANALYTICS_EVENTS.navTabJournalClicked,
-      isActive: (path) =>
-        path === "/diary" ||
-        path.startsWith("/diary/history") ||
-        (path.startsWith("/journal") &&
-          !path.startsWith("/journal/stats") &&
-          !path.startsWith("/journal/categories")),
-    },
+    meTab
+      ? {
+          href: "/me",
+          label: "나",
+          tab: "journal",
+          event: ANALYTICS_EVENTS.navTabJournalClicked,
+          isActive: (path) => path === "/me" || path.startsWith("/saju"),
+        }
+      : {
+          href: diaryHref,
+          label: "일기",
+          tab: "journal",
+          event: ANALYTICS_EVENTS.navTabJournalClicked,
+          isActive: (path) =>
+            path === "/diary" ||
+            path.startsWith("/diary/history") ||
+            (path.startsWith("/journal") &&
+              !path.startsWith("/journal/stats") &&
+              !path.startsWith("/journal/categories")),
+        },
     {
       href: "/",
-      label: "홈",
+      label: meTab ? "오늘" : "홈",
       tab: "home",
       event: ANALYTICS_EVENTS.navTabHomeClicked,
       isActive: (path) => path === "/",
@@ -75,7 +90,7 @@ export default function AppNav() {
       style={{
         borderColor: "var(--px-border2)",
         background: "var(--px-bg2)",
-        boxShadow: "0 -4px 0 #000",
+        boxShadow: "var(--sh-over)",
         paddingBottom: "env(safe-area-inset-bottom, 0px)",
       }}
       aria-label="메인 메뉴"

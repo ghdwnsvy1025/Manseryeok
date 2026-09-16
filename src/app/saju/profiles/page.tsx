@@ -211,7 +211,7 @@ export default function SajuProfilesPage() {
               color: "var(--px-accent)",
               borderColor: "var(--px-accent)",
               background: "var(--px-bg3)",
-              boxShadow: "4px 4px 0 #4a3a00",
+              boxShadow: "var(--sh-4g)",
             }}
           >
             {isEdit ? "★ 수정하기 ★" : "★ 프로필 추가 ★"}
@@ -286,7 +286,7 @@ export default function SajuProfilesPage() {
             color: "var(--px-accent)",
             borderColor: "var(--px-accent)",
             background: "var(--px-bg3)",
-            boxShadow: "4px 4px 0 #4a3a00",
+            boxShadow: "var(--sh-4g)",
           }}
         >
           ★ 프로필 관리 ★
@@ -308,7 +308,7 @@ export default function SajuProfilesPage() {
           style={{
             borderColor: "var(--px-accent)",
             background: "var(--px-bg3)",
-            boxShadow: "4px 4px 0 #4a3a00",
+            boxShadow: "var(--sh-4g)",
           }}
         >
           <button
@@ -379,7 +379,7 @@ export default function SajuProfilesPage() {
                   style={{
                     borderColor: "var(--px-border)",
                     background: "var(--px-bg2)",
-                    boxShadow: "2px 2px 0 #000",
+                    boxShadow: "var(--sh-2)",
                   }}
                 >
                   <button
@@ -473,7 +473,7 @@ export default function SajuProfilesPage() {
             borderColor: "var(--px-accent)",
             background: "var(--px-bg3)",
             color: "var(--px-accent)",
-            boxShadow: "3px 3px 0 #4a3a00",
+            boxShadow: "var(--sh-3g)",
           }}
           aria-label={profiles.length === 0 ? "내 프로필 등록" : "다른 사람 추가"}
         >

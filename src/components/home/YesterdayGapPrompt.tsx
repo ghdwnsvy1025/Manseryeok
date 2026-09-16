@@ -23,7 +23,7 @@ export default function YesterdayGapPrompt({ todayDate }: Props) {
       style={{
         borderColor: "var(--px-border2)",
         background: "var(--px-bg2)",
-        boxShadow: "2px 2px 0 #000",
+        boxShadow: "var(--sh-2)",
       }}
       aria-label="어제 기록 메우기"
     >
@@ -42,7 +42,7 @@ export default function YesterdayGapPrompt({ todayDate }: Props) {
           borderColor: "#000",
           background: "var(--px-bg3)",
           color: "var(--px-text-on-panel)",
-          boxShadow: "2px 2px 0 #000",
+          boxShadow: "var(--sh-2)",
         }}
         onClick={() =>
           void trackContentExposure({

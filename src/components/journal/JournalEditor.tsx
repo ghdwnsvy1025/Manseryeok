@@ -573,7 +573,7 @@ export default function JournalEditor({ initialDate }: Props) {
               borderColor: "var(--px-border2)",
               background: "var(--px-bg3)",
               color: "var(--px-accent)",
-              boxShadow: "2px 2px 0 #000",
+              boxShadow: "var(--sh-2)",
             }}
             aria-label="날짜 바꾸기"
             title="날짜 바꾸기"

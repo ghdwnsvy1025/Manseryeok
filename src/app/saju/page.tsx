@@ -176,7 +176,7 @@ function SajuPageInner() {
               color: "var(--px-accent)",
               borderColor: "var(--px-accent)",
               background: "var(--px-bg3)",
-              boxShadow: "4px 4px 0 #4a3a00",
+              boxShadow: "var(--sh-4g)",
             }}
           >
             ★ 내 사주 ★
@@ -194,7 +194,7 @@ function SajuPageInner() {
           type="button"
           onClick={() => setMode("register")}
           className="ui-primary-btn px-8 py-4 text-base"
-          style={{ boxShadow: "4px 4px 0 #000" }}
+          style={{ boxShadow: "var(--sh-4)" }}
         >
           사주 등록하기
         </button>
@@ -219,7 +219,7 @@ function SajuPageInner() {
               color: "var(--px-accent)",
               borderColor: "var(--px-accent)",
               background: "var(--px-bg3)",
-              boxShadow: "4px 4px 0 #4a3a00",
+              boxShadow: "var(--sh-4g)",
             }}
           >
             ★ 사주 등록 ★

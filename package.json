@@ -13,7 +13,8 @@
     "test": "jest",
     "test:e2e": "playwright test",
     "test:e2e:report": "playwright show-report",
-    "build:fortune-digest": "node scripts/build-fortune-theory-digest.mjs"
+    "build:fortune-digest": "node scripts/build-fortune-theory-digest.mjs",
+    "shots": "node scripts/shoot-flow.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.0",

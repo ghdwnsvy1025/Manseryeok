@@ -19,6 +19,8 @@ import { XP_GAUGE_FILL, XP_GAIN_COLOR } from "@/lib/ui/xpGauge";
 import EmotionalLoadingHint from "@/components/ui/EmotionalLoadingHint";
 import CherryBlossomLayer from "@/components/motion/CherryBlossomLayer";
 import { shareAppInvite } from "@/lib/app/shareInvite";
+import FortuneFitGain from "@/components/hypothesis/FortuneFitGain";
+import PetalLayer from "@/components/hypothesis/PetalLayer";
 
 type Props = {
   entry: JournalEntry;
@@ -35,6 +37,16 @@ type Props = {
   authorName?: string | null;
   workTitle?: string | null;
   deliveryId?: string | null;
+  /**
+   * 운세 맞춤도 상승 — 있으면 명언 자리를 대신한다.
+   * 플래그가 꺼져 있거나 계산이 안 되면 undefined 로 넘어와 기존 명언이 나온다.
+   */
+  fortuneFitGain?: {
+    before: number;
+    after: number;
+    nextStep: string;
+    waitingCount: number;
+  } | null;
   onClose: () => void;
 };
 
@@ -53,6 +65,7 @@ export default function JournalSaveCompleteModal({
   authorName,
   workTitle,
   deliveryId,
+  fortuneFitGain,
   onClose,
 }: Props) {
   const [gauge, setGauge] = useState(0);
@@ -201,12 +214,14 @@ export default function JournalSaveCompleteModal({
       aria-label="저장 완료"
       onClick={onClose}
     >
+      {/* 오늘 첫 기록일 때만 3초 흩날림. 고쳐서 다시 저장할 때는 조용히 넘어간다 */}
+      {xp.wasFirstSaveOfDay && <PetalLayer variant="burst" />}
       <div
         className="home-celebrate-banner relative z-10 w-full max-w-sm max-h-[88dvh] border-2 flex flex-col"
         style={{
           background: "var(--px-bg2)",
           borderColor: "var(--px-accent)",
-          boxShadow: "4px 4px 0 #000",
+          boxShadow: "var(--sh-4)",
         }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -227,6 +242,14 @@ export default function JournalSaveCompleteModal({
             </p>
           </div>
 
+          {fortuneFitGain ? (
+            <FortuneFitGain
+              before={fortuneFitGain.before}
+              after={fortuneFitGain.after}
+              nextStep={fortuneFitGain.nextStep}
+              waitingCount={fortuneFitGain.waitingCount}
+            />
+          ) : (
           <section
             className={`p-4 border-2 space-y-3 relative overflow-hidden ${
               showQuoteLoading ? "" : "save-quote-card"
@@ -292,6 +315,7 @@ export default function JournalSaveCompleteModal({
               </>
             )}
           </section>
+          )}
 
           <section
             className="p-3 border-2 space-y-2"

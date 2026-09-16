@@ -66,7 +66,7 @@ export default function StatsDetailPanel({ stats, entries, overallAvg }: Props) 
   return (
     <div
       className="p-3 border-2 space-y-3"
-      style={{ background: "var(--px-bg3)", borderColor: "var(--px-border)", boxShadow: "3px 3px 0 #000" }}
+      style={{ background: "var(--px-bg3)", borderColor: "var(--px-border)", boxShadow: "var(--sh-3)" }}
     >
       <div className="flex items-start justify-between gap-2">
         <div>

@@ -9,6 +9,7 @@ import { getJournalStorage } from "@/lib/journal/getStorage";
 import { SAJU_PROFILE_CHANGED_EVENT } from "@/lib/diary/profileStorage";
 import { todayDateString } from "@/lib/diary/dayPillar";
 import { personalizationFromXp } from "@/lib/journal/personalization";
+import { isCalmHomeEnabled } from "@/lib/app/featureFlags";
 import {
   formatPersonalizationLevel,
   progressFromTotalXp,
@@ -149,6 +150,7 @@ export default function HeaderProgressBadge() {
     }
   };
 
+  const calmHome = isCalmHomeEnabled();
   const levelLabel = progress
     ? formatPersonalizationLevel(progress.level)
     : null;
@@ -171,21 +173,30 @@ export default function HeaderProgressBadge() {
   return (
     <>
       <div className="shrink-0 flex items-center gap-1.5">
-        <button
-          type="button"
-          className="px-2.5 py-1.5 border-2 text-[11px] font-black tabular-nums whitespace-nowrap"
-          style={{
-            borderColor: "var(--px-accent)",
-            background:
-              "color-mix(in srgb, var(--px-accent) 14%, var(--px-bg3))",
-            color: "var(--px-accent)",
-            boxShadow: "2px 2px 0 #000",
-          }}
-          aria-label={`개인화 레벨 ${levelLabel}, 경험치·운세 근거 보기`}
-          onClick={() => setXpOpen(true)}
-        >
-          {levelLabel}
-        </button>
+        {/*
+          새 홈에서는 Lv 배지를 감춘다.
+          "네 진행 상태"를 말하는 자리가 Lv 배지 · 최근 나의 상태 · 운세 맞춤도로
+          세 군데였는데, 그중 운세 맞춤도만 실제로 운세가 정확해지는 근거를 쓴다.
+          XP는 그 약속을 뒷받침하지 못하므로 새 홈에서는 맞춤도로 통일한다.
+          (지우지 않는다 — 플래그를 끄면 그대로 돌아온다)
+        */}
+        {!calmHome && (
+          <button
+            type="button"
+            className="px-2.5 py-1.5 border-2 text-[11px] font-black tabular-nums whitespace-nowrap"
+            style={{
+              borderColor: "var(--px-accent)",
+              background:
+                "color-mix(in srgb, var(--px-accent) 14%, var(--px-bg3))",
+              color: "var(--px-accent)",
+              boxShadow: "var(--sh-2)",
+            }}
+            aria-label={`개인화 레벨 ${levelLabel}, 경험치·운세 근거 보기`}
+            onClick={() => setXpOpen(true)}
+          >
+            {levelLabel}
+          </button>
+        )}
         {recordedToday ? (
           <button
             type="button"
@@ -197,7 +208,7 @@ export default function HeaderProgressBadge() {
               background:
                 "color-mix(in srgb, var(--signal-condition) 16%, var(--px-bg3))",
               color: "var(--signal-condition)",
-              boxShadow: "2px 2px 0 #000",
+              boxShadow: "var(--sh-2)",
             }}
             aria-label="오늘 일기 완료, 요약 보기"
             onClick={() => {
@@ -217,7 +228,7 @@ export default function HeaderProgressBadge() {
               background:
                 "color-mix(in srgb, var(--px-accent) 18%, var(--px-bg3))",
               color: "var(--px-accent)",
-              boxShadow: "2px 2px 0 #000",
+              boxShadow: "var(--sh-2)",
             }}
             aria-label="오늘 아직 기록 안 함, 일기 쓰기로 이동"
           >
@@ -240,7 +251,7 @@ export default function HeaderProgressBadge() {
             style={{
               borderColor: "var(--px-accent)",
               background: "var(--px-bg2)",
-              boxShadow: "4px 4px 0 #4a3a00",
+              boxShadow: "var(--sh-4g)",
             }}
             onClick={(e) => e.stopPropagation()}
           >

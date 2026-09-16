@@ -8,7 +8,9 @@ import HomeG from "@/components/home/HomeG";
 import HomeSaveCelebration from "@/components/home/HomeSaveCelebration";
 import HomeMotionGate from "@/components/home/HomeMotionGate";
 import { useUserAppState } from "@/hooks/useUserAppState";
-import { isNewDiaryEnabled } from "@/lib/app/featureFlags";
+import HypothesisIntro from "@/components/hypothesis/HypothesisIntro";
+import { isHypothesisCardsEnabled, isNewDiaryEnabled } from "@/lib/app/featureFlags";
+import { hasSeenDay0Cards } from "@/lib/hypothesis/day0Answers";
 import { isAnonymousUser } from "@/lib/auth/anonymousSession";
 import { autoMigrateLocalJournalToAccount } from "@/lib/auth/autoMigrateLocalJournal";
 import {
@@ -22,6 +24,7 @@ import {
   enableGuestMode,
   isGuestMode,
 } from "@/lib/auth/guestMode";
+import type { SajuProfile } from "@/lib/diary/types";
 import {
   loadLocalSajuProfiles,
   SAJU_PROFILE_CHANGED_EVENT,
@@ -69,7 +72,7 @@ async function getSessionWithTimeout(
   }
 }
 
-type Phase = "loading" | "login" | "saju" | "home";
+type Phase = "loading" | "login" | "saju" | "cards" | "home";
 
 export default function HomePage() {
   const { state, refresh } = useUserAppState();
@@ -77,6 +80,7 @@ export default function HomePage() {
   const [localProfileHint, setLocalProfileHint] = useState(false);
   const [sajuDone, setSajuDone] = useState(false);
   const [loginError, setLoginError] = useState("");
+  const [cardsProfile, setCardsProfile] = useState<SajuProfile | null>(null);
   const newDiary = isNewDiaryEnabled();
 
   // 첫 페인트 전에 로컬 잠금/게스트로 바로 결정 — getSession 대기 없이
@@ -208,6 +212,9 @@ export default function HomePage() {
         disableGuestMode();
         void autoMigrateLocalJournalToAccount();
         setPhase((prev) => {
+          // 카드 덱을 보는 중이면 건드리지 않는다.
+          // SIGNED_IN / INITIAL_SESSION 이 뒤늦게 도착해 사용자를 홈으로 튕겨낼 수 있다.
+          if (prev === "cards") return prev;
           if (
             prev === "login" ||
             prev === "loading" ||
@@ -238,7 +245,12 @@ export default function HomePage() {
   }, [phase, localProfileHint, state?.hasSajuProfile]);
 
   useEffect(() => {
-    if (phase === "login" || phase === "saju" || phase === "loading") {
+    if (
+      phase === "login" ||
+      phase === "saju" ||
+      phase === "cards" ||
+      phase === "loading"
+    ) {
       hideShellChrome();
     } else if (phase === "home") {
       showShellChrome();
@@ -265,9 +277,34 @@ export default function HomePage() {
   if (phase === "saju") {
     return (
       <SajuProfileSetup
-        onCompleted={() => {
+        onCompleted={(profile) => {
           setSajuDone(true);
           setLocalProfileHint(localHasSajuProfile());
+
+          // 플래그가 꺼져 있으면 기존과 완전히 같은 경로로 홈에 간다.
+          // 이미 카드를 본 프로필이면 다시 보여주지 않는다.
+          if (
+            isHypothesisCardsEnabled() &&
+            profile &&
+            !hasSeenDay0Cards(profile.id)
+          ) {
+            setCardsProfile(profile);
+            setPhase("cards");
+          } else {
+            setPhase("home");
+          }
+          void refresh();
+        }}
+      />
+    );
+  }
+
+  if (phase === "cards" && cardsProfile) {
+    return (
+      <HypothesisIntro
+        profile={cardsProfile}
+        onDone={() => {
+          setCardsProfile(null);
           setPhase("home");
           void refresh();
         }}

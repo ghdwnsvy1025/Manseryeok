@@ -31,3 +31,9 @@ e2e/results.json
 
 # Supabase CLI local temp
 supabase/.temp/
+
+# 시연용 가짜 기록 (생성물)
+scripts/demo-seed.json
+
+# Claude 로컬 설정
+.claude/

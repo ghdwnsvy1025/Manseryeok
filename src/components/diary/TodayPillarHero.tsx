@@ -14,7 +14,7 @@ export default function TodayPillarHero({ dateLabel, dayPillar }: Props) {
       style={{
         borderColor: "var(--px-accent)",
         background: "var(--px-bg3)",
-        boxShadow: "3px 3px 0 #000",
+        boxShadow: "var(--sh-3)",
       }}
     >
       <p className="ui-hint">{dateLabel}</p>

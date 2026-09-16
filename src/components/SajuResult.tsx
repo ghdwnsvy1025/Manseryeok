@@ -913,7 +913,7 @@ export default function SajuResult({
                       style={{
                         background: "var(--px-bg2)",
                         border: "2px solid var(--px-border)",
-                        boxShadow: "3px 3px 0 #000",
+                        boxShadow: "var(--sh-3)",
                         minHeight: isMobile ? "96px" : "200px",
                       }}
                     >
@@ -964,7 +964,7 @@ export default function SajuResult({
                     style={{
                       background: "var(--px-bg2)",
                       border: "2px solid var(--px-border)",
-                      boxShadow: "3px 3px 0 #000",
+                      boxShadow: "var(--sh-3)",
                     }}
                   >
                     <div className="text-center pb-1 w-full" style={{ borderBottom: "1px solid var(--px-border)" }}>
@@ -1067,7 +1067,7 @@ export default function SajuResult({
                   style={{
                     background: "color-mix(in srgb, #fbbf24 10%, var(--px-bg2))",
                     border: "2px solid #fbbf24",
-                    boxShadow: "3px 3px 0 #4a3a00",
+                    boxShadow: "var(--sh-3g)",
                   }}
                 >
                   <div className="text-center pb-1 w-full" style={{ borderBottom: "1px solid var(--px-border)" }}>
@@ -1146,7 +1146,7 @@ export default function SajuResult({
                   style={{
                     background: "color-mix(in srgb, #7dd3fc 10%, var(--px-bg2))",
                     border: "2px solid #7dd3fc",
-                    boxShadow: "3px 3px 0 #0a3a4a",
+                    boxShadow: "var(--sh-3b)",
                   }}
                 >
                   <div className="text-center pb-1 w-full" style={{ borderBottom: "1px solid var(--px-border)" }}>
@@ -1308,7 +1308,7 @@ export default function SajuResult({
                   style={{
                     background: "color-mix(in srgb, #fbbf24 10%, var(--px-bg2))",
                     border: "2px solid #fbbf24",
-                    boxShadow: "3px 3px 0 #4a3a00",
+                    boxShadow: "var(--sh-3g)",
                     padding: isMobile ? "1px 2px" : "2px 3px",
                   }}
                 >
@@ -1329,7 +1329,7 @@ export default function SajuResult({
                     style={{
                       background: "color-mix(in srgb, #7dd3fc 10%, var(--px-bg2))",
                       border: "2px solid #7dd3fc",
-                      boxShadow: "3px 3px 0 #0a3a4a",
+                      boxShadow: "var(--sh-3b)",
                       padding: isMobile ? "1px 2px" : "2px 3px",
                     }}
                   >
@@ -1374,7 +1374,7 @@ export default function SajuResult({
                   borderColor: "var(--px-accent)",
                   background:
                     "color-mix(in srgb, var(--px-accent) 10%, var(--px-bg2))",
-                  boxShadow: "3px 3px 0 #4a3a00",
+                  boxShadow: "var(--sh-3g)",
                 }}
                 aria-label="오행 분포율"
               >
@@ -1457,7 +1457,7 @@ export default function SajuResult({
           ref={daeunSectionRef}
           id="saju-daeun-section"
           className={isMobile ? "mt-2" : "mt-3"}
-          style={{ background: "var(--px-bg3)", border: "2px solid var(--px-border)", boxShadow: "3px 3px 0 #000", overflowAnchor: "none" }}
+          style={{ background: "var(--px-bg3)", border: "2px solid var(--px-border)", boxShadow: "var(--sh-3)", overflowAnchor: "none" }}
         >
           <div className={isMobile ? "p-2 space-y-1" : "p-2 space-y-1"}>
             {(() => {
@@ -1640,7 +1640,7 @@ export default function SajuResult({
                         style={{
                           background: "color-mix(in srgb, #fbbf24 8%, var(--px-bg2))",
                           border: "1px solid #fbbf2466",
-                          boxShadow: "1px 1px 0 #4a3a00",
+                          boxShadow: "var(--sh-1g)",
                         }}
                         aria-label="년운"
                       >
@@ -1731,7 +1731,7 @@ export default function SajuResult({
               background: "var(--px-accent)",
               borderColor: "#000",
               color: "#000",
-              boxShadow: "4px 4px 0 #000",
+              boxShadow: "var(--sh-4)",
             }}
           >
             오늘 기록하기 →

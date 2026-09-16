@@ -32,7 +32,7 @@ export default function Error({
           borderColor: "var(--px-accent)",
           color: "var(--px-accent)",
           background: "var(--px-bg3)",
-          boxShadow: "2px 2px 0 #000",
+          boxShadow: "var(--sh-2)",
         }}
         onClick={() => reset()}
       >

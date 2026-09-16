@@ -34,7 +34,7 @@ export default function BetaFeedbackHost() {
           borderColor: "#000",
           background: "var(--px-accent)",
           color: "#111",
-          boxShadow: "3px 3px 0 #000",
+          boxShadow: "var(--sh-3)",
         }}
         aria-label="의견 보내기"
       >

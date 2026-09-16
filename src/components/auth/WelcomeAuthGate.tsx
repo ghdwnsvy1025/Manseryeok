@@ -148,7 +148,7 @@ export default function WelcomeAuthGate({
         style={{
           background: "var(--px-bg3)",
           borderColor: "var(--px-border)",
-          boxShadow: "3px 3px 0 #000",
+          boxShadow: "var(--sh-3)",
         }}
         aria-label="로그인 방법"
       >
@@ -161,7 +161,7 @@ export default function WelcomeAuthGate({
             background: "var(--px-accent)",
             borderColor: "#000",
             color: "#111",
-            boxShadow: "4px 4px 0 #000",
+            boxShadow: "var(--sh-4)",
           }}
         >
           {loading === "google" ? "연결 중…" : "Google로 시작하기"}
@@ -176,7 +176,7 @@ export default function WelcomeAuthGate({
             background: "color-mix(in srgb, var(--px-text-on-panel) 12%, var(--px-bg2))",
             borderColor: "#000",
             color: "var(--px-text-on-panel)",
-            boxShadow: "4px 4px 0 #000",
+            boxShadow: "var(--sh-4)",
           }}
         >
           {loading === "guest" ? "준비 중…" : "비로그인으로 둘러보기"}

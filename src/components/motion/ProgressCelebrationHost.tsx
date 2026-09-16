@@ -12,6 +12,7 @@ import {
   type ProgressCelebrationDetail,
 } from "@/lib/ui/motionEvents";
 import { formatPersonalizationLevel } from "@/lib/product/personalizationLevel";
+import { isCalmHomeEnabled } from "@/lib/app/featureFlags";
 
 type ModalState =
   | { kind: "levelup"; level: number; previousLevel: number }
@@ -28,6 +29,8 @@ export default function ProgressCelebrationHost() {
     key: number;
   } | null>(null);
   const [modal, setModal] = useState<ModalState>(null);
+  // 플래그가 홈 모양을 가르므로 안내 문구도 같이 갈라야 한다
+  const calmHome = isCalmHomeEnabled();
 
   useEffect(() => {
     const onCelebrate = (ev: Event) => {
@@ -104,7 +107,7 @@ export default function ProgressCelebrationHost() {
             background: "var(--px-bg2)",
             borderColor: "var(--px-accent)",
             color: "var(--px-accent)",
-            boxShadow: "3px 3px 0 #000",
+            boxShadow: "var(--sh-3)",
           }}
           aria-live="polite"
         >
@@ -125,7 +128,7 @@ export default function ProgressCelebrationHost() {
             style={{
               background: "var(--px-bg2)",
               borderColor: "var(--px-accent)",
-              boxShadow: "4px 4px 0 #000",
+              boxShadow: "var(--sh-4)",
             }}
             onClick={(e) => e.stopPropagation()}
           >
@@ -177,14 +180,17 @@ export default function ProgressCelebrationHost() {
                   className="text-base font-black"
                   style={{ color: "var(--px-accent)" }}
                 >
-                  성장이 상단에 보여요
+                  {calmHome ? "쓸수록 정확해져요" : "성장이 상단에 보여요"}
                 </p>
                 <p
                   className="text-xs leading-relaxed font-bold"
                   style={{ color: "var(--px-text)" }}
                 >
-                  오른쪽 위 배지에서 레벨과 연속 기록을 확인할 수 있어요. 기록을
-                  저장하면 XP가 쌓이고, 레벨이 오르면 축하 팝업이 뜹니다.
+                  {/* 새 홈은 XP·레벨을 걷어내고 운세 맞춤도로 통일했다.
+                      안내 문구가 옛 화면을 가리키면 첫 화면부터 말이 어긋난다. */}
+                  {calmHome
+                    ? "홈 아래 운세 맞춤도가 오늘의 기록만큼 올라가요. 맞춤도가 오르면 내일 운세가 오늘보다 더 내 얘기가 됩니다."
+                    : "오른쪽 위 배지에서 레벨과 연속 기록을 확인할 수 있어요. 기록을 저장하면 XP가 쌓이고, 레벨이 오르면 축하 팝업이 뜹니다."}
                 </p>
               </>
             )}

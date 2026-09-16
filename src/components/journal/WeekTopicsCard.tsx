@@ -86,7 +86,7 @@ export default function WeekTopicsCard({
         style={{
           borderColor: "var(--px-border2)",
           background: "var(--px-bg3)",
-          boxShadow: "2px 2px 0 #000",
+          boxShadow: "var(--sh-2)",
         }}
         aria-label="지난 30일 화제"
       >
@@ -183,7 +183,7 @@ export default function WeekTopicsCard({
       style={{
         background: "var(--px-bg3)",
         borderColor: "var(--px-border2)",
-        boxShadow: "2px 2px 0 #000",
+        boxShadow: "var(--sh-2)",
       }}
       aria-label="지난 30일 화제"
     >

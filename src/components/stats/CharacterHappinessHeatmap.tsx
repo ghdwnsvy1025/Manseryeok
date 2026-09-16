@@ -183,7 +183,7 @@ function PatternCharSheet({
     borderColor: "var(--px-border)",
     background: "var(--px-bg2)",
     color: "var(--px-text)",
-    boxShadow: "2px 2px 0 #000",
+    boxShadow: "var(--sh-2)",
   } as const;
 
   return (
@@ -214,7 +214,7 @@ function PatternCharSheet({
           style={{
             borderColor: accent,
             background: "var(--px-bg2)",
-            boxShadow: "4px 4px 0 #4a3a00",
+            boxShadow: "var(--sh-4g)",
           }}
         >
           <div className="flex items-start justify-between gap-2">
@@ -349,7 +349,7 @@ function PatternCharSheet({
                               borderColor: "var(--signal-emotion)",
                               background:
                                 "color-mix(in srgb, var(--signal-emotion) 14%, var(--px-bg3))",
-                              boxShadow: "1px 1px 0 #000",
+                              boxShadow: "var(--sh-1)",
                             }}
                           >
                             <span
@@ -386,7 +386,7 @@ function PatternCharSheet({
                               borderColor: "var(--px-border2)",
                               color: "#fffef8",
                               background: "var(--px-bg3)",
-                              boxShadow: "1px 1px 0 #000",
+                              boxShadow: "var(--sh-1)",
                             }}
                           >
                             {m.label}

@@ -106,7 +106,7 @@ export default function HomeHub({ state }: Props) {
         style={{
           background: "var(--px-bg2)",
           borderColor: "var(--px-border2)",
-          boxShadow: "3px 3px 0 #000",
+          boxShadow: "var(--sh-3)",
         }}
         aria-label="오늘"
       >
@@ -275,7 +275,7 @@ function QuickLink({
       style={{
         background: "var(--px-bg2)",
         borderColor: "var(--px-border)",
-        boxShadow: "2px 2px 0 #000",
+        boxShadow: "var(--sh-2)",
       }}
     >
       <p className="text-sm font-black" style={{ color: accent }}>

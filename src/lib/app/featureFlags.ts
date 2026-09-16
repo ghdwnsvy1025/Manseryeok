@@ -58,6 +58,27 @@ export type FeatureFlags = {
    * 기본 OFF — 특징은 저장하되 점수 반영은 실험 플래그로만.
    */
   sajuRelationsScoringEnabled: boolean;
+  /**
+   * Day 0 가설 카드 덱 — 생년월일 저장 직후 카드를 한 장씩 보여준다.
+   * OFF면 기존과 똑같이 바로 홈으로 간다.
+   */
+  hypothesisCardsEnabled: boolean;
+  /**
+   * 깔끔한 홈 — 시간대에 따라 할 일 하나만 크게, 나머지는 접는다.
+   * OFF면 기존 홈(블록 아홉 개)이 그대로 나온다.
+   */
+  calmHomeEnabled: boolean;
+  /**
+   * 감성 톤 — 각진 테두리·딱딱한 그림자·픽셀 폰트를 눕힌다.
+   * OFF면 기존 복고풍 그대로. globals.css 의 [data-skin="soft"] 블록만 걸린다.
+   */
+  softThemeEnabled: boolean;
+  /**
+   * 죽은 화면 봉인 — `/diary/*` · `/analysis/*` · `/forecast` 로 주소를 직접 쳐도
+   * 들여보내지 않고 "지금은 여기서 봅니다"를 알려준다.
+   * 파일은 그대로 두므로 OFF 하면 즉시 원래대로 열린다.
+   */
+  sealLegacyRoutesEnabled: boolean;
 };
 
 const TRUE = new Set(["1", "true", "yes", "on"]);
@@ -89,6 +110,10 @@ export const DEFAULT_FEATURE_FLAGS: FeatureFlags = {
   contentFeedbackEnabled: true,
   exposureAdjustedEvaluationEnabled: false,
   sajuRelationsScoringEnabled: false,
+  hypothesisCardsEnabled: false,
+  calmHomeEnabled: false,
+  softThemeEnabled: false,
+  sealLegacyRoutesEnabled: false,
 };
 
 /** Playwright Phase 6.1 — bake-safe conservative matrix */
@@ -211,6 +236,22 @@ export function getFeatureFlags(): FeatureFlags {
       process.env.NEXT_PUBLIC_FF_EXPOSURE_ADJUSTED_EVAL,
       DEFAULT_FEATURE_FLAGS.exposureAdjustedEvaluationEnabled
     ),
+    hypothesisCardsEnabled: asBool(
+      process.env.NEXT_PUBLIC_FF_HYPOTHESIS_CARDS,
+      DEFAULT_FEATURE_FLAGS.hypothesisCardsEnabled
+    ),
+    calmHomeEnabled: asBool(
+      process.env.NEXT_PUBLIC_FF_CALM_HOME,
+      DEFAULT_FEATURE_FLAGS.calmHomeEnabled
+    ),
+    softThemeEnabled: asBool(
+      process.env.NEXT_PUBLIC_FF_SOFT_THEME,
+      DEFAULT_FEATURE_FLAGS.softThemeEnabled
+    ),
+    sealLegacyRoutesEnabled: asBool(
+      process.env.NEXT_PUBLIC_FF_SEAL_LEGACY,
+      DEFAULT_FEATURE_FLAGS.sealLegacyRoutesEnabled
+    ),
     sajuRelationsScoringEnabled: asBool(
       process.env.NEXT_PUBLIC_FF_SAJU_RELATIONS_SCORING,
       DEFAULT_FEATURE_FLAGS.sajuRelationsScoringEnabled
@@ -289,6 +330,26 @@ export function isContentFeedbackEnabled(): boolean {
 
 export function isExposureAdjustedEvaluationEnabled(): boolean {
   return getFeatureFlags().exposureAdjustedEvaluationEnabled;
+}
+
+/** Day 0 가설 카드 덱 */
+export function isHypothesisCardsEnabled(): boolean {
+  return getFeatureFlags().hypothesisCardsEnabled;
+}
+
+/** 깔끔한 홈 (시간대별 단일 초점) */
+export function isCalmHomeEnabled(): boolean {
+  return getFeatureFlags().calmHomeEnabled;
+}
+
+/** 감성 톤 (부드러운 테두리·그림자) */
+export function isSoftThemeEnabled(): boolean {
+  return getFeatureFlags().softThemeEnabled;
+}
+
+/** 죽은 화면 봉인 (주소로 직접 와도 안내 화면으로) */
+export function isSealLegacyRoutesEnabled(): boolean {
+  return getFeatureFlags().sealLegacyRoutesEnabled;
 }
 
 /** 합충을 최종 점수에 반영할지 (기본 false = 특징만 저장) */

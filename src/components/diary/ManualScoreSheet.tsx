@@ -36,7 +36,7 @@ export default function ManualScoreSheet({
         style={{
           background: "var(--px-bg2)",
           borderColor: "#60a5fa",
-          boxShadow: "4px 4px 0 #000",
+          boxShadow: "var(--sh-4)",
         }}
       >
         <div
@@ -91,7 +91,7 @@ export default function ManualScoreSheet({
             style={{
               background: "var(--px-bg2)",
               borderColor: "var(--px-accent)",
-              boxShadow: "4px 4px 0 #000",
+              boxShadow: "var(--sh-4)",
             }}
           >
             <div className="flex items-start justify-between gap-3">

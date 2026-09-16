@@ -71,7 +71,7 @@ export default function TenGodChip({ label, color }: Props) {
               style={{
                 background: "var(--px-bg2)",
                 borderColor: "var(--px-border2)",
-                boxShadow: "4px 4px 0 #000",
+                boxShadow: "var(--sh-4)",
               }}
               onClick={(e) => e.stopPropagation()}
             >
@@ -95,7 +95,7 @@ export default function TenGodChip({ label, color }: Props) {
                   borderColor: "#000",
                   background: "var(--px-accent)",
                   color: "#111",
-                  boxShadow: "2px 2px 0 #000",
+                  boxShadow: "var(--sh-2)",
                 }}
                 onClick={() => setOpen(false)}
               >

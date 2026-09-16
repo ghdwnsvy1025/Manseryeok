@@ -80,7 +80,7 @@ export default function BetaFeedbackModal({ open, onClose }: Props) {
         style={{
           background: "var(--px-bg2)",
           borderColor: "var(--px-accent)",
-          boxShadow: "6px 6px 0 #000",
+          boxShadow: "var(--sh-6)",
         }}
       >
         {done ? (
@@ -106,7 +106,7 @@ export default function BetaFeedbackModal({ open, onClose }: Props) {
                 borderColor: "#000",
                 color: "#111",
                 background: "var(--px-accent)",
-                boxShadow: "3px 3px 0 #000",
+                boxShadow: "var(--sh-3)",
               }}
             >
               닫기
@@ -190,7 +190,7 @@ export default function BetaFeedbackModal({ open, onClose }: Props) {
                 borderColor: "#000",
                 color: "#111",
                 background: "var(--px-accent)",
-                boxShadow: "3px 3px 0 #000",
+                boxShadow: "var(--sh-3)",
                 opacity: saving ? 0.7 : 1,
               }}
             >

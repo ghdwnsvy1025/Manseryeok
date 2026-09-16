@@ -101,7 +101,7 @@ function HappinessGauge({ score }: { score: number }) {
       style={{
         borderColor: `color-mix(in srgb, ${band.color} 45%, var(--px-border2))`,
         background: `linear-gradient(165deg, color-mix(in srgb, ${band.color} 16%, var(--px-bg2)), var(--px-bg3))`,
-        boxShadow: "2px 2px 0 #000",
+        boxShadow: "var(--sh-2)",
       }}
       aria-label={`최근 7일 행복도 ${score}점, ${band.label} ${band.emoji}`}
     >
@@ -212,7 +212,7 @@ function FocusToneSquare({
       style={{
         borderColor: border,
         background: "var(--px-bg3)",
-        boxShadow: "2px 2px 0 #000",
+        boxShadow: "var(--sh-2)",
       }}
       aria-label={`${title} ${item.value}${item.score != null ? ` ${item.score}점` : ""}`}
     >

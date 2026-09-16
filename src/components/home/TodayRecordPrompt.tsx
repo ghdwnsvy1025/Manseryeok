@@ -22,7 +22,7 @@ export default function TodayRecordPrompt({ todayDate, entryDates }: Props) {
       style={{
         borderColor: "var(--px-accent)",
         background: "var(--px-bg2)",
-        boxShadow: "2px 2px 0 #000",
+        boxShadow: "var(--sh-2)",
       }}
       aria-label="오늘 기록하기"
     >

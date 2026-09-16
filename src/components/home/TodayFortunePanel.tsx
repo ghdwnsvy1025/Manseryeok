@@ -131,7 +131,7 @@ function FortuneActionBoxes({
           style={{
             borderColor: "color-mix(in srgb, #4ade80 70%, var(--px-border2))",
             background: "color-mix(in srgb, #4ade80 14%, var(--px-bg3))",
-            boxShadow: "2px 2px 0 #000",
+            boxShadow: "var(--sh-2)",
           }}
         >
           <p
@@ -154,7 +154,7 @@ function FortuneActionBoxes({
           style={{
             borderColor: "color-mix(in srgb, #fb923c 70%, var(--px-border2))",
             background: "color-mix(in srgb, #fb923c 14%, var(--px-bg3))",
-            boxShadow: "2px 2px 0 #000",
+            boxShadow: "var(--sh-2)",
           }}
         >
           <p
@@ -932,7 +932,7 @@ export default function TodayFortunePanel({
           style={{
             borderColor: "var(--px-border)",
             background: "var(--px-bg2)",
-            boxShadow: "2px 2px 0 #000",
+            boxShadow: "var(--sh-2)",
           }}
         >
           {hydrating && !overall && (
@@ -1093,7 +1093,7 @@ export default function TodayFortunePanel({
               style={{
                 background: "var(--px-bg2)",
                 borderColor: "var(--px-accent)",
-                boxShadow: "4px 4px 0 #4a3a00",
+                boxShadow: "var(--sh-4g)",
               }}
               onClick={(e) => e.stopPropagation()}
             >
@@ -1143,7 +1143,7 @@ export default function TodayFortunePanel({
               style={{
                 borderColor: "var(--px-border)",
                 background: "var(--px-bg2)",
-                boxShadow: "2px 2px 0 #000",
+                boxShadow: "var(--sh-2)",
               }}
             >
               {loading && <FortuneLoadingHint />}

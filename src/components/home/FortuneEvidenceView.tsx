@@ -92,7 +92,7 @@ export function FortuneEvidenceSummary({
         borderColor: "var(--px-accent)",
         background:
           "linear-gradient(135deg, color-mix(in srgb, var(--px-accent) 22%, var(--px-bg2)), var(--px-bg3))",
-        boxShadow: "2px 2px 0 #000",
+        boxShadow: "var(--sh-2)",
       }}
       aria-label={`지금 운세는 기록 ${journalPct}퍼센트와 사주 ${natalPct}퍼센트`}
     >

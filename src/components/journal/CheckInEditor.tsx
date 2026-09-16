@@ -62,6 +62,8 @@ import { validateCheckInSave } from "@/lib/journal/checkin/validation";
 import type { CoreStateUi, DomainStateUi } from "@/lib/journal/checkin/validation";
 import DiaryWriteSheet from "@/components/journal/DiaryWriteSheet";
 import JournalSaveCompleteModal from "@/components/journal/JournalSaveCompleteModal";
+import { buildHomeCompletion } from "@/lib/hypothesis/homeCompletion";
+import { isHypothesisCardsEnabled } from "@/lib/app/featureFlags";
 import HappinessSlider from "@/components/journal/HappinessSlider";
 import OrdinalPicker from "@/components/journal/OrdinalPicker";
 import { reportQuestionFeedback } from "@/lib/journal/reportQuestionFeedback";
@@ -199,6 +201,12 @@ export default function CheckInEditor({ initialDate }: Props) {
   >({});
   const [sajuProfile, setSajuProfile] = useState<SajuProfile | null>(null);
   const [showComplete, setShowComplete] = useState(false);
+  const [fortuneFitGain, setFortuneFitGain] = useState<{
+    before: number;
+    after: number;
+    nextStep: string;
+    waitingCount: number;
+  } | null>(null);
   const [savedEntry, setSavedEntry] = useState<JournalEntry | null>(null);
   const [saveMeta, setSaveMeta] = useState<JournalSaveResult["xp"] | null>(null);
   const [openAiStatus, setOpenAiStatus] = useState<OpenAiCallStatus | null>(null);
@@ -1213,6 +1221,33 @@ export default function CheckInEditor({ initialDate }: Props) {
           });
         }
       }
+      // 운세 맞춤도가 이번 기록으로 얼마나 올랐는지 — 명언 자리를 대신한다
+      if (isHypothesisCardsEnabled() && sajuProfile?.pillars) {
+        try {
+          const storage = await getJournalStorage();
+          const all = await storage.list();
+          const after = buildHomeCompletion({
+            pillars: sajuProfile.pillars,
+            entries: all,
+          });
+          const before = buildHomeCompletion({
+            pillars: sajuProfile.pillars,
+            entries: all.filter((e) => e.entryDate !== date),
+          });
+          if (after) {
+            setFortuneFitGain({
+              before: before?.completion.percent ?? 0,
+              after: after.completion.percent,
+              nextStep: after.completion.nextStep,
+              waitingCount: after.waitingCount,
+            });
+          }
+        } catch {
+          // 계산 실패하면 기존 명언이 그대로 나온다
+          setFortuneFitGain(null);
+        }
+      }
+
       setShowComplete(true);
       notifyJournalProgressChanged();
       try {
@@ -1377,7 +1412,7 @@ export default function CheckInEditor({ initialDate }: Props) {
               style={{
                 borderColor: "var(--px-accent)",
                 background: "var(--px-bg2)",
-                boxShadow: "2px 2px 0 #000",
+                boxShadow: "var(--sh-2)",
               }}
               aria-label="날짜 바꾸기"
               title="달력 열기"
@@ -1952,6 +1987,7 @@ export default function CheckInEditor({ initialDate }: Props) {
           authorName={quoteMeta.authorName}
           workTitle={quoteMeta.workTitle}
           deliveryId={quoteMeta.deliveryId}
+          fortuneFitGain={fortuneFitGain}
           onClose={() => {
             setShowComplete(false);
             requestHomeInstallSheet();

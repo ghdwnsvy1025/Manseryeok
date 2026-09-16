@@ -122,7 +122,7 @@ export default function TodayOneSentence(props: Props) {
       style={{
         background: "var(--px-bg2)",
         borderColor: tone.border,
-        boxShadow: "3px 3px 0 #000",
+        boxShadow: "var(--sh-3)",
       }}
       aria-label="오늘의 한 문장"
       aria-busy={status === "loading"}

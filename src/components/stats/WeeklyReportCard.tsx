@@ -196,7 +196,7 @@ export default function WeeklyReportCard({ report, embedded }: Props) {
             borderColor: "var(--px-accent)",
             color: "#111",
             background: "var(--px-accent)",
-            boxShadow: "2px 2px 0 #000",
+            boxShadow: "var(--sh-2)",
           }}
         >
           {shared === "done"

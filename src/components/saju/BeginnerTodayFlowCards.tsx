@@ -139,7 +139,7 @@ export default function BeginnerTodayFlowCards({
         style={{
           background: "var(--px-bg2)",
           borderColor: "var(--px-accent)",
-          boxShadow: "3px 3px 0 #000",
+          boxShadow: "var(--sh-3)",
         }}
       >
         <p

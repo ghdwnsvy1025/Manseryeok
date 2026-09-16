@@ -719,7 +719,7 @@ export default function DiaryEditor({ initialDate }: Props) {
             background: "var(--px-bg2)",
             borderColor: "var(--px-accent)",
             color: "var(--px-accent)",
-            boxShadow: "3px 3px 0 #000",
+            boxShadow: "var(--sh-3)",
           }}
         >
           {totalEntryDays}일 기록됨 · 간지별 행복도 패턴 보기 →
@@ -985,7 +985,7 @@ export default function DiaryEditor({ initialDate }: Props) {
           borderColor: "var(--px-border)",
           background: "var(--px-bg2)",
           color: "var(--px-accent)",
-          boxShadow: "2px 2px 0 #000",
+          boxShadow: "var(--sh-2)",
         }}
       >
         과거 기록 보기 →

@@ -92,7 +92,7 @@ export default function NightTomorrowReport({
         style={{
           background: "var(--px-bg2)",
           borderColor: "var(--px-border)",
-          boxShadow: "4px 4px 0 #000",
+          boxShadow: "var(--sh-4)",
         }}
       >
         <header className="space-y-1">

@@ -79,7 +79,7 @@ export function StatsEmptyState() {
           background: "var(--px-accent)",
           borderColor: "#000",
           color: "#000",
-          boxShadow: "3px 3px 0 #000",
+          boxShadow: "var(--sh-3)",
         }}
       >
         오늘 기록하기

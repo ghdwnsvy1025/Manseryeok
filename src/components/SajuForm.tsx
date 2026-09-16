@@ -563,7 +563,7 @@ export default function SajuForm({
             width: "auto",
             maxWidth: "100%",
             border: "2px solid #000",
-            boxShadow: "2px 2px 0 #000",
+            boxShadow: "var(--sh-2)",
             borderRight: "2px solid #000",
           }}
         >
@@ -598,7 +598,7 @@ export default function SajuForm({
               display: "inline-block",
               width: "auto",
               border: "2px solid #000",
-              boxShadow: "2px 2px 0 #000",
+              boxShadow: "var(--sh-2)",
               borderRight: "2px solid #000",
             }}
           >

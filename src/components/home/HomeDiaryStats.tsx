@@ -145,7 +145,7 @@ function LevelProgressCard({
       style={{
         background: "var(--px-bg2)",
         borderColor: "var(--px-border)",
-        boxShadow: "2px 2px 0 #000",
+        boxShadow: "var(--sh-2)",
       }}
       aria-label={`개인화 레벨 ${currentLabel}`}
     >
@@ -235,7 +235,7 @@ function Happiness30Card({
       style={{
         background: "var(--px-bg2)",
         borderColor: "var(--px-border)",
-        boxShadow: "2px 2px 0 #000",
+        boxShadow: "var(--sh-2)",
       }}
     >
       <div className="flex items-center justify-between gap-2">
@@ -328,7 +328,7 @@ function AreaCard({
       style={{
         background: "var(--px-bg2)",
         borderColor: "var(--px-border)",
-        boxShadow: "2px 2px 0 #000",
+        boxShadow: "var(--sh-2)",
       }}
     >
       <p className="text-[10px] font-bold" style={{ color: "var(--px-text2)" }}>
@@ -374,7 +374,7 @@ function HappinessTrendChart({ series }: { series: RatingSeriesPoint[] }) {
       style={{
         background: "var(--px-bg2)",
         borderColor: "var(--px-border)",
-        boxShadow: "2px 2px 0 #000",
+        boxShadow: "var(--sh-2)",
       }}
       aria-label="행복도 추이 그래프"
     >

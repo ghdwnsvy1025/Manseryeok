@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import {
   buildGanjiCollection,
@@ -24,6 +25,10 @@ import {
 } from "@/lib/journal/statsInsight";
 import TrendOverlayChart from "@/components/stats/TrendOverlayChart";
 import StatsSummaryStrip from "@/components/stats/StatsSummaryStrip";
+import { buildWeekTopicSupportItems } from "@/lib/journal/topics/topicSupport";
+import { buildWeekTopicSummary } from "@/lib/journal/topics/weekTopics";
+import { buildHomeEStats } from "@/lib/journal/homeStats";
+import TodayStatusCard from "@/components/home/TodayStatusCard";
 import JournalRecordCalendar from "@/components/stats/JournalRecordCalendar";
 import CharacterHappinessHeatmap from "@/components/stats/CharacterHappinessHeatmap";
 import StatsGanjiCollection from "@/components/stats/StatsGanjiCollection";
@@ -169,6 +174,27 @@ export default function StatsPage() {
   const weeklyReport = useMemo(
     () => buildWeeklyReport(journalEntries, today),
     [journalEntries, today]
+  );
+
+  // "최근 나의 상태" — 홈에서 여기로 옮겨 왔다.
+  // 최근 7일 기록을 요약하는 내용이라 "기록" 탭의 요약 줄 바로 아래가 제자리다.
+  const eStats = useMemo(
+    () => buildHomeEStats(journalEntries, today, enabledCodes),
+    [journalEntries, today, enabledCodes]
+  );
+  const weekTopics = useMemo(
+    () =>
+      buildWeekTopicSummary(journalEntries, {
+        asOf: today,
+        windowDays: 30,
+        topN: 5,
+        withSupport: true,
+      }),
+    [journalEntries, today]
+  );
+  const weekTopicSupportItems = useMemo(
+    () => buildWeekTopicSupportItems(weekTopics.topics, journalEntries, 3),
+    [weekTopics.topics, journalEntries]
   );
 
   const streak = useMemo(
@@ -335,6 +361,12 @@ export default function StatsPage() {
             recordedToday={streak.recordedToday}
           />
 
+          <TodayStatusCard
+            stats={eStats}
+            weekTopics={weekTopics}
+            weekTopicSupportItems={weekTopicSupportItems}
+          />
+
           <JournalRecordCalendar
             entries={journalEntries}
             today={today}
@@ -489,6 +521,34 @@ export default function StatsPage() {
             entries={journalEntries}
             uniqueDays={uniqueDays}
           />
+
+          {/*
+            기록 통계로 가는 길.
+            이 화면은 만들어 놓고 앱 안에서 **링크가 0곳**이라 아무도 못 갔다.
+            봉인 대상이 아니라 흡수 대상이라 판단해, 기록 탭 안으로 들여온다.
+          */}
+          <Link
+            href="/journal/stats"
+            className="px-card flex items-center justify-between gap-3 p-3"
+          >
+            <span className="min-w-0">
+              <span
+                className="block text-sm font-bold"
+                style={{ color: "var(--px-text-on-panel)" }}
+              >
+                기록 통계 자세히
+              </span>
+              <span className="block ui-hint">
+                일기 글에 반복된 화제 · 카테고리별 평균
+              </span>
+            </span>
+            <span
+              className="text-sm font-black shrink-0"
+              style={{ color: "var(--px-text2)" }}
+            >
+              →
+            </span>
+          </Link>
 
           <StatsGanjiCollection
             collection={collection}

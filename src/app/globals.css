@@ -42,6 +42,27 @@
   --signal-insufficient: #94a3b8;
   --signal-positive: #4ade80;
   --signal-caution: #fbbf24;
+
+  /* 복고풍의 정체 — 딱딱한 검정 그림자. 여기 한 곳에 모아 두면
+     감성 톤에서 값만 바꿔 전부 부드러워진다. */
+  --sh-1:  1px 1px 0 #000;
+  --sh-2:  2px 2px 0 #000;
+  --sh-3:  3px 3px 0 #000;
+  --sh-4:  4px 4px 0 #000;
+  --sh-4b: 4px 4px 0 #000014;
+  --sh-8:  8px 8px 0 #000;
+  --sh-in: inset 2px 2px 0 #000;
+  --sh-6:  6px 6px 0 #000;
+  --sh-1g: 1px 1px 0 #4a3a00;
+  --sh-3g: 3px 3px 0 #4a3a00;
+  --sh-4g: 4px 4px 0 #4a3a00;
+  --sh-3b: 3px 3px 0 #0a3a4a;
+  --sh-4r: 4px 4px 0 #7f1d1d;
+  --sh-under: 0 4px 0 #4a3a00;
+  --sh-over:  0 -4px 0 #000;
+  /* 각진 검정 테두리 색 · 선택된 칩의 복고 크림색 */
+  --px-edge:  #000;
+  --px-cream: #efe6c6;
 }
 
 * {
@@ -83,13 +104,13 @@ textarea {
 .px-card {
   background: var(--px-bg2);
   border: 2px solid var(--px-border);
-  box-shadow: 4px 4px 0 #000;
+  box-shadow: var(--sh-4);
 }
 
 .px-card-accent {
   background: var(--px-bg2);
   border: 2px solid var(--px-border2);
-  box-shadow: 4px 4px 0 #000014;
+  box-shadow: var(--sh-4b);
 }
 
 /* ── Pixel Input ── */
@@ -97,13 +118,13 @@ textarea {
   background: var(--px-bg);
   border: 2px solid var(--px-border2);
   color: var(--px-text);
-  box-shadow: inset 2px 2px 0 #000;
+  box-shadow: var(--sh-in);
   outline: none;
   font-family: inherit;
 }
 .px-input:focus {
   border-color: var(--px-accent);
-  box-shadow: inset 2px 2px 0 #000, 0 0 0 2px #c8a70044;
+  box-shadow: var(--sh-in), 0 0 0 2px #c8a70044;
 }
 
 /* ── Pixel Button ── */
@@ -145,9 +166,9 @@ textarea {
   display: flex;
   width: 100%;
   max-width: 20rem;
-  border: 2px solid #000;
+  border: 2px solid var(--px-edge);
   background: #0c0c14;
-  box-shadow: 3px 3px 0 #000;
+  box-shadow: var(--sh-3);
   overflow: hidden;
 }
 .saju-choice-chip {
@@ -159,7 +180,7 @@ textarea {
   font-family: inherit;
   line-height: 1.2;
   border: none;
-  border-right: 2px solid #000;
+  border-right: 2px solid var(--px-edge);
   background: transparent;
   color: #7a7a96;
   cursor: pointer;
@@ -173,11 +194,11 @@ textarea {
   background: color-mix(in srgb, #fff 4%, transparent);
 }
 .saju-choice-chip.is-on {
-  background: #efe6c6;
+  background: var(--px-cream);
   color: #1a1208;
 }
 .saju-choice-chip:focus-visible {
-  outline: 2px solid #efe6c6;
+  outline: 2px solid var(--px-cream);
   outline-offset: -2px;
   z-index: 1;
 }
@@ -189,7 +210,7 @@ textarea {
   background-size: 10px;
   border: 2px solid var(--px-border2);
   color: var(--px-text);
-  box-shadow: inset 2px 2px 0 #000;
+  box-shadow: var(--sh-in);
   outline: none;
   font-family: inherit;
   padding-right: 28px;
@@ -300,7 +321,7 @@ textarea {
   padding: 0.75rem;
   border: 2px solid var(--px-border);
   background: var(--px-bg2);
-  box-shadow: 2px 2px 0 #000;
+  box-shadow: var(--sh-2);
 }
 .stats-chip {
   padding: 0.35rem 0.55rem;
@@ -393,7 +414,7 @@ textarea {
 .home-section__body {
   border: 2px solid var(--px-border2);
   background: var(--px-bg3);
-  box-shadow: 2px 2px 0 #000;
+  box-shadow: var(--sh-2);
   /* 본문: 제목보다 한 단계 더 밝은 중립색 (보라 틴트 제거) */
   --px-text: #f7f7fc;
   --px-text2: #c8c8d4;
@@ -422,7 +443,7 @@ textarea {
   padding: 1rem 0.85rem;
   border: 2px solid var(--px-border2);
   background: var(--px-bg3);
-  box-shadow: 2px 2px 0 #000;
+  box-shadow: var(--sh-2);
 }
 .stats-category-title {
   font-size: 0.95rem;
@@ -442,13 +463,13 @@ textarea {
   color: #f0f0f8;
   background: var(--px-bg2);
   min-height: 2.75rem;
-  box-shadow: 1px 1px 0 #000;
+  box-shadow: var(--sh-1);
 }
 .stats-chip-cat.is-on {
   border-color: var(--chip-accent, var(--px-accent));
   color: #111;
   background: var(--chip-accent, var(--px-accent));
-  box-shadow: 2px 2px 0 #000;
+  box-shadow: var(--sh-2);
 }
 .stats-status-warn {
   font-size: 0.75rem;
@@ -488,16 +509,16 @@ textarea {
   font-size: var(--text-control);
   font-weight: 800;
   padding: 10px 16px;
-  border: 2px solid #000;
+  border: 2px solid var(--px-edge);
   color: #000;
   background: var(--px-accent);
-  box-shadow: 3px 3px 0 #000;
+  box-shadow: var(--sh-3);
   cursor: pointer;
   font-family: inherit;
   transition: transform 80ms, box-shadow 80ms;
 }
 .ui-primary-btn:active:not(:disabled) {
-  box-shadow: 1px 1px 0 #000;
+  box-shadow: var(--sh-1);
   transform: translate(2px, 2px);
 }
 .ui-primary-btn:disabled {
@@ -520,7 +541,7 @@ textarea {
   border-color: #000;
   color: #000;
   background: var(--px-accent);
-  box-shadow: 3px 3px 0 #000;
+  box-shadow: var(--sh-3);
 }
 .ui-mode-btn:active:not(:disabled) {
   transform: translate(1px, 1px);
@@ -566,13 +587,13 @@ textarea {
   border: 2px solid var(--px-accent);
   color: var(--px-text-on-panel);
   background: var(--px-bg2);
-  box-shadow: 2px 2px 0 #000;
+  box-shadow: var(--sh-2);
   cursor: pointer;
   font-family: inherit;
   transition: transform 80ms, box-shadow 80ms;
 }
 .ui-action-btn:active {
-  box-shadow: 1px 1px 0 #000;
+  box-shadow: var(--sh-1);
   transform: translate(1px, 1px);
 }
 .ui-action-btn-muted {
@@ -583,11 +604,11 @@ textarea {
   border-color: #000;
   color: #000;
   background: var(--px-accent);
-  box-shadow: 2px 2px 0 #000;
+  box-shadow: var(--sh-2);
 }
 @keyframes ui-action-pulse {
-  0%, 100% { box-shadow: 2px 2px 0 #000, 0 0 0 0 color-mix(in srgb, var(--px-accent) 0%, transparent); }
-  50% { box-shadow: 2px 2px 0 #000, 0 0 0 3px color-mix(in srgb, var(--px-accent) 55%, transparent); }
+  0%, 100% { box-shadow: var(--sh-2), 0 0 0 0 color-mix(in srgb, var(--px-accent) 0%, transparent); }
+  50% { box-shadow: var(--sh-2), 0 0 0 3px color-mix(in srgb, var(--px-accent) 55%, transparent); }
 }
 .ui-action-btn-pulse {
   animation: ui-action-pulse 1.4s ease-in-out 2;
@@ -712,7 +733,7 @@ textarea {
   overflow: hidden;
   box-shadow:
     0 0 0 3px #1a1a2e,
-    8px 8px 0 #000;
+    var(--sh-8);
   background: var(--px-bg);
 }
 
@@ -763,7 +784,7 @@ textarea {
   height: 12px;
   border: 2px solid var(--px-border);
   background: var(--px-bg);
-  box-shadow: inset 2px 2px 0 #000;
+  box-shadow: var(--sh-in);
   pointer-events: none;
 }
 .diary-slider-zone {
@@ -821,9 +842,9 @@ textarea {
   height: 28px;
   margin-top: -8px;
   background: var(--slider-color, var(--px-accent));
-  border: 3px solid #000;
+  border: 3px solid var(--px-edge);
   border-radius: 0;
-  box-shadow: 2px 2px 0 #000;
+  box-shadow: var(--sh-2);
 }
 .diary-score-slider::-moz-range-track {
   height: 12px;
@@ -835,8 +856,8 @@ textarea {
   width: 28px;
   height: 28px;
   background: var(--slider-color, var(--px-accent));
-  border: 3px solid #000;
-  box-shadow: 2px 2px 0 #000;
+  border: 3px solid var(--px-edge);
+  box-shadow: var(--sh-2);
   border-radius: 0;
 }
 
@@ -876,15 +897,15 @@ body::before {
 
 @keyframes pillarSlotGlow {
   0% {
-    box-shadow: 2px 2px 0 #000;
+    box-shadow: var(--sh-2);
     border-color: var(--px-border);
   }
   40% {
-    box-shadow: 0 0 12px var(--px-accent), 3px 3px 0 #000;
+    box-shadow: 0 0 12px var(--px-accent), var(--sh-3);
     border-color: var(--px-accent);
   }
   100% {
-    box-shadow: 2px 2px 0 #000;
+    box-shadow: var(--sh-2);
     border-color: var(--px-border);
   }
 }
@@ -1059,7 +1080,7 @@ body::before {
   border-top: 2px solid color-mix(in srgb, var(--px-accent) 55%, transparent);
   border-bottom: 2px solid color-mix(in srgb, var(--px-accent) 55%, transparent);
   background: color-mix(in srgb, var(--px-accent) 12%, var(--px-bg3));
-  box-shadow: 2px 2px 0 #000;
+  box-shadow: var(--sh-2);
 }
 
 .fortune-readable .fortune-body__lead-mark {
@@ -1078,11 +1099,11 @@ body::before {
   0%,
   100% {
     transform: scale(1);
-    box-shadow: 2px 2px 0 #000;
+    box-shadow: var(--sh-2);
   }
   50% {
     transform: scale(1.012);
-    box-shadow: 3px 3px 0 #000;
+    box-shadow: var(--sh-3);
   }
 }
 
@@ -1131,7 +1152,7 @@ body::before {
     var(--px-bg2) 55%,
     var(--px-bg3) 100%
   );
-  box-shadow: 2px 2px 0 #000;
+  box-shadow: var(--sh-2);
   animation: fortune-tease-breathe 2.8s ease-in-out infinite;
 }
 
@@ -1936,16 +1957,16 @@ body::before {
   padding: 0.9rem 1rem;
   font-size: 0.875rem;
   font-weight: 900;
-  border: 2px solid #000;
+  border: 2px solid var(--px-edge);
   color: #111;
   background: var(--px-accent);
-  box-shadow: 3px 3px 0 #000;
+  box-shadow: var(--sh-3);
   opacity: 0;
   animation: welcome-line-in 720ms cubic-bezier(0.22, 1, 0.36, 1) 1980ms both;
 }
 .welcome-splash__cta:active {
   transform: translate(1px, 1px);
-  box-shadow: 2px 2px 0 #000;
+  box-shadow: var(--sh-2);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -2195,3 +2216,278 @@ body::before {
 }
 
 
+
+
+/* ══════════════════════════════════════════════════════════
+   감성 톤 (soft theme)
+   플래그 NEXT_PUBLIC_FF_SOFT_THEME 로 켜면 <html data-skin="soft">.
+   끄면 이 블록이 통째로 안 걸려 기존 복고풍 그대로다.
+
+   왜 이렇게 하나 —
+   색은 76%가 --px-* 변수를 통하므로 토큰만 갈면 대부분 바뀐다.
+   그런데 이 앱 인상의 8할은 색이 아니라 **형태**다.
+   각진 2~3px 테두리(266곳)와 딱딱한 4px 4px 0 그림자(128곳).
+   그 둘을 부드럽게 바꾸는 게 핵심이다.
+   ══════════════════════════════════════════════════════════ */
+
+:root[data-skin="soft"] {
+  /* 밤하늘 자정 (2026-09-11 사장님 선택) —
+     처음엔 푸른기를 빼고 먹빛으로 갔는데 **칙칙하다**는 지적을 받았다.
+     숫자로 재 보니 그럴 만했다. 배경 채도 15%, 테두리 12%, 보조글 10%.
+     거의 무채색이었다. 게다가 원래 복고 강조색은 채도 100%였는데
+     61%로 떨어뜨려 놨다. "부드럽게"를 "흐리게"로 잘못 옮긴 것이다.
+
+     부드러움은 형태(1px 테두리·퍼진 그림자)가 이미 맡고 있다.
+     그러니 색은 오히려 진해도 된다 — 배경에 깊은 남보라를 넣어
+     같은 강조색이 더 진해 보이게 한다. */
+  --px-bg:       #0d0b1a;
+  --px-bg2:      #151228;
+  --px-bg3:      #1c1836;
+  --px-border:   #2a2450;
+  --px-border2:  #3d3570;
+
+  /* 살구빛(#e0b080)보다 채도·명도를 올린 금빛.
+     배경 대비 9.8:1 → 12.1:1 로 오히려 더 잘 읽힌다. */
+  --px-accent:   #ffc078;
+
+  --px-text:     #e8e4f5;
+  --px-text2:    #9a93c0;
+  --px-text-on-panel: #f3f0ff;
+
+  /* 형태 — 이 셋이 "감성"을 결정한다 */
+  --skin-border-w: 1px;
+  --skin-radius: 14px;
+  --skin-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
+  --skin-shadow-lift: 0 6px 20px rgba(0, 0, 0, 0.45);
+
+  /* 픽셀 폰트를 본문 폰트로 — 제목까지 각지면 감성이 안 산다 */
+  --font-display: var(--font-body);
+
+  /* 줄간격을 살짝 넓혀 숨 쉬게 */
+  line-height: 1.7;
+
+  /* 여기가 핵심 —
+     globals.css 의 딱딱한 그림자 33곳은 전부 이 7개 토큰을 통한다.
+     클래스 이름을 하나씩 쫓지 않고 값만 바꿔 한 번에 눕힌다. */
+  --sh-1:  var(--skin-shadow);
+  --sh-2:  var(--skin-shadow);
+  --sh-3:  var(--skin-shadow);
+  --sh-4:  var(--skin-shadow);
+  --sh-4b: var(--skin-shadow);
+  --sh-8:  var(--skin-shadow-lift);
+  --sh-in: none;
+  --sh-6:  var(--skin-shadow-lift);
+  --sh-1g: var(--skin-shadow);
+  --sh-3g: var(--skin-shadow);
+  --sh-4g: var(--skin-shadow);
+  --sh-3b: var(--skin-shadow);
+  --sh-4r: var(--skin-shadow);
+  /* 헤더 아래·하단탭 위 가로줄을 아예 없앤다 (2026-09-11 사장님 지적).
+     헤더는 이미 테두리 있는 카드고, 하단탭은 배경색이 달라서
+     선이 없어도 구분된다. 선이 하나 줄면 화면이 그만큼 조용해진다. */
+  --sh-under: none;
+  --sh-over:  none;
+
+  /* 각진 검정 테두리 → 은은한 경계, 복고 크림 → 살구빛 */
+  --px-edge:  var(--px-border2);
+  --px-cream: var(--px-accent);
+}
+
+/* ── 카드·입력·버튼 ─────────────────────────── */
+:root[data-skin="soft"] .px-card,
+:root[data-skin="soft"] .px-card-accent {
+  border-width: var(--skin-border-w);
+  border-radius: var(--skin-radius);
+  box-shadow: var(--skin-shadow);
+}
+
+:root[data-skin="soft"] .px-input {
+  border-width: var(--skin-border-w);
+  border-radius: 10px;
+  box-shadow: none;
+}
+:root[data-skin="soft"] .px-input:focus {
+  box-shadow: 0 0 0 3px rgba(224, 176, 128, 0.18);
+}
+
+:root[data-skin="soft"] .px-btn {
+  border-width: var(--skin-border-w);
+  border-radius: 12px;
+  box-shadow: var(--skin-shadow);
+}
+:root[data-skin="soft"] .px-btn:hover {
+  box-shadow: var(--skin-shadow-lift);
+  transform: translateY(-1px);
+}
+:root[data-skin="soft"] .px-btn:active {
+  box-shadow: var(--skin-shadow);
+  transform: translateY(1px);
+}
+:root[data-skin="soft"] .px-btn:disabled {
+  box-shadow: var(--skin-shadow);
+  transform: none;
+}
+
+:root[data-skin="soft"] .ui-primary-btn {
+  border-radius: 14px;
+  box-shadow: var(--skin-shadow);
+}
+
+/* ── 두꺼운 테두리를 한 겹으로 ────────────────
+   Tailwind 의 border-2 / border-4 가 266곳에 박혀 있어
+   개별 파일을 다 고치는 대신 여기서 한 번에 눕힌다. */
+:root[data-skin="soft"] .border-2,
+:root[data-skin="soft"] .border-4 {
+  border-width: var(--skin-border-w) !important;
+  border-radius: var(--skin-radius);
+}
+
+/* ── 딱딱한 그림자 ───────────────────────────
+   처음엔 [style*="4px 4px 0"] 로 인라인 style 을 겨냥했는데 **하나도 안 걸렸다.**
+   브라우저가 style 속성을 rgb(0, 0, 0) 4px 4px 0px 로 다시 쓰기 때문이다.
+   그래서 tsx 108곳의 인라인 그림자를 전부 var(--sh-*) 토큰으로 바꿨고,
+   여기서는 그 토큰 값만 갈아끼운다. 선택자 요행에 기대지 않는다. */
+
+/* 그림자 없이 각진 테두리만 인라인으로 박은 곳(33곳)도 같이 눕힌다.
+   이게 빠져 있어서 Day 0 카드·진행바가 혼자 각져 있었다. */
+:root[data-skin="soft"] [style*="2px solid"],
+:root[data-skin="soft"] [style*="3px solid"],
+:root[data-skin="soft"] [style*="4px solid"] {
+  border-width: var(--skin-border-w) !important;
+  border-radius: var(--skin-radius);
+}
+
+/* ── 하단 탭·헤더 ──────────────────────────────
+   가로줄을 없애는 대신 배경색 차이로 구분한다. */
+:root[data-skin="soft"] .app-bottom-nav {
+  border-top-width: 0;
+}
+
+/* ── 글자 ────────────────────────────────────
+   픽셀 폰트를 쓰던 곳을 본문 폰트로 되돌린다. */
+:root[data-skin="soft"] .ui-section-title,
+:root[data-skin="soft"] h1,
+:root[data-skin="soft"] h2 {
+  font-family: var(--font-body);
+  letter-spacing: -0.01em;
+}
+
+/* ── 모서리 ──────────────────────────────────
+   그림자·색은 토큰으로 해결됐지만 border-radius 는 값이 아니라
+   속성 자체가 없는 곳이 많다. 그래서 실제로 각져 보이는 것만 짚는다. */
+:root[data-skin="soft"] .saju-choice-track,
+:root[data-skin="soft"] .stats-panel,
+:root[data-skin="soft"] .stats-category-panel,
+:root[data-skin="soft"] .stats-chip,
+:root[data-skin="soft"] .stats-chip-cat,
+:root[data-skin="soft"] .home-section__body,
+:root[data-skin="soft"] .ui-mode-btn,
+:root[data-skin="soft"] .ui-action-btn,
+:root[data-skin="soft"] .welcome-splash__cta,
+:root[data-skin="soft"] .fortune-tease {
+  border-radius: var(--skin-radius);
+}
+
+:root[data-skin="soft"] .diary-score-slider::-webkit-slider-thumb,
+:root[data-skin="soft"] .diary-score-slider::-moz-range-thumb {
+  border-radius: 999px;
+}
+
+/* 선택된 칩 안쪽도 트랙을 따라 둥글게 (첫·끝만) */
+:root[data-skin="soft"] .saju-choice-chip:first-child {
+  border-radius: var(--skin-radius) 0 0 var(--skin-radius);
+}
+:root[data-skin="soft"] .saju-choice-chip:last-child {
+  border-radius: 0 var(--skin-radius) var(--skin-radius) 0;
+}
+
+/* 진행바 — 홈 맞춤도 막대가 유일하게 각져 있다 */
+:root[data-skin="soft"] .h-1\.5 {
+  border-radius: 999px;
+}
+
+/* 체크박스·라디오 — 브라우저 기본 흰 네모가 유일하게 튄다 */
+:root[data-skin="soft"] input[type="checkbox"],
+:root[data-skin="soft"] input[type="radio"] {
+  accent-color: var(--px-accent);
+  width: 1.05rem;
+  height: 1.05rem;
+}
+
+/* ══════════════════════════════════════════════════════════
+   벚꽃잎 (PetalLayer.tsx) — 2026-09-15 사장님 선택 C + B
+   세로 기둥(.petal-col)이 부모 높이만큼 내려가고, 안의 꽃잎(.petal)이 좌우로 흔들린다.
+   기둥 높이 = 부모 높이라서 translateY(%) 가 곧 화면 높이 비율이 된다 —
+   top 을 움직이지 않고 transform 만 써서 GPU 가 처리한다.
+   ══════════════════════════════════════════════════════════ */
+.petal-layer {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.petal-layer--ambient {
+  z-index: 0;
+}
+/* 저장 직후 흩날림은 카드 위로 — 3초짜리 축하라 잠깐 글을 덮어도 된다 */
+.petal-layer--burst {
+  z-index: 30;
+}
+
+.petal-col {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  width: 14px;
+  will-change: transform;
+}
+.petal-layer--ambient .petal-col {
+  animation-name: petal-fall-ambient;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+.petal-layer--burst .petal-col {
+  opacity: 0;
+  animation-name: petal-fall-burst;
+  animation-timing-function: cubic-bezier(0.25, 0.6, 0.45, 1);
+  animation-iteration-count: 1;
+  animation-fill-mode: forwards;
+}
+
+.petal {
+  display: block;
+  /* 한쪽 모서리만 둥근 타원 = 꽃잎 */
+  border-radius: 100% 0 100% 0;
+  animation-name: petal-sway;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+  animation-direction: alternate;
+}
+.petal--0 {
+  background: #f2a6c0;
+}
+.petal--1 {
+  background: #ffc9dd;
+}
+
+@keyframes petal-fall-ambient {
+  from { transform: translateY(-6%); }
+  to   { transform: translateY(104%); }
+}
+@keyframes petal-fall-burst {
+  0%   { transform: translateY(-8%);  opacity: 0; }
+  10%  { opacity: 1; }
+  70%  { opacity: 1; }
+  100% { transform: translateY(96%);  opacity: 0; }
+}
+@keyframes petal-sway {
+  from { transform: translate3d(-10px, 0, 0) rotate(-25deg); }
+  to   { transform: translate3d(10px, 0, 0) rotate(35deg); }
+}
+
+/* 폰에서 "동작 줄이기"를 켠 사람 — 멀미가 날 수 있어 아예 안 그린다 */
+@media (prefers-reduced-motion: reduce) {
+  .petal-layer {
+    display: none;
+  }
+}

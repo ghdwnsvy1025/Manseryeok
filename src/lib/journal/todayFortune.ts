@@ -430,6 +430,21 @@ export async function generateTodayFortuneV2(
     onboardingCompleted?: boolean;
     totalXp?: number;
     sajuProfile?: SajuProfile | null;
+    /**
+     * 이 사람 **본인 기록으로 확인된** 오늘의 패턴 문장들.
+     * 원국 이론은 "이런 사람은 보통 이렇다"이고, 이건 "이 사람은 실제로 이랬다"다.
+     * 충돌하면 이쪽이 이긴다 — 그게 이 앱이 다른 사주 앱과 갈리는 지점이다.
+     * 비어 있으면 프롬프트에서 통째로 빠져 기존과 동일하게 동작한다.
+     */
+    verifiedDayFacts?: string[];
+    /**
+     * 오늘이 이 사람의 용신일이면 그 사실 한 문장.
+     *
+     * verifiedDayFacts 와 **일부러 분리했다.** 저쪽은 기록으로 확인된 사실이고
+     * 이건 아직 확인 전인 사주 이론이다. 한 통에 담으면 이론이 사실 행세를 한다.
+     * 용신일이 아니면 넘기지 않는다 → 프롬프트에서 통째로 빠져 기존과 같이 동작한다.
+     */
+    todayYongsinFact?: string | null;
   }
 ): Promise<TodayFortuneV2Result> {
   const scored = scoreFortuneDomains(insight, {
@@ -587,6 +602,18 @@ export async function generateTodayFortuneV2(
             natalSignatureVersion: "natal-signature-v1.1.0",
             /** 날짜 잠금 — 날마다 갈라지는 본체 */
             dayStructureBrief,
+            /**
+             * 본인 기록으로 확인된 사실 — 이론보다 우선한다.
+             * 없으면 필드 자체가 빠진다.
+             */
+            verifiedDayPatterns:
+              opts?.verifiedDayFacts && opts.verifiedDayFacts.length > 0
+                ? opts.verifiedDayFacts
+                : undefined,
+            /** 오늘이 용신일일 때만 — 이론 중 가장 큰 사실 */
+            todayYongsin: opts?.todayYongsinFact
+              ? { isYongsinDay: true, fact: opts.todayYongsinFact }
+              : undefined,
             /** 4계층 분석 사실 — 문장 전에 코드로 고정 */
             analysisFacts: analysisFacts
               ? {

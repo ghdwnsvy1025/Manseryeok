@@ -31,7 +31,7 @@ export default function CoachmarkOverlay({ steps, onComplete, onSkip }: Props) {
         style={{
           background: "var(--px-bg2)",
           borderColor: "var(--px-accent)",
-          boxShadow: "6px 6px 0 #000",
+          boxShadow: "var(--sh-6)",
         }}
       >
         <p className="ui-hint">
@@ -67,7 +67,7 @@ export default function CoachmarkOverlay({ steps, onComplete, onSkip }: Props) {
               borderColor: "#000",
               color: "#000",
               background: "var(--px-accent)",
-              boxShadow: "3px 3px 0 #000",
+              boxShadow: "var(--sh-3)",
             }}
           >
             {isLast ? "시작하기" : "다음"}

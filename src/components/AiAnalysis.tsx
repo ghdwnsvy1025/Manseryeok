@@ -59,7 +59,7 @@ export default function AiAnalysis({ result }: AiAnalysisProps) {
       style={{
         background: "var(--px-bg3)",
         border: "2px solid var(--px-accent)",
-        boxShadow: "3px 3px 0 #4a3a00",
+        boxShadow: "var(--sh-3g)",
       }}
     >
       <p className="text-xs font-bold" style={{ color: "var(--px-accent)" }}>
