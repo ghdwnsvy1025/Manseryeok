@@ -70,6 +70,36 @@ export function mod(a: number, b: number): number {
   return ((a % b) + b) % b;
 }
 
+/**
+ * 날짜/시각에 분을 더한 결과 반환 (음수 가능)
+ * 자정을 넘으면 JDN 기준으로 일/월/년이 함께 이동한다.
+ */
+export function addMinutesToDateTime(
+  year: number,
+  month: number,
+  day: number,
+  hour: number,
+  minute: number,
+  deltaMinutes: number
+): { year: number; month: number; day: number; hour: number; minute: number } {
+  const totalMinutes = hour * 60 + minute + deltaMinutes;
+  const dayShift = Math.floor(totalMinutes / 1440);
+  const minuteOfDay = mod(totalMinutes, 1440);
+
+  let date = { year, month, day };
+  if (dayShift !== 0) {
+    // 정수 JDN은 해당 날짜의 정오이므로 날짜 부분만 사용
+    const shifted = jdnToGregorian(gregorianToJdn(year, month, day) + dayShift);
+    date = { year: shifted.year, month: shifted.month, day: shifted.day };
+  }
+
+  return {
+    ...date,
+    hour: Math.floor(minuteOfDay / 60),
+    minute: minuteOfDay % 60,
+  };
+}
+
 /** JDN(날짜) + UTC 시각(시, 분) → JDE */
 export function toJDE(jdn: number, utcHour: number, utcMinute: number): number {
   return jdn - 0.5 + (utcHour * 60 + utcMinute) / 1440.0;

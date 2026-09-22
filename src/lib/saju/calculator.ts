@@ -4,7 +4,7 @@
 // ============================================================
 
 import type { SajuInput, SajuResult } from "./types";
-import { kstToJDE, mod } from "./jdn";
+import { addMinutesToDateTime, kstToJDE, mod } from "./jdn";
 import { getYearPillar } from "./yearPillar";
 import { getMonthPillar } from "./monthPillar";
 import { getDayPillar } from "./dayPillar";
@@ -106,9 +106,22 @@ export function calculateSaju(input: SajuInput): SajuResult {
     }
 
     // 보정 적용
-    const totalMinutes = kstHour * 60 + kstMinute + Math.round(timeCorrectionMinutes);
-    kstHour = mod(Math.floor(totalMinutes / 60), 24);
-    kstMinute = mod(totalMinutes, 60);
+    // 보정으로 자정을 넘으면 날짜(일/월/년)도 함께 이동한다.
+    // 이후 년주·월주·일주·시주·대운은 모두 이 보정된 날짜/시각을 사용한다.
+    const corrected = addMinutesToDateTime(
+      solarYear,
+      solarMonth,
+      solarDay,
+      kstHour,
+      kstMinute,
+      Math.round(timeCorrectionMinutes)
+    );
+    solarYear = corrected.year;
+    solarMonth = corrected.month;
+    solarDay = corrected.day;
+    kstHour = corrected.hour;
+    kstMinute = corrected.minute;
+    assertSupportedSolarDate(solarYear, solarMonth, solarDay);
 
     const corrLabel = options.timeCorrection === "localMeanSolarTime" ? "평균태양시" : "진태양시";
     warnings.push(

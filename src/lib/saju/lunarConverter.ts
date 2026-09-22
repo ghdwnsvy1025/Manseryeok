@@ -57,8 +57,9 @@ export function lunarToSolar(
 
     // 변환 결과 역검증: 양력→음력으로 되돌려 확인
     const lunarBack = solar.getLunar();
+    // Lunar에는 isLeap()이 없다 — 윤달은 getMonth() 음수로만 구분된다
     const backMonth = Math.abs(lunarBack.getMonth());
-    const backIsLeap = lunarBack.isLeap();
+    const backIsLeap = lunarBack.getMonth() < 0;
 
     if (
       lunarBack.getYear() !== year ||
