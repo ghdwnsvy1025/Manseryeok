@@ -216,7 +216,6 @@ describe("앱 기록 → 가설 입력 어댑터", () => {
         scores: [
           { categoryCode: "energy", userScore: 10, rawScore: 10, isNotApplicable: false },
           { categoryCode: "physical_condition", userScore: 1, rawScore: 1, isNotApplicable: false },
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
         ] as any,
       }),
     ]);
@@ -230,7 +229,6 @@ describe("앱 기록 → 가설 입력 어댑터", () => {
     const [record] = toDayRecords([
       entry({
         coreStates: { energy: { ordinal: 2, isNotApplicable: false } },
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         scores: [{ categoryCode: "energy", userScore: 10, rawScore: 10, isNotApplicable: false }] as any,
       }),
     ]);
