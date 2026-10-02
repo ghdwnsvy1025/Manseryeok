@@ -361,6 +361,25 @@ async function main() {
       await page.waitForTimeout(2500);
       await shoot(page, "fortune-open");
       await page.waitForTimeout(300);
+
+      // 7-3. 패널 안의 둘째 문 — 여기서야 LLM 운세가 불린다. 결과까지 찍는다
+      const tease = page
+        .getByRole("button", { name: /오늘의 운세 보기|오늘의 운세 펼치기/ })
+        .first();
+      if (await tease.isVisible().catch(() => false)) {
+        await tease.click({ force: true });
+        // 로딩 문구("…고르는 중")가 사라질 때까지 — LLM 응답은 10~40초 걸린다
+        await page
+          .locator(".fortune-body__lead, .fortune-body, [data-fortune-error]")
+          .first()
+          .waitFor({ timeout: 90000 })
+          .catch(() => {});
+        await page.waitForTimeout(2500);
+        await shoot(page, "fortune-result");
+        await page.mouse.wheel(0, 700);
+        await page.waitForTimeout(500);
+        await shoot(page, "fortune-result-2");
+      }
     }
 
     // 8. "나" 탭 — 하단 탭에서 눌러서 들어간다 (링크가 실제로 붙어 있는지도 같이 확인)

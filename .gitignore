@@ -37,3 +37,7 @@ scripts/demo-seed.json
 
 # Claude 로컬 설정
 .claude/
+
+# 스크린샷 점검 산출물 · 개발 서버 로그
+shots*/
+*.log
