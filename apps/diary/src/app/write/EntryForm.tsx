@@ -1,6 +1,6 @@
 "use client";
 
-import { startTransition, useActionState, useState, type FormEvent } from "react";
+import { startTransition, useActionState, useRef, useState, type FormEvent } from "react";
 import { saveEntryAction, type FormState } from "@/app/actions";
 import { MAX_MOODS, MAX_NOTE, MOODS } from "@/lib/entry";
 
@@ -28,6 +28,9 @@ export function EntryForm({ date, initial }: Props) {
   const [happiness, setHappiness] = useState<number | null>(initial?.happiness ?? null);
   const [moods, setMoods] = useState<string[]>(initial?.moods ?? []);
   const [note, setNote] = useState(initial?.note ?? "");
+  // 행복도 없이 저장을 누르면 그 자리로 데려가 이유를 보여 준다 (버튼을 막아 두면 눌러도 반응이 없어 저장된 줄 안다)
+  const [missingHappiness, setMissingHappiness] = useState(false);
+  const happinessRef = useRef<HTMLFieldSetElement>(null);
 
   function toggleMood(m: string) {
     setMoods((cur) => (cur.includes(m) ? cur.filter((x) => x !== m) : cur.length < MAX_MOODS ? [...cur, m] : cur));
@@ -37,6 +40,12 @@ export function EntryForm({ date, initial }: Props) {
   // 서버에서 오류가 났을 때 적은 내용이 사라지면 안 된다.
   function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (happiness === null) {
+      setMissingHappiness(true);
+      happinessRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      happinessRef.current?.querySelector("input")?.focus({ preventScroll: true });
+      return;
+    }
     const data = new FormData(e.currentTarget);
     startTransition(() => action(data));
   }
@@ -45,9 +54,11 @@ export function EntryForm({ date, initial }: Props) {
     <form onSubmit={onSubmit} className="flex flex-col gap-8">
       <input type="hidden" name="entryDate" value={date} />
 
-      <fieldset>
+      <fieldset ref={happinessRef}>
         <legend className="text-[17px] font-bold">행복도</legend>
-        <p className="mt-1 h-5 text-sm text-muted">{happiness ? `${happiness} · ${hint(happiness)}` : "1부터 10까지"}</p>
+        <p className={`mt-1 h-5 text-sm ${missingHappiness && happiness === null ? "font-bold text-danger" : "text-muted"}`} aria-live="polite">
+          {happiness ? `${happiness} · ${hint(happiness)}` : missingHappiness ? "행복도를 먼저 골라 주세요" : "1부터 10까지"}
+        </p>
         <div className="mt-3 grid grid-cols-5 gap-2">
           {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
             <label key={n} className="relative">
@@ -58,7 +69,6 @@ export function EntryForm({ date, initial }: Props) {
                 checked={happiness === n}
                 onChange={() => setHappiness(n)}
                 className="peer sr-only"
-                required
               />
               <span className="flex h-12 cursor-pointer items-center justify-center rounded-xl border border-line bg-surface text-[17px] font-bold text-muted peer-checked:border-lamp peer-checked:bg-lamp peer-checked:text-lamp-ink peer-focus-visible:outline-2 peer-focus-visible:outline-lamp">
                 {n}
@@ -126,10 +136,10 @@ export function EntryForm({ date, initial }: Props) {
 
       <button
         type="submit"
-        disabled={pending || happiness === null}
+        disabled={pending}
         className="h-14 rounded-2xl bg-lamp text-[17px] font-bold text-lamp-ink disabled:opacity-40"
       >
-        {pending ? "저장하는 중…" : happiness === null ? "행복도를 골라 주세요" : "저장"}
+        {pending ? "저장하는 중…" : "저장"}
       </button>
     </form>
   );
