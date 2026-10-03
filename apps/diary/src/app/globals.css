@@ -1,0 +1,39 @@
+@import "tailwindcss";
+
+/* 사주읽는밤 — 밤하늘 남색 위에 등불 한 점. 색은 여기서만 정한다. */
+@theme {
+  --color-night: #0e0c1b;          /* 바탕 */
+  --color-surface: #18152b;        /* 카드 */
+  --color-surface-2: #221e3b;      /* 눌린 칸·입력 */
+  --color-line: #2f2a52;           /* 테두리 */
+  --color-ink: #ede9f8;            /* 본문 */
+  --color-muted: #a39dc2;          /* 보조 글 */
+  --color-faint: #6f6993;          /* 더 흐린 글 */
+  --color-lamp: #ffc47e;           /* 강조·버튼 (등불) */
+  --color-lamp-ink: #2b1c06;       /* 등불 위 글자 */
+  --color-moon: #c9c2ff;           /* 간지·한자 */
+  --color-danger: #ff8f8f;
+
+  --font-sans: var(--font-noto), "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+  --font-serif: var(--font-gowun), "AppleMyungjo", "Batang", serif;
+}
+
+html {
+  color-scheme: dark;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background: var(--color-night);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  /* 위쪽에 아주 옅은 달빛 */
+  background-image: radial-gradient(120% 60% at 50% -10%, #2a2350 0%, transparent 60%);
+  background-attachment: fixed;
+  min-height: 100dvh;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-lamp);
+  outline-offset: 2px;
+}

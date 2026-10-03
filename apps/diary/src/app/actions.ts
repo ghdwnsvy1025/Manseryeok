@@ -1,0 +1,69 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+import { getUser } from "@/lib/supabase/server";
+import { saveEntry, saveSajuProfile } from "@/lib/db";
+import { validateEntry } from "@/lib/entry";
+import { dayGanji } from "@/lib/ganji";
+import { computeProfile, validateProfile } from "@/lib/profile";
+
+export interface FormState {
+  error: string | null;
+}
+
+/** 로그인 뒤 돌아갈 곳. 외부 주소로 튀지 않게 앱 안 경로만 허용한다. */
+function safeNext(value: FormDataEntryValue | null, fallback: string): string {
+  const s = typeof value === "string" ? value : "";
+  return s.startsWith("/") && !s.startsWith("//") ? s : fallback;
+}
+
+export async function saveEntryAction(_prev: FormState, form: FormData): Promise<FormState> {
+  const checked = validateEntry({
+    entryDate: form.get("entryDate"),
+    happiness: form.get("happiness"),
+    moods: form.getAll("moods"),
+    note: form.get("note"),
+  });
+  if (!checked.ok) return { error: checked.error };
+
+  const { supabase, user } = await getUser();
+  if (!user) redirect(`/login?next=${encodeURIComponent("/write")}`);
+
+  try {
+    await saveEntry(supabase, user.id, checked.value, dayGanji(checked.value.entryDate));
+  } catch (e) {
+    console.error(e);
+    return { error: "저장하지 못했어요. 잠시 뒤 다시 눌러 주세요." };
+  }
+  revalidatePath("/");
+  revalidatePath("/me");
+  redirect(`/?saved=${checked.value.entryDate}`);
+}
+
+export async function saveProfileAction(_prev: FormState, form: FormData): Promise<FormState> {
+  const checked = validateProfile(Object.fromEntries(form.entries()));
+  if (!checked.ok) return { error: checked.error };
+
+  const computed = computeProfile(checked.value);
+  if (!computed.ok) return { error: computed.error };
+
+  const { supabase, user } = await getUser();
+  if (!user) redirect("/login?next=/onboarding");
+
+  try {
+    await saveSajuProfile(supabase, user.id, checked.value, computed.value);
+  } catch (e) {
+    console.error(e);
+    return { error: "저장하지 못했어요. 잠시 뒤 다시 눌러 주세요." };
+  }
+  revalidatePath("/", "layout");
+  redirect(safeNext(form.get("next"), "/"));
+}
+
+export async function signOutAction(): Promise<void> {
+  const { supabase } = await getUser();
+  await supabase.auth.signOut();
+  revalidatePath("/", "layout");
+  redirect("/");
+}

@@ -51,7 +51,7 @@ w        = n / (n + k)      n = 오늘과 같은 간지 성분(일간·일지·�
 | 스택 | Next.js 15 · React 19 · Supabase(같은 프로젝트, 새 테이블) · Tailwind · PostHog · Vercel |
 | 엔진 | `src/lib/saju/`를 `packages/saju-engine/`로 옮겨 원본으로 삼는다. 사주 코어는 지금처럼 커밋 해시를 적어 복사(vendor)한다 |
 | LLM | 운세 1회 호출 · 입력 2,000토큰 이내 · 사용자(게스트는 프로필 지문)·날짜 단위 서버 캐시 |
-| DB | 테이블 6개: 사용자 · 사주 프로필 · 기록 · 운세 캐시 · 운세 피드백 · 알림 설정. 간지 통계는 저장하지 않고 읽을 때 계산 |
+| DB | 테이블 6개, 이름은 모두 `night_` 접두어 (레거시 테이블과 겹치지 않게): `night_profiles` · `night_saju_profiles` · `night_entries` · `night_fortunes` · `night_fortune_feedback` · `night_notification_settings`. 간지 통계는 저장하지 않고 읽을 때 계산. 마이그레이션은 `apps/diary/supabase/migrations/`, 적용은 SQL Editor |
 | API | 5개: 운세 생성 · 기록 저장 · 간지 통계 · 알림 등록 · 계정 삭제 |
 
 ## 3. 단계
@@ -59,7 +59,7 @@ w        = n / (n + k)      n = 오늘과 같은 간지 성분(일간·일지·�
 | 단계 | 내용 | 기간 | 상태 |
 |---|---|---|---|
 | 0 | 데이터 전체 백업 · 레거시 동결 · 이 문서 | 1일 | **완료 2026-10-04** |
-| 1 | 엔진 패키지 분리 · 새 앱 뼈대 · Google 로그인 · 기록 저장 | 5일 | |
+| 1 | 엔진 패키지 분리 · 새 앱 뼈대 · Google 로그인 · 기록 저장 | 5일 | **코드 완료 2026-10-04** · DB 적용과 실계정 로그인 확인 대기 |
 | 2 | 운세 v3 (엔진 점수 + LLM 1회 + 캐시) | 4일 | |
 | 3 | 간지별 행복도 · 맞춤도 · 나 탭 | 4일 | |
 | 4 | 저녁 알림 · 설치 유도 · 공유 카드 | 3일 | |
@@ -90,7 +90,15 @@ w        = n / (n + k)      n = 오늘과 같은 간지 성분(일간·일지·�
 
 **레거시 플래그 (운영 .env)**: LEGACY_MENU · NEW_DIARY · SAJU_SNAPSHOT · PERSONALIZATION(+TRAIN·DISPLAY) · NEW_ANALYSIS · ANALYSIS_NARRATIVE_LLM · ANALYSIS_CACHE · HYPOTHESIS_CARDS · CALM_HOME · SOFT_THEME · SEAL_LEGACY 켜짐. CHECKIN_V2 꺼짐.
 
-## 5. 레거시에서 가져올 것 / 버릴 것
+## 5. 1단계 기록
+
+- `packages/saju-engine`: 레거시 `src/lib/saju/` 최상위 15개 파일과 테스트 11개(146건)를 옮겼다. 풀이 문장 생성기(`reading/`·`rules/`·`interpretation/`)는 새 앱에서 안 써서 두고 왔다. jest → vitest.
+- `apps/diary`: Next 15 · React 19 · Tailwind 4 · @supabase/ssr. 화면은 오늘(`/`) · 쓰기(`/write`) · 나(`/me`) · 로그인 · 생년월일(`/onboarding`). 저장은 서버 액션.
+- 엔진은 `file:` 링크로 쓴다. npm이 링크된 패키지의 의존성을 깔지 않아서 앱이 `lunar-javascript`를 직접 의존하고, `next.config.ts`에서 `resolve.symlinks = false`로 앱의 node_modules에서 찾게 했다. Vercel 배포 시 Root Directory는 `apps/diary`.
+- 개발 서버는 레거시와 같은 3001 포트를 쓴다. Supabase 리디렉트 허용 목록(`/auth/callback`)을 그대로 쓰기 위해서다.
+- 계산 기준은 레거시와 같다: 자정 일 바뀜 · 진태양시 보정 · 출생지 8개 도시 경도. 1990-01-01 12:00 서울 → 己巳 丙子 丙寅 甲午로 레거시 화면과 일치.
+
+## 6. 레거시에서 가져올 것 / 버릴 것
 
 **가져올 것**: 만세력·오행 분포 엔진 · Supabase 프로젝트와 Google 로그인 설정 · "오늘 기록, 고마워요" 계열 문장 톤 · PWA 설치 안내(카톡 인앱 처리 포함) · 시간대별 홈 분기(낮=운세, 밤=기록)
 
