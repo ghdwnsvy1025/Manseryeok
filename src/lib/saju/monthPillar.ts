@@ -11,8 +11,8 @@ import {
   MONTH_SOLAR_TERM_LONGITUDES,
   MONTH_BRANCH_INDICES,
 } from "./constants";
-import { SOLAR_TERM_INFO, getSolarTermJDE, getSolarTermKSTIso } from "./solarTerms";
-import { mod } from "./jdn";
+import { SOLAR_TERM_INFO, getSolarTermJDE } from "./solarTerms";
+import { jdeToKSTIso } from "./jdn";
 import type { Pillar } from "./types";
 
 export interface MonthPillarResult {
@@ -86,14 +86,9 @@ export function getMonthPillar(
     monthNumber,
     startJDE: boundaries[monthNumber - 1],
     endJDE: boundaries[monthNumber],
-    startTermKSTIso: getSolarTermKSTIso(
-      monthNumber <= 11 ? sajuYear : sajuYear + 1,
-      startLon
-    ),
-    endTermKSTIso: getSolarTermKSTIso(
-      monthNumber <= 11 ? sajuYear + 1 : sajuYear + 1,
-      longitudes[Math.min(monthNumber, 11)]
-    ),
+    // 탐색에 사용한 경계를 그대로 표시 (끝 = 다음 절입)
+    startTermKSTIso: jdeToKSTIso(boundaries[monthNumber - 1]),
+    endTermKSTIso: jdeToKSTIso(boundaries[monthNumber]),
     startTermName: startTermInfo ? `${startTermInfo.ko}(${startTermInfo.hanja})` : "알 수 없음",
     pillar: {
       stem: {

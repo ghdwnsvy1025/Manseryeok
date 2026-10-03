@@ -52,7 +52,10 @@ export function calculateSaju(input: SajuInput): SajuResult {
   let solarDay = input.day;
   let lunarConversionInfo: SajuResult["input"]["lunarConversion"] | undefined;
 
-  assertSupportedSolarDate(input.year, input.month, input.day);
+  // 음력 입력(예: 2월 30일)은 양력 기준으로 검사하지 않는다 — lunarToSolar가 존재 여부를 검증한다.
+  if (options.calendarType !== "lunar") {
+    assertSupportedSolarDate(input.year, input.month, input.day);
+  }
 
   if (options.calendarType === "lunar") {
     const conv = lunarToSolar(
