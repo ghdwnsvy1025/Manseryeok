@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getUser } from "@/lib/supabase/server";
-import { saveEntry, saveSajuProfile } from "@/lib/db";
+import { saveEntry, saveFortuneVote, saveSajuProfile } from "@/lib/db";
+import { clearGuestProfile, writeGuestProfile } from "@/lib/guest";
 import { validateEntry } from "@/lib/entry";
 import { dayGanji } from "@/lib/ganji";
 import { computeProfile, validateProfile } from "@/lib/profile";
@@ -66,4 +67,36 @@ export async function signOutAction(): Promise<void> {
   await supabase.auth.signOut();
   revalidatePath("/", "layout");
   redirect("/");
+}
+
+export async function guestProfileAction(_prev: FormState, form: FormData): Promise<FormState> {
+  const checked = validateProfile({ ...Object.fromEntries(form.entries()), name: "손님" });
+  if (!checked.ok) return { error: checked.error };
+  const computed = computeProfile(checked.value);
+  if (!computed.ok) return { error: computed.error };
+  const { name: _name, ...guest } = checked.value;
+  void _name;
+  await writeGuestProfile(guest);
+  revalidatePath("/");
+  redirect("/");
+}
+
+export async function clearGuestAction(): Promise<void> {
+  await clearGuestProfile();
+  revalidatePath("/");
+  redirect("/");
+}
+
+export async function fortuneVoteAction(form: FormData): Promise<void> {
+  const date = String(form.get("date") ?? "");
+  const vote = Number(form.get("vote"));
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || (vote !== 1 && vote !== -1)) return;
+  const { supabase, user } = await getUser();
+  if (!user) redirect(`/login?next=${encodeURIComponent("/")}`);
+  try {
+    await saveFortuneVote(supabase, user.id, date, vote);
+  } catch (e) {
+    console.error(e);
+  }
+  revalidatePath("/");
 }

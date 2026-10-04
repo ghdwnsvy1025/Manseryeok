@@ -1,8 +1,15 @@
 import Link from "next/link";
+import { clearGuestAction, guestProfileAction } from "@/app/actions";
+import { FortuneCard } from "@/components/FortuneCard";
 import { getUser } from "@/lib/supabase/server";
-import { getEntry, getSajuProfile } from "@/lib/db";
+import { getEntry, getFortuneVote, getSajuProfile, listEntriesForStats } from "@/lib/db";
+import { getTodayFortune } from "@/lib/fortune";
+import type { FortuneContent } from "@/lib/fortune/types";
 import { dayGanji } from "@/lib/ganji";
+import { guestKeyOf, readGuestProfile } from "@/lib/guest";
+import { computeProfile } from "@/lib/profile";
 import { addDays, formatKoreanDate, hourKST, todayKST } from "@/lib/time";
+import { ProfileForm } from "./onboarding/ProfileForm";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +24,33 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
   const [profile, entry] = user
     ? await Promise.all([getSajuProfile(supabase, user.id), getEntry(supabase, user.id, today)])
     : [null, null];
+
+  // 운세: 로그인 + 프로필이면 기록까지 반영, 게스트는 쿠키의 생년월일로
+  let fortune: FortuneContent | null = null;
+  let vote: 1 | -1 | null = null;
+  let guestHasProfile = false;
+  let fortuneError: string | null = null;
+  try {
+    if (user && profile) {
+      const entries = await listEntriesForStats(supabase, user.id);
+      [fortune, vote] = await Promise.all([
+        getTodayFortune({ date: today, pillars: profile.pillars, entries, owner: { userId: user.id } }),
+        getFortuneVote(supabase, user.id, today),
+      ]);
+    } else if (!user) {
+      const guest = await readGuestProfile();
+      if (guest) {
+        guestHasProfile = true;
+        const computed = computeProfile({ ...guest, name: "손님" });
+        if (computed.ok) {
+          fortune = await getTodayFortune({ date: today, pillars: computed.value.pillars, entries: [], owner: { guestKey: guestKeyOf(guest) } });
+        }
+      }
+    }
+  } catch (e) {
+    console.error("오늘 운세", e);
+    fortuneError = "운세를 불러오지 못했어요. 잠시 뒤 다시 열어 주세요.";
+  }
 
   const writeCard = !user ? (
     <section className="rounded-3xl border border-line bg-surface p-6">
@@ -54,8 +88,29 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
     </section>
   );
 
-  const fortuneCard =
-    user && !profile ? (
+  let fortuneCard: React.ReactNode;
+  if (fortune) {
+    fortuneCard = (
+      <>
+        <FortuneCard fortune={fortune} canVote={Boolean(user)} vote={vote} defaultOpen={!night || !user} />
+        {!user && guestHasProfile && (
+          <form action={clearGuestAction} className="-mt-2 text-right">
+            <button type="submit" className="text-xs text-faint underline underline-offset-4">
+              다른 생년월일로 보기
+            </button>
+          </form>
+        )}
+      </>
+    );
+  } else if (fortuneError) {
+    fortuneCard = (
+      <section className="rounded-3xl border border-line p-6 text-muted">
+        <h2 className="text-lg font-bold text-ink">오늘의 운세</h2>
+        <p className="mt-2 text-[15px]">{fortuneError}</p>
+      </section>
+    );
+  } else if (user) {
+    fortuneCard = (
       <section className="rounded-3xl border border-line bg-surface p-6">
         <h2 className="text-lg font-bold">생년월일을 알려 주세요</h2>
         <p className="mt-2 text-[15px] text-muted">내 사주로 오늘 운세를 계산해요. 한 번만 넣으면 돼요.</p>
@@ -66,12 +121,16 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
           생년월일 넣기
         </Link>
       </section>
-    ) : (
-      <section className="rounded-3xl border border-dashed border-line p-6 text-muted">
-        <h2 className="text-lg font-bold text-ink">오늘의 운세</h2>
-        <p className="mt-2 text-sm">개발 중 · 2단계에서 이 자리에 운세가 들어와요.</p>
+    );
+  } else {
+    fortuneCard = (
+      <section className="rounded-3xl border border-line bg-surface p-6">
+        <h2 className="text-lg font-bold">오늘 운세, 생년월일만 넣으면 바로 보여요</h2>
+        <p className="mt-2 mb-6 text-[15px] text-muted">이 기기에만 남고 서버에 저장하지 않아요.</p>
+        <ProfileForm next="/" initial={null} serverAction={guestProfileAction} askName={false} submitLabel="오늘 운세 보기" />
       </section>
     );
+  }
 
   return (
     <main className="flex flex-col gap-5">

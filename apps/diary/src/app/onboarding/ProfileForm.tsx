@@ -53,8 +53,18 @@ function Segmented<T extends string>({
   );
 }
 
-export function ProfileForm({ next, initial }: { next: string; initial: ProfileFormValues | null }) {
-  const [state, action, pending] = useActionState<FormState, FormData>(saveProfileAction, { error: null });
+interface ProfileFormProps {
+  next: string;
+  initial: ProfileFormValues | null;
+  /** 게스트 화면은 다른 액션을 쓴다 (쿠키에만 저장) */
+  serverAction?: (prev: FormState, form: FormData) => Promise<FormState>;
+  /** 게스트는 이름을 받지 않는다 */
+  askName?: boolean;
+  submitLabel?: string;
+}
+
+export function ProfileForm({ next, initial, serverAction = saveProfileAction, askName = true, submitLabel = "저장" }: ProfileFormProps) {
+  const [state, action, pending] = useActionState<FormState, FormData>(serverAction, { error: null });
   const [gender, setGender] = useState<"male" | "female" | null>(initial?.gender ?? null);
   const [calendar, setCalendar] = useState<"solar" | "lunar">(initial?.calendar ?? "solar");
   const [timeUnknown, setTimeUnknown] = useState(initial?.timeUnknown ?? false);
@@ -71,6 +81,7 @@ export function ProfileForm({ next, initial }: { next: string; initial: ProfileF
     <form onSubmit={onSubmit} className="flex flex-col gap-6">
       <input type="hidden" name="next" value={next} />
 
+      {askName && (
       <div>
         <label htmlFor="name" className="text-[15px] font-bold">
           이름
@@ -86,6 +97,7 @@ export function ProfileForm({ next, initial }: { next: string; initial: ProfileF
           required
         />
       </div>
+      )}
 
       <div>
         <p className="text-[15px] font-bold">성별</p>
@@ -168,7 +180,7 @@ export function ProfileForm({ next, initial }: { next: string; initial: ProfileF
       )}
 
       <button type="submit" disabled={pending} className="h-14 rounded-2xl bg-lamp text-[17px] font-bold text-lamp-ink disabled:opacity-50">
-        {pending ? "계산하는 중…" : "저장"}
+        {pending ? "계산하는 중…" : submitLabel}
       </button>
     </form>
   );

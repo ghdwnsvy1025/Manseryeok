@@ -134,3 +134,36 @@ export async function saveEntry(sb: SupabaseClient, userId: string, input: Entry
   );
   if (error) fail("기록 저장", error);
 }
+
+/** 운세 보정용: 전체 기록을 가볍게 (날짜 역순 제한 없음, 간지 통계에도 쓴다) */
+export async function listEntriesForStats(
+  sb: SupabaseClient,
+  userId: string,
+): Promise<Pick<EntryRow, "entry_date" | "happiness" | "day_ganji_index" | "day_stem" | "day_branch">[]> {
+  const { data, error } = await sb
+    .from("night_entries")
+    .select("entry_date, happiness, day_ganji_index, day_stem, day_branch")
+    .eq("user_id", userId)
+    .order("entry_date", { ascending: false })
+    .limit(2000);
+  if (error) fail("기록 통계 읽기", error);
+  return data ?? [];
+}
+
+export async function getFortuneVote(sb: SupabaseClient, userId: string, date: string): Promise<1 | -1 | null> {
+  const { data, error } = await sb
+    .from("night_fortune_feedback")
+    .select("vote")
+    .eq("user_id", userId)
+    .eq("fortune_date", date)
+    .maybeSingle();
+  if (error) fail("운세 피드백 읽기", error);
+  return (data?.vote as 1 | -1 | undefined) ?? null;
+}
+
+export async function saveFortuneVote(sb: SupabaseClient, userId: string, date: string, vote: 1 | -1): Promise<void> {
+  const { error } = await sb
+    .from("night_fortune_feedback")
+    .upsert({ user_id: userId, fortune_date: date, vote }, { onConflict: "user_id,fortune_date" });
+  if (error) fail("운세 피드백 저장", error);
+}
