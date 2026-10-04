@@ -2,8 +2,13 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { signOutAction } from "@/app/actions";
 import { getUser } from "@/lib/supabase/server";
-import { countEntries, getSajuProfile, listEntries } from "@/lib/db";
-import { formatKoreanDate } from "@/lib/time";
+import { GanjiGrid } from "@/components/GanjiGrid";
+import { StatsSummary } from "@/components/StatsSummary";
+import { countEntries, getSajuProfile, listEntries, listEntriesForStats } from "@/lib/db";
+import { fitPercent } from "@/lib/fortune/personal";
+import { dayGanji } from "@/lib/ganji";
+import { byBranch, byElement, byStem, ganjiGrid, highlights } from "@/lib/stats/ganji";
+import { formatKoreanDate, todayKST } from "@/lib/time";
 import type { PillarSnapshot } from "@/lib/profile";
 
 export const dynamic = "force-dynamic";
@@ -19,14 +24,18 @@ function PillarCell({ label, p }: { label: string; p: PillarSnapshot | null }) {
   );
 }
 
-export default async function MePage() {
+export default async function MePage({ searchParams }: { searchParams: Promise<{ cell?: string }> }) {
+  const { cell } = await searchParams;
   const { supabase, user } = await getUser();
   if (!user) redirect("/login?next=/me");
-  const [profile, entries, total] = await Promise.all([
+  const [profile, entries, total, all] = await Promise.all([
     getSajuProfile(supabase, user.id),
     listEntries(supabase, user.id, 30),
     countEntries(supabase, user.id),
+    listEntriesForStats(supabase, user.id),
   ]);
+  const selected = cell !== undefined && /^\d{1,2}$/.test(cell) && Number(cell) < 60 ? Number(cell) : null;
+  const todayIndex = dayGanji(todayKST()).index;
 
   return (
     <main className="flex flex-col gap-6">
@@ -61,6 +70,15 @@ export default async function MePage() {
         ) : (
           <p className="mt-2 text-[15px] text-muted">생년월일을 넣으면 내 사주와 운세가 보여요.</p>
         )}
+      </section>
+
+      <section className="flex flex-col gap-4">
+        <div>
+          <h2 className="text-[17px] font-bold">간지별 내 행복도</h2>
+          <p className="mt-1 text-sm text-muted">60가지 날 가운데 나는 어떤 날에 행복했는지. 쓸수록 칸이 켜져요.</p>
+        </div>
+        <GanjiGrid cells={ganjiGrid(all)} selected={selected} todayIndex={todayIndex} basePath="/me" />
+        <StatsSummary h={highlights(all)} fitPercent={fitPercent(all.length)} stems={byStem(all)} branches={byBranch(all)} elements={byElement(all)} />
       </section>
 
       <section>
