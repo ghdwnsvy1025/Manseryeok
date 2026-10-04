@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Gowun_Batang, Noto_Sans_KR } from "next/font/google";
 import { BottomNav } from "@/components/BottomNav";
+import { PwaRegister } from "@/components/PwaRegister";
 import "./globals.css";
 
 // 한글 글꼴은 서브셋 지정이 안 돼 미리 불러오지 않는다
@@ -10,6 +11,9 @@ const gowun = Gowun_Batang({ weight: ["400", "700"], preload: false, variable: "
 export const metadata: Metadata = {
   title: "사주읽는밤 일기",
   description: "밤에 한 줄 쓰면, 내 기록으로 운세가 점점 내 것이 됩니다.",
+  manifest: "/manifest.webmanifest",
+  appleWebApp: { capable: true, statusBarStyle: "default", title: "사주읽는밤" },
+  icons: { icon: "/icons/favicon-48.png", apple: "/icons/apple-touch-icon.png" },
 };
 
 export const viewport: Viewport = {
@@ -25,6 +29,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="antialiased">
         <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col px-5 pt-6 pb-28">{children}</div>
         <BottomNav />
+        <PwaRegister />
       </body>
     </html>
   );

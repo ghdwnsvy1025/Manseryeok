@@ -167,3 +167,31 @@ export async function saveFortuneVote(sb: SupabaseClient, userId: string, date: 
     .upsert({ user_id: userId, fortune_date: date, vote }, { onConflict: "user_id,fortune_date" });
   if (error) fail("운세 피드백 저장", error);
 }
+
+export interface NotificationSettingsRow {
+  enabled: boolean;
+  remind_at: string; // "21:00:00"
+  web_push: unknown | null;
+  kakao_opt_in: boolean;
+}
+
+export async function getNotificationSettings(sb: SupabaseClient, userId: string): Promise<NotificationSettingsRow | null> {
+  const { data, error } = await sb
+    .from("night_notification_settings")
+    .select("enabled, remind_at, web_push, kakao_opt_in")
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (error) fail("알림 설정 읽기", error);
+  return (data as NotificationSettingsRow | null) ?? null;
+}
+
+export async function saveNotificationSettings(
+  sb: SupabaseClient,
+  userId: string,
+  patch: Partial<NotificationSettingsRow>,
+): Promise<void> {
+  const { error } = await sb
+    .from("night_notification_settings")
+    .upsert({ user_id: userId, ...patch }, { onConflict: "user_id" });
+  if (error) fail("알림 설정 저장", error);
+}

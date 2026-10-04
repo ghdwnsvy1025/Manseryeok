@@ -3,8 +3,13 @@ import { redirect } from "next/navigation";
 import { signOutAction } from "@/app/actions";
 import { getUser } from "@/lib/supabase/server";
 import { GanjiGrid } from "@/components/GanjiGrid";
+import { InstallHint } from "@/components/InstallHint";
+import { NotificationSettings } from "@/components/NotificationSettings";
+import { ShareCard } from "@/components/ShareCard";
+import { shareCardText, shareMessage } from "@/lib/share";
+import { hourOf } from "@/lib/remind";
 import { StatsSummary } from "@/components/StatsSummary";
-import { countEntries, getSajuProfile, listEntries, listEntriesForStats } from "@/lib/db";
+import { countEntries, getNotificationSettings, getSajuProfile, listEntries, listEntriesForStats } from "@/lib/db";
 import { fitPercent } from "@/lib/fortune/personal";
 import { dayGanji } from "@/lib/ganji";
 import { byBranch, byElement, byStem, ganjiGrid, highlights } from "@/lib/stats/ganji";
@@ -28,12 +33,16 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
   const { cell } = await searchParams;
   const { supabase, user } = await getUser();
   if (!user) redirect("/login?next=/me");
-  const [profile, entries, total, all] = await Promise.all([
+  const [profile, entries, total, all, notif] = await Promise.all([
     getSajuProfile(supabase, user.id),
     listEntries(supabase, user.id, 30),
     countEntries(supabase, user.id),
     listEntriesForStats(supabase, user.id),
+    getNotificationSettings(supabase, user.id),
   ]);
+  const h = highlights(all);
+  const card = shareCardText(h, profile?.name ?? null);
+  const share = card ? shareMessage(card) : null;
   const selected = cell !== undefined && /^\d{1,2}$/.test(cell) && Number(cell) < 60 ? Number(cell) : null;
   const todayIndex = dayGanji(todayKST()).index;
 
@@ -78,7 +87,18 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
           <p className="mt-1 text-sm text-muted">60가지 날 가운데 나는 어떤 날에 행복했는지. 쓸수록 칸이 켜져요.</p>
         </div>
         <GanjiGrid cells={ganjiGrid(all)} selected={selected} todayIndex={todayIndex} basePath="/me" />
-        <StatsSummary h={highlights(all)} fitPercent={fitPercent(all.length)} stems={byStem(all)} branches={byBranch(all)} elements={byElement(all)} />
+        <StatsSummary h={h} fitPercent={fitPercent(all.length)} stems={byStem(all)} branches={byBranch(all)} elements={byElement(all)} />
+      </section>
+
+      <section className="flex flex-col gap-3">
+        <h2 className="text-[17px] font-bold">내일도 오게</h2>
+        <NotificationSettings
+          enabled={Boolean(notif?.enabled && notif.web_push)}
+          remindHour={notif ? Math.max(20, Math.min(23, hourOf(notif.remind_at))) : 21}
+          kakaoChannelUrl="https://pf.kakao.com/_WJJxiX"
+        />
+        <InstallHint />
+        <ShareCard card={card} title={share?.title ?? ""} text={share?.text ?? ""} />
       </section>
 
       <section>

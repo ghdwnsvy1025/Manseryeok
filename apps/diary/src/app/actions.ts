@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getUser } from "@/lib/supabase/server";
-import { saveEntry, saveFortuneVote, saveSajuProfile } from "@/lib/db";
+import { saveEntry, saveFortuneVote, saveNotificationSettings, saveSajuProfile } from "@/lib/db";
+import { isAllowedRemindHour } from "@/lib/remind";
 import { clearGuestProfile, writeGuestProfile } from "@/lib/guest";
 import { validateEntry } from "@/lib/entry";
 import { dayGanji } from "@/lib/ganji";
@@ -99,4 +100,56 @@ export async function fortuneVoteAction(form: FormData): Promise<void> {
     console.error(e);
   }
   revalidatePath("/");
+}
+
+/** 브라우저가 만든 푸시 구독을 저장하고 알림을 켠다 */
+export async function enablePushAction(subscriptionJson: string, remindHour: number): Promise<{ ok: boolean; error?: string }> {
+  const { supabase, user } = await getUser();
+  if (!user) return { ok: false, error: "로그인이 필요해요." };
+  let sub: unknown;
+  try {
+    sub = JSON.parse(subscriptionJson);
+  } catch {
+    return { ok: false, error: "구독 정보를 읽지 못했어요." };
+  }
+  if (!sub || typeof sub !== "object" || typeof (sub as { endpoint?: unknown }).endpoint !== "string") {
+    return { ok: false, error: "구독 정보가 올바르지 않아요." };
+  }
+  const hour = isAllowedRemindHour(remindHour) ? remindHour : 21;
+  try {
+    await saveNotificationSettings(supabase, user.id, {
+      enabled: true,
+      web_push: sub,
+      remind_at: `${String(hour).padStart(2, "0")}:00`,
+    });
+  } catch (e) {
+    console.error(e);
+    return { ok: false, error: "저장하지 못했어요." };
+  }
+  revalidatePath("/me");
+  return { ok: true };
+}
+
+export async function disablePushAction(): Promise<void> {
+  const { supabase, user } = await getUser();
+  if (!user) return;
+  try {
+    await saveNotificationSettings(supabase, user.id, { enabled: false, web_push: null });
+  } catch (e) {
+    console.error(e);
+  }
+  revalidatePath("/me");
+}
+
+export async function setRemindHourAction(form: FormData): Promise<void> {
+  const hour = Number(form.get("hour"));
+  if (!isAllowedRemindHour(hour)) return;
+  const { supabase, user } = await getUser();
+  if (!user) return;
+  try {
+    await saveNotificationSettings(supabase, user.id, { remind_at: `${String(hour).padStart(2, "0")}:00` });
+  } catch (e) {
+    console.error(e);
+  }
+  revalidatePath("/me");
 }
