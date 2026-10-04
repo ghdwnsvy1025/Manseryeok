@@ -23,9 +23,10 @@ describe("저녁 알림 대상", () => {
     expect(hourOf("")).toBe(-1);
   });
 
-  test("허용 시각은 20~23시", () => {
+  test("허용 시각 (지금은 21시 하나)", () => {
     expect(isAllowedRemindHour(21)).toBe(true);
     expect(isAllowedRemindHour(8)).toBe(false);
+    expect(isAllowedRemindHour(22)).toBe(false);
   });
 
   test("문구에 내일 간지가 들어가고 금지어가 없다", () => {

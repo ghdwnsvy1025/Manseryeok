@@ -85,7 +85,7 @@ export function NotificationSettings({ enabled, remindHour, kakaoChannelUrl }: P
         <div>
           <p className="text-[15px] font-bold">저녁 알림</p>
           <p className="mt-0.5 text-sm text-muted">
-            {enabled ? `매일 ${remindHour}시, 아직 안 썼을 때만 한 번` : "기록 안 한 날 저녁에 한 번만 알려 드려요"}
+            {enabled ? `매일 밤 ${remindHour}시, 아직 안 썼을 때만 한 번` : "기록 안 한 날 밤 9시에 한 번만 알려 드려요"}
           </p>
         </div>
         {support === "ok" ? (
@@ -113,7 +113,7 @@ export function NotificationSettings({ enabled, remindHour, kakaoChannelUrl }: P
         </p>
       )}
 
-      {enabled && (
+      {enabled && REMIND_HOURS.length > 1 && (
         <form action={setRemindHourAction} className="flex items-center gap-2 text-sm">
           <label htmlFor="remind-hour" className="text-muted">
             알림 시각

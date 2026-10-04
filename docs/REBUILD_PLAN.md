@@ -63,7 +63,7 @@ w        = n / (n + k)      n = 오늘과 같은 간지 성분(일간·일지·�
 | 2 | 운세 v3 (엔진 점수 + LLM 1회 + 캐시) | 4일 | **코드 완료 2026-10-04** · 게스트 흐름 확인, 로그인 사용자 화면은 사용자 확인 대기 |
 | 3 | 간지별 행복도 · 맞춤도 · 나 탭 | 4일 | **코드 완료 2026-10-04** |
 | 4 | 저녁 알림 · 설치 유도 · 공유 카드 | 3일 | **코드 완료 2026-10-04** · 실기기 푸시 수신은 배포 뒤 확인 |
-| 5 | 레거시 데이터 이관 · 배포 전환 · 레거시 보관 | 1일 | |
+| 5 | 레거시 데이터 이관 · 배포 전환 · 레거시 보관 | 1일 | **이관 완료 2026-10-04** · 배포 전환은 디자인 반영 뒤 사용자가 Vercel에서 (아래 9절) |
 
 ## 4. 0단계 기록
 
@@ -123,7 +123,30 @@ w        = n / (n + k)      n = 오늘과 같은 간지 성분(일간·일지·�
 - **공유 카드**: 브라우저 캔버스로 1080×1350 PNG를 그려 Web Share API(파일 공유)로 넘기고, 안 되면 내려받기. 서버 렌더러(satori)는 webp·한글 글꼴 문제로 포기. 캐릭터는 `public/characters/<간지>.webp`(디자인 세션이 바이럴에서 복사).
 - 디자인 명세 `apps/diary/docs/design/04-알림-설치-공유.md`.
 
-## 9. 레거시에서 가져올 것 / 버릴 것
+## 9. 5단계 기록 — 이관 결과와 배포 전환 절차
+
+**이관 (2026-10-04 실행, `apps/diary/scripts/migrate-legacy.migrate.ts`)**
+
+| 항목 | 결과 |
+|---|---|
+| 기록 | 88건 넣음 (journal 108건 → 같은 날 중복 21건은 최신 것만 87건 + 구 diary 중 journal과 안 겹친 1건). 익명 3건 버림 |
+| 사주 프로필 | 11명 중 10명 넣음 (1명은 새 앱에서 이미 만들어 건너뜀) |
+| 검증 | 레거시에 저장돼 있던 네 기둥과 엔진 재계산이 11명 전부 일치 |
+| 결과 테이블 | `night_entries` 89 (legacy 88 + app 1) · `night_saju_profiles` 11 · `night_profiles` 11 (모두 `migrated_from_legacy` 표시) |
+
+다시 돌려도 안전하다 (같은 날은 건너뛴다). 되돌리려면 `delete from night_entries where source = 'legacy'`.
+
+**배포 전환 (사용자가 Vercel 대시보드에서)**
+
+1. 디자인 세션 작업을 검토·커밋해 `rebuild`에 올린다 (`public/characters/` 60장 포함 — 공유 카드가 쓴다).
+2. Vercel 프로젝트 Settings → General → **Root Directory = `apps/diary`**, Framework = Next.js. Node 20 이상.
+3. Settings → Environment Variables (Production): `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `OPENAI_API_KEY`, `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`, `CRON_SECRET`. 값은 로컬 `apps/diary/.env.local`과 같게 (VAPID가 다르면 기존 알림 구독이 끊긴다).
+4. Settings → Git → Production Branch를 `rebuild`로 바꾸거나, `rebuild`를 `main`에 머지한다. 머지하는 쪽을 권장 (그래야 "main = 운영"이 유지된다). 머지 전 `main`의 레거시 코드는 태그 `legacy-final`로 남아 있다.
+5. 배포 뒤 확인: `/` 게스트 운세 · Google 로그인(`/auth/callback`은 레거시와 같은 경로라 Supabase 리디렉트 목록 수정 불필요) · `/me` 격자 · `/manifest.webmanifest` · 크론은 다음 날 UTC 12시(한국 21시)에 Vercel 로그에서 `/api/cron/remind` 200 확인.
+6. 크론은 무료 플랜 제한(하루 1회)에 맞춰 **밤 9시 고정**이다. 유료 플랜으로 가면 `REMIND_HOURS`와 `vercel.json`을 매시로 늘린다.
+7. 안정되면 `src/`(레거시 앱)를 지우고 `packages/`·`apps/`만 남긴다. 그 커밋 전에 `legacy-final` 태그가 있는지 다시 확인.
+
+## 10. 레거시에서 가져올 것 / 버릴 것
 
 **가져올 것**: 만세력·오행 분포 엔진 · Supabase 프로젝트와 Google 로그인 설정 · "오늘 기록, 고마워요" 계열 문장 톤 · PWA 설치 안내(카톡 인앱 처리 포함) · 시간대별 홈 분기(낮=운세, 밤=기록)
 

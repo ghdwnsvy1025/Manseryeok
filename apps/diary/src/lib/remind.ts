@@ -30,7 +30,8 @@ export function remindMessage(tomorrowGanjiKo: string): { title: string; body: s
   };
 }
 
-export const REMIND_HOURS = [20, 21, 22, 23] as const;
+// Vercel 무료 플랜은 크론을 하루 한 번만 돌릴 수 있어 당분간 밤 9시 하나다. 유료로 바꾸면 [20, 21, 22, 23]으로 늘리고 vercel.json을 매시로.
+export const REMIND_HOURS = [21] as const;
 export function isAllowedRemindHour(h: number): h is (typeof REMIND_HOURS)[number] {
   return (REMIND_HOURS as readonly number[]).includes(h);
 }
