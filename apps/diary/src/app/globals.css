@@ -1,39 +1,168 @@
 @import "tailwindcss";
 
-/* 사주읽는밤 — 밤하늘 남색 위에 등불 한 점. 색은 여기서만 정한다. */
+/*
+  사주읽는밤 — 한지 위의 밤.
+  재료는 바이럴 60갑자 카드의 넷뿐: 한지 크림, 녹갈색 선, 별 금색, 밤하늘 남색.
+  색 값은 눈대중이 아니라 에셋 키트(에셋/사주 일기/ui-kit)를 analyze_kit.py로 측정한 값이다 (2026-10-04).
+  바탕·테두리·패널·버튼면·괘선은 CSS 색이 아니라 public/ui/ 의 키트 이미지를 쓴다 (아래 재료 클래스).
+*/
 @theme {
-  --color-night: #0e0c1b;          /* 바탕 */
-  --color-surface: #18152b;        /* 카드 */
-  --color-surface-2: #221e3b;      /* 눌린 칸·입력 */
-  --color-line: #2f2a52;           /* 테두리 */
-  --color-ink: #ede9f8;            /* 본문 */
-  --color-muted: #a39dc2;          /* 보조 글 */
-  --color-faint: #6f6993;          /* 더 흐린 글 */
-  --color-lamp: #ffc47e;           /* 강조·버튼 (등불) */
-  --color-lamp-ink: #2b1c06;       /* 등불 위 글자 */
-  --color-moon: #c9c2ff;           /* 간지·한자 */
-  --color-danger: #ff8f8f;
+  --color-paper: #f1debb;          /* 바탕 한지 — paper-bg 평균색 */
+  --color-paper-2: #f4e3c2;        /* 카드 표면 — paper-bg 가장 밝은 지배색 */
+  --color-paper-3: #e6d2a9;        /* 눌린 칸·입력 */
+  --color-line: #5b6134;           /* 괘선 — divider 선 색 */
+  --color-frame: #767b3c;          /* 녹갈색 테두리 — card-frame 지배색 */
+  --color-ink: #2b2417;            /* 본문 먹색 */
+  --color-muted: #6f6047;          /* 보조 글 */
+  --color-faint: #9b8b6b;          /* 더 흐린 글 */
+  --color-gold: #d8a332;           /* 행동 버튼 하나, 점수 눈금 — gold-wash 평균색 */
+  --color-gold-ink: #2b1f05;       /* 금색 위 글자 */
+  --color-sky: #0d2544;            /* 밤하늘 남색 패널 — sky-panel 평균색 */
+  --color-sky-2: #0a203c;          /* 패널 안 구분선·눌린 면 — sky-panel 가장 어두운 지배색 */
+  --color-sky-ink: #f3e9cf;        /* 남색 위 글자 */
+  --color-sky-muted: #b3bfd8;      /* 남색 위 보조 글 */
+  --color-ganji: #1f3f73;          /* 간지 글자 */
+  --color-danger: #b4432f;
+
+  /* 옛 이름 별칭. 01·03 명세가 끝나면 지운다. 새 코드에서 쓰지 않는다 */
+  --color-night: var(--color-paper);
+  --color-surface: var(--color-paper-2);
+  --color-surface-2: var(--color-paper-3);
+  --color-lamp: var(--color-gold);
+  --color-lamp-ink: var(--color-gold-ink);
+  --color-moon: var(--color-ganji);
 
   --font-sans: var(--font-noto), "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
   --font-serif: var(--font-gowun), "AppleMyungjo", "Batang", serif;
 }
 
 html {
-  color-scheme: dark;
+  color-scheme: light;
   -webkit-text-size-adjust: 100%;
 }
 
+/* 바탕은 한지 그 자체 (키트 paper-bg 타일) */
 body {
-  background: var(--color-night);
+  background-color: var(--color-paper);
+  background-image: url("/ui/paper-bg.webp");
+  background-size: 512px 512px;
   color: var(--color-ink);
   font-family: var(--font-sans);
-  /* 위쪽에 아주 옅은 달빛 */
-  background-image: radial-gradient(120% 60% at 50% -10%, #2a2350 0%, transparent 60%);
-  background-attachment: fixed;
   min-height: 100dvh;
 }
 
 :focus-visible {
-  outline: 2px solid var(--color-lamp);
+  outline: 2px solid var(--color-gold);
   outline-offset: 2px;
+}
+
+/* ── 재료 클래스: 키트 이미지를 그대로 쓴다. CSS는 배치만 ───────────── */
+
+/* 카드 테두리: 키트 card-frame (녹갈색 이중선 + 모서리 괘). 모서리는 각지다 — 카드 세계관 그대로.
+   slice 40: public/ui 사본(512px)에서 귀퉁이 괘 장식이 x≈8~36px까지라, 그 전체를 코너 조각에 넣는다.
+   변 조각은 장식 없는 이중선뿐이라 stretch — 변 가운데에 장식이 다시 찍히지 않는다. */
+.card-frame {
+  border: 14px solid transparent;
+  border-image: url("/ui/card-frame-clean.png") 40 / 14px / 0 stretch;
+  background-clip: padding-box;
+}
+
+/* 밤하늘 패널: 키트 sky-panel */
+.sky-panel {
+  background-color: var(--color-sky);
+  background-image: url("/ui/sky-panel.webp");
+  background-size: cover;
+  background-position: center;
+}
+
+/* 금색 면 버튼: 키트 gold-wash */
+.gold-plate {
+  background-color: var(--color-gold);
+  background-image: url("/ui/gold-wash.webp");
+  background-size: 512px 512px;
+  background-position: center;
+}
+
+/* 괘선: 키트 divider (붓으로 그은 가는 선) */
+.rule {
+  display: block;
+  height: 8px;
+  background: url("/ui/divider-clean.png") center / 100% 100% no-repeat;
+}
+.rule--light {
+  opacity: 0.85;
+}
+
+/* 유일한 장치 — 밤이 되면 한지 위로 남색이 번진다. 한지는 끝까지 한지다. */
+main[data-sky] {
+  position: relative;
+}
+main[data-sky="dusk"]::before,
+main[data-sky="night"]::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  /* 물감처럼 종이에 스며들게 곱하기 혼합. 회색이 아니라 남색으로 번진다 */
+  mix-blend-mode: multiply;
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--color-sky) 38%, white) 0%,
+    color-mix(in srgb, var(--color-sky) 14%, white) 16%,
+    white 30%
+  );
+}
+main[data-sky="night"]::before {
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--color-sky) 62%, white) 0%,
+    color-mix(in srgb, var(--color-sky) 30%, white) 20%,
+    color-mix(in srgb, var(--color-sky) 8%, white) 36%,
+    white 46%
+  );
+}
+
+/* 모션 1 — 운세가 열리는 순간. 종이가 위에서 아래로 한 번 펼쳐진다 */
+.fortune-body {
+  display: grid;
+  grid-template-rows: 1fr;
+}
+.fortune-body > div {
+  overflow: hidden;
+}
+details[open] > .fortune-body {
+  animation: fortune-unfold 400ms ease-out;
+}
+@keyframes fortune-unfold {
+  from {
+    grid-template-rows: 0fr;
+    opacity: 0;
+  }
+  to {
+    grid-template-rows: 1fr;
+    opacity: 1;
+  }
+}
+
+/* 모션 2 — 저장이 끝난 뒤 "저장했어요" 줄이 150ms 늦게 나타난다 */
+.saved-line {
+  animation: saved-in 300ms ease-out 150ms both;
+}
+@keyframes saved-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  details[open] > .fortune-body,
+  .saved-line {
+    animation: none;
+  }
 }

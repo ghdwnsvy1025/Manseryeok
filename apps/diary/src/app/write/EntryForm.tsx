@@ -50,8 +50,12 @@ export function EntryForm({ date, initial }: Props) {
     startTransition(() => action(data));
   }
 
+  // 모션 2 — 저장이 끝나는 순간. 서버가 응답하는 동안 폼이 아래로 접히며 사라진다 (600ms).
+  // 성공이면 그대로 오늘 화면으로 이동하고, 오류면 pending이 풀리며 다시 펼쳐진다.
+  const folding = pending ? "origin-bottom scale-y-[0.96] opacity-0" : "origin-bottom";
+
   return (
-    <form onSubmit={onSubmit} className="flex flex-col gap-8">
+    <form onSubmit={onSubmit} className={`flex flex-col gap-8 transition-[transform,opacity] duration-[600ms] ease-out ${folding}`}>
       <input type="hidden" name="entryDate" value={date} />
 
       <fieldset ref={happinessRef}>
@@ -70,7 +74,7 @@ export function EntryForm({ date, initial }: Props) {
                 onChange={() => setHappiness(n)}
                 className="peer sr-only"
               />
-              <span className="flex h-12 cursor-pointer items-center justify-center rounded-xl border border-line bg-surface text-[17px] font-bold text-muted peer-checked:border-lamp peer-checked:bg-lamp peer-checked:text-lamp-ink peer-focus-visible:outline-2 peer-focus-visible:outline-lamp">
+              <span className="flex h-12 cursor-pointer items-center justify-center rounded-xl border border-line bg-paper-2 text-[17px] font-bold text-muted peer-checked:border-gold peer-checked:bg-gold peer-checked:text-gold-ink peer-focus-visible:outline-2 peer-focus-visible:outline-gold">
                 {n}
               </span>
             </label>
@@ -81,7 +85,7 @@ export function EntryForm({ date, initial }: Props) {
       <fieldset>
         <legend className="text-[17px] font-bold">기분</legend>
         <p className="mt-1 text-sm text-muted">
-          {MAX_MOODS}개까지 · 안 골라도 돼요 {moods.length > 0 && <span className="text-lamp">({moods.length}/{MAX_MOODS})</span>}
+          {MAX_MOODS}개까지 · 안 골라도 돼요 {moods.length > 0 && <span className="text-ganji">({moods.length}/{MAX_MOODS})</span>}
         </p>
         <div className="mt-3 flex flex-wrap gap-2">
           {MOODS.map((m) => {
@@ -99,8 +103,8 @@ export function EntryForm({ date, initial }: Props) {
                   className="peer sr-only"
                 />
                 <span
-                  className={`inline-flex h-10 cursor-pointer items-center rounded-full border px-4 text-[15px] peer-focus-visible:outline-2 peer-focus-visible:outline-lamp ${
-                    on ? "border-lamp bg-lamp/15 font-bold text-lamp" : "border-line bg-surface text-ink/85"
+                  className={`inline-flex h-10 cursor-pointer items-center rounded-full border px-4 text-[15px] peer-focus-visible:outline-2 peer-focus-visible:outline-gold ${
+                    on ? "border-ganji bg-paper-3 font-bold text-ganji" : "border-line bg-paper-2 text-ink/85"
                   } ${full ? "cursor-not-allowed opacity-40" : ""}`}
                 >
                   {m}
@@ -124,7 +128,7 @@ export function EntryForm({ date, initial }: Props) {
           value={note}
           onChange={(e) => setNote(e.target.value)}
           placeholder="오늘 기억하고 싶은 일 하나"
-          className="mt-3 w-full resize-none rounded-2xl border border-line bg-surface p-4 text-[16px] leading-relaxed placeholder:text-faint focus:border-lamp focus:outline-none"
+          className="mt-3 w-full resize-none rounded-2xl border border-line bg-paper-2 p-4 text-[16px] leading-relaxed placeholder:text-faint focus:border-ganji focus:outline-none"
         />
       </div>
 
@@ -137,7 +141,7 @@ export function EntryForm({ date, initial }: Props) {
       <button
         type="submit"
         disabled={pending}
-        className="h-14 rounded-2xl bg-lamp text-[17px] font-bold text-lamp-ink disabled:opacity-40"
+        className="h-14 rounded-2xl bg-gold text-[17px] font-bold text-gold-ink disabled:opacity-40"
       >
         {pending ? "저장하는 중…" : "저장"}
       </button>
