@@ -23,6 +23,11 @@ function hint(n: number): string {
   return "";
 }
 
+/**
+ * 쓰기 폼 — 일기장 페이지 한 장 (톤 v3).
+ * 행복도는 도장(키트 stamp), 기분은 종이 띠지(tag-strip), 메모는 편지지 괘선 위 손글씨.
+ * 폼 필드 이름·값과 저장 로직은 그대로다.
+ */
 export function EntryForm({ date, initial }: Props) {
   const [state, action, pending] = useActionState<FormState, FormData>(saveEntryAction, { error: null });
   const [happiness, setHappiness] = useState<number | null>(initial?.happiness ?? null);
@@ -55,81 +60,92 @@ export function EntryForm({ date, initial }: Props) {
   const folding = pending ? "origin-bottom scale-y-[0.96] opacity-0" : "origin-bottom";
 
   return (
-    <form onSubmit={onSubmit} className={`flex flex-col gap-8 transition-[transform,opacity] duration-[600ms] ease-out ${folding}`}>
+    <form onSubmit={onSubmit} className={`flex flex-col gap-5 transition-[transform,opacity] duration-[600ms] ease-out ${folding}`}>
       <input type="hidden" name="entryDate" value={date} />
 
-      <fieldset ref={happinessRef}>
-        <legend className="text-[17px] font-bold">행복도</legend>
-        <p className={`mt-1 h-5 text-sm ${missingHappiness && happiness === null ? "font-bold text-danger" : "text-muted"}`} aria-live="polite">
-          {happiness ? `${happiness} · ${hint(happiness)}` : missingHappiness ? "행복도를 먼저 골라 주세요" : "1부터 10까지"}
-        </p>
-        <div className="mt-3 grid grid-cols-5 gap-2">
-          {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
-            <label key={n} className="relative">
-              <input
-                type="radio"
-                name="happiness"
-                value={n}
-                checked={happiness === n}
-                onChange={() => setHappiness(n)}
-                className="peer sr-only"
-              />
-              <span className="flex h-12 cursor-pointer items-center justify-center rounded-xl border border-line bg-paper-2 text-[17px] font-bold text-muted peer-checked:border-gold peer-checked:bg-gold peer-checked:text-gold-ink peer-focus-visible:outline-2 peer-focus-visible:outline-gold">
-                {n}
-              </span>
-            </label>
-          ))}
-        </div>
-      </fieldset>
+      {/* 카드 종이 한 장 */}
+      <div className="card-frame card-paper flex flex-col gap-7 p-5">
+        <fieldset ref={happinessRef}>
+          <legend className="text-[17px] font-bold">행복도</legend>
+          <p className={`mt-1 h-5 text-sm ${missingHappiness && happiness === null ? "font-bold text-danger" : "text-muted"}`} aria-live="polite">
+            {happiness ? `${happiness} · ${hint(happiness)}` : missingHappiness ? "행복도를 먼저 골라 주세요" : "1부터 10까지, 도장 하나"}
+          </p>
+          <div className="mt-3 grid grid-cols-5 gap-2">
+            {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => {
+              const on = happiness === n;
+              return (
+                <label key={n} className="relative">
+                  <input
+                    type="radio"
+                    name="happiness"
+                    value={n}
+                    checked={on}
+                    onChange={() => setHappiness(n)}
+                    className="peer sr-only"
+                  />
+                  <span
+                    className={`stamp flex aspect-square cursor-pointer items-center justify-center font-serif text-[22px] peer-focus-visible:outline-2 peer-focus-visible:outline-gold ${
+                      on ? "stamp--on text-gold-ink" : "text-line"
+                    }`}
+                  >
+                    {n}
+                  </span>
+                </label>
+              );
+            })}
+          </div>
+        </fieldset>
 
-      <fieldset>
-        <legend className="text-[17px] font-bold">기분</legend>
-        <p className="mt-1 text-sm text-muted">
-          {MAX_MOODS}개까지 · 안 골라도 돼요 {moods.length > 0 && <span className="text-ganji">({moods.length}/{MAX_MOODS})</span>}
-        </p>
-        <div className="mt-3 flex flex-wrap gap-2">
-          {MOODS.map((m) => {
-            const on = moods.includes(m);
-            const full = !on && moods.length >= MAX_MOODS;
-            return (
-              <label key={m}>
-                <input
-                  type="checkbox"
-                  name="moods"
-                  value={m}
-                  checked={on}
-                  disabled={full}
-                  onChange={() => toggleMood(m)}
-                  className="peer sr-only"
-                />
-                <span
-                  className={`inline-flex h-10 cursor-pointer items-center rounded-full border px-4 text-[15px] peer-focus-visible:outline-2 peer-focus-visible:outline-gold ${
-                    on ? "border-ganji bg-paper-3 font-bold text-ganji" : "border-line bg-paper-2 text-ink/85"
-                  } ${full ? "cursor-not-allowed opacity-40" : ""}`}
-                >
-                  {m}
-                </span>
-              </label>
-            );
-          })}
-        </div>
-      </fieldset>
+        <fieldset>
+          <legend className="text-[17px] font-bold">기분</legend>
+          <p className="mt-1 text-sm text-muted">
+            {MAX_MOODS}개까지 · 안 골라도 돼요 {moods.length > 0 && <span className="text-ganji">({moods.length}/{MAX_MOODS})</span>}
+          </p>
+          <div className="mt-3 flex flex-wrap gap-x-2 gap-y-3">
+            {MOODS.map((m) => {
+              const on = moods.includes(m);
+              const full = !on && moods.length >= MAX_MOODS;
+              return (
+                <label key={m}>
+                  <input
+                    type="checkbox"
+                    name="moods"
+                    value={m}
+                    checked={on}
+                    disabled={full}
+                    onChange={() => toggleMood(m)}
+                    className="peer sr-only"
+                  />
+                  <span
+                    className={`tag h-10 cursor-pointer px-2 text-[15px] peer-focus-visible:outline-2 peer-focus-visible:outline-gold ${
+                      on ? "tag--on font-bold text-sky-ink" : "text-ink"
+                    } ${full ? "cursor-not-allowed opacity-45" : ""}`}
+                  >
+                    {m}
+                  </span>
+                </label>
+              );
+            })}
+          </div>
+        </fieldset>
 
-      <div>
-        <label htmlFor="note" className="text-[17px] font-bold">
-          한 줄
-        </label>
-        <p className="mt-1 text-sm text-muted">안 써도 돼요</p>
-        <textarea
-          id="note"
-          name="note"
-          rows={2}
-          maxLength={MAX_NOTE}
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-          placeholder="오늘 기억하고 싶은 일 하나"
-          className="mt-3 w-full resize-none rounded-2xl border border-line bg-paper-2 p-4 text-[16px] leading-relaxed placeholder:text-faint focus:border-ganji focus:outline-none"
-        />
+        <div>
+          <label htmlFor="note" className="text-[17px] font-bold">
+            한 줄
+          </label>
+          <p className="mt-1 text-sm text-muted">안 써도 돼요</p>
+          {/* 편지지 괘선 위에 손글씨. 안내 문구(placeholder)는 앱 글이라 본문 서체 */}
+          <textarea
+            id="note"
+            name="note"
+            rows={2}
+            maxLength={MAX_NOTE}
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="오늘 기억하고 싶은 일 하나"
+            className="ruled mt-2 w-full resize-none bg-transparent px-1 font-hand text-[22px] text-ink placeholder:font-sans placeholder:text-[16px] placeholder:text-faint focus:outline-none focus-visible:outline-2 focus-visible:outline-gold"
+          />
+        </div>
       </div>
 
       {state.error && (
@@ -138,12 +154,13 @@ export function EntryForm({ date, initial }: Props) {
         </p>
       )}
 
+      {/* 화면에 금색 면은 이것 하나 */}
       <button
         type="submit"
         disabled={pending}
-        className="h-14 rounded-2xl bg-gold text-[17px] font-bold text-gold-ink disabled:opacity-40"
+        className="gold-plate h-14 rounded-xl text-[17px] font-bold text-gold-ink disabled:opacity-40"
       >
-        {pending ? "저장하는 중…" : "저장"}
+        {pending ? "저장하는 중…" : "저장하기"}
       </button>
     </form>
   );

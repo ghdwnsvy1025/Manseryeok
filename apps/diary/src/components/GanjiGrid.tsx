@@ -13,16 +13,16 @@ interface Props {
 }
 
 /**
- * 60갑자 격자 10×6. 자바스크립트 없이 링크로 칸을 고른다 (?cell=N).
- * 기록이 있는 칸은 행복도에 따라 등불색 농도가 달라지고, 없는 칸은 윤곽선만.
- * 디자인 명세 03에서 시각을 다듬는다 (구조·링크 형식은 유지).
+ * 60갑자 도장판 10×6 (톤 v3). 자바스크립트 없이 링크로 칸을 고른다 (?cell=N).
+ * 기록 없는 칸 = 빈 도장 자리 + 지지 한 글자. 기록 있는 칸 = 그 간지 동물 + 평균 행복도 농도의 금빛 테두리.
+ * 숫자·이모지는 넣지 않는다. 전환 효과 없음.
  */
 export function GanjiGrid({ cells, selected, todayIndex, basePath }: Props) {
   const picked = selected !== null ? cells[selected] : null;
   return (
-    <div>
+    <div className="-mx-2">
       {/* 열마다 천간이 같다: 甲 열, 乙 열 … 癸 열 */}
-      <div className="mb-1 grid grid-cols-10 gap-1 text-center text-[11px] text-faint" aria-hidden>
+      <div className="mb-1 grid grid-cols-10 gap-1 text-center font-serif text-[12px] text-faint" aria-hidden>
         {STEMS.map((s) => (
           <span key={s}>{s}</span>
         ))}
@@ -31,8 +31,8 @@ export function GanjiGrid({ cells, selected, todayIndex, basePath }: Props) {
         {cells.map((c) => {
           const isSel = c.index === selected;
           const isToday = c.index === todayIndex;
-          // 1~10 → 0.25~1.0. 기록이 없으면 투명
-          const alpha = c.mean === null ? 0 : 0.25 + ((c.mean - 1) / 9) * 0.75;
+          // 1~10 → 0.35~1.0. 기록이 없으면 금빛 테두리 없음
+          const ink = c.mean === null ? 0 : 0.35 + ((c.mean - 1) / 9) * 0.65;
           return (
             <li key={c.index}>
               <Link
@@ -40,31 +40,43 @@ export function GanjiGrid({ cells, selected, todayIndex, basePath }: Props) {
                 scroll={false}
                 aria-label={`${c.ko}일 ${c.n ? `${c.n}번, 평균 ${c.mean}` : "기록 없음"}`}
                 aria-current={isSel ? "true" : undefined}
-                className={`flex aspect-square items-center justify-center rounded-md border text-[11px] leading-none ${
-                  isSel ? "border-ink" : isToday ? "border-moon" : "border-line"
-                } ${c.n ? "text-lamp-ink" : "text-faint"}`}
-                style={c.n ? { backgroundColor: `color-mix(in srgb, var(--color-lamp) ${Math.round(alpha * 100)}%, transparent)` } : undefined}
+                className={`board-cell flex aspect-square items-center justify-center rounded-[22%] ${
+                  isSel ? "outline-2 outline-offset-1 outline-ink" : isToday ? "outline-2 outline-offset-1 outline-ganji" : ""
+                }`}
+                style={{ "--ink": ink } as React.CSSProperties}
               >
-                {c.hanja[1]}
+                {c.n ? (
+                  // 기록한 간지의 동물 (바이럴 60갑자 세트). 크기 고정, 지연 로딩
+                  <img
+                    src={`/characters/${c.ko}.webp`}
+                    alt=""
+                    width={24}
+                    height={24}
+                    loading="lazy"
+                    className="h-[70%] w-[70%] object-contain"
+                  />
+                ) : (
+                  <span className="font-serif text-[12px] leading-none text-faint">{c.hanja[1]}</span>
+                )}
               </Link>
             </li>
           );
         })}
       </ol>
-      <p className="mt-3 min-h-6 text-[15px]" aria-live="polite">
+      <p className="mx-2 mt-3 min-h-6 text-[15px]" aria-live="polite">
         {picked ? (
           picked.n ? (
             <>
-              <b className="text-moon">{picked.ko}일</b> {picked.n}번 · 평균 행복도 <b>{picked.mean}</b>
+              <b className="text-ganji">{picked.ko}일</b> {picked.n}번 · 평균 행복도 <b className="font-serif">{picked.mean}</b>
               <span className="text-faint"> · 신호 {picked.signal}</span>
             </>
           ) : (
             <>
-              <b className="text-moon">{picked.ko}일</b>은 아직 기록이 없어요.
+              <b className="text-ganji">{picked.ko}일</b>은 아직 기록이 없어요.
             </>
           )
         ) : (
-          <span className="text-faint">칸을 누르면 그날의 평균이 보여요. 테두리가 밝은 칸이 오늘이에요.</span>
+          <span className="text-faint">칸을 누르면 그날의 평균이 보여요. 남색 테두리가 오늘이에요.</span>
         )}
       </p>
     </div>

@@ -16,14 +16,16 @@ export default async function WritePage({ searchParams }: { searchParams: Promis
   if (!user) redirect(`/login?next=${encodeURIComponent(`/write?date=${date}`)}`);
   const existing = await getEntry(supabase, user.id, date);
   const ganji = dayGanji(date);
+  // "10월 5일" — 요일은 뺀다
+  const dateLabel = formatKoreanDate(date).replace(/\s*\S+요일$/, "");
 
   return (
     <main>
-      <header className="mb-6">
-        <p className="text-sm text-muted">
-          {date === today ? "오늘" : formatKoreanDate(date)} · <span className="text-moon">{ganji.ko}일</span>
-        </p>
-        <h1 className="mt-1 font-serif text-[26px] font-bold">{existing ? "기록 고치기" : "오늘 하루, 어땠어요?"}</h1>
+      <header className="mb-5">
+        {existing && <p className="text-sm text-muted">기록 고치기</p>}
+        <h1 className="mt-1 font-serif text-[26px] leading-snug">
+          {dateLabel} <span className="text-ganji">{ganji.ko}일</span>, {date === today ? "오늘" : "그날"} 하루
+        </h1>
       </header>
       <EntryForm
         date={date}

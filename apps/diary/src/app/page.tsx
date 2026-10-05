@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { clearGuestAction, guestProfileAction } from "@/app/actions";
 import { FortuneCard } from "@/components/FortuneCard";
+import { TodayEntryCard } from "@/components/TodayEntryCard";
 import { getUser } from "@/lib/supabase/server";
 import { getEntry, getFortuneVote, getSajuProfile, listEntriesForStats } from "@/lib/db";
 import { getTodayFortune } from "@/lib/fortune";
@@ -13,10 +14,10 @@ import { ProfileForm } from "./onboarding/ProfileForm";
 
 export const dynamic = "force-dynamic";
 
-/** 한지 카드 공통 — 키트 테두리(card-frame) 위에 한지 표면 */
-const card = "card-frame bg-paper-2 p-5";
-/** 금색 면 버튼 — 키트 gold-wash. 화면에 하나만 */
-const goldButton = "gold-plate mt-5 flex h-13 items-center justify-center rounded-xl font-bold text-gold-ink";
+/** 한지 카드 공통 — 키트 테두리(card-frame) 위에 카드 종이(card-paper) */
+const card = "card-frame card-paper p-5";
+/** 금색 면 버튼 — 키트 gold-wash. 화면에 하나만. 밤에는 조금 커진다(56→60px) */
+const goldButtonBase = "gold-plate mt-5 flex items-center justify-center rounded-xl text-[17px] font-bold text-gold-ink";
 /** 테두리 버튼 */
 const lineButton = "mt-5 flex h-13 items-center justify-center rounded-xl border border-frame font-bold text-ink";
 
@@ -29,6 +30,7 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
   const night = hour >= 18 || hour < 5;
   // 밤에 번지는 남색 — 유일한 장치 (globals.css main[data-sky])
   const sky = hour >= 21 || hour < 5 ? "night" : hour >= 18 ? "dusk" : "day";
+  const goldButton = `${goldButtonBase} ${sky === "day" ? "h-14" : "h-15"}`;
 
   const { supabase, user } = await getUser();
   const [profile, entry] = user
@@ -40,9 +42,12 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
   let vote: 1 | -1 | null = null;
   let guestHasProfile = false;
   let fortuneError: string | null = null;
+  // 60칸 띠에 기록한 간지를 표시하려고 try 밖에 둔다
+  const recordedGanji = new Set<number>();
   try {
     if (user && profile) {
       const entries = await listEntriesForStats(supabase, user.id);
+      for (const e of entries) recordedGanji.add(Number(e.day_ganji_index));
       [fortune, vote] = await Promise.all([
         getTodayFortune({ date: today, pillars: profile.pillars, entries, owner: { userId: user.id } }),
         getFortuneVote(supabase, user.id, today),
@@ -76,27 +81,10 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
       </Link>
     </section>
   ) : entry ? (
-    <section className={card}>
-      <p className={`text-sm font-bold text-gold ${saved === today ? "saved-line" : ""}`}>
-        {saved === today ? "저장했어요" : "오늘 기록, 고마워요"}
-      </p>
-      <h2 className="mt-1 font-serif text-2xl font-bold leading-snug">오늘도 한 줄 남겼어요</h2>
-      <p className="mt-3 text-[15px] text-muted">
-        행복도 <b className="text-ink">{entry.happiness}</b>
-        {entry.moods.length > 0 && <> · {entry.moods.join(", ")}</>}
-      </p>
-      {entry.note && <p className="mt-2 line-clamp-2 text-[15px] text-ink/90">“{entry.note}”</p>}
-      <span aria-hidden className="rule mt-5" />
-      <p className="mt-3 text-[17px]">
-        내일은 <b className="text-ganji">{tomorrow.ko}일</b>이에요.
-      </p>
-      <Link href={`/write?date=${today}`} className="mt-4 inline-block text-sm text-muted underline underline-offset-4">
-        오늘 기록 고치기
-      </Link>
-    </section>
+    <TodayEntryCard entry={entry} today={today} tomorrowKo={tomorrow.ko} justSaved={saved === today} />
   ) : (
     <section className={card}>
-      <h2 className="font-serif text-2xl font-bold leading-snug">오늘 하루, 어땠어요?</h2>
+      <h2 className="font-serif text-[24px] leading-snug">오늘 하루, 어땠어요?</h2>
       <p className="mt-2 text-[15px] text-muted">행복도 하나만 골라도 돼요. 30초면 끝나요.</p>
       <Link href="/write" className={goldButton}>
         오늘 기록하기
@@ -108,7 +96,14 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
   if (fortune) {
     fortuneCard = (
       <>
-        <FortuneCard fortune={fortune} canVote={Boolean(user)} vote={vote} defaultOpen={!night || !user} />
+        <FortuneCard
+          fortune={fortune}
+          dateLabel={formatKoreanDate(today).replace(/\s*\S+요일$/, "")}
+          ganjiKo={ganji.ko}
+          canVote={Boolean(user)}
+          vote={vote}
+          defaultOpen={!night || !user}
+        />
         {!user && guestHasProfile && (
           <form action={clearGuestAction} className="-mt-2 text-right">
             <button type="submit" className="text-xs text-faint underline underline-offset-4">
@@ -150,9 +145,9 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
       <header className="flex items-end justify-between gap-3">
         <div className="min-w-0">
           <p className="text-sm text-muted">{formatKoreanDate(today)}</p>
-          <h1 className="mt-1 font-serif text-[30px] font-bold leading-tight">
+          <h1 className="mt-1 font-serif text-[32px] leading-tight">
             오늘은 <span className="text-ganji">{ganji.ko}일</span>
-            <span className="ml-2 text-[28px] font-normal text-muted">{ganji.hanja}</span>
+            <span className="ml-2 text-[28px] text-muted">{ganji.hanja}</span>
           </h1>
         </div>
         {/* 이 화면의 유일한 그림 — 그날 일진의 동물 (바이럴 60갑자 세트) */}
@@ -164,18 +159,21 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
           className="h-16 w-16 shrink-0 object-contain"
         />
       </header>
-      {/* 밤에는 기록을, 낮에는 운세를 먼저 */}
-      {night ? (
-        <>
-          {writeCard}
-          {fortuneCard}
-        </>
-      ) : (
-        <>
-          {fortuneCard}
-          {writeCard}
-        </>
-      )}
+
+      {/* 60칸 띠 — 60갑자 중 오늘 위치에 금빛 점, 기록한 간지는 흐린 점. 누르면 "나"로 */}
+      <Link
+        href="/me"
+        aria-label={`60갑자 띠 — 오늘은 ${ganji.index + 1}번째 ${ganji.ko}일. 나 화면으로`}
+        className="-mt-2 grid grid-cols-30 gap-px"
+      >
+        {Array.from({ length: 60 }, (_, i) => (
+          <span key={i} aria-hidden className={`h-[10px] ${i === ganji.index ? "bg-gold" : recordedGanji.has(i) ? "bg-line/40" : "border border-line/20"}`} />
+        ))}
+      </Link>
+
+      {/* 순서 고정: 운세 카드가 늘 위, 기록 카드가 아래 (톤 v3) */}
+      {fortuneCard}
+      {writeCard}
     </main>
   );
 }
