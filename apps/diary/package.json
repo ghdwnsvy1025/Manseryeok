@@ -10,6 +10,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.131.0",
+    "@saju/core-rules": "file:../../packages/saju-core-rules",
     "@saju/engine": "file:../../packages/saju-engine",
     "@supabase/ssr": "^0.7.0",
     "@supabase/supabase-js": "^2.58.0",

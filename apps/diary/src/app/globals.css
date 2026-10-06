@@ -1,10 +1,10 @@
 @import "tailwindcss";
 
 /*
-  사주읽는밤 — 밤의 일기장 (톤 v3).
-  재료는 바이럴 60갑자 카드의 넷뿐: 한지 크림, 녹갈색 선, 별 금색, 밤하늘 남색.
+  사주읽는밤 — 한지 일기장 (톤 v3.1).
+  재료는 바이럴 60갑자 카드의 넷뿐: 한지 크림, 녹갈색 선, 별 금색, 밤하늘 남색(악센트로만 — v3.1에서 남색 면과 밤 번짐을 지웠다).
   색 값은 눈대중이 아니라 에셋 키트(에셋/사주 일기/ui-kit)를 analyze_kit.py로 측정한 값이다 (2026-10-05 v3 재측정).
-  바탕·카드 종이·테두리·패널·버튼면·괘선·도장·띠지·도장판·나무패는 CSS 색이 아니라 public/ui/ 의 키트 이미지를 쓴다 (아래 재료 클래스).
+  바탕·카드 종이·테두리·버튼면·괘선·도장·띠지·도장판·나무패는 CSS 색이 아니라 public/ui/ 의 키트 이미지를 쓴다 (아래 재료 클래스).
 */
 @theme {
   --color-paper: #f1debb;          /* 바탕 한지 — paper-bg 평균색 */
@@ -17,10 +17,8 @@
   --color-faint: #9b8b6b;          /* 더 흐린 글 */
   --color-gold: #d8a332;           /* 행동 버튼 하나, 점수 눈금 — gold-wash 평균색 */
   --color-gold-ink: #2b1f05;       /* 금색 위 글자 */
-  --color-sky: #222f46;            /* 따뜻한 밤 남색 — sky-panel-warm 위 60% 평균색 */
-  --color-sky-2: #172843;          /* 패널 안 눌린 면 — sky-panel-warm 가장 어두운 지배색 */
-  --color-sky-ink: #f3e9cf;        /* 남색 위 글자 */
-  --color-sky-muted: #b5afa2;      /* 남색 위 보조 글 — sky 32% + paper-2 68% (한지빛 섞인 연한 남) */
+  --color-sky: #222f46;            /* 따뜻한 밤 남색 — 악센트(글자·띠지·테두리)로만. 면으로 쓰지 않는다 (v3.1) */
+  --color-sky-2: #172843;          /* 남색 악센트의 진한 쪽 */
   --color-ganji: #1f3f73;          /* 간지 글자 */
   --color-danger: #b4432f;
 
@@ -75,12 +73,15 @@ body {
   background-size: 512px 512px;
 }
 
-/* 따뜻한 밤하늘 패널: 키트 sky-panel-warm (위는 밤하늘, 아래 1/3 금빛 달무리) */
-.sky-panel {
-  background-color: var(--color-sky);
-  background-image: url("/ui/sky-panel-warm.webp");
-  background-size: cover;
-  background-position: center top;
+/* 운세 카드의 금색 이중 테두리 (v3.1 — 밤 패널 대신). 바깥 3px는 키트 gold-wash 질감, 안쪽 1px는 금색 선.
+   card-paper 위에 겹쳐 쓴다. 화면에서 유일하게 금색 테두리를 두른 카드다 */
+.card-gold {
+  border: 3px solid transparent;
+  border-image: url("/ui/gold-wash.webp") 64 / 3px / 0 round;
+  background-clip: padding-box;
+  box-shadow:
+    inset 0 0 0 3px var(--color-paper-2),
+    inset 0 0 0 4px var(--color-gold);
 }
 
 /* 금색 면 버튼: 키트 gold-wash */
@@ -166,36 +167,6 @@ input:checked + .stamp {
   border-image: url("/ui/wood-tablet-clean.webp") 140 0 80 0 fill / 34px 0 20px / 0 stretch;
 }
 
-/* 유일한 장치 — 밤이 되면 한지 위로 남색이 번진다. 한지는 끝까지 한지다. */
-main[data-sky] {
-  position: relative;
-}
-main[data-sky="dusk"]::before,
-main[data-sky="night"]::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  /* 물감처럼 종이에 스며들게 곱하기 혼합. 회색이 아니라 남색으로 번진다 */
-  mix-blend-mode: multiply;
-  background: linear-gradient(
-    to bottom,
-    color-mix(in srgb, var(--color-sky) 38%, white) 0%,
-    color-mix(in srgb, var(--color-sky) 14%, white) 16%,
-    white 30%
-  );
-}
-main[data-sky="night"]::before {
-  background: linear-gradient(
-    to bottom,
-    color-mix(in srgb, var(--color-sky) 62%, white) 0%,
-    color-mix(in srgb, var(--color-sky) 30%, white) 20%,
-    color-mix(in srgb, var(--color-sky) 8%, white) 36%,
-    white 46%
-  );
-}
-
 /* 모션 1 — 운세가 열리는 순간. 종이가 위에서 아래로 한 번 펼쳐진다 */
 .fortune-body {
   display: grid;
@@ -233,10 +204,89 @@ details[open] > .fortune-body {
   }
 }
 
+/* 모션 3 — 저장 완료 "팡" (톤 v3.1, 색종이 금지의 유일한 예외). SaveBurst.tsx가 쓴다.
+   카드가 0.6→1.08→1.0으로 튀어나오고(400ms), 그 뒤에서 한지 조각 8개와 금빛 가루 8개가
+   --dx/--dy 방향으로 날아가며 사라진다(600ms). 글자는 150ms 늦게. 전체 1.5초 뒤 200ms로 걷힌다. */
+.burst-card {
+  animation: burst-pop 400ms cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
+}
+@keyframes burst-pop {
+  from {
+    transform: scale(0.6);
+    opacity: 0;
+  }
+  70% {
+    transform: scale(1.08);
+    opacity: 1;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+.burst-bit {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  pointer-events: none;
+  background-repeat: no-repeat;
+  animation: burst-fly 600ms ease-out 120ms both;
+}
+.burst-bit--paper {
+  background-image: url("/ui/pop-paper-bits-clean.png");
+}
+.burst-bit--gold {
+  background-image: url("/ui/pop-gold-dust-clean.png");
+}
+@keyframes burst-fly {
+  /* 카드 가장자리 뒤에서 나타나 바깥으로 — 가운데에서 시작하면 카드에 가려 안 보인다 */
+  from {
+    transform: translate(calc(-50% + var(--dx) * 0.5), calc(-50% + var(--dy) * 0.5)) scale(0.6) rotate(0deg);
+    opacity: 1;
+  }
+  to {
+    transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(1) rotate(var(--rot));
+    opacity: 0;
+  }
+}
+.burst-text {
+  animation: saved-in 300ms ease-out 150ms both;
+}
+.burst-overlay {
+  animation: burst-overlay-in 200ms ease-out both;
+}
+.burst-overlay[data-closing] {
+  animation: burst-overlay-out 200ms ease-out both;
+}
+@keyframes burst-overlay-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes burst-overlay-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   details[open] > .fortune-body,
   .saved-line,
+  .burst-card,
+  .burst-text,
+  .burst-overlay,
+  .burst-overlay[data-closing],
   input:checked + .stamp {
     animation: none;
+  }
+  /* 팡·흩날림 없이 카드만 바로 보인다 */
+  .burst-bit {
+    display: none;
   }
 }

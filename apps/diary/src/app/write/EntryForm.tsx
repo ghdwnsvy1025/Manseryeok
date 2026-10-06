@@ -55,12 +55,12 @@ export function EntryForm({ date, initial }: Props) {
     startTransition(() => action(data));
   }
 
-  // 모션 2 — 저장이 끝나는 순간. 서버가 응답하는 동안 폼이 아래로 접히며 사라진다 (600ms).
-  // 성공이면 그대로 오늘 화면으로 이동하고, 오류면 pending이 풀리며 다시 펼쳐진다.
-  const folding = pending ? "origin-bottom scale-y-[0.96] opacity-0" : "origin-bottom";
+  // 저장이 끝나는 순간의 보상 "팡"(톤 v3.1)은 SaveBurst가 맡는다. 서버 액션이 성공하면 바로 /?saved=날짜로
+  // 보내므로(actions.ts) 성공 신호는 이 폼이 아니라 오늘 화면(page.tsx)이 받는다. 여기서는 접힘 전환 없이
+  // 버튼만 흐려진다. 오류면 pending이 풀리며 적은 내용이 그대로 남는다.
 
   return (
-    <form onSubmit={onSubmit} className={`flex flex-col gap-5 transition-[transform,opacity] duration-[600ms] ease-out ${folding}`}>
+    <form onSubmit={onSubmit} className="flex flex-col gap-5">
       <input type="hidden" name="entryDate" value={date} />
 
       {/* 카드 종이 한 장 */}
@@ -118,7 +118,7 @@ export function EntryForm({ date, initial }: Props) {
                   />
                   <span
                     className={`tag h-10 cursor-pointer px-2 text-[15px] peer-focus-visible:outline-2 peer-focus-visible:outline-gold ${
-                      on ? "tag--on font-bold text-sky-ink" : "text-ink"
+                      on ? "tag--on font-bold text-paper-2" : "text-ink"
                     } ${full ? "cursor-not-allowed opacity-45" : ""}`}
                   >
                     {m}

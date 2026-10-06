@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { clearGuestAction, guestProfileAction } from "@/app/actions";
 import { FortuneCard } from "@/components/FortuneCard";
+import { SaveBurst } from "@/components/SaveBurst";
 import { TodayEntryCard } from "@/components/TodayEntryCard";
 import { getUser } from "@/lib/supabase/server";
-import { getEntry, getFortuneVote, getSajuProfile, listEntriesForStats } from "@/lib/db";
+import { birthProfileOf, getEntry, getFortuneVote, getSajuProfile, listEntriesForStats } from "@/lib/db";
 import { getTodayFortune } from "@/lib/fortune";
 import type { FortuneContent } from "@/lib/fortune/types";
 import { dayGanji } from "@/lib/ganji";
@@ -16,8 +17,8 @@ export const dynamic = "force-dynamic";
 
 /** 한지 카드 공통 — 키트 테두리(card-frame) 위에 카드 종이(card-paper) */
 const card = "card-frame card-paper p-5";
-/** 금색 면 버튼 — 키트 gold-wash. 화면에 하나만. 밤에는 조금 커진다(56→60px) */
-const goldButtonBase = "gold-plate mt-5 flex items-center justify-center rounded-xl text-[17px] font-bold text-gold-ink";
+/** 금색 면 버튼 — 키트 gold-wash. 화면에 하나만. 늘 56px (v3.1에서 밤 분기 삭제) */
+const goldButton = "gold-plate mt-5 flex h-14 items-center justify-center rounded-xl text-[17px] font-bold text-gold-ink";
 /** 테두리 버튼 */
 const lineButton = "mt-5 flex h-13 items-center justify-center rounded-xl border border-frame font-bold text-ink";
 
@@ -27,10 +28,8 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
   const ganji = dayGanji(today);
   const tomorrow = dayGanji(addDays(today, 1));
   const hour = hourKST();
+  // 밤에는 로그인 사용자의 운세를 접어 두고 기록을 먼저 보이게 한다 (화면 색은 시간과 무관 — v3.1)
   const night = hour >= 18 || hour < 5;
-  // 밤에 번지는 남색 — 유일한 장치 (globals.css main[data-sky])
-  const sky = hour >= 21 || hour < 5 ? "night" : hour >= 18 ? "dusk" : "day";
-  const goldButton = `${goldButtonBase} ${sky === "day" ? "h-14" : "h-15"}`;
 
   const { supabase, user } = await getUser();
   const [profile, entry] = user
@@ -49,7 +48,7 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
       const entries = await listEntriesForStats(supabase, user.id);
       for (const e of entries) recordedGanji.add(Number(e.day_ganji_index));
       [fortune, vote] = await Promise.all([
-        getTodayFortune({ date: today, pillars: profile.pillars, entries, owner: { userId: user.id } }),
+        getTodayFortune({ date: today, pillars: profile.pillars, profile: birthProfileOf(profile), entries, owner: { userId: user.id } }),
         getFortuneVote(supabase, user.id, today),
       ]);
     } else if (!user) {
@@ -58,7 +57,7 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
         guestHasProfile = true;
         const computed = computeProfile({ ...guest, name: "손님" });
         if (computed.ok) {
-          fortune = await getTodayFortune({ date: today, pillars: computed.value.pillars, entries: [], owner: { guestKey: guestKeyOf(guest) } });
+          fortune = await getTodayFortune({ date: today, pillars: computed.value.pillars, profile: guest, entries: [], owner: { guestKey: guestKeyOf(guest) } });
         }
       }
     }
@@ -141,23 +140,21 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
   }
 
   return (
-    <main data-sky={sky} className="flex flex-col gap-5">
-      <header className="flex items-end justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-sm text-muted">{formatKoreanDate(today)}</p>
-          <h1 className="mt-1 font-serif text-[32px] leading-tight">
-            오늘은 <span className="text-ganji">{ganji.ko}일</span>
-            <span className="ml-2 text-[28px] text-muted">{ganji.hanja}</span>
-          </h1>
-        </div>
-        {/* 이 화면의 유일한 그림 — 그날 일진의 동물 (바이럴 60갑자 세트) */}
-        <img
-          src={`/characters/${ganji.ko}.webp`}
-          alt={`${ganji.ko} 동물`}
-          width={64}
-          height={64}
-          className="h-16 w-16 shrink-0 object-contain"
+    <main className="flex flex-col gap-5">
+      {/* 저장 완료 "팡" — 방금 저장하고 돌아왔을 때 한 번 (톤 v3.1). 그림은 운세 카드 안의 동물 하나뿐이므로 제목 줄에는 없다 */}
+      {user && entry && saved === today && (
+        <SaveBurst
+          ganjiKo={ganji.ko}
+          happiness={entry.happiness}
+          signature={`${today}|${entry.happiness}|${entry.moods.join(",")}|${entry.note ?? ""}`}
         />
+      )}
+      <header>
+        <p className="text-sm text-muted">{formatKoreanDate(today)}</p>
+        <h1 className="mt-1 font-serif text-[32px] leading-tight">
+          오늘은 <span className="text-ganji">{ganji.ko}일</span>
+          <span className="ml-2 text-[28px] text-muted">{ganji.hanja}</span>
+        </h1>
       </header>
 
       {/* 60칸 띠 — 60갑자 중 오늘 위치에 금빛 점, 기록한 간지는 흐린 점. 누르면 "나"로 */}

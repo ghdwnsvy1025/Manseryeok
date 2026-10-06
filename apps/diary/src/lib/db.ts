@@ -3,7 +3,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { EntryInput } from "./entry";
 import type { DayGanji } from "./ganji";
-import type { ComputedProfile, ProfileInput, PillarsSnapshot } from "./profile";
+import { CITIES, type CityId } from "./cities";
+import type { BirthProfile, ComputedProfile, ProfileInput, PillarsSnapshot } from "./profile";
 
 export interface EntryRow {
   id: string;
@@ -30,6 +31,22 @@ export interface SajuProfileRow {
   city: string;
   pillars: PillarsSnapshot;
   engine_version: string;
+}
+
+/** 저장된 프로필 행 → 운세 계산 입력 (대운·세운용). 모르는 도시는 서울로 */
+export function birthProfileOf(row: SajuProfileRow): BirthProfile {
+  const city = (CITIES.find((c) => c.id === row.city)?.id ?? "seoul") as CityId;
+  return {
+    gender: row.gender,
+    calendar: row.calendar,
+    isLeapMonth: row.is_leap_month,
+    birthYear: row.birth_year,
+    birthMonth: row.birth_month,
+    birthDay: row.birth_day,
+    birthHour: row.birth_hour,
+    birthMinute: row.birth_minute,
+    city,
+  };
 }
 
 const ENTRY_COLUMNS = "id, entry_date, happiness, moods, note, day_ganji_index, day_stem, day_branch";

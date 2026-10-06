@@ -20,6 +20,9 @@ export interface ProfileInput {
   city: CityId;
 }
 
+/** 운세 계산에 필요한 출생 정보 (이름 제외). 게스트 쿠키(GuestProfile)와 같은 모양 */
+export type BirthProfile = Omit<ProfileInput, "name">;
+
 export interface PillarSnapshot {
   stem: string; // 한자
   branch: string;

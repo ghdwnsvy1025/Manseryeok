@@ -140,7 +140,7 @@ w        = n / (n + k)      n = 오늘과 같은 간지 성분(일간·일지·�
 
 1. 디자인 세션 작업을 검토·커밋해 `rebuild`에 올린다 (`public/characters/` 60장 포함 — 공유 카드가 쓴다).
 2. Vercel 프로젝트 Settings → General → **Root Directory = `apps/diary`**, Framework = Next.js. Node 20 이상.
-3. Settings → Environment Variables (Production): `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `OPENAI_API_KEY`, `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`, `CRON_SECRET`. 값은 로컬 `apps/diary/.env.local`과 같게 (VAPID가 다르면 기존 알림 구독이 끊긴다).
+3. Settings → Environment Variables (Production): `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `ANTHROPIC_API_KEY`(운세 글, Claude Sonnet 5), `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`, `CRON_SECRET`. 값은 로컬 `apps/diary/.env.local`과 같게 (VAPID가 다르면 기존 알림 구독이 끊긴다).
 4. Settings → Git → Production Branch를 `rebuild`로 바꾸거나, `rebuild`를 `main`에 머지한다. 머지하는 쪽을 권장 (그래야 "main = 운영"이 유지된다). 머지 전 `main`의 레거시 코드는 태그 `legacy-final`로 남아 있다.
 5. 배포 뒤 확인: `/` 게스트 운세 · Google 로그인(`/auth/callback`은 레거시와 같은 경로라 Supabase 리디렉트 목록 수정 불필요) · `/me` 격자 · `/manifest.webmanifest` · 크론은 다음 날 UTC 12시(한국 21시)에 Vercel 로그에서 `/api/cron/remind` 200 확인.
 6. 크론은 무료 플랜 제한(하루 1회)에 맞춰 **밤 9시 고정**이다. 유료 플랜으로 가면 `REMIND_HOURS`와 `vercel.json`을 매시로 늘린다.

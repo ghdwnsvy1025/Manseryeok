@@ -1,0 +1,614 @@
+{
+ "1": {
+  "chart": "癸亥 癸亥 乙卯 丙戌",
+  "strength": "신강",
+  "center": "인성",
+  "yong": "토",
+  "strong": "수",
+  "inbi": 74,
+  "isolated": [],
+  "flow": [
+   "수",
+   "목",
+   "화",
+   "토"
+  ]
+ },
+ "2": {
+  "chart": "丙午 己亥 己亥 甲子",
+  "strength": "신약",
+  "center": "재성",
+  "yong": "토",
+  "strong": "수",
+  "inbi": 43,
+  "isolated": [],
+  "flow": [
+   "화",
+   "토"
+  ]
+ },
+ "3": {
+  "chart": "辛酉 辛丑 壬辰 甲辰",
+  "strength": "신약",
+  "center": "관성",
+  "yong": "수",
+  "strong": "토",
+  "inbi": 43,
+  "isolated": [],
+  "flow": [
+   "토",
+   "금",
+   "수",
+   "목"
+  ]
+ },
+ "4": {
+  "chart": "壬戌 壬子 丙戌 甲午",
+  "strength": "신약",
+  "center": "관성",
+  "yong": "화",
+  "strong": "수",
+  "inbi": 34,
+  "isolated": [],
+  "flow": [
+   "목",
+   "화",
+   "토"
+  ]
+ },
+ "5": {
+  "chart": "戊寅 乙丑 丙戌 己丑",
+  "strength": "신약",
+  "center": "식상",
+  "yong": "목",
+  "strong": "토",
+  "inbi": 34,
+  "isolated": [],
+  "flow": [
+   "목",
+   "화",
+   "토"
+  ]
+ },
+ "6": {
+  "chart": "癸酉 辛酉 丁巳 己酉",
+  "strength": "신약",
+  "center": "재성",
+  "yong": "화",
+  "strong": "금",
+  "inbi": 28,
+  "isolated": [],
+  "flow": [
+   "화",
+   "토",
+   "금"
+  ]
+ },
+ "7": {
+  "chart": "丙寅 辛丑 壬戌 乙巳",
+  "strength": "신약",
+  "center": "관성",
+  "yong": "수",
+  "strong": "토",
+  "inbi": 21,
+  "isolated": [],
+  "flow": [
+   "토",
+   "금",
+   "수",
+   "목",
+   "화",
+   "토"
+  ]
+ },
+ "8": {
+  "chart": "庚申 丙戌 丁卯 丙午",
+  "strength": "신강",
+  "center": "비겁",
+  "yong": "금",
+  "strong": "화",
+  "inbi": 66,
+  "isolated": [],
+  "flow": [
+   "목",
+   "화",
+   "토",
+   "금"
+  ]
+ },
+ "9": {
+  "chart": "丙申 庚子 癸酉 辛酉",
+  "strength": "신강",
+  "center": "인성",
+  "yong": "화",
+  "strong": "금",
+  "inbi": 91,
+  "isolated": [
+   "丙"
+  ],
+  "flow": [
+   "금",
+   "수"
+  ]
+ },
+ "10": {
+  "chart": "壬戌 壬寅 己卯 壬申",
+  "strength": "신약",
+  "center": "재성",
+  "yong": "토",
+  "strong": "수",
+  "inbi": 21,
+  "isolated": [
+   "戌"
+  ],
+  "flow": [
+   "수",
+   "목"
+  ]
+ },
+ "11": {
+  "chart": "己未 丙子 庚申 己卯",
+  "strength": "신강",
+  "center": "인성",
+  "yong": "목",
+  "strong": "토",
+  "inbi": 62,
+  "isolated": [
+   "丙",
+   "卯"
+  ],
+  "flow": [
+   "토",
+   "금",
+   "수"
+  ]
+ },
+ "12": {
+  "chart": "己卯 己巳 己未 辛未",
+  "strength": "신강",
+  "center": "비겁",
+  "yong": "수",
+  "strong": "토",
+  "inbi": 74,
+  "isolated": [],
+  "flow": [
+   "목",
+   "화",
+   "토",
+   "금"
+  ]
+ },
+ "13": {
+  "chart": "丁未 丁未 己丑 辛未",
+  "strength": "신강",
+  "center": "비겁",
+  "yong": "수",
+  "strong": "토",
+  "inbi": 87,
+  "isolated": [],
+  "flow": [
+   "화",
+   "토",
+   "금"
+  ]
+ },
+ "14": {
+  "chart": "庚子 戊子 庚辰 丙戌",
+  "strength": "신강",
+  "center": "인성",
+  "yong": "목",
+  "strong": "토",
+  "inbi": 62,
+  "isolated": [],
+  "flow": [
+   "토",
+   "금",
+   "수"
+  ]
+ },
+ "15": {
+  "chart": "己酉 乙亥 甲辰 丁卯",
+  "strength": "중화",
+  "center": "비겁",
+  "yong": "토",
+  "strong": "목",
+  "inbi": 47,
+  "isolated": [],
+  "flow": [
+   "토",
+   "금",
+   "수",
+   "목",
+   "화"
+  ]
+ },
+ "16": {
+  "chart": "辛酉 乙未 丙午 甲午",
+  "strength": "신강",
+  "center": "비겁",
+  "yong": "금",
+  "strong": "화",
+  "inbi": 66,
+  "isolated": [],
+  "flow": [
+   "목",
+   "화",
+   "토",
+   "금"
+  ]
+ },
+ "17": {
+  "chart": "癸未 甲寅 庚午 癸未",
+  "strength": "신약",
+  "center": "재성",
+  "yong": "금",
+  "strong": "목",
+  "inbi": 34,
+  "isolated": [],
+  "flow": [
+   "수",
+   "목",
+   "화",
+   "토"
+  ]
+ },
+ "18": {
+  "chart": "庚戌 丁亥 辛亥 己丑",
+  "strength": "신강",
+  "center": "인성",
+  "yong": "목",
+  "strong": "토",
+  "inbi": 55,
+  "isolated": [],
+  "flow": [
+   "토",
+   "금",
+   "수"
+  ]
+ },
+ "19": {
+  "chart": "癸卯 甲子 乙亥 丁亥",
+  "strength": "신강",
+  "center": "인성",
+  "yong": "토",
+  "strong": "수",
+  "inbi": 87,
+  "isolated": [],
+  "flow": [
+   "수",
+   "목",
+   "화"
+  ]
+ },
+ "20": {
+  "chart": "辛酉 丙申 丁卯 辛亥",
+  "strength": "신약",
+  "center": "재성",
+  "yong": "화",
+  "strong": "금",
+  "inbi": 40,
+  "isolated": [],
+  "flow": [
+   "금",
+   "수",
+   "목",
+   "화"
+  ]
+ },
+ "21": {
+  "chart": "甲戌 甲戌 己巳 甲子",
+  "strength": "중화",
+  "center": "비겁",
+  "yong": "수",
+  "strong": "목",
+  "inbi": 53,
+  "isolated": [
+   "巳"
+  ],
+  "flow": [
+   "화",
+   "토"
+  ]
+ },
+ "22": {
+  "chart": "甲子 丙子 壬辰 己酉",
+  "strength": "중화",
+  "center": "비겁",
+  "yong": "화",
+  "strong": "수",
+  "inbi": 47,
+  "isolated": [],
+  "flow": [
+   "수",
+   "목",
+   "화"
+  ]
+ },
+ "23": {
+  "chart": "丁巳 丙午 丁酉 丙午",
+  "strength": "신강",
+  "center": "비겁",
+  "yong": "금",
+  "strong": "화",
+  "inbi": 81,
+  "isolated": [
+   "酉"
+  ],
+  "flow": [
+   "화"
+  ]
+ },
+ "24": {
+  "chart": "丙辰 己亥 戊寅 乙卯",
+  "strength": "신약",
+  "center": "관성",
+  "yong": "토",
+  "strong": "목",
+  "inbi": 43,
+  "isolated": [
+   "亥"
+  ],
+  "flow": [
+   "화",
+   "토"
+  ]
+ },
+ "25": {
+  "chart": "庚辰 甲申 辛酉 庚寅",
+  "strength": "신강",
+  "center": "비겁",
+  "yong": "목",
+  "strong": "금",
+  "inbi": 74,
+  "isolated": [],
+  "flow": [
+   "토",
+   "금"
+  ]
+ },
+ "26": {
+  "chart": "戊申 辛酉 庚寅 庚辰",
+  "strength": "신강",
+  "center": "비겁",
+  "yong": "목",
+  "strong": "금",
+  "inbi": 81,
+  "isolated": [
+   "寅"
+  ],
+  "flow": [
+   "토",
+   "금"
+  ]
+ },
+ "27": {
+  "chart": "癸亥 甲子 癸未 壬子",
+  "strength": "신강",
+  "center": "비겁",
+  "yong": "화",
+  "strong": "수",
+  "inbi": 68,
+  "isolated": [],
+  "flow": [
+   "수",
+   "목"
+  ]
+ },
+ "28": {
+  "chart": "辛未 乙未 癸未 己未",
+  "strength": "신약",
+  "center": "관성",
+  "yong": "수",
+  "strong": "토",
+  "inbi": 17,
+  "isolated": [],
+  "flow": [
+   "토",
+   "금"
+  ]
+ },
+ "29": {
+  "chart": "乙卯 戊寅 癸卯 乙卯",
+  "strength": "신약",
+  "center": "식상",
+  "yong": "금",
+  "strong": "목",
+  "inbi": 9,
+  "isolated": [],
+  "flow": [
+   "수",
+   "목"
+  ]
+ },
+ "30": {
+  "chart": "戊寅 己未 戊辰 丙辰",
+  "strength": "신강",
+  "center": "비겁",
+  "yong": "수",
+  "strong": "토",
+  "inbi": 87,
+  "isolated": [],
+  "flow": [
+   "화",
+   "토"
+  ]
+ },
+ "31": {
+  "chart": "癸亥 己未 己未 丙寅",
+  "strength": "신강",
+  "center": "비겁",
+  "yong": "수",
+  "strong": "토",
+  "inbi": 66,
+  "isolated": [],
+  "flow": [
+   "목",
+   "화",
+   "토"
+  ]
+ },
+ "32": {
+  "chart": "甲戌 乙亥 乙卯 辛巳",
+  "strength": "신강",
+  "center": "비겁",
+  "yong": "토",
+  "strong": "목",
+  "inbi": 62,
+  "isolated": [
+   "戌",
+   "亥"
+  ],
+  "flow": [
+   "수",
+   "목",
+   "화"
+  ]
+ },
+ "33": {
+  "chart": "庚寅 庚辰 癸卯 甲寅",
+  "strength": "신약",
+  "center": "식상",
+  "yong": "금",
+  "strong": "목",
+  "inbi": 30,
+  "isolated": [
+   "辰"
+  ],
+  "flow": [
+   "토",
+   "금",
+   "수",
+   "목"
+  ]
+ },
+ "34": {
+  "chart": "壬辰 癸丑 丁丑 甲辰",
+  "strength": "신약",
+  "center": "식상",
+  "yong": "목",
+  "strong": "토",
+  "inbi": 21,
+  "isolated": [],
+  "flow": [
+   "목",
+   "화",
+   "토"
+  ]
+ },
+ "35": {
+  "chart": "丙辰 庚子 壬子 庚戌",
+  "strength": "신강",
+  "center": "비겁",
+  "yong": "화",
+  "strong": "수",
+  "inbi": 66,
+  "isolated": [],
+  "flow": [
+   "토",
+   "금",
+   "수"
+  ]
+ },
+ "36": {
+  "chart": "甲子 丁丑 己巳 辛未",
+  "strength": "신강",
+  "center": "비겁",
+  "yong": "수",
+  "strong": "토",
+  "inbi": 66,
+  "isolated": [
+   "子"
+  ],
+  "flow": [
+   "수",
+   "목",
+   "화",
+   "토",
+   "금"
+  ]
+ },
+ "37": {
+  "chart": "癸亥 癸亥 癸亥 癸亥",
+  "strength": "신강",
+  "center": "비겁",
+  "yong": "화",
+  "strong": "수",
+  "inbi": 100,
+  "isolated": [],
+  "flow": [
+   "수"
+  ]
+ },
+ "38": {
+  "chart": "丙寅 癸巳 癸亥 癸丑",
+  "strength": "중화",
+  "center": "비겁",
+  "yong": "화",
+  "strong": "수",
+  "inbi": 53,
+  "isolated": [],
+  "flow": [
+   "목",
+   "화"
+  ]
+ },
+ "39": {
+  "chart": "甲子 壬申 乙未 辛巳",
+  "strength": "신약",
+  "center": "관성",
+  "yong": "목",
+  "strong": "금",
+  "inbi": 43,
+  "isolated": [],
+  "flow": [
+   "화",
+   "토",
+   "금",
+   "수",
+   "목"
+  ]
+ },
+ "40": {
+  "chart": "庚午 戊寅 己酉 丁卯",
+  "strength": "중화",
+  "center": "식상",
+  "yong": "화",
+  "strong": "금",
+  "inbi": 47,
+  "isolated": [],
+  "flow": [
+   "목",
+   "화",
+   "토",
+   "금"
+  ]
+ },
+ "41": {
+  "chart": "癸丑 甲子 庚辰 庚辰",
+  "strength": "신강",
+  "center": "인성",
+  "yong": "목",
+  "strong": "토",
+  "inbi": 66,
+  "isolated": [],
+  "flow": [
+   "수",
+   "목"
+  ]
+ },
+ "42": {
+  "chart": "癸酉 丁巳 丁酉 乙巳",
+  "strength": "신강",
+  "center": "비겁",
+  "yong": "금",
+  "strong": "화",
+  "inbi": 60,
+  "isolated": [
+   "乙"
+  ],
+  "flow": [
+   "금",
+   "수"
+  ]
+ }
+}

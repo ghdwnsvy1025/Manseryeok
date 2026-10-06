@@ -35,7 +35,7 @@ export function TodayEntryCard({ entry, today, tomorrowKo, justSaved }: Props) {
       {entry.moods.length > 0 && (
         <ul className="mt-3 flex flex-wrap gap-2" aria-label="기분">
           {entry.moods.map((m) => (
-            <li key={m} className="tag tag--on h-8 px-1 text-[14px] text-sky-ink">
+            <li key={m} className="tag tag--on h-8 px-1 text-[14px] text-paper-2">
               {m}
             </li>
           ))}

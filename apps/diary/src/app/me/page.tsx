@@ -138,7 +138,7 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
                     {e.moods.length > 0 && (
                       <span className="mt-1.5 flex flex-wrap gap-1.5">
                         {e.moods.map((m) => (
-                          <span key={m} className="tag tag--on h-6 px-0.5 text-[12px] text-sky-ink">
+                          <span key={m} className="tag tag--on h-6 px-0.5 text-[12px] text-paper-2">
                             {m}
                           </span>
                         ))}
