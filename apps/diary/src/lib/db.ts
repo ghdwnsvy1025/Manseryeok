@@ -1,7 +1,7 @@
 // night_* 테이블 읽기·쓰기. 모두 로그인한 사용자의 Supabase 클라이언트로 부르며 RLS가 본인 행만 허용한다.
 // 스키마: supabase/migrations/0001_night_core.sql
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { EntryInput } from "./entry";
+import type { EntryInput, Promise_ } from "./entry";
 import type { DayGanji } from "./ganji";
 import { CITIES, type CityId } from "./cities";
 import type { BirthProfile, ComputedProfile, ProfileInput, PillarsSnapshot } from "./profile";
@@ -15,6 +15,9 @@ export interface EntryRow {
   day_ganji_index: number;
   day_stem: string;
   day_branch: string;
+  /** 오늘의 작은 약속 (0003_promise.sql). 컬럼 적용 전이면 undefined */
+  promise?: Promise_ | null;
+  promise_text?: string | null;
 }
 
 export interface SajuProfileRow {
@@ -49,12 +52,23 @@ export function birthProfileOf(row: SajuProfileRow): BirthProfile {
   };
 }
 
-const ENTRY_COLUMNS = "id, entry_date, happiness, moods, note, day_ganji_index, day_stem, day_branch";
+const ENTRY_COLUMNS_LEGACY = "id, entry_date, happiness, moods, note, day_ganji_index, day_stem, day_branch";
+/** 0003_promise.sql 적용 뒤의 전체 컬럼. 적용 전이면 읽기·쓰기가 컬럼 없음으로 실패하므로 LEGACY로 한 번 더 시도한다 */
+const ENTRY_COLUMNS = `${ENTRY_COLUMNS_LEGACY}, promise, promise_text`;
 const PROFILE_COLUMNS =
   "id, name, gender, calendar, is_leap_month, birth_year, birth_month, birth_day, birth_hour, birth_minute, city, pillars, engine_version";
 
 function fail(what: string, error: { message: string }): never {
   throw new Error(`${what}: ${error.message}`);
+}
+
+/**
+ * 마이그레이션이 아직 안 적용돼 컬럼이 없을 때의 오류. Postgres 42703 · PostgREST PGRST204(스키마 캐시에 컬럼 없음).
+ * 그동안은 약속 없이 저장·읽기로 물러난다 — 사용자에게 500을 보이지 않는다.
+ */
+export function isMissingColumnError(error: { code?: string; message: string } | null | undefined): boolean {
+  if (!error) return false;
+  return error.code === "42703" || error.code === "PGRST204" || /column .* does not exist|Could not find the '.*' column/i.test(error.message);
 }
 
 export async function getSajuProfile(sb: SupabaseClient, userId: string): Promise<SajuProfileRow | null> {
@@ -95,34 +109,62 @@ export async function saveSajuProfile(
   if (e2) fail("사용자 저장", e2);
 }
 
-/** 로그인 직후 한 번. 이미 있으면 그대로 둔다. */
-export async function ensureUserRow(sb: SupabaseClient, userId: string): Promise<void> {
+/** 로그인(익명 포함) 직후 한 번. 이미 있으면 그대로 둔다. 익명 사용자는 이름 "손님" */
+export async function ensureUserRow(sb: SupabaseClient, userId: string, displayName: string | null = null): Promise<void> {
   const { error } = await sb
     .from("night_profiles")
-    .upsert({ user_id: userId }, { onConflict: "user_id", ignoreDuplicates: true });
+    .upsert({ user_id: userId, ...(displayName ? { display_name: displayName } : {}) }, { onConflict: "user_id", ignoreDuplicates: true });
   if (error) fail("사용자 만들기", error);
 }
 
-export async function getEntry(sb: SupabaseClient, userId: string, date: string): Promise<EntryRow | null> {
+export interface LinkPromptState {
+  promptedAt: string | null;
+  promptCount: number;
+}
+
+/**
+ * Google 연결 안내를 몇 번 보여 줬는지. 컬럼은 0002_anon.sql — 아직 적용 전이면(42703) 0으로 본다.
+ */
+export async function getLinkPromptState(sb: SupabaseClient, userId: string): Promise<LinkPromptState> {
   const { data, error } = await sb
-    .from("night_entries")
-    .select(ENTRY_COLUMNS)
+    .from("night_profiles")
+    .select("link_prompted_at, link_prompt_count")
     .eq("user_id", userId)
-    .eq("entry_date", date)
     .maybeSingle();
+  if (error) {
+    if (error.code === "42703" || /column|does not exist/i.test(error.message)) return { promptedAt: null, promptCount: 0 };
+    fail("연결 안내 상태 읽기", error);
+  }
+  const row = data as { link_prompted_at?: string | null; link_prompt_count?: number | null } | null;
+  return { promptedAt: row?.link_prompted_at ?? null, promptCount: Number(row?.link_prompt_count ?? 0) };
+}
+
+/** 안내를 보여 줬다고 기록한다. 컬럼이 없으면 조용히 넘어간다 */
+export async function markLinkPrompted(sb: SupabaseClient, userId: string, nextCount: number): Promise<void> {
+  const { error } = await sb
+    .from("night_profiles")
+    .upsert(
+      { user_id: userId, link_prompted_at: new Date().toISOString(), link_prompt_count: nextCount },
+      { onConflict: "user_id" },
+    );
+  if (error && !(error.code === "42703" || /column|does not exist/i.test(error.message))) fail("연결 안내 기록", error);
+}
+
+export async function getEntry(sb: SupabaseClient, userId: string, date: string): Promise<EntryRow | null> {
+  const q = (cols: string) => sb.from("night_entries").select(cols).eq("user_id", userId).eq("entry_date", date).maybeSingle();
+  let { data, error } = await q(ENTRY_COLUMNS);
+  if (error && isMissingColumnError(error)) ({ data, error } = await q(ENTRY_COLUMNS_LEGACY));
   if (error) fail("기록 읽기", error);
-  return data as EntryRow | null;
+  return data as unknown as EntryRow | null;
 }
 
 export async function listEntries(sb: SupabaseClient, userId: string, limit = 30): Promise<EntryRow[]> {
-  const { data, error } = await sb
-    .from("night_entries")
-    .select(ENTRY_COLUMNS)
-    .eq("user_id", userId)
-    .order("entry_date", { ascending: false })
-    .limit(limit);
+  const q = (cols: string) =>
+    sb.from("night_entries").select(cols).eq("user_id", userId).order("entry_date", { ascending: false }).limit(limit);
+  let { data, error } = await q(ENTRY_COLUMNS);
+  if (error && isMissingColumnError(error)) ({ data, error } = await q(ENTRY_COLUMNS_LEGACY));
   if (error) fail("기록 목록 읽기", error);
-  return (data ?? []) as EntryRow[];
+  return (data ?? []) as unknown as EntryRow[];
 }
 
 export async function countEntries(sb: SupabaseClient, userId: string): Promise<number> {
@@ -136,35 +178,64 @@ export async function countEntries(sb: SupabaseClient, userId: string): Promise<
 
 /** 같은 날 기록이 있으면 고친다 (하루 하나). */
 export async function saveEntry(sb: SupabaseClient, userId: string, input: EntryInput, ganji: DayGanji): Promise<void> {
-  const { error } = await sb.from("night_entries").upsert(
-    {
-      user_id: userId,
-      entry_date: input.entryDate,
-      happiness: input.happiness,
-      moods: input.moods,
-      note: input.note,
-      day_ganji_index: ganji.index,
-      day_stem: ganji.stemKo,
-      day_branch: ganji.branchKo,
-    },
-    { onConflict: "user_id,entry_date" },
-  );
-  if (error) fail("기록 저장", error);
+  const base = {
+    user_id: userId,
+    entry_date: input.entryDate,
+    happiness: input.happiness,
+    moods: input.moods,
+    note: input.note,
+    day_ganji_index: ganji.index,
+    day_stem: ganji.stemKo,
+    day_branch: ganji.branchKo,
+  };
+  const upsert = (row: Record<string, unknown>) => sb.from("night_entries").upsert(row, { onConflict: "user_id,entry_date" });
+  const { error } = await upsert({ ...base, promise: input.promise, promise_text: input.promiseText });
+  if (!error) return;
+  // 0003_promise.sql 적용 전: 약속 컬럼을 빼고 다시 저장 (약속만 버려지고 기록은 남는다)
+  if (isMissingColumnError(error)) {
+    const { error: e2 } = await upsert(base);
+    if (e2) fail("기록 저장", e2);
+    return;
+  }
+  fail("기록 저장", error);
 }
 
 /** 운세 보정용: 전체 기록을 가볍게 (날짜 역순 제한 없음, 간지 통계에도 쓴다) */
 export async function listEntriesForStats(
   sb: SupabaseClient,
   userId: string,
-): Promise<Pick<EntryRow, "entry_date" | "happiness" | "day_ganji_index" | "day_stem" | "day_branch">[]> {
-  const { data, error } = await sb
-    .from("night_entries")
-    .select("entry_date, happiness, day_ganji_index, day_stem, day_branch")
-    .eq("user_id", userId)
-    .order("entry_date", { ascending: false })
-    .limit(2000);
+): Promise<Pick<EntryRow, "entry_date" | "happiness" | "day_ganji_index" | "day_stem" | "day_branch" | "promise">[]> {
+  const legacy = "entry_date, happiness, day_ganji_index, day_stem, day_branch";
+  const q = (cols: string) =>
+    sb.from("night_entries").select(cols).eq("user_id", userId).order("entry_date", { ascending: false }).limit(2000);
+  let { data, error } = await q(`${legacy}, promise`);
+  if (error && isMissingColumnError(error)) ({ data, error } = await q(legacy));
   if (error) fail("기록 통계 읽기", error);
-  return data ?? [];
+  return (data ?? []) as unknown as Pick<EntryRow, "entry_date" | "happiness" | "day_ganji_index" | "day_stem" | "day_branch" | "promise">[];
+}
+
+export interface CachedFortuneDo {
+  /** 운세 "하면 좋아요" 한 줄 = 그날의 약속 */
+  doText: string;
+}
+
+/**
+ * 그날 운세 캐시의 do 문장만 읽는다 (쓰기 화면의 "오늘의 작은 약속").
+ * night_fortunes에서 owner+date로 select만 한다 — 캐시가 없어도 새로 계산하거나 모델을 부르지 않는다.
+ * RLS night_fortunes_read_own으로 본인 행만 보이므로 사용자 클라이언트로 부른다.
+ * 읽기 실패(테이블 없음 등)도 null — 약속 블록을 생략할 뿐 쓰기 화면을 막지 않는다.
+ */
+export async function readCachedFortune(sb: SupabaseClient, userId: string, date: string): Promise<CachedFortuneDo | null> {
+  const { data, error } = await sb
+    .from("night_fortunes")
+    .select("content")
+    .eq("user_id", userId)
+    .eq("fortune_date", date)
+    .maybeSingle();
+  if (error || !data) return null;
+  const content = (data as { content?: unknown }).content;
+  const doText = content && typeof content === "object" ? (content as { do?: unknown }).do : null;
+  return typeof doText === "string" && doText.trim() ? { doText: doText.trim() } : null;
 }
 
 export async function getFortuneVote(sb: SupabaseClient, userId: string, date: string): Promise<1 | -1 | null> {

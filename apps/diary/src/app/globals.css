@@ -20,7 +20,17 @@
   --color-sky: #222f46;            /* 따뜻한 밤 남색 — 악센트(글자·띠지·테두리)로만. 면으로 쓰지 않는다 (v3.1) */
   --color-sky-2: #172843;          /* 남색 악센트의 진한 쪽 */
   --color-ganji: #1f3f73;          /* 간지 글자 */
+  --color-sheet: #eddcbc;          /* 호적 양식지 — form-sheet 평균색 (v3.2, 이미지 못 받을 때 바탕) */
   --color-danger: #b4432f;
+
+  /* v3.2 넷째 색 — 인주 빨강. 키트 stamp-inked-red-clean 지배색(#be281d·#c12c21) 측정값. 도장·인장에만 쓴다 (버튼·글자·테두리 금지) */
+  --color-seal: #bf2a1f;
+  /* 오행 점 — 네 기둥 나무패 안의 8px 점에만 (v3.2). 다른 곳 금지 */
+  --color-wood: #3f7a4a;
+  --color-fire: #bf2a1f;           /* = seal */
+  --color-earth: #b58a2e;          /* = gold-ink 계열 */
+  --color-metal: #9a9a92;
+  --color-water: #1c2b52;          /* = sky 계열 */
 
   /* 옛 이름 별칭. 01·03 명세가 끝나면 지운다. 새 코드에서 쓰지 않는다 */
   --color-night: var(--color-paper);
@@ -126,12 +136,147 @@ body {
   border-image-source: url("/ui/tag-strip-navy-clean.webp");
 }
 
-/* 도장: 키트 stamp-empty(빈 자리) / stamp-inked(금빛 인주 자국). 숫자는 코드 글자 */
+/* 띠지 변형 (v3.2 운세 카드): 하면 좋아요 = 금색 띠지(gold-wash 면), 피해요 = 먹색 테두리 띠지 */
+.tag--gold {
+  border-image-source: url("/ui/gold-wash.webp");
+  border-image-slice: 0 44 fill;
+}
+.tag--ink {
+  box-shadow: inset 0 0 0 1.5px var(--color-ink);
+}
+
+/* 호적 양식지 (v3.2 생년월일 입력): 키트 form-sheet(1024×1536)의 괘선 칸에 입력칸을 맞춘다.
+   절대 위치가 아니라 컨테이너 폭 기준(cqw) 격자 — 양식지는 폭 100%로 깔리고, 행 높이는 그 폭에 비례한다.
+   이미지 행 경계(y, 1024 기준 %): 21.2 / 39.7 / 58.2 / 77.1 / 96.8 / 115.4 / 129.0 / 147.6.
+   맨 위 행(0~21.2)은 쓰지 않아 바닥 기준으로 깔고, 두 번째 행부터 7행을 쓴다.
+   세로 칸 경계: 반 = 49.95, 삼분 = 34.5 · 65.4 (바깥 테두리 2.15 · 97.75). */
+.form-sheet {
+  container-type: inline-size;
+  background-color: var(--color-sheet);
+  background-image: url("/ui/form-sheet.webp");
+  background-size: 100% auto;
+  background-position: center bottom;
+  background-repeat: no-repeat;
+}
+.form-sheet__rows {
+  display: grid;
+  grid-template-rows: 18.5cqw 18.5cqw 18.9cqw 19.7cqw 18.6cqw 13.6cqw 18.65cqw;
+  padding: 0 2.25cqw 2.4cqw;
+}
+.form-sheet__row {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: 1fr;
+}
+.form-sheet__row--half {
+  grid-template-columns: 47.8cqw 47.7cqw;
+}
+.form-sheet__row--third {
+  grid-template-columns: 32.35cqw 30.9cqw 32.25cqw;
+}
+.form-sheet__cell {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+  padding: 0 3cqw;
+}
+.form-sheet__cell--row {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+/* 양식지 칸 안의 입력: 테두리 없이 숫자만 (칸은 양식지가 그린다). 포커스는 칸 아래 금색 밑줄 */
+.form-sheet__input {
+  width: 100%;
+  min-width: 0;
+  height: 40px;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  text-align: center;
+  font-family: var(--font-serif);
+  font-size: 22px;
+  color: var(--color-ink);
+}
+.form-sheet__input--right {
+  text-align: right;
+}
+.form-sheet__input::placeholder {
+  color: var(--color-faint);
+  font-size: 17px;
+  font-family: var(--font-sans);
+}
+.form-sheet__input:focus {
+  outline: none;
+  box-shadow: inset 0 -2px 0 var(--color-gold);
+}
+.form-sheet__input:disabled {
+  color: var(--color-faint);
+}
+.form-sheet__select {
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  padding: 0 1.4em 0 0;
+  font-family: var(--font-serif);
+  font-size: 20px;
+  color: var(--color-ink);
+  text-align: right;
+}
+.form-sheet__select:focus {
+  outline: none;
+  box-shadow: inset 0 -2px 0 var(--color-gold);
+}
+
+/* 붓선 로딩 (v3.2): divider 붓선을 마스크로 왼→오 1.8s 반복 드러내기. 금색. 스피너·점·회전 없음 */
+.brush-loading {
+  display: block;
+  height: 10px;
+  width: 100%;
+  background-color: var(--color-gold);
+  mask: url("/ui/divider-clean.png") center / 100% 100% no-repeat;
+  -webkit-mask: url("/ui/divider-clean.png") center / 100% 100% no-repeat;
+  animation: brush-draw 1.8s ease-in-out infinite;
+}
+@keyframes brush-draw {
+  0% {
+    clip-path: inset(0 100% 0 0);
+    opacity: 1;
+  }
+  80% {
+    clip-path: inset(0 0 0 0);
+    opacity: 1;
+  }
+  100% {
+    clip-path: inset(0 0 0 0);
+    opacity: 0;
+  }
+}
+/* 운세 카드 자리 로딩 — 닫힌 운세 카드와 같은 높이 (summary p-5 + 64px 동물) */
+.fortune-loading {
+  min-height: 116px; /* 닫힌 운세 카드와 같은 높이 — 로딩→카드 전환 때 튀지 않게 */
+}
+
+/* 화면 뼈대 (v3.2): 제목 자리는 한지보다 한 단계 어두운 네모(4px), 카드 틀은 빈 카드. 정지 상태, 깜빡임 없음 */
+.page-skeleton__title {
+  display: inline-block;
+  min-width: 6em;
+  border-radius: 4px;
+  background: var(--color-paper-3);
+  color: transparent;
+  user-select: none;
+}
+
+/* 도장: 키트 stamp-empty(빈 자리) / stamp-inked-red(인주 찍힌 자국, v3.2 — 금빛 stamp-inked는 더 쓰지 않는다). 숫자는 코드 글자 */
 .stamp {
   background: url("/ui/stamp-empty-clean.webp") center / contain no-repeat;
 }
 .stamp--on {
-  background-image: url("/ui/stamp-inked-clean.webp");
+  background-image: url("/ui/stamp-inked-red-clean.png");
 }
 /* 도장을 고를 때 120ms 눌림 한 번 (톤 v3 허용 모션) */
 input:checked + .stamp {
@@ -144,6 +289,38 @@ input:checked + .stamp {
   to {
     transform: scale(1);
   }
+}
+
+/* 오늘 약속 세그먼트 3칸 (v3.2): 한지 띠 하나를 셋으로 나눈다. 고른 칸은 남색 띠지(tag--on)와 같은 면.
+   라디오는 sr-only, 시각은 label 안의 span */
+.promise-seg {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+.promise-seg__cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 40px;
+  cursor: pointer;
+  font-size: 15px;
+  color: var(--color-ink);
+  background-color: var(--color-paper-2);
+  box-shadow: inset 0 0 0 1.5px var(--color-line);
+}
+input:checked + .promise-seg__cell {
+  font-weight: 700;
+  color: var(--color-paper-2);
+  background-color: var(--color-sky);
+  background-image: url("/ui/tag-strip-navy-clean.webp");
+  background-size: cover;
+  background-position: center;
+  box-shadow: none;
+}
+input:focus-visible + .promise-seg__cell {
+  outline: 2px solid var(--color-gold);
+  outline-offset: 2px;
 }
 
 /* 도장판 칸: 키트 stamp-board-cell. 빈 자리는 항상, 찍힘 테두리는 --ink(평균 행복도) 농도로 겹친다 */
@@ -159,6 +336,63 @@ input:checked + .stamp {
   background: url("/ui/stamp-board-cell-inked-clean.webp") center / 100% 100% no-repeat;
   opacity: var(--ink, 0);
 }
+
+/* 카드 앨범 칸 (v3.2): 모은 칸은 바이럴 카드 썸네일을 칸에 맞춰 cover.
+   금 테두리 농도 = 평균 행복도(--ink 0.35~1), 약속 지킨 날이 있으면(data-kept) 금 2px 고정.
+   오른쪽 아래 작은 인장(seal-collected)은 인주 — 인장 밖에서는 쓰지 않는다 */
+.album-cell {
+  position: relative;
+  overflow: hidden;
+  background-color: var(--color-paper-3);
+}
+.album-cell > img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.album-cell::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-gold) calc(var(--ink, 0) * 100%), transparent);
+}
+.album-cell[data-kept]::before {
+  box-shadow: inset 0 0 0 2px var(--color-gold);
+}
+.album-cell::after {
+  content: "";
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  width: 10px;
+  height: 10px;
+  pointer-events: none;
+  background: url("/ui/seal-collected-clean.png") center / contain no-repeat;
+}
+
+/* 선택 칸 상세의 큰 카드 (폭 60%) */
+.album-pick {
+  width: 60%;
+  height: auto;
+  display: block;
+}
+
+/* 나무패 안의 오행 점 (v3.2): 지름 8px. 오행 색은 여기서만 */
+.element-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  vertical-align: middle;
+}
+.element-dot--wood { background-color: var(--color-wood); }
+.element-dot--fire { background-color: var(--color-fire); }
+.element-dot--earth { background-color: var(--color-earth); }
+.element-dot--metal { background-color: var(--color-metal); }
+.element-dot--water { background-color: var(--color-water); }
 
 /* 나무패: 키트 wood-tablet. 뾰족한 머리(위 140px)와 바닥(아래 80px)은 비율대로, 몸통만 늘인다 */
 .wood-tablet {
@@ -252,6 +486,39 @@ details[open] > .fortune-body {
 .burst-text {
   animation: saved-in 300ms ease-out 150ms both;
 }
+/* 약속 지킨 날의 금테 카드 (v3.2): 카드 바깥에 금 2px */
+.burst-card[data-kept] {
+  outline: 2px solid var(--color-gold);
+  outline-offset: 0;
+}
+/* 팡 카드 오른쪽 아래 행복도 인주 도장 (v3.2): 카드 팡 150ms 뒤 1.4→1로 꽝(120ms). 숫자는 한지색 송명 28px */
+.burst-stamp {
+  position: absolute;
+  right: 6%;
+  bottom: 5%;
+  width: 26%;
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: url("/ui/stamp-inked-red-clean.png") center / contain no-repeat;
+  font-family: var(--font-serif);
+  font-size: 28px;
+  line-height: 1;
+  color: var(--color-paper-2);
+  transform: rotate(-8deg);
+  animation: stamp-slam 120ms ease-out 550ms both;
+}
+@keyframes stamp-slam {
+  from {
+    transform: rotate(-8deg) scale(1.4);
+    opacity: 0;
+  }
+  to {
+    transform: rotate(-8deg) scale(1);
+    opacity: 1;
+  }
+}
 .burst-overlay {
   animation: burst-overlay-in 200ms ease-out both;
 }
@@ -280,9 +547,11 @@ details[open] > .fortune-body {
   .saved-line,
   .burst-card,
   .burst-text,
+  .burst-stamp,
   .burst-overlay,
   .burst-overlay[data-closing],
-  input:checked + .stamp {
+  input:checked + .stamp,
+  .brush-loading {
     animation: none;
   }
   /* 팡·흩날림 없이 카드만 바로 보인다 */

@@ -66,3 +66,29 @@ describe("하이라이트", () => {
     expect(h).toMatchObject({ total: 0, overallMean: null, bestGanji: null, worstGanji: null, unseen: 60 });
   });
 });
+
+describe("오늘의 작은 약속 집계 (keptCount)", () => {
+  const withPromise = [
+    { ...e(47, "신", "해", 8), promise: "kept" as const },
+    { ...e(47, "신", "해", 9), promise: "missed" as const },
+    { ...e(47, "신", "해", 6), promise: "kept" as const },
+    { ...e(51, "을", "묘", 3), promise: "na" as const },
+    { ...e(0, "갑", "자", 6) }, // promise 없음 (컬럼 적용 전 행)
+    { ...e(7, "신", "미", 7), promise: null },
+  ];
+
+  test("간지별로 kept만 센다. 없으면 0", () => {
+    const g = ganjiGrid(withPromise);
+    expect(g[47]).toMatchObject({ n: 3, keptCount: 2 });
+    expect(g[51]).toMatchObject({ n: 1, keptCount: 0 });
+    expect(g[0]).toMatchObject({ n: 1, keptCount: 0 });
+    expect(g[59]).toMatchObject({ n: 0, keptCount: 0 });
+  });
+
+  test("천간·지지·오행 묶음에도 keptCount가 있다", () => {
+    expect(byStem(withPromise).find((b) => b.key === "신")).toMatchObject({ n: 4, keptCount: 2 });
+    expect(byBranch(withPromise).find((b) => b.key === "해")).toMatchObject({ n: 3, keptCount: 2 });
+    expect(byElement(withPromise).find((b) => b.key === "금")).toMatchObject({ keptCount: 2 });
+    expect(ganjiGrid(ENTRIES).every((c) => c.keptCount === 0)).toBe(true);
+  });
+});

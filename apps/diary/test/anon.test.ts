@@ -1,0 +1,113 @@
+// 익명 시작 (docs/ANON_START.md 5절): 익명 세션으로 저장되는지, Google 버튼 문구, 안내 카드 횟수, 미들웨어가 리디렉트하지 않는지
+import { beforeEach, describe, expect, test, vi } from "vitest";
+
+// --- 가짜 Supabase ---------------------------------------------------------
+const saved: Record<string, unknown>[] = [];
+const fakeUser = { id: "anon-1", is_anonymous: true, email: undefined };
+let currentUser: typeof fakeUser | null = fakeUser;
+
+function fakeSupabase() {
+  return {
+    from(table: string) {
+      return {
+        upsert(row: Record<string, unknown>) {
+          saved.push({ table, ...row });
+          return Promise.resolve({ error: null });
+        },
+      };
+    },
+    auth: { signOut: () => Promise.resolve({ error: null }) },
+  };
+}
+
+vi.mock("@/lib/supabase/server", () => ({
+  getUser: async () => ({ supabase: fakeSupabase(), user: currentUser }),
+  createClient: async () => fakeSupabase(),
+}));
+vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
+vi.mock("next/navigation", () => ({
+  redirect: (to: string) => {
+    throw new Error(`REDIRECT:${to}`);
+  },
+}));
+
+// 미들웨어: 세션 없는 요청
+vi.mock("@supabase/ssr", () => ({
+  createServerClient: () => ({ auth: { getUser: async () => ({ data: { user: null } }) } }),
+}));
+
+import { saveEntryAction, saveProfileAction } from "@/app/actions";
+import { googleButtonLabel, shouldShowLinkPrompt } from "@/lib/linkPrompt";
+import { middleware } from "@/middleware";
+import { NextRequest } from "next/server";
+
+beforeEach(() => {
+  saved.length = 0;
+  currentUser = fakeUser;
+  process.env.NEXT_PUBLIC_SUPABASE_URL = "https://example.supabase.co";
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = "anon";
+});
+
+function form(entries: Record<string, string | string[]>): FormData {
+  const f = new FormData();
+  for (const [k, v] of Object.entries(entries)) {
+    for (const item of Array.isArray(v) ? v : [v]) f.append(k, item);
+  }
+  return f;
+}
+
+describe("익명 세션에서 저장", () => {
+  test("saveEntryAction은 익명 user_id로 기록을 저장하고 오늘 화면으로 간다", async () => {
+    const f = form({ entryDate: "2026-10-06", happiness: "7", moods: ["기쁨"], note: "한 줄" });
+    await expect(saveEntryAction({ error: null }, f)).rejects.toThrow("REDIRECT:/?saved=2026-10-06");
+    const row = saved.find((r) => r.table === "night_entries");
+    expect(row).toBeTruthy();
+    expect(row!.user_id).toBe("anon-1");
+    expect(row!.happiness).toBe(7);
+  });
+
+  test("세션이 아직 없으면 로그인으로 보내지 않고 '준비 중' 오류만 돌려준다", async () => {
+    currentUser = null;
+    const f = form({ entryDate: "2026-10-06", happiness: "7" });
+    const r = await saveEntryAction({ error: null }, f);
+    expect(r.error).toMatch(/준비/);
+    expect(saved).toHaveLength(0);
+  });
+
+  test("saveProfileAction은 익명이라 이름이 없으면 '손님'으로 저장하고 운세를 기다리지 않고 돌아간다", async () => {
+    const f = form({ gender: "female", calendar: "solar", birthYear: "1995", birthMonth: "3", birthDay: "14", timeUnknown: "on", city: "seoul", next: "/" });
+    await expect(saveProfileAction({ error: null }, f)).rejects.toThrow("REDIRECT:/");
+    const row = saved.find((r) => r.table === "night_saju_profiles");
+    expect(row!.name).toBe("손님");
+    expect(row!.user_id).toBe("anon-1");
+  });
+});
+
+describe("Google 버튼 문구", () => {
+  test("익명 세션일 때만 '연결'", () => {
+    expect(googleButtonLabel({ isAnonymous: true })).toBe("Google로 연결하기");
+    expect(googleButtonLabel(null)).toBe("Google로 시작하기");
+    expect(googleButtonLabel({ isAnonymous: false })).toBeNull();
+  });
+});
+
+describe("Google 연결 안내 카드", () => {
+  test("익명 + 첫 기록 뒤 한 번, 7건째 한 번 더, 그 뒤로는 없음", () => {
+    expect(shouldShowLinkPrompt({ isAnonymous: true, entryCount: 0, promptCount: 0 })).toBe(false);
+    expect(shouldShowLinkPrompt({ isAnonymous: true, entryCount: 1, promptCount: 0 })).toBe(true);
+    expect(shouldShowLinkPrompt({ isAnonymous: true, entryCount: 3, promptCount: 1 })).toBe(false);
+    expect(shouldShowLinkPrompt({ isAnonymous: true, entryCount: 7, promptCount: 1 })).toBe(true);
+    expect(shouldShowLinkPrompt({ isAnonymous: true, entryCount: 20, promptCount: 2 })).toBe(false);
+    expect(shouldShowLinkPrompt({ isAnonymous: false, entryCount: 1, promptCount: 0 })).toBe(false);
+  });
+});
+
+describe("미들웨어", () => {
+  test("세션이 없어도 /write·/me·/onboarding을 로그인으로 보내지 않는다", async () => {
+    for (const path of ["/write", "/me", "/onboarding", "/settings"]) {
+      const res = await middleware(new NextRequest(`http://localhost:3001${path}`));
+      expect(res.status).toBe(200);
+      expect(res.headers.get("location")).toBeNull();
+    }
+  });
+});

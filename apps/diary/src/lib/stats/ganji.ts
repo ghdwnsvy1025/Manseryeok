@@ -19,6 +19,8 @@ export interface Bucket {
   n: number;
   mean: number | null;
   signal: Signal;
+  /** 오늘의 작은 약속을 지킨 날 수 (톤 v3.2). 1 이상이면 격자 칸이 금테 */
+  keptCount: number;
 }
 
 export interface GanjiCell extends Bucket {
@@ -35,16 +37,18 @@ function round1(x: number): number {
 
 function bucketize<K extends string>(entries: EntryLike[], keyOf: (e: EntryLike) => K, keys: readonly K[], koOf: (k: K) => string): Bucket[] {
   const acc = new Map<K, number[]>();
+  const kept = new Map<K, number>();
   for (const e of entries) {
     const k = keyOf(e);
     const arr = acc.get(k) ?? [];
     arr.push(e.happiness);
     acc.set(k, arr);
+    if (e.promise === "kept") kept.set(k, (kept.get(k) ?? 0) + 1);
   }
   return keys.map((k) => {
     const xs = acc.get(k) ?? [];
     const mean = xs.length ? round1(xs.reduce((a, b) => a + b, 0) / xs.length) : null;
-    return { key: k, ko: koOf(k), n: xs.length, mean, signal: signalOf(xs.length) };
+    return { key: k, ko: koOf(k), n: xs.length, mean, signal: signalOf(xs.length), keptCount: kept.get(k) ?? 0 };
   });
 }
 

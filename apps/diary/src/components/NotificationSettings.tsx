@@ -94,7 +94,7 @@ export function NotificationSettings({ enabled, remindHour, kakaoChannelUrl }: P
               끄기
             </button>
           ) : (
-            <button type="button" onClick={enable} disabled={busy} className="h-10 shrink-0 rounded-full bg-lamp px-4 text-sm font-bold text-lamp-ink disabled:opacity-60">
+            <button type="button" onClick={enable} disabled={busy} className="h-10 shrink-0 rounded-full border border-frame bg-transparent px-4 text-sm font-bold text-ink disabled:opacity-60">
               {busy ? "켜는 중…" : "켜기"}
             </button>
           )

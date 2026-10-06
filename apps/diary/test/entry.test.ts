@@ -7,7 +7,22 @@ const base = { entryDate: TODAY, happiness: "7", moods: [] as unknown, note: "" 
 describe("validateEntry", () => {
   test("행복도만 있어도 저장된다", () => {
     const r = validateEntry(base, TODAY);
-    expect(r).toEqual({ ok: true, value: { entryDate: TODAY, happiness: 7, moods: [], note: null } });
+    expect(r).toEqual({ ok: true, value: { entryDate: TODAY, happiness: 7, moods: [], note: null, promise: null, promiseText: null } });
+  });
+
+  test("오늘의 작은 약속: 없거나 빈 값이면 null, kept/missed/na만 받고 문장은 상태가 있을 때만 남긴다", () => {
+    expect(validateEntry({ ...base, promise: "", promiseText: "x" }, TODAY)).toMatchObject({ ok: true, value: { promise: null, promiseText: null } });
+    expect(validateEntry({ ...base, promise: null, promiseText: null }, TODAY)).toMatchObject({ ok: true, value: { promise: null } });
+    for (const p of ["kept", "missed", "na"]) {
+      expect(validateEntry({ ...base, promise: p, promiseText: " 저녁에 지출을 확인해요 " }, TODAY)).toMatchObject({
+        ok: true,
+        value: { promise: p, promiseText: "저녁에 지출을 확인해요" },
+      });
+    }
+    expect(validateEntry({ ...base, promise: "kept", promiseText: "" }, TODAY)).toMatchObject({ ok: true, value: { promise: "kept", promiseText: null } });
+    const bad = validateEntry({ ...base, promise: "yes" }, TODAY);
+    expect(bad.ok).toBe(false);
+    expect(bad).toMatchObject({ error: expect.stringContaining("약속") });
   });
 
   test("행복도는 1~10 정수", () => {

@@ -14,6 +14,8 @@ export interface EntryLike {
   day_stem: string;
   day_branch: string;
   happiness: number;
+  /** 오늘의 작은 약속 (톤 v3.2). 컬럼 적용 전이거나 약속이 없던 날은 없음 */
+  promise?: "kept" | "missed" | "na" | null;
 }
 
 function mean(xs: number[]): number | null {

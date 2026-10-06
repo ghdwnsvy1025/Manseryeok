@@ -23,8 +23,9 @@ function Row({ b }: { b: Bucket }) {
 
 function Group({ title, items }: { title: string; items: Bucket[] }) {
   if (items.every((b) => b.n === 0)) return null;
+  // 기록이 1건이라도 있으면 펼친 상태가 기본 (v3.2)
   return (
-    <details className="card-frame card-paper px-5 py-3">
+    <details open className="card-frame card-paper px-5 py-3">
       <summary className="cursor-pointer list-none text-[15px] font-bold [&::-webkit-details-marker]:hidden">
         {title} <span className="ml-1 text-sm font-normal text-faint">평균 / 횟수</span>
       </summary>
@@ -74,9 +75,15 @@ export function StatsSummary({ h, fitPercent, stems, branches, elements }: Props
         <p className="text-[15px] text-muted">같은 간지 날을 두 번 이상 겪으면 가장 행복한 날이 여기 떠요.</p>
       )}
 
-      <Group title="천간별" items={stems} />
-      <Group title="지지별" items={branches} />
-      <Group title="오행별" items={elements} />
+      {h.total === 0 ? (
+        <p className="card-frame card-paper px-5 py-4 text-[15px] text-muted">첫 기록을 남기면 여기에 천간·지지·오행별 평균이 쌓여요.</p>
+      ) : (
+        <>
+          <Group title="천간별" items={stems} />
+          <Group title="지지별" items={branches} />
+          <Group title="오행별" items={elements} />
+        </>
+      )}
     </div>
   );
 }

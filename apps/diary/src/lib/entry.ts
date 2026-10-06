@@ -24,17 +24,25 @@ export const MAX_NOTE = 500;
 /** 기록할 수 있는 가장 이른 날짜 (레거시 이관분 포함) */
 export const EARLIEST_ENTRY_DATE = "2020-01-01";
 
+/** 오늘의 작은 약속(톤 v3.2): 운세 "하면 좋아요" 한 줄을 지켰는지. 약속이 없던 날(운세 캐시 없음)은 null */
+export const PROMISES = ["kept", "missed", "na"] as const;
+export type Promise_ = (typeof PROMISES)[number];
+export const MAX_PROMISE_TEXT = 200;
+
 export interface EntryInput {
   entryDate: string;
   happiness: number;
   moods: Mood[];
   note: string | null;
+  promise: Promise_ | null;
+  /** 그날 약속한 문장(운세 do). 운세가 나중에 바뀌어도 무엇을 약속했는지 남는다 */
+  promiseText: string | null;
 }
 
 export type Validation<T> = { ok: true; value: T } | { ok: false; error: string };
 
 export function validateEntry(
-  raw: { entryDate: unknown; happiness: unknown; moods: unknown; note: unknown },
+  raw: { entryDate: unknown; happiness: unknown; moods: unknown; note: unknown; promise?: unknown; promiseText?: unknown },
   today: string = todayKST(),
 ): Validation<EntryInput> {
   const entryDate = typeof raw.entryDate === "string" ? raw.entryDate : "";
@@ -57,5 +65,15 @@ export function validateEntry(
   const text = typeof raw.note === "string" ? raw.note.trim() : "";
   if (text.length > MAX_NOTE) return { ok: false, error: `메모는 ${MAX_NOTE}자까지 쓸 수 있어요.` };
 
-  return { ok: true, value: { entryDate, happiness, moods: moods as Mood[], note: text || null } };
+  // 약속: 없거나 빈 값이면 null. 목록 밖의 값은 거부
+  const promiseRaw = typeof raw.promise === "string" ? raw.promise.trim() : "";
+  if (promiseRaw && !(PROMISES as readonly string[]).includes(promiseRaw)) {
+    return { ok: false, error: "약속 상태가 올바르지 않아요." };
+  }
+  const promise = promiseRaw ? (promiseRaw as Promise_) : null;
+  const promiseTextRaw = typeof raw.promiseText === "string" ? raw.promiseText.trim().slice(0, MAX_PROMISE_TEXT) : "";
+  // 약속 상태가 없으면 문장도 남기지 않는다
+  const promiseText = promise && promiseTextRaw ? promiseTextRaw : null;
+
+  return { ok: true, value: { entryDate, happiness, moods: moods as Mood[], note: text || null, promise, promiseText } };
 }

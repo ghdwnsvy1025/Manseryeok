@@ -2,14 +2,15 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { supabaseEnv } from "@/lib/supabase/env";
 
-/** 로그인해야 들어갈 수 있는 화면. 게스트는 오늘 화면만 본다. */
-const PROTECTED = ["/write", "/me", "/onboarding"];
-
+/**
+ * 세션 쿠키 갱신만 한다 (@supabase/ssr 권장 방식).
+ * 익명 시작(docs/ANON_START.md) 뒤로는 보호 경로가 없다 — 세션이 없는 첫 요청도 리디렉트하지 않고,
+ * 페이지가 "준비 중"을 그리는 사이 AnonBoot(클라이언트)가 익명 세션을 만들고 새로 그린다.
+ */
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({ request });
   const { url, anonKey } = supabaseEnv();
 
-  // 세션 쿠키를 갱신해 요청과 응답 양쪽에 반영한다 (@supabase/ssr 권장 방식)
   const supabase = createServerClient(url, anonKey, {
     cookies: {
       getAll: () => request.cookies.getAll(),
@@ -20,16 +21,9 @@ export async function middleware(request: NextRequest) {
       },
     },
   });
-  const { data } = await supabase.auth.getUser();
+  // 토큰이 만료됐으면 여기서 갱신돼 응답 쿠키에 실린다
+  await supabase.auth.getUser();
 
-  const path = request.nextUrl.pathname;
-  if (!data.user && PROTECTED.some((p) => path === p || path.startsWith(`${p}/`))) {
-    const login = request.nextUrl.clone();
-    login.pathname = "/login";
-    login.search = "";
-    login.searchParams.set("next", path + request.nextUrl.search);
-    return NextResponse.redirect(login);
-  }
   return response;
 }
 

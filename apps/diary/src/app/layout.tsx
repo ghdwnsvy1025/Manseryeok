@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Gowun_Batang, Nanum_Pen_Script, Song_Myung } from "next/font/google";
+import { AnonBoot } from "@/components/AnonBoot";
 import { BottomNav } from "@/components/BottomNav";
 import { PwaRegister } from "@/components/PwaRegister";
 import "./globals.css";
@@ -39,6 +40,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col px-5 pt-6 pb-28">{children}</div>
         <BottomNav />
         <PwaRegister />
+        {/* 첫 방문에 익명 세션 하나 (docs/ANON_START.md) */}
+        <AnonBoot />
       </body>
     </html>
   );

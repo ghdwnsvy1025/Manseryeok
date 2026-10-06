@@ -7,6 +7,40 @@ import type { AreaSignal, FortuneContent } from "@/lib/fortune/types";
 const SIGNAL_COLOR: Record<AreaSignal, string> = { "↑": "text-gold", "→": "text-muted", "↓": "text-ink" };
 const SIGNAL_WORD: Record<AreaSignal, string> = { "↑": "좋아요", "→": "보통이에요", "↓": "조심해요" };
 
+/** 받침 유무 — 조사 고르기 */
+function batchim(s: string): boolean {
+  const code = s.charCodeAt(s.length - 1);
+  return code >= 0xac00 && code <= 0xd7a3 && (code - 0xac00) % 28 !== 0;
+}
+
+/**
+ * "내 기록으로 본 오늘" 문장 (02 v3.2). 컴포넌트에서 조립한다.
+ * 같은 간지 기록이 있으면 "계축일에 N번 기록 · 평균 M", 없으면 "계나 축이 든 날에 N번 · 평균 M",
+ * 둘 다 없으면 "아직 기록이 없어 사주만으로 계산했어요".
+ * 비교 문장은 |M×(10/9) − score| ≥ 1.5일 때만.
+ */
+function personalLines(fortune: FortuneContent, ganjiKo: string): { main: string; compare: string | null } {
+  const p = fortune.personal;
+  const stem = ganjiKo.slice(0, 1);
+  const branch = ganjiKo.slice(1);
+  let main: string;
+  let mean: number | null = null;
+  if (p.sameGanjiCount > 0 && p.sameGanjiMean !== null) {
+    mean = p.sameGanjiMean;
+    main = `${ganjiKo}일에 ${p.sameGanjiCount}번 기록 · 평균 ${mean.toFixed(1)}`;
+  } else if (p.n > 0 && p.mean !== null) {
+    mean = p.mean;
+    main = `${stem}${batchim(stem) ? "이나" : "나"} ${branch}${batchim(branch) ? "이" : "가"} 든 날에 ${p.n}번 · 평균 ${mean.toFixed(1)}`;
+  } else {
+    return { main: "아직 기록이 없어 사주만으로 계산했어요", compare: null };
+  }
+  const scaled = mean * (10 / 9);
+  const gap = scaled - fortune.score;
+  const compare =
+    Math.abs(gap) >= 1.5 ? `사주 점수는 ${fortune.score.toFixed(1)}이지만 내 기록은 ${gap > 0 ? "좋은" : "낮은"} 편` : null;
+  return { main, compare };
+}
+
 interface Props {
   fortune: FortuneContent;
   /** 카드 머리에 들어가는 날짜 ("10월 5일") */
@@ -26,11 +60,14 @@ interface Props {
  * 닫혀 있어도 날짜·간지와 밴드 단어·동물까지는 보이고, 숫자·눈금·본문은 열어야 보인다.
  * 접힘/펼침은 details 요소로 처리해 자바스크립트 없이도 열린다.
  * 열리는 전환은 globals.css의 .fortune-body (디자인 명세 02).
+ * v3.2: 본문과 영역 줄 사이 "내 기록으로 본 오늘" 블록, 하면/피해요는 띠지, 맨 아래 "왜 이런 운세인가요?" details.
  */
 export function FortuneCard({ fortune, dateLabel, ganjiKo, canVote, vote, defaultOpen }: Props) {
   const scoreText = fortune.score.toFixed(1);
   const filled = Math.max(0, Math.min(10, Math.round(fortune.score)));
   const areas = (fortune.areas ?? []).slice(0, 3);
+  const personal = personalLines(fortune, ganjiKo);
+  const facts = (fortune.core?.facts ?? fortune.base?.facts ?? []).slice(0, 10);
   return (
     <details open={defaultOpen} className="group card-gold card-paper text-ink">
       <summary className="flex cursor-pointer list-none items-start justify-between gap-3 p-5 [&::-webkit-details-marker]:hidden">
@@ -73,6 +110,14 @@ export function FortuneCard({ fortune, dateLabel, ganjiKo, canVote, vote, defaul
             <h2 className="border-l-2 border-gold pl-3 font-serif text-[24px] leading-snug">{fortune.headline}</h2>
             <p className="mt-3 text-[16px] leading-[1.7] text-ink/90">{fortune.body}</p>
 
+            {/* 내 기록으로 본 오늘 (v3.2): 한지보다 한 단계 어두운 네모. 기록이 없으면 같은 자리에 사주만으로 계산했다는 말 */}
+            <div className="mt-5 rounded-[4px] bg-paper-3 px-4 py-3">
+              <p className="text-[13px] text-muted">내 기록으로 본 오늘</p>
+              <p className="mt-1 text-[16px] leading-[1.6] text-ink">{personal.main}</p>
+              {personal.compare && <p className="mt-0.5 text-[15px] leading-[1.6] text-ink/85">{personal.compare}</p>}
+              {fortune.fitNote && <p className="mt-1 text-[14px] leading-[1.6] text-muted">{fortune.fitNote}</p>}
+            </div>
+
             {/* 영역 줄 (v4): 신호 있는 영역 1~3개. 화살표는 글자, 색으로 길흉을 말하지 않는다(↓도 ink) */}
             {areas.length > 0 && (
               <dl className="mt-5 grid grid-cols-[4.5rem_1fr] gap-x-3 gap-y-2 text-[16px] leading-[1.5]">
@@ -91,21 +136,16 @@ export function FortuneCard({ fortune, dateLabel, ganjiKo, canVote, vote, defaul
               </dl>
             )}
 
-            <dl className="mt-5 grid grid-cols-[5.5rem_1fr] gap-x-3 gap-y-2 text-[15px]">
-              <dt className="text-muted">하면 좋아요</dt>
-              <dd>{fortune.do}</dd>
-              <dt className="text-muted">피해요</dt>
-              <dd className="text-ink/85">{fortune.dont}</dd>
+            {/* 하면 좋아요 = 금색 띠지, 피해요 = 먹색 테두리 띠지. 라벨은 띠지 안, 문장은 오른쪽 (v3.2) */}
+            <dl className="mt-5 grid grid-cols-[auto_1fr] items-start gap-x-3 gap-y-3 text-[16px] leading-[1.5]">
+              <dt className="tag tag--gold h-8 px-0.5 text-[14px] font-bold text-gold-ink">하면 좋아요</dt>
+              <dd className="min-w-0 break-keep pt-1">{fortune.do}</dd>
+              <dt className="tag tag--ink h-8 px-0.5 text-[14px] font-bold text-ink">피해요</dt>
+              <dd className="min-w-0 break-keep pt-1 text-ink/85">{fortune.dont}</dd>
             </dl>
 
-            {/* 카드 안 붓선은 이 한 곳뿐 — 표와 맨 아래 흐린 한 줄 사이 */}
+            {/* 카드 안 붓선은 이 한 곳뿐 — 띠지와 맨 아래(투표·근거) 사이 */}
             <span aria-hidden className="rule rule--light mt-5" />
-            <p className="mt-4 text-sm text-muted">
-              {fortune.personal.n > 0
-                ? `내 기록 ${fortune.personal.n}일이 오늘 점수의 ${Math.round(fortune.personal.weight * 100)}%를 정했어요 · 맞춤도 ${fortune.fitPercent}%`
-                : "아직 내 기록이 없어 사주만으로 계산했어요"}
-              {fortune.fitNote ? ` · ${fortune.fitNote}` : null}
-            </p>
 
             {canVote && (
               <form action={fortuneVoteAction} className="mt-4 flex items-center gap-2 text-sm text-muted">
@@ -130,6 +170,22 @@ export function FortuneCard({ fortune, dateLabel, ganjiKo, canVote, vote, defaul
                   아니에요
                 </button>
               </form>
+            )}
+
+            {/* 왜 이런 운세인가요? — core.facts 6~10줄, 왼쪽 금색 세로선 (v3.2) */}
+            {facts.length > 0 && (
+              <details className="group/why mt-4">
+                <summary className="cursor-pointer list-none text-[15px] text-muted underline underline-offset-4 [&::-webkit-details-marker]:hidden">
+                  왜 이런 운세인가요?
+                </summary>
+                <ul className="mt-3 flex flex-col gap-1.5 border-l-2 border-gold pl-3 text-[14px] leading-[1.6] text-muted">
+                  {facts.map((f, i) => (
+                    <li key={i} className="break-keep">
+                      {f}
+                    </li>
+                  ))}
+                </ul>
+              </details>
             )}
           </div>
         </div>

@@ -9,6 +9,8 @@ interface Props {
   happiness: number;
   /** 같은 저장을 두 번 터뜨리지 않기 위한 열쇠 (날짜·내용). 바뀌면 다시 터진다 */
   signature: string;
+  /** 오늘의 작은 약속을 지킨 날 (톤 v3.2) → 카드가 금테. 시각은 디자이너가 data-kept로 입힌다 */
+  kept?: boolean;
 }
 
 /** 키트 sprite sheet(1024×1024) 안의 조각 위치 [x, y, w, h] — ui-kit/pop-pieces.json에서 측정 */
@@ -55,7 +57,7 @@ function Bit({ kind, box, size, dx, dy, rot }: { kind: "paper" | "gold"; box: [n
  * 탭하면 바로 닫힌다. reduced-motion이면 팡·흩날림 없이 카드만 보이고 1초 뒤 걷힌다.
  * 오늘 화면(/?saved=날짜)에서 한 번만 뜬다. 저장 자체는 서버 액션이 끝낸 뒤라 성공이 보장된다.
  */
-export function SaveBurst({ ganjiKo, happiness, signature }: Props) {
+export function SaveBurst({ ganjiKo, happiness, signature, kept = false }: Props) {
   const [phase, setPhase] = useState<"hidden" | "open" | "closing">("hidden");
 
   useEffect(() => {
@@ -113,12 +115,16 @@ export function SaveBurst({ ganjiKo, happiness, signature }: Props) {
           alt={`${ganjiKo}일 카드`}
           width={768}
           height={1030}
+          data-kept={kept ? "" : undefined}
           className="burst-card relative h-auto w-full"
         />
+        {/* 행복도 인주 도장 — 카드 팡 150ms 뒤 꽝 (v3.2). 숫자 한지색 */}
+        <span className="burst-stamp" aria-label={`행복도 ${happiness}`}>
+          {happiness}
+        </span>
       </div>
       <p className="burst-text mt-6 text-center">
         <span className="block font-serif text-[22px] leading-snug text-ink">{ganjiKo}일 카드를 모았어요</span>
-        <span className="mt-1 block text-[16px] text-muted">행복도 {happiness}</span>
       </p>
     </div>,
     document.body,

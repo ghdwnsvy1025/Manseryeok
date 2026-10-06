@@ -51,7 +51,7 @@ export function InstallHint() {
         <button
           type="button"
           onClick={() => promptEvent.prompt().finally(() => setPromptEvent(null))}
-          className="mt-3 h-10 rounded-full bg-lamp px-4 text-sm font-bold text-lamp-ink"
+          className="mt-3 h-10 rounded-full border border-frame bg-transparent px-4 text-sm font-bold text-ink"
         >
           앱으로 설치
         </button>
