@@ -3,6 +3,7 @@ import { signOutAction } from "@/app/actions";
 import { ClearAllButton } from "@/components/ClearAllButton";
 import { InstallHint } from "@/components/InstallHint";
 import { LinkGoogleButton } from "@/components/LinkGoogleButton";
+import { NameForm } from "@/components/NameForm";
 import { NotificationSettings } from "@/components/NotificationSettings";
 import { Booting } from "@/components/Booting";
 import { getNotificationSettings, getSajuProfile } from "@/lib/db";
@@ -15,7 +16,7 @@ const card = "card-frame card-paper";
 /** 카드 안 목록의 한 줄. 줄 사이는 괘선 색의 얇은 선 */
 const row = "border-t border-line/25 px-5 py-5 first:border-t-0";
 
-/** 설정 — 한지 카드 한 장에 목록: Google 연결 · 알림 · 생년월일 · 앱으로 두기 · 로그아웃/기록 지우기 (docs/ANON_START.md 3절, 톤 v3.2) */
+/** 설정 — 한지 카드 한 장에 목록: Google 연결 · 이름 · 알림 · 생년월일 · 앱으로 두기 · 로그아웃/기록 지우기 (docs/ANON_START.md 3절, 톤 v3.2, B4·B9) */
 export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
   const { error } = await searchParams;
   const { supabase, user } = await getUser();
@@ -61,6 +62,12 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
           )}
         </div>
 
+        {/* 이름 (B4) — 익명 기본값 "손님"은 빈 칸으로 보인다 */}
+        <div className={row}>
+          <h2 className="font-serif text-[20px] leading-snug">이름</h2>
+          <NameForm current={profile?.name ?? null} />
+        </div>
+
         <div className={row}>
           <h2 className="font-serif text-[20px] leading-snug">알림</h2>
           <div className="mt-3 flex flex-col gap-3">
@@ -97,7 +104,15 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
 
         <div className={`${row} py-4`}>
           {anonymous ? (
-            <ClearAllButton />
+            <>
+              <ClearAllButton />
+              <p className="mt-2 text-sm text-faint">이 기기의 기록을 모두 지워요. 되돌릴 수 없어요.</p>
+              {error === "delete" && (
+                <p role="alert" className="mt-2 text-sm text-danger">
+                  지우지 못했어요. 잠시 뒤 다시 눌러 주세요.
+                </p>
+              )}
+            </>
           ) : (
             <form action={signOutAction}>
               <button type="submit" className="text-sm text-faint underline underline-offset-4">

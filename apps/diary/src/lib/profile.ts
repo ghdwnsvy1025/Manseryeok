@@ -76,14 +76,22 @@ export function dateExists(calendar: "solar" | "lunar", year: number, month: num
   }
 }
 
+/** 이름 한 칸 검증 (온보딩·설정 "이름" 공용, B4). 앞뒤 공백을 지운 1~40자 */
+export function validateName(raw: unknown): { ok: true; value: string } | { ok: false; error: string } {
+  const name = typeof raw === "string" ? raw.trim() : "";
+  if (!name) return { ok: false, error: "이름을 적어 주세요." };
+  if (name.length > 40) return { ok: false, error: "이름은 40자까지 쓸 수 있어요." };
+  return { ok: true, value: name };
+}
+
 /**
  * 입력 검증. 화면 순서대로 걸리고, 어느 묶음에서 걸렸는지 field로 알린다.
  * 엔진 오류 문구("~해주세요", "1900-2100 범위")가 사용자에게 가지 않도록 날짜·시각·성별은 여기서 먼저 잡는다.
  */
 export function validateProfile(raw: Record<string, unknown>): ProfileValidation {
-  const name = typeof raw.name === "string" ? raw.name.trim() : "";
-  if (!name) return fail("name", "이름을 적어 주세요.");
-  if (name.length > 40) return fail("name", "이름은 40자까지 쓸 수 있어요.");
+  const checkedName = validateName(raw.name);
+  if (!checkedName.ok) return fail("name", checkedName.error);
+  const name = checkedName.value;
 
   if (raw.calendar !== "solar" && raw.calendar !== "lunar") return fail("calendar", "양력인지 음력인지 골라 주세요.");
   const calendar = raw.calendar;

@@ -3,11 +3,23 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getUser } from "@/lib/supabase/server";
-import { ensureUserRow, getSajuProfile, markLinkPrompted, saveEntry, saveFortuneVote, saveNotificationSettings, saveSajuProfile } from "@/lib/db";
+import { adminClient } from "@/lib/supabase/admin";
+import {
+  deleteAllUserRows,
+  deleteFortunesAsAdmin,
+  ensureUserRow,
+  getSajuProfile,
+  markLinkPrompted,
+  saveEntry,
+  saveFortuneVote,
+  saveName,
+  saveNotificationSettings,
+  saveSajuProfile,
+} from "@/lib/db";
 import { isAllowedRemindHour } from "@/lib/remind";
 import { validateEntry } from "@/lib/entry";
 import { dayGanji } from "@/lib/ganji";
-import { COMPUTE_ERROR, computeProfile, validateProfile, type ProfileField } from "@/lib/profile";
+import { COMPUTE_ERROR, computeProfile, validateName, validateProfile, type ProfileField } from "@/lib/profile";
 
 export interface FormState {
   error: string | null;
@@ -92,8 +104,60 @@ export async function saveProfileAction(_prev: FormState, form: FormData): Promi
   redirect(isFirst ? "/welcome" : safeNext(form.get("next"), "/"));
 }
 
+/** 설정 "이름" 저장 (B4). 1~40자. night_saju_profiles.name과 night_profiles.display_name을 같이 바꾼다 */
+export async function saveNameAction(_prev: FormState, form: FormData): Promise<FormState> {
+  const checked = validateName(form.get("name"));
+  if (!checked.ok) return { error: checked.error, field: "name" };
+  const { supabase, user } = await getUser();
+  if (!user) return { error: NOT_READY };
+  try {
+    await saveName(supabase, user.id, checked.value);
+  } catch (e) {
+    console.error(e);
+    return { error: "저장하지 못했어요. 잠시 뒤 다시 눌러 주세요." };
+  }
+  revalidatePath("/", "layout");
+  return { error: null };
+}
+
 /**
- * 로그아웃(또는 익명 "기록 모두 지우기"). 중간 화면 없이 액션 안에서 끝낸다.
+ * 익명 사용자의 "기록 모두 지우기" (B9) — 진짜 삭제. Google 사용자에게는 이 버튼이 없고(로그아웃만), 와도 아무것도 하지 않는다.
+ * 1) 사용자 클라이언트로 본인 행 삭제(RLS) 2) 운세 캐시는 admin으로 user_id 조건 삭제 3) auth.admin.deleteUser로 계정 삭제
+ * 4) 이 기기의 세션 쿠키를 지우고(local — 계정이 이미 없어 서버 로그아웃은 의미 없다) 새 익명 세션 → /.
+ * 1·2·3이 실패하면 세션은 끊지 않고 설정으로 돌아간다 (기록이 서버에 남은 채 세션만 끊기는 일이 없게).
+ */
+export async function deleteAllAction(): Promise<void> {
+  const { supabase, user } = await getUser();
+  if (!user) return;
+  if (!user.is_anonymous) return;
+  const admin = adminClient();
+  try {
+    await deleteAllUserRows(supabase, user.id);
+    await deleteFortunesAsAdmin(admin, user.id);
+    const { error } = await admin.auth.admin.deleteUser(user.id);
+    if (error) throw new Error(`계정 지우기: ${error.message}`);
+  } catch (e) {
+    console.error("기록 모두 지우기 실패", e);
+    redirect("/settings?error=delete");
+  }
+  const { error: outError } = await supabase.auth.signOut({ scope: "local" });
+  if (outError) console.error("세션 지우기 실패", outError);
+  const { data, error } = await supabase.auth.signInAnonymously();
+  if (error || !data.user) {
+    console.error("지운 뒤 익명 시작 실패", error ?? new Error("사용자 없음"));
+  } else {
+    try {
+      await ensureUserRow(supabase, data.user.id, "손님");
+    } catch (e) {
+      console.error(e);
+    }
+  }
+  revalidatePath("/", "layout");
+  redirect("/");
+}
+
+/**
+ * 로그아웃. 중간 화면 없이 액션 안에서 끝낸다. (익명 "기록 모두 지우기"는 deleteAllAction — B9)
  * 끊은 자리에서 바로 새 익명 세션을 만들어 쿠키에 심는다 — 서버 액션의 redirect는 소프트 내비게이션이라
  * 이미 마운트된 AnonBoot가 다시 돌지 않고, 돌아간 화면이 "준비하고 있어요"에 멈춰 있던 버그(2026-10-07).
  * 새 익명 세션 만들기가 실패하면 세션 없이 돌아가고, AnonBoot(경로 변경 감지)나 "다시 시도"가 이어받는다.

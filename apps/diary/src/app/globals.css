@@ -169,12 +169,16 @@ body {
   border-radius: 8px;
   background-color: var(--color-paper-3);
 }
-/* 신호 줄 (v3.6): 띠지를 문장 앞에 인라인으로 붙이고 문장은 전체 폭으로 흐른다. 줄 사이 10px */
+/* 신호 줄 (v3.7): 첫 줄에 띠지만, 문장은 둘째 줄부터 왼쪽 끝에서 들여쓰기 없이. 줄 사이 14px */
 .signal-box__row {
   margin: 0;
 }
 .signal-box__row + .signal-box__row {
-  margin-top: 10px;
+  margin-top: 14px;
+}
+.signal-box__text {
+  display: block;
+  margin-top: 6px;
 }
 /* 신호 띠지: 세 종류가 같은 모양. 폭은 글자대로(v3.6 — 고정 7rem 삭제), 문장 앞 인라인. 모양은 키트 tag-strip(찢긴 한지 띠)을 mask로 쓴다 —
    면은 저마다 다르고(한지 / 금색 / 먹색) 찢긴 가장자리는 똑같다. */
@@ -184,7 +188,6 @@ body {
   align-items: center;
   justify-content: center;
   vertical-align: middle;
-  margin-right: 8px;
   height: 30px;
   padding: 0 14px;
   font-size: 14px;
@@ -716,9 +719,22 @@ details[open] > .fortune-body {
 .medal-pair {
   display: flex;
   flex-shrink: 0;
-  align-items: center;
+  align-items: flex-start;
   gap: 6px;
   padding-top: 2px;
+}
+/* v3.7: 메달 아래 11px 라벨 "나 · 기축" / "오늘 · 을묘". ×는 메달 높이(56px) 가운데에 */
+.medal-pair__item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.medal-pair__label {
+  font-size: 11px;
+  line-height: 1;
+  white-space: nowrap;
+  color: var(--color-muted);
 }
 .medal {
   display: block;
@@ -740,7 +756,7 @@ details[open] > .fortune-body {
 .medal-pair__x {
   font-family: var(--font-serif);
   font-size: 18px;
-  line-height: 1;
+  line-height: 56px;
   color: var(--color-gold);
 }
 
@@ -826,4 +842,37 @@ input:focus-visible + .promise-stamp > .promise-stamp__mark {
   max-width: 320px;
   margin-top: 20px;
   animation: saved-in 300ms ease-out 450ms both;
+}
+
+/* ── v3.7 점수 붓바탕 (운세 카드 머리) ──────────────────────────────────── */
+
+/* "무난 6.1/10"을 카드 폭 가운데, 뒤에 금빛 붓 자국: 키트 gold-wash를 divider 붓선(세로로 늘림) 모양으로 mask.
+   폭 60%·높이 64px·글자 뒤. 밴드와 무관하게 금색 하나 — 길흉을 색으로 말하지 않는다 */
+.score-brush {
+  position: relative;
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 10px;
+  padding: 8px 0;
+  line-height: 1;
+}
+.score-brush::before {
+  content: "";
+  position: absolute;
+  z-index: 0;
+  left: 20%;
+  top: 50%;
+  width: 60%;
+  height: 64px;
+  transform: translateY(-50%);
+  background: var(--color-gold) url("/ui/gold-wash.webp") center / 512px 512px;
+  opacity: 0.55;
+  mask: url("/ui/divider-clean.png") center / 100% 100% no-repeat;
+  -webkit-mask: url("/ui/divider-clean.png") center / 100% 100% no-repeat;
+  pointer-events: none;
+}
+.score-brush > * {
+  position: relative;
+  z-index: 1;
 }

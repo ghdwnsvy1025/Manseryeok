@@ -1,9 +1,13 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Booting } from "@/components/Booting";
+import { BurstPreload } from "@/components/BurstPreload";
+import { characterOfGanji } from "@/lib/character";
 import { getUser } from "@/lib/supabase/server";
 import { getEntry, getSajuProfile, readCachedFortune } from "@/lib/db";
 import { dayGanji } from "@/lib/ganji";
 import { formatKoreanDate, parseYmd, todayKST } from "@/lib/time";
+import { writeDateLinks } from "@/lib/writeNav";
 import { EntryForm } from "./EntryForm";
 
 export const dynamic = "force-dynamic";
@@ -15,6 +19,9 @@ export default async function WritePage({ searchParams }: { searchParams: Promis
   const ganji = dayGanji(date);
   // "10월 5일" — 요일은 뺀다
   const dateLabel = formatKoreanDate(date).replace(/\s*\S+요일$/, "");
+  const isToday = date === today;
+  // 날짜 앞뒤 이동 (B7): 어제로는 2020-01-01까지, 내일로는 오늘까지
+  const nav = writeDateLinks(date, today);
 
   const { supabase, user } = await getUser();
   // 세션이 아직 없는 첫 요청: 리디렉트하지 않고 뼈대만 그린다. AnonBoot가 곧 새로 그린다 (docs/ANON_START.md 1절, B2)
@@ -36,11 +43,31 @@ export default async function WritePage({ searchParams }: { searchParams: Promis
       <header className="mb-5">
         {existing && <p className="text-sm text-muted">기록 고치기</p>}
         <h1 className="mt-1 font-serif text-[26px] leading-snug">
-          {dateLabel} <span className="text-ganji">{ganji.ko}일</span>, {date === today ? "오늘" : "그날"} 하루
+          {dateLabel} <span className="text-ganji">{ganji.ko}일</span>, {isToday ? "오늘" : "그날"} 하루
         </h1>
+        {/* 날짜 앞뒤 이동 (B7). 없는 쪽은 자리만 비운다 */}
+        <nav aria-label="다른 날" className="mt-2 flex items-center justify-between text-sm text-muted">
+          {nav.prev ? (
+            <Link href={nav.prev} className="underline underline-offset-4">
+              ‹ 어제
+            </Link>
+          ) : (
+            <span />
+          )}
+          {nav.next ? (
+            <Link href={nav.next} className="underline underline-offset-4">
+              내일 ›
+            </Link>
+          ) : (
+            <span />
+          )}
+        </nav>
       </header>
+      {/* 저장 뒤 팡에 쓸 그날 캐릭터·틀·도장을 미리 받아 둔다 (전수조사 B8) */}
+      <BurstPreload characterSrc={characterOfGanji(ganji.ko).characterSrc} />
       <EntryForm
         date={date}
+        notePlaceholder={isToday ? "오늘 기억하고 싶은 일 하나" : "그날 기억하고 싶은 일 하나"}
         promiseText={promiseText}
         initial={
           existing

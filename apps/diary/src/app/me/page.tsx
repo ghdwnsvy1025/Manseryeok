@@ -106,7 +106,7 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
         {/* 제목 자리 = 내 카드 (v3.3): 폭 56%, 이 화면의 그림 하나. 카드 자체가 테두리를 가지고 있어 틀을 더 두르지 않는다 */}
         <img src={me.cardSrc} alt={`내 카드 ${me.ganjiKo}`} width={768} height={1030} className="h-auto w-[56%] max-w-[240px]" />
         <h1 className="mt-4 font-serif text-[20px] leading-snug">
-          {profile.name} · <span className="text-ganji">{me.ganjiKo}일</span> · {me.animal}
+          {profile.name !== "손님" && <>{profile.name} · </>}<span className="text-ganji">{me.ganjiKo}일</span> · {me.animal}
         </h1>
       </header>
 

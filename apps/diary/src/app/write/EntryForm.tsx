@@ -8,6 +8,8 @@ interface Props {
   date: string;
   /** 그날 운세의 "하면 좋아요" 한 줄 = 오늘의 작은 약속 (톤 v3.2). 운세 캐시가 없으면 null → 약속 블록 생략 */
   promiseText: string | null;
+  /** "한 줄" 안내 문구. 과거 날짜면 "그날…" (B7). 없으면 오늘 문구 */
+  notePlaceholder?: string;
   initial: { happiness: number; moods: string[]; note: string; promise: Promise_ | null } | null;
 }
 
@@ -37,7 +39,7 @@ function hint(n: number): string {
  * 행복도는 도장(키트 stamp), 기분은 종이 띠지(tag-strip), 메모는 편지지 괘선 위 손글씨.
  * 폼 필드 이름·값과 저장 로직은 그대로다.
  */
-export function EntryForm({ date, promiseText, initial }: Props) {
+export function EntryForm({ date, promiseText, notePlaceholder, initial }: Props) {
   const [state, action, pending] = useActionState<FormState, FormData>(saveEntryAction, { error: null });
   const [happiness, setHappiness] = useState<number | null>(initial?.happiness ?? null);
   const [promise, setPromise] = useState<Promise_ | null>(initial?.promise ?? null);
@@ -187,7 +189,7 @@ export function EntryForm({ date, promiseText, initial }: Props) {
             maxLength={MAX_NOTE}
             value={note}
             onChange={(e) => setNote(e.target.value)}
-            placeholder="오늘 기억하고 싶은 일 하나"
+            placeholder={notePlaceholder ?? "오늘 기억하고 싶은 일 하나"}
             className="ruled mt-2 w-full resize-none bg-transparent px-1 font-hand text-[22px] text-ink placeholder:font-sans placeholder:text-[16px] placeholder:text-faint focus:outline-none focus-visible:outline-2 focus-visible:outline-gold"
           />
         </div>

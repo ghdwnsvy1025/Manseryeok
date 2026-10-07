@@ -49,6 +49,8 @@ function fakeSupabase() {
   };
 }
 
+vi.mock("server-only", () => ({}));
+vi.mock("@/lib/supabase/admin", () => ({ adminClient: () => ({}) }));
 vi.mock("@/lib/supabase/server", () => ({
   getUser: async () => ({ supabase: fakeSupabase(), user: fakeUser }),
   createClient: async () => fakeSupabase(),

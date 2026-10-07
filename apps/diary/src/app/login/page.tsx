@@ -3,7 +3,7 @@ import { GoogleButton } from "./GoogleButton";
 
 /**
  * 기존 Google 사용자용. 앱 안에서 여기로 오는 링크는 없고, 주소를 직접 치면 열린다 (docs/ANON_START.md 2절).
- * 세션이 익명이면 GoogleButton이 로그인 대신 연결(linkIdentity)을 한다 — 익명 기록이 새 계정으로 갈라지지 않게.
+ * 세션이 익명이면 GoogleButton이 "연결"과 "기존 계정으로 로그인" 두 버튼을 처음부터 보인다 (B10) — 기존 사용자가 새 기기에서 두 번 실패하지 않게.
  * 모양(톤 v3.2): 한지 위에 글과 버튼만. 카드 없음, 그림 없음, 금색 면은 Google 버튼 하나.
  */
 export default async function LoginPage({ searchParams }: { searchParams: Promise<{ next?: string; error?: string }> }) {
@@ -29,7 +29,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
           로그인하지 못했어요. 다시 눌러 주세요.
         </p>
       )}
-      <GoogleButton next={next} offerFreshLogin={error === "link"} />
+      <GoogleButton next={next} />
       <Link href="/" className="mt-5 text-center text-[15px] text-muted underline underline-offset-4">
         로그인 없이 시작하기
       </Link>

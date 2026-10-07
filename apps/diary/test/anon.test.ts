@@ -44,6 +44,8 @@ function fakeSupabase() {
 const authCalls: string[] = [];
 let anonSignInFails = false;
 
+vi.mock("server-only", () => ({}));
+vi.mock("@/lib/supabase/admin", () => ({ adminClient: () => ({}) }));
 vi.mock("@/lib/supabase/server", () => ({
   getUser: async () => ({ supabase: fakeSupabase(), user: currentUser }),
   createClient: async () => fakeSupabase(),

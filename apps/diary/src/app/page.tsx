@@ -2,19 +2,22 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { Booting } from "@/components/Booting";
+import { BurstPreload } from "@/components/BurstPreload";
 import { FortuneCard } from "@/components/FortuneCard";
 import { FortuneLoading } from "@/components/FortuneLoading";
 import { LinkPromptCard } from "@/components/LinkPromptCard";
 import { SaveBurst } from "@/components/SaveBurst";
+import { SavedPastNotice } from "@/components/SavedPastNotice";
 import { TodayEntryCard } from "@/components/TodayEntryCard";
 import { getUser } from "@/lib/supabase/server";
 import { birthProfileOf, countEntries, getEntry, getFortuneVote, getLinkPromptState, getSajuProfile, listEntries, listEntriesForStats, readFortuneCacheRow, type SajuProfileRow } from "@/lib/db";
 import { characterOf, characterOfGanji, todayLine } from "@/lib/character";
 import { cachedFortuneContent, getTodayFortune, type FortuneCacheLookup } from "@/lib/fortune";
+import { withLivePersonal } from "@/lib/fortune/live";
 import type { EntryLike } from "@/lib/fortune/personal";
 import { dayGanji } from "@/lib/ganji";
 import { shouldShowLinkPrompt } from "@/lib/linkPrompt";
-import { addDays, formatKoreanDate, hourKST, todayKST } from "@/lib/time";
+import { addDays, formatKoreanDate, hourKST, parseYmd, todayKST } from "@/lib/time";
 
 export const dynamic = "force-dynamic";
 
@@ -111,7 +114,9 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
   const fortuneDateLabel = formatKoreanDate(today).replace(/\s*\S+요일$/, "");
   const defaultOpen = !night || entries.length === 0;
   // 캐시 히트: 기다릴 것이 없으니 fallback 없이 바로 카드. 미스(또는 지문 불일치): 계산·모델 호출은 Suspense 안에서
-  const cachedFortune = cachedFortuneContent(cachedRow ?? null, profile.pillars, birthProfileOf(profile));
+  // B5: 캐시는 날짜 단위라 오늘 저장한 기록이 "내 기록으로 본 오늘"에 없다. 내 기록 블록·맞춤도만 현재 기록으로 다시 센다 (점수·글은 캐시 그대로)
+  const cachedRaw = cachedFortuneContent(cachedRow ?? null, profile.pillars, birthProfileOf(profile));
+  const cachedFortune = cachedRaw ? withLivePersonal(cachedRaw, entries, today) : null;
   const fortuneCard = cachedFortune ? (
     <FortuneCard fortune={cachedFortune} dateLabel={fortuneDateLabel} ganjiKo={ganji.ko} canVote vote={vote} defaultOpen={defaultOpen} />
   ) : (
@@ -129,6 +134,10 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
     </Suspense>
   );
 
+  // B8: 과거 날짜를 저장하고 돌아온 경우 — 팡은 오늘만, 과거는 제목 아래 작은 한지 띠 한 번
+  const savedPast = saved && saved !== today && parseYmd(saved) ? saved : null;
+  const savedPastLabel = savedPast ? formatKoreanDate(savedPast).replace(/\s*\S+요일$/, "") : "";
+
   const writeCard = entry ? (
     <TodayEntryCard entry={entry} today={today} tomorrowKo={tomorrow.ko} justSaved={saved === today} />
   ) : (
@@ -145,6 +154,7 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
   return (
     <main className="flex flex-col gap-5">
       {/* 저장 완료 "팡" — 방금 저장하고 돌아왔을 때 한 번 (톤 v3.1). 카드는 오늘 일진 캐릭터 + char-frame 틀 (05 v3.5) */}
+      {entry && saved === today && <BurstPreload characterSrc={todayCharacter.characterSrc} />}
       {entry && saved === today && (
         <SaveBurst
           ganjiKo={ganji.ko}
@@ -169,17 +179,25 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
           <p className="mt-1 text-[14px] text-muted">
             <Link href="/me">{todayLine(ganji.index, entryCount)}</Link>
           </p>
+          {savedPast && <SavedPastNotice date={savedPast} label={savedPastLabel} />}
         </div>
-        {/* 이 화면의 그림 하나 = 두 메달 한 쌍 "나 × 오늘" (v3.6): 왼쪽 내 캐릭터(일주), 오른쪽 오늘 일진 캐릭터. 얼굴·상반신만 */}
+        {/* 이 화면의 그림 하나 = 두 메달 한 쌍 "나 × 오늘" (v3.6): 왼쪽 내 캐릭터(일주), 오른쪽 오늘 일진 캐릭터. 얼굴·상반신만.
+            v3.7: 메달 아래 11px 라벨 "나 · 기축" / "오늘 · 을묘" — 메달이 무엇인지 글자로 */}
         <div className="medal-pair" aria-label={`나 ${myCharacter.ganjiKo} × 오늘 ${ganji.ko}`}>
-          <span className="medal" title={`나 · ${myCharacter.ganjiKo} ${myCharacter.animal}`}>
-            <img src={myCharacter.characterSrc} alt={`내 캐릭터 ${myCharacter.ganjiKo} ${myCharacter.animal}`} width={56} height={56} data-ganji={myCharacter.ganjiKo} />
+          <span className="medal-pair__item">
+            <span className="medal" title={`내 일주 캐릭터 ${myCharacter.ganjiKo}(${myCharacter.animal})`}>
+              <img src={myCharacter.characterSrc} alt={`내 캐릭터 ${myCharacter.ganjiKo} ${myCharacter.animal}`} width={56} height={56} data-ganji={myCharacter.ganjiKo} />
+            </span>
+            <span className="medal-pair__label">나 · {myCharacter.ganjiKo}</span>
           </span>
           <span aria-hidden className="medal-pair__x">
             ×
           </span>
-          <span className="medal" title={`오늘 · ${ganji.ko}일`}>
-            <img src={todayCharacter.characterSrc} alt={`오늘 ${ganji.ko}일 캐릭터 ${todayCharacter.animal}`} width={56} height={56} data-ganji={ganji.ko} />
+          <span className="medal-pair__item">
+            <span className="medal" title={`오늘 일진 캐릭터 ${ganji.ko}(${todayCharacter.animal})`}>
+              <img src={todayCharacter.characterSrc} alt={`오늘 ${ganji.ko}일 캐릭터 ${todayCharacter.animal}`} width={56} height={56} data-ganji={ganji.ko} />
+            </span>
+            <span className="medal-pair__label">오늘 · {ganji.ko}</span>
           </span>
         </div>
       </header>

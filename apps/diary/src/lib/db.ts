@@ -109,6 +109,44 @@ export async function saveSajuProfile(
   if (e2) fail("사용자 저장", e2);
 }
 
+/**
+ * 이름만 바꾼다 (설정 "이름", B4). night_saju_profiles.name(운세·공유 문구가 읽는 쪽)과
+ * night_profiles.display_name을 같이 맞춘다. 사주 프로필이 아직 없으면 night_profiles만 바뀐다 (0 rows는 오류가 아니다).
+ */
+export async function saveName(sb: SupabaseClient, userId: string, name: string): Promise<void> {
+  const { error } = await sb.from("night_saju_profiles").update({ name }).eq("user_id", userId);
+  if (error) fail("이름 저장", error);
+  const { error: e2 } = await sb.from("night_profiles").upsert({ user_id: userId, display_name: name }, { onConflict: "user_id" });
+  if (e2) fail("사용자 이름 저장", e2);
+}
+
+/** 사용자 클라이언트(RLS: 본인 행만)로 지우는 night_* 테이블. 순서는 자식 → 부모 (B9) */
+export const USER_DELETABLE_TABLES = [
+  "night_entries",
+  "night_fortune_feedback",
+  "night_notification_settings",
+  "night_saju_profiles",
+  "night_profiles",
+] as const;
+
+/**
+ * 본인 기록 전부 지우기 (설정 "기록 모두 지우기", B9). 사용자 클라이언트로 부르므로 RLS가 본인 행만 허용한다.
+ * night_fortunes는 사용자에게 지우기 권한이 없어 deleteFortunesAsAdmin이 따로 맡는다.
+ */
+export async function deleteAllUserRows(sb: SupabaseClient, userId: string): Promise<void> {
+  for (const table of USER_DELETABLE_TABLES) {
+    const { error } = await sb.from(table).delete().eq("user_id", userId);
+    if (error) fail(`${table} 지우기`, error);
+  }
+}
+
+/** 운세 캐시 지우기 — RLS가 읽기만 허용하므로 service role 클라이언트로, user_id 조건을 반드시 건다 */
+export async function deleteFortunesAsAdmin(admin: SupabaseClient, userId: string): Promise<void> {
+  if (!userId) throw new Error("운세 캐시 지우기: user_id가 없다");
+  const { error } = await admin.from("night_fortunes").delete().eq("user_id", userId);
+  if (error) fail("운세 캐시 지우기", error);
+}
+
 /** 로그인(익명 포함) 직후 한 번. 이미 있으면 그대로 둔다. 익명 사용자는 이름 "손님" */
 export async function ensureUserRow(sb: SupabaseClient, userId: string, displayName: string | null = null): Promise<void> {
   const { error } = await sb
