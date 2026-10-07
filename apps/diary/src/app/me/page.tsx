@@ -40,23 +40,30 @@ function pillarInfo(p: PillarSnapshot | null, dayStem: string, self: boolean): P
   };
 }
 
-/** 나무패 하나 (키트 wood-tablet). 위 천간 한자 / 가운데 지지 한자 / 아래 십신 + 오행 글자 + 오행 점. 일주 패에 "나" 금색 */
+/** 오행 글자색 (톤 v3.6) — 나무패 안의 천간·지지 한자에만. 토큰 el-* (globals.css @theme) */
+const ELEMENT_TEXT: Record<Element, string> = {
+  wood: "text-el-wood",
+  fire: "text-el-fire",
+  earth: "text-el-earth",
+  metal: "text-el-metal",
+  water: "text-el-water",
+};
+
+/** 나무패 하나 (키트 wood-tablet). 위 천간 한자 / 가운데 지지 한자(각각 그 오행 색, v3.6) / 아래 십신 + 오행 글자. 일주 패에 "나" 금색.
+    오행 점은 뺐다 — 글자색이 생겨 중복 */
 function PillarCell({ label, info }: { label: string; info: PillarInfo | null }) {
   const self = info?.tenGod === "나";
   return (
     <div className="flex flex-col items-center gap-2">
       <div className="wood-tablet flex min-h-[148px] w-full flex-col items-center justify-center gap-1 font-serif text-[28px] leading-none text-ganji">
-        <span>{info ? info.p.stem : "·"}</span>
-        <span>{info ? info.p.branch : "·"}</span>
+        <span className={info ? ELEMENT_TEXT[info.stemElement] : undefined}>{info ? info.p.stem : "·"}</span>
+        <span className={info ? ELEMENT_TEXT[info.branchElement] : undefined}>{info ? info.p.branch : "·"}</span>
         {info && (
           <span className="mt-1 flex flex-col items-center gap-0.5 font-sans text-[13px] leading-tight text-ink">
             <span className={self ? "text-[12px] font-bold text-gold-ink" : ""}>{info.tenGod}</span>
-            <span className="flex items-center gap-1 text-[12px] text-muted">
-              {/* 오행 점은 여기서만 (톤 v3.2). 왼쪽 천간, 오른쪽 지지 */}
-              <span aria-hidden className={`element-dot element-dot--${info.stemElement}`} />
+            <span className="text-[12px] text-muted">
               {ELEMENT_KO[info.stemElement]}
               {ELEMENT_KO[info.branchElement]}
-              <span aria-hidden className={`element-dot element-dot--${info.branchElement}`} />
             </span>
           </span>
         )}

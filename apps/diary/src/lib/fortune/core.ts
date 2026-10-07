@@ -12,6 +12,9 @@
 //   v4.2 영역: 오늘(일운 ≤2) + 이달(월운 1) + 올해(세운 1), 모두 코어 luckAreas. "위아래" 문장 없음.
 //   v4.3: 합 문장 0개 — 어댑터의 "용신 손상 … 합으로 묶음" 판정과 "묶여…"/"누그러져요" 문장 삭제(합은 hits에만 남는다. 코어 luck()이 내는 플래그는 flags에 그대로 두되 문장은 만들지 않는다).
 //        같은 십신이면 첫 문장은 "두 번 겹쳐요" 대신 "아주 강해요". 일진 facts = 십신 성격 · 용신 역할 · 합계 판정 · 충(있을 때) · 대운/세운/월운 판정 · 대운 플래그.
+//   v4.4 (운세 글 — 오늘만, 00-톤.md v3.6): 대운·세운·월운 판정 문장과 대운 플래그 문장은 facts에서 빼고 contextFacts(근거 표시용, 항상)로 옮긴다.
+//        facts에는 바뀌는 날에만 한 문장 — (a) 월운이 바뀐 날(절기 입절일 = monthGanjiList 시작일) 이달 운, (b) 입춘일 올해 운, (c) 대운 교체일(현재 대운 시작일) 10년 운,
+//        (d) 운↔일진 충(최고경보 포함)이 있는 날 그 운. 점수·영역·context 데이터는 그대로.
 //
 // 모델 호출은 없다. 문장은 쓰지 않고(facts는 글 재료) 숫자는 영역에 만들지 않는다(코어: 일운 확신도 "낮음").
 import type { TenGod } from "@saju/engine";
@@ -252,13 +255,19 @@ export function computeCoreFortune(input: CoreInput): CoreFortune {
     };
   };
   let daeun: CoreFortune["context"]["daeun"];
+  /** v4.4 (c): 오늘이 현재 대운의 시작일(교체일)인가 */
+  let daeunStartsToday = false;
   if (input.profile) {
     try {
       const birth = fromBirth(toBirthInput(input.profile));
       const same = birth.pillars.every((x, i) => x === p[i] || (i === 3 && !p[3]));
       if (!same) console.warn("[fortune v4] 원국 불일치: 일기 앱", p.join(" "), "/ 코어", birth.pillars.join(" "), "→ 일기 앱 스냅샷을 믿음");
       const lc = currentLuckContext(birth, input.date);
-      if (lc.현재대운) daeun = { 순서: lc.현재대운.순서, ...ctxItem(lc.현재대운.간지) };
+      if (lc.현재대운) {
+        daeun = { 순서: lc.현재대운.순서, ...ctxItem(lc.현재대운.간지) };
+        const cur = birth.대운.목록.find((d) => d.순서 === lc.현재대운!.순서);
+        daeunStartsToday = !!cur?.시작일 && cur.시작일.slice(0, 10) === input.date;
+      }
     } catch (e) {
       console.warn("[fortune v4] 대운 계산 실패, 대운 없이 진행:", e instanceof Error ? e.message : e);
     }
@@ -363,26 +372,35 @@ export function computeCoreFortune(input: CoreInput): CoreFortune {
     else if (f.startsWith("중화 사주")) flagFacts.add("내 사주는 치우침이 적어 운의 좋고 나쁨보다 하는 일의 성격이 더 크게 작용해요.");
   }
   facts.push(...flagFacts);
-  if (daeun) {
-    facts.push(
-      `지금 10년 단위 운 ${ko(daeun.간지)}은 ${daeun.판정 ? VERDICT_WORD[daeun.판정] : "판정 보류"}${daeun.clash ? "이고, 오늘 글자와 부딪혀 변동이 겹치는 날이에요" : "이에요"}.`,
-    );
-    // v4.1 ③: 대운 플래그(용신 손상 · 운 내부 상충)는 항상 문장으로
-    const df = daeun.플래그 ?? [];
-    if (df.some((f) => f.startsWith("용신 손상"))) facts.push("지금 10년 단위 운이 내게 모자란 쪽을 누르고 있어요.");
-    if (df.some((f) => f.startsWith("운 내부 상충"))) facts.push("지금 10년 단위 운은 겉과 속이 달라요.");
+
+  // ---- 맥락 문장 (v4.4): 근거 표시용 contextFacts에는 항상, 글 재료 facts에는 바뀌는 날·충인 날에만 ----
+  const contextFacts: string[] = [];
+  const daeunFact = daeun
+    ? `지금 10년 단위 운 ${ko(daeun.간지)}은 ${daeun.판정 ? VERDICT_WORD[daeun.판정] : "판정 보류"}${daeun.clash ? "이고, 오늘 글자와 부딪혀 변동이 겹치는 날이에요" : "이에요"}.`
+    : null;
+  const seunFact = `올해 운 ${ko(seunItem.간지)}은 ${seunItem.판정 ? VERDICT_WORD[seunItem.판정] : "판정 보류"}${seunItem.clash ? "이고, 오늘 글자와 부딪혀요" : "이에요"}.`;
+  const wolunFact = wolun ? `이달 운 ${ko(wolun.간지)}은 ${wolun.판정 ? VERDICT_WORD[wolun.판정] : "판정 보류"}${wolun.clash ? "이고, 오늘 글자와 부딪혀요" : "이에요"}.` : null;
+  if (daeunFact) {
+    contextFacts.push(daeunFact);
+    // 대운 플래그(용신 손상 · 운 내부 상충) 문장은 근거에만 (v4.1 ③ → v4.4)
+    const df = daeun?.플래그 ?? [];
+    if (df.some((f) => f.startsWith("용신 손상"))) contextFacts.push("지금 10년 단위 운이 내게 모자란 쪽을 누르고 있어요.");
+    if (df.some((f) => f.startsWith("운 내부 상충"))) contextFacts.push("지금 10년 단위 운은 겉과 속이 달라요.");
   }
-  facts.push(
-    `올해 운 ${ko(seunItem.간지)}은 ${seunItem.판정 ? VERDICT_WORD[seunItem.판정] : "판정 보류"}${seunItem.clash ? "이고, 오늘 글자와 부딪혀요" : "이에요"}.`,
-  );
-  // v4.1 ③: 월운 판정 문장은 항상
-  if (wolun) {
-    facts.push(
-      `이달 운 ${ko(wolun.간지)}은 ${wolun.판정 ? VERDICT_WORD[wolun.판정] : "판정 보류"}${wolun.clash ? "이고, 오늘 글자와 부딪혀요" : "이에요"}.`,
-    );
-  }
-  if (facts.length < 6 && keywords.positive.length) facts.push(`오늘 글자에 잘 붙는 말: ${keywords.positive.slice(0, 3).join(", ")}.`);
-  if (facts.length < 6 && keywords.negative.length) facts.push(`오늘 글자에서 조심할 말: ${keywords.negative.slice(0, 3).join(", ")}.`);
+  contextFacts.push(seunFact);
+  if (wolunFact) contextFacts.push(wolunFact);
+  // (c) 대운 교체일 · (d) 대운 충
+  if (daeunFact && (daeunStartsToday || daeun?.clash)) facts.push(daeunFact);
+  // (b) 입춘일 · (d) 세운 충
+  const ipchunToday = ipchunDate(Number(input.date.slice(0, 4))) === input.date;
+  if (ipchunToday || seunItem.clash) facts.push(seunFact);
+  // (a) 월운이 바뀐 날 = 절기 입절일(코어 monthGanjiList의 시작일, KST) · (d) 월운 충
+  const wolunStartsToday = !!wol && wol.시작.slice(0, 10) === input.date;
+  if (wolunFact && (wolunStartsToday || wolun?.clash)) facts.push(wolunFact);
+
+  // v4.4: 맥락 문장이 빠져 채움 문장이 자주 쓰이므로 다른 facts처럼 "~요"로 끝낸다
+  if (facts.length < 6 && keywords.positive.length) facts.push(`오늘 글자에는 '${keywords.positive.slice(0, 3).join(", ")}' 같은 말이 잘 붙어요.`);
+  if (facts.length < 6 && keywords.negative.length) facts.push(`오늘 글자에서는 '${keywords.negative.slice(0, 3).join(", ")}' 같은 말을 조심해요.`);
   if (facts.length < 6) facts.push(`오늘은 ${AREA_WORD[todayAreas[0]?.area ?? "대인"]} 쪽에 신호가 ${todayAreas.length ? "있어요" : "뚜렷하지 않아요"}.`);
   facts.splice(10);
 
@@ -392,6 +410,7 @@ export function computeCoreFortune(input: CoreInput): CoreFortune {
     context: { ...(daeun ? { daeun } : {}), seun: seunItem, ...(wolun ? { wolun } : {}), 입춘전: seun.입춘전 },
     areas,
     facts,
+    contextFacts,
     keywords,
     caveats,
     parts: { raw: round2(raw), rel: round2(relScore), ctx: round2(ctxScore), score01: round2(score01) },

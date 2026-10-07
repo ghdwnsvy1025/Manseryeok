@@ -1,4 +1,3 @@
-import { Fragment } from "react";
 import { fortuneVoteAction } from "@/app/actions";
 import { AREA_WORD } from "@/lib/fortune/core";
 import type { AreaSignal, FortuneContent } from "@/lib/fortune/types";
@@ -63,13 +62,17 @@ interface Props {
  * 열리는 전환은 globals.css의 .fortune-body (디자인 명세 02).
  * v3.2: 본문 아래 "내 기록으로 본 오늘" 블록, 맨 아래 "왜 이런 운세인가요?" details.
  * v3.4: 영역 줄(오늘/이달/올해)과 하면/피해요가 "오늘의 신호" 상자 하나에 같은 모양의 띠지로 들어간다.
+ * v3.6: 띠지는 문장 앞 인라인, 문장은 전체 폭으로 흐른다 (라벨 열 고정폭 없음).
  */
 export function FortuneCard({ fortune, dateLabel, ganjiKo, canVote, vote, defaultOpen }: Props) {
   const scoreText = fortune.score.toFixed(1);
   /** 영역 줄 최대 4 (오늘 ≤2 · 이달 1 · 올해 1). period는 기능 쪽이 곧 넣는다 — 없으면 "오늘" */
   const areas = (fortune.areas ?? []).slice(0, 4).map((a) => ({ ...a, period: (a as { period?: Period }).period ?? "오늘" }));
   const personal = personalLines(fortune, ganjiKo);
-  const facts = (fortune.core?.facts ?? fortune.base?.facts ?? []).slice(0, 10);
+  // 근거: core.facts 뒤에 core.contextFacts(기능 쪽이 넣는 중 — 없으면 빈 배열)를 이어서
+  const contextFacts: string[] = (fortune.core as { contextFacts?: string[] } | undefined)?.contextFacts ?? [];
+  // 절기일엔 같은 맥락 문장이 facts와 contextFacts 양쪽에 있어 중복을 뺀다
+  const facts = Array.from(new Set([...(fortune.core?.facts ?? fortune.base?.facts ?? []), ...contextFacts])).slice(0, 12);
   return (
     <details open={defaultOpen} className="group card-gold card-paper text-ink">
       <summary className="flex cursor-pointer list-none items-start justify-between gap-3 p-5 [&::-webkit-details-marker]:hidden">
@@ -108,10 +111,10 @@ export function FortuneCard({ fortune, dateLabel, ganjiKo, canVote, vote, defaul
 
             {/* 오늘의 신호 (v3.4): 한 상자에 같은 띠지. 영역 = 먹색 테두리, 하면 좋아요 = 금색 면, 피해요 = 먹색 면.
                 화살표는 글자, 색으로 길흉을 말하지 않는다(↓도 ink) */}
-            <dl className="signal-box mt-5 grid grid-cols-[7rem_1fr] items-start gap-x-3 gap-y-2.5 text-[16px] leading-[1.5]">
+            <ul className="signal-box mt-5 list-none text-[16px] leading-[1.5]">
               {areas.map((a) => (
-                <Fragment key={`${a.period}-${a.area}`}>
-                  <dt className="sig sig--line">
+                <li key={`${a.period}-${a.area}`} className="signal-box__row break-keep text-ink/90">
+                  <span className="sig sig--line">
                     <span className="text-muted">{a.period}</span>
                     <span aria-hidden className="mx-1 text-faint">·</span>
                     <span>{AREA_WORD[a.area]}</span>
@@ -119,15 +122,19 @@ export function FortuneCard({ fortune, dateLabel, ganjiKo, canVote, vote, defaul
                       {a.signal}
                     </span>
                     <span className="sr-only">{SIGNAL_WORD[a.signal]}</span>
-                  </dt>
-                  <dd className="min-w-0 break-keep pt-1 text-ink/90">{a.line}</dd>
-                </Fragment>
+                  </span>
+                  {a.line}
+                </li>
               ))}
-              <dt className="sig sig--gold">하면 좋아요</dt>
-              <dd className="min-w-0 break-keep pt-1">{fortune.do}</dd>
-              <dt className="sig sig--ink">피해요</dt>
-              <dd className="min-w-0 break-keep pt-1 text-ink/85">{fortune.dont}</dd>
-            </dl>
+              <li className="signal-box__row break-keep">
+                <span className="sig sig--gold">하면 좋아요</span>
+                {fortune.do}
+              </li>
+              <li className="signal-box__row break-keep text-ink/85">
+                <span className="sig sig--ink">피해요</span>
+                {fortune.dont}
+              </li>
+            </ul>
 
             {/* 카드 안 붓선은 이 한 곳뿐 — 띠지와 맨 아래(투표·근거) 사이 */}
             <span aria-hidden className="rule rule--light mt-5" />

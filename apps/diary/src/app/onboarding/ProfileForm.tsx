@@ -1,6 +1,6 @@
 "use client";
 
-import { startTransition, useActionState, useState, type FormEvent } from "react";
+import { startTransition, useActionState, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { saveProfileAction, type FormState } from "@/app/actions";
 import { CITIES } from "@/lib/cities";
 import type { ProfileField } from "@/lib/profile";
@@ -60,7 +60,8 @@ interface ProfileFormProps {
  * 입력칸 .field: 56px · 녹갈 1px · paper-3 바탕 · 숫자 Song Myung 22px. 상태만 분명히 —
  * 빈 칸 = 흐린 자리표시 / 입력 중 = 금색 2px / 채움 = 먹색 글자 / 오류 = 먹색 1.5px + 아래 danger 한 줄.
  * 양·음력, 성별, 시간 모름은 두 칸 세그먼트 .seg (띠지 없음). 윤달은 음력일 때만 체크 한 줄. 도시 select도 같은 입력칸 모양.
- * name=·value=·서버 액션·검증 문구는 기능 쪽 그대로. 카드 틀은 부모(온보딩 페이지·오늘 화면)가 두른다.
+ * name=·value=·서버 액션·검증 문구는 기능 쪽 그대로. 카드 틀(card-frame card-paper)은 부모(온보딩 페이지)가 두른다.
+ * v3.6: 연→월→일→시→분 자동 포커스 이동(자릿수가 차면 다음, 백스페이스로 비면 이전). 시·도 목록은 CITIES 그대로.
  */
 export function ProfileForm({ next, initial, serverAction = saveProfileAction, askName = true, submitLabel = "저장" }: ProfileFormProps) {
   const [state, action, pending] = useActionState<FormState, FormData>(serverAction, { error: null });
@@ -79,6 +80,39 @@ export function ProfileForm({ next, initial, serverAction = saveProfileAction, a
         {state.error}
       </p>
     ) : null;
+
+  // 자동 이동 (톤 v3.6): 연(4)·월(2)·일(2)·시(2)·분(2) — 자릿수가 차면 다음 칸, 백스페이스로 빈 칸에서 누르면 이전 칸.
+  // 값은 건드리지 않는다(name/value 그대로). 시간을 모르면 일 다음 칸은 없다
+  const yearRef = useRef<HTMLInputElement>(null);
+  const monthRef = useRef<HTMLInputElement>(null);
+  const dayRef = useRef<HTMLInputElement>(null);
+  const hourRef = useRef<HTMLInputElement>(null);
+  const minuteRef = useRef<HTMLInputElement>(null);
+  const order = [yearRef, monthRef, dayRef, hourRef, minuteRef];
+  const digits = [4, 2, 2, 2, 2];
+  function advance(i: number) {
+    return (e: FormEvent<HTMLInputElement>) => {
+      const v = e.currentTarget.value.replace(/\D/g, "");
+      if (v.length >= digits[i]) {
+        const next = order[i + 1]?.current;
+        if (next) {
+          next.focus();
+          next.select();
+        }
+      }
+    };
+  }
+  function retreat(i: number) {
+    return (e: KeyboardEvent<HTMLInputElement>) => {
+      if (e.key !== "Backspace" || e.currentTarget.value !== "") return;
+      const prev = order[i - 1]?.current;
+      if (!prev) return;
+      e.preventDefault();
+      prev.focus();
+      const n = prev.value.length;
+      prev.setSelectionRange?.(n, n);
+    };
+  }
 
   // form action 대신 onSubmit으로 보낸다. React 19는 action 폼을 제출 뒤 비우는데,
   // 서버에서 오류가 났을 때 적은 내용이 사라지면 안 된다.
@@ -124,9 +158,9 @@ export function ProfileForm({ next, initial, serverAction = saveProfileAction, a
       <div className="flex flex-col gap-2">
         <span className={groupLabel}>태어난 날 {calendar === "lunar" ? "(음력 그대로)" : ""}</span>
         <div className="grid grid-cols-[2fr_1fr_1fr] gap-2">
-          <input name="birthYear" inputMode="numeric" maxLength={4} placeholder="1995" defaultValue={initial?.birthYear} aria-label="태어난 해" aria-invalid={invalidAt("date")} className="field" required />
-          <input name="birthMonth" inputMode="numeric" maxLength={2} placeholder="월" defaultValue={initial?.birthMonth} aria-label="태어난 달" aria-invalid={invalidAt("date")} className="field" required />
-          <input name="birthDay" inputMode="numeric" maxLength={2} placeholder="일" defaultValue={initial?.birthDay} aria-label="태어난 날" aria-invalid={invalidAt("date")} className="field" required />
+          <input ref={yearRef} onInput={advance(0)} name="birthYear" inputMode="numeric" maxLength={4} placeholder="1995" defaultValue={initial?.birthYear} aria-label="태어난 해" aria-invalid={invalidAt("date")} className="field" required />
+          <input ref={monthRef} onInput={advance(1)} onKeyDown={retreat(1)} name="birthMonth" inputMode="numeric" maxLength={2} placeholder="월" defaultValue={initial?.birthMonth} aria-label="태어난 달" aria-invalid={invalidAt("date")} className="field" required />
+          <input ref={dayRef} onInput={advance(2)} onKeyDown={retreat(2)} name="birthDay" inputMode="numeric" maxLength={2} placeholder="일" defaultValue={initial?.birthDay} aria-label="태어난 날" aria-invalid={invalidAt("date")} className="field" required />
         </div>
         {errorAt("date")}
       </div>
@@ -147,8 +181,8 @@ export function ProfileForm({ next, initial, serverAction = saveProfileAction, a
         </div>
         {!timeUnknown && (
           <div className="grid grid-cols-2 gap-2">
-            <input name="birthHour" inputMode="numeric" maxLength={2} placeholder="시 (0~23)" defaultValue={initial?.birthHour} aria-label="태어난 시" aria-invalid={invalidAt("time")} className="field" />
-            <input name="birthMinute" inputMode="numeric" maxLength={2} placeholder="분" defaultValue={initial?.birthMinute} aria-label="태어난 분" aria-invalid={invalidAt("time")} className="field" />
+            <input ref={hourRef} onInput={advance(3)} onKeyDown={retreat(3)} name="birthHour" inputMode="numeric" maxLength={2} placeholder="시 (0~23)" defaultValue={initial?.birthHour} aria-label="태어난 시" aria-invalid={invalidAt("time")} className="field" />
+            <input ref={minuteRef} onKeyDown={retreat(4)} name="birthMinute" inputMode="numeric" maxLength={2} placeholder="분" defaultValue={initial?.birthMinute} aria-label="태어난 분" aria-invalid={invalidAt("time")} className="field" />
           </div>
         )}
         {errorAt("time")}

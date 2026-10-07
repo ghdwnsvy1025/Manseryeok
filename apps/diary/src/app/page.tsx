@@ -7,10 +7,10 @@ import { FortuneLoading } from "@/components/FortuneLoading";
 import { LinkPromptCard } from "@/components/LinkPromptCard";
 import { SaveBurst } from "@/components/SaveBurst";
 import { TodayEntryCard } from "@/components/TodayEntryCard";
-import { createClient, getUser } from "@/lib/supabase/server";
-import { birthProfileOf, countEntries, getEntry, getFortuneVote, getLinkPromptState, getSajuProfile, listEntries, listEntriesForStats, type SajuProfileRow } from "@/lib/db";
+import { getUser } from "@/lib/supabase/server";
+import { birthProfileOf, countEntries, getEntry, getFortuneVote, getLinkPromptState, getSajuProfile, listEntries, listEntriesForStats, readFortuneCacheRow, type SajuProfileRow } from "@/lib/db";
 import { characterOf, characterOfGanji, todayLine } from "@/lib/character";
-import { getTodayFortune } from "@/lib/fortune";
+import { cachedFortuneContent, getTodayFortune, type FortuneCacheLookup } from "@/lib/fortune";
 import type { EntryLike } from "@/lib/fortune/personal";
 import { dayGanji } from "@/lib/ganji";
 import { shouldShowLinkPrompt } from "@/lib/linkPrompt";
@@ -25,6 +25,7 @@ const goldButton = "gold-plate mt-5 flex h-14 items-center justify-center rounde
 
 /**
  * 운세 카드 — 모델 호출(3~6초)을 기다리는 안쪽 층. 바깥 층은 기다리지 않고 먼저 그려진다 (docs/ANON_START.md 4절).
+ * 캐시가 맞는 날은 여기까지 오지 않는다 — 바깥에서 바로 FortuneCard를 그린다. 투표는 바깥 Promise.all이 읽어 넘긴다.
  * 서버 컴포넌트 사이의 props라 직렬화되지 않는다.
  */
 async function FortuneSection({
@@ -34,6 +35,8 @@ async function FortuneSection({
   today,
   ganjiKo,
   defaultOpen,
+  cached,
+  vote,
 }: {
   userId: string;
   profile: SajuProfileRow;
@@ -41,13 +44,12 @@ async function FortuneSection({
   today: string;
   ganjiKo: string;
   defaultOpen: boolean;
+  /** 바깥에서 읽어 둔 캐시 행(지문이 안 맞는 행) 또는 null(없음). undefined면 운세 쪽이 다시 조회 */
+  cached: FortuneCacheLookup | null | undefined;
+  vote: 1 | -1 | null;
 }) {
   try {
-    const supabase = await createClient();
-    const [fortune, vote] = await Promise.all([
-      getTodayFortune({ date: today, pillars: profile.pillars, profile: birthProfileOf(profile), entries, owner: { userId } }),
-      getFortuneVote(supabase, userId, today),
-    ]);
+    const fortune = await getTodayFortune({ date: today, pillars: profile.pillars, profile: birthProfileOf(profile), entries, owner: { userId }, cached });
     return (
       <FortuneCard
         fortune={fortune}
@@ -82,28 +84,48 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
   // 세션이 아직 없는 첫 요청: 뼈대만 그리고 AnonBoot를 기다린다. 리디렉트하지 않는다 (B2)
   if (!user) return <Booting title={formatKoreanDate(today)} cards={2} />;
 
-  const [profile, entry, entries, linkState, entryCount, recent] = await Promise.all([
+  // 한 단계에 전부 읽는다 — 운세 캐시 행·투표도 여기서. 캐시가 맞으면 Suspense 없이 바로 그린다 (전수조사 A-2·3)
+  const [profile, entry, entries, linkState, entryCount, recent, cachedRow, vote] = await Promise.all([
     getSajuProfile(supabase, user.id),
     getEntry(supabase, user.id, today),
     listEntriesForStats(supabase, user.id),
     getLinkPromptState(supabase, user.id),
     countEntries(supabase, user.id),
     listEntries(supabase, user.id, 8),
+    readFortuneCacheRow(supabase, user.id, today),
+    getFortuneVote(supabase, user.id, today),
   ]);
   // 생년월일이 없으면 먼저 받는다 — /write·/me와 같은 규칙 (B1). 오늘 화면 안에서 폼을 그리지 않는다
   if (!profile) redirect("/onboarding?next=/");
 
   // 내 캐릭터 = 일주 (톤 v3.3)
   const myCharacter = characterOf(profile.pillars);
+  // 오늘 일진 캐릭터 — 머리의 두 번째 메달 (v3.6). 팡 카드도 같은 것을 쓴다
+  const todayCharacter = characterOfGanji(ganji.ko);
   // 팡 카드 아래 지난 도장들: 최근 7개 기록의 행복도 (오늘 제외, 최신순)
   const recentHappiness = recent.filter((e) => e.entry_date !== today).slice(0, 7).map((e) => e.happiness);
 
   const showLinkPrompt =
     Boolean(entry) && shouldShowLinkPrompt({ isAnonymous: Boolean(user.is_anonymous), entryCount: entries.length, promptCount: linkState.promptCount });
 
-  const fortuneCard = (
+  const fortuneDateLabel = formatKoreanDate(today).replace(/\s*\S+요일$/, "");
+  const defaultOpen = !night || entries.length === 0;
+  // 캐시 히트: 기다릴 것이 없으니 fallback 없이 바로 카드. 미스(또는 지문 불일치): 계산·모델 호출은 Suspense 안에서
+  const cachedFortune = cachedFortuneContent(cachedRow ?? null, profile.pillars, birthProfileOf(profile));
+  const fortuneCard = cachedFortune ? (
+    <FortuneCard fortune={cachedFortune} dateLabel={fortuneDateLabel} ganjiKo={ganji.ko} canVote vote={vote} defaultOpen={defaultOpen} />
+  ) : (
     <Suspense fallback={<FortuneLoading character={myCharacter.characterSrc} />}>
-      <FortuneSection userId={user.id} profile={profile} entries={entries} today={today} ganjiKo={ganji.ko} defaultOpen={!night || entries.length === 0} />
+      <FortuneSection
+        userId={user.id}
+        profile={profile}
+        entries={entries}
+        today={today}
+        ganjiKo={ganji.ko}
+        defaultOpen={defaultOpen}
+        cached={cachedRow}
+        vote={vote}
+      />
     </Suspense>
   );
 
@@ -127,7 +149,7 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
         <SaveBurst
           ganjiKo={ganji.ko}
           ganjiHanja={ganji.hanja}
-          characterSrc={characterOfGanji(ganji.ko).characterSrc}
+          characterSrc={todayCharacter.characterSrc}
           recentHappiness={recentHappiness}
           happiness={entry.happiness}
           kept={entry.promise === "kept"}
@@ -148,14 +170,18 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
             <Link href="/me">{todayLine(ganji.index, entryCount)}</Link>
           </p>
         </div>
-        {/* 이 화면의 유일한 그림 — 내 캐릭터 (일주, v3.3) */}
-        <img
-          src={myCharacter.characterSrc}
-          alt={`내 캐릭터 ${myCharacter.ganjiKo} ${myCharacter.animal}`}
-          width={64}
-          height={64}
-          className="h-16 w-16 shrink-0 object-contain"
-        />
+        {/* 이 화면의 그림 하나 = 두 메달 한 쌍 "나 × 오늘" (v3.6): 왼쪽 내 캐릭터(일주), 오른쪽 오늘 일진 캐릭터. 얼굴·상반신만 */}
+        <div className="medal-pair" aria-label={`나 ${myCharacter.ganjiKo} × 오늘 ${ganji.ko}`}>
+          <span className="medal" title={`나 · ${myCharacter.ganjiKo} ${myCharacter.animal}`}>
+            <img src={myCharacter.characterSrc} alt={`내 캐릭터 ${myCharacter.ganjiKo} ${myCharacter.animal}`} width={56} height={56} data-ganji={myCharacter.ganjiKo} />
+          </span>
+          <span aria-hidden className="medal-pair__x">
+            ×
+          </span>
+          <span className="medal" title={`오늘 · ${ganji.ko}일`}>
+            <img src={todayCharacter.characterSrc} alt={`오늘 ${ganji.ko}일 캐릭터 ${todayCharacter.animal}`} width={56} height={56} data-ganji={ganji.ko} />
+          </span>
+        </div>
       </header>
 
       {/* 순서 고정: 운세 카드가 늘 위, 기록 카드가 아래 (톤 v3) */}

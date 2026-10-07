@@ -238,6 +238,28 @@ export async function readCachedFortune(sb: SupabaseClient, userId: string, date
   return typeof doText === "string" && doText.trim() ? { doText: doText.trim() } : null;
 }
 
+/**
+ * 오늘 화면이 첫 Promise.all에서 읽어 두는 운세 캐시 행 (RLS: 본인 것만 읽기). 지문 비교는 lib/fortune의 cachedFortuneContent가 한다.
+ * null = 행이 없음(확정), undefined = 읽기 실패(운세 쪽이 service role로 다시 조회한다)
+ */
+export async function readFortuneCacheRow(
+  sb: SupabaseClient,
+  userId: string,
+  date: string,
+): Promise<{ id: string; profile_fingerprint: string; content: unknown } | null | undefined> {
+  const { data, error } = await sb
+    .from("night_fortunes")
+    .select("id, profile_fingerprint, content")
+    .eq("user_id", userId)
+    .eq("fortune_date", date)
+    .maybeSingle();
+  if (error) {
+    console.error("운세 캐시 읽기", error);
+    return undefined;
+  }
+  return (data as { id: string; profile_fingerprint: string; content: unknown } | null) ?? null;
+}
+
 export async function getFortuneVote(sb: SupabaseClient, userId: string, date: string): Promise<1 | -1 | null> {
   const { data, error } = await sb
     .from("night_fortune_feedback")

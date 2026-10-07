@@ -3,8 +3,8 @@
 import type { TenGod } from "@saju/engine";
 import type { AreaName, AreaPeriod, AreaSignal, BaseFortune, CoreFortune, PersonalAdjustment } from "./types";
 
-/** 사용자 문장에 쓰면 안 되는 말. 테스트가 전 조합을 검사한다 */
-export const BANNED = ["기운", "흐름", "두근", "결을", "결이 ", "결로", "용신", "기신", "십신", "일간", "일지"];
+/** 사용자 문장에 쓰면 안 되는 말. 테스트가 전 조합을 검사한다. v4.4: "특별한·남다른·다른 날과 달리·차별"(날마다 다르다고 우기는 말) 추가 */
+export const BANNED = ["기운", "흐름", "두근", "결을", "결이 ", "결로", "용신", "기신", "십신", "일간", "일지", "특별한", "남다른", "다른 날과 달리", "차별"];
 
 const BY_TEN_GOD: Record<TenGod, { headline: string; lead: string; do: string; dont: string }> = {
   비견: {

@@ -3,12 +3,13 @@ import { STEMS, getTenGod } from "@saju/engine";
 import { fromBirth, toCorePillars } from "@saju/core-rules";
 import { branchRelation, computeBaseFortune, FAMILY_OF } from "@/lib/fortune/base";
 import { COEF, computeCoreFortune, ipchunDate, resolveYongsin, seunOf, toBirthInput, UNKNOWN_HOUR_MIN } from "@/lib/fortune/core";
-import { buildBrief, hanjaToKo, plainFact, type BriefInput } from "@/lib/fortune/brief";
+import { buildBrief, hanjaToKo, hasContextFact, plainFact, type BriefInput } from "@/lib/fortune/brief";
 import { ownerFilter, saveFortuneCache } from "@/lib/fortune/cache";
-import { generateFortuneText, OUTPUT_SCHEMA } from "@/lib/fortune/llm";
-import { AREA_OVERLAP_MAX, STRUCTURE_WORDS, tokenOverlap, validateFortuneText, type ModelText } from "@/lib/fortune/validate";
+import { generateFortuneText, OUTPUT_SCHEMA, SYSTEM } from "@/lib/fortune/llm";
+import { solarTermOf, solarTermsOfYear, termDayWord } from "@/lib/fortune/solarTerms";
+import { AREA_OVERLAP_MAX, CONTEXT_MENTION_RE, STRUCTURE_WORDS, tokenOverlap, validateFortuneText, type ModelText } from "@/lib/fortune/validate";
 import { adjustWithEntries, bandOf, fitPercent, happinessToScore, toTenPoint } from "@/lib/fortune/personal";
-import { findBanned, templateInputFromCore, templateText } from "@/lib/fortune/text";
+import { BANNED, findBanned, templateInputFromCore, templateText } from "@/lib/fortune/text";
 import type { AreaName, AreaSignal, CoreFortune } from "@/lib/fortune/types";
 import { dayGanji } from "@/lib/ganji";
 import { computeProfile, type BirthProfile, type PillarsSnapshot } from "@/lib/profile";
@@ -190,7 +191,7 @@ describe("v4.1 보강 (乙亥 丙戌 己丑 辛未 × 2026-10-07 甲寅: 천간�
     expect(todayOf(v4(PROFILE_B, "2026-02-04"))).toEqual(["재물↑", "대인↑"]);
   });
 
-  test("③ ctx = 대운 판정 × 0.2 + 세운 판정 × 0.15 (월운은 0), 월운·대운 플래그 문장이 항상 facts에", () => {
+  test("③ ctx = 대운 판정 × 0.2 + 세운 판정 × 0.15 (월운은 0), 월운·대운 플래그 문장은 contextFacts에 항상 (v4.4: facts에는 평일엔 없음)", () => {
     expect(COEF.daeunVerdict).toBe(0.2);
     expect(COEF.seunVerdict).toBe(0.15);
     expect(r.context.daeun).toMatchObject({ 간지: "癸未", 판정: "유리", 합계: 1 });
@@ -200,12 +201,19 @@ describe("v4.1 보강 (乙亥 丙戌 己丑 辛未 × 2026-10-07 甲寅: 천간�
     expect(r.parts.ctx).toBe(-0.17); // 1×0.2 + (−2.5)×0.15 = −0.175 → 소수 2자리 (월운 −0.5는 0)
     expect(r.parts.score01).toBe(0.69); // v4.2: raw 1.25 → 2.5 (Y-12), 寅亥 육합 +0.5는 합 점수 삭제로 0 (0.74 → 0.69)
     expect(r.context.daeun?.플래그).toEqual(expect.arrayContaining([expect.stringContaining("용신 손상"), expect.stringContaining("개두")]));
-    expect(r.facts).toContain("지금 10년 단위 운이 내게 모자란 쪽을 누르고 있어요.");
-    expect(r.facts).toContain("지금 10년 단위 운은 겉과 속이 달라요.");
-    expect(r.facts).toContain("이달 운 丁酉은 조심할 편이에요.");
+    // v4.4: 2026-10-07(추분 보름째, 충 없음)은 평일 — 맥락 문장은 contextFacts에만
+    expect(r.contextFacts).toEqual([
+      "지금 10년 단위 운 癸未은 수월한 편이에요.",
+      "지금 10년 단위 운이 내게 모자란 쪽을 누르고 있어요.",
+      "지금 10년 단위 운은 겉과 속이 달라요.",
+      "올해 운 丙午은 조심할 편이에요.",
+      "이달 운 丁酉은 조심할 편이에요.",
+    ]);
+    expect(hasContextFact(r.facts)).toBe(false);
+    expect(r.facts.some((f) => f.includes("10년 단위 운"))).toBe(false);
     expect(r.facts.length).toBeLessThanOrEqual(10);
     // 월운 플래그(절각)는 문장이 되지 않는다
-    expect(r.facts.some((f) => f.includes("이달") && f.includes("겉과 속"))).toBe(false);
+    expect(r.contextFacts.some((f) => f.includes("이달") && f.includes("겉과 속"))).toBe(false);
     // 용신이 없으면 판정 몫이 없고 ctx는 충·합만
     const noY = v4({ ...PROFILE_A, birthYear: 1985, birthMonth: 5, birthDay: 3, birthHour: null, birthMinute: null }, "2026-06-15");
     expect(noY.context.seun.합계).toBeUndefined();
@@ -239,12 +247,12 @@ describe("v4.2 합은 점수 없이 플래그만 · 위아래 문장 없음 · �
   test("v4.3 (a) 합 묶임 판정 삭제: 오늘 寅 × 연지 亥(용신) 육합이어도 '용신 손상 … 묶음' 플래그와 '묶여…' 문장이 없다 (hits에는 남는다)", () => {
     expect(c.relations.hits.some((h) => h.kind === "육합")).toBe(true);
     expect(c.relations.flags.some((f) => f.includes("묶음"))).toBe(false);
-    expect(c.facts.some((f) => f.includes("묶"))).toBe(false);
+    expect(c.facts.some((f) => /묶여|묶음/.test(f))).toBe(false); // 키워드 채움 문장의 '틀에 묶임'(KW)은 합 문장이 아니다
     // 용신 글자가 아닌 합(A 2026-06-15 申巳 육합)도 마찬가지
     const other = v4(PROFILE_A, "2026-06-15");
     expect(other.relations.hits.some((h) => h.kind === "육합")).toBe(true);
     expect(other.relations.flags.some((f) => f.includes("묶음"))).toBe(false);
-    expect(other.facts.some((f) => f.includes("묶"))).toBe(false);
+    expect(other.facts.some((f) => /묶여|묶음/.test(f))).toBe(false);
   });
 
   test("v4.3 (b) 코어 '긴장이 풀리는 시기' 플래그는 flags에 남되 '누그러져요' 문장은 없다 (C 원국 丑未충 × 午일: 午가 未와 육합)", () => {
@@ -271,8 +279,8 @@ describe("v4.2 합은 점수 없이 플래그만 · 위아래 문장 없음 · �
     }
     // 십신이 다르면 "함께 와요" (A 2026-10-05 壬子: 편관 + 정관)
     expect(v4(PROFILE_A, "2026-10-05").facts[0]).toBe("오늘은 '압박과 책임'(편관)과 '약속과 역할'(정관)이 함께 와요.");
-    // 운 내부 상충 문장도 "위아래" 없이
-    expect(c.facts).toContain("지금 10년 단위 운은 겉과 속이 달라요.");
+    // 운 내부 상충 문장도 "위아래" 없이 (v4.4: 근거용 contextFacts에)
+    expect(c.contextFacts).toContain("지금 10년 단위 운은 겉과 속이 달라요.");
   });
 
   test("영역 period: 오늘(일운 ≤2) → 이달(월운 1) → 올해(세운 1), 모두 코어 luckAreas. 용신 없으면 비어 있다", () => {
@@ -333,15 +341,17 @@ describe("v4 시간 모름 (Y-10)", () => {
 });
 
 describe("v4 글 재료 (facts·keywords)", () => {
-  test("facts는 6~10문장, 금지어 없음, 어미는 ~어요", () => {
-    for (const prof of [PROFILE_A, PROFILE_B, { ...PROFILE_A, birthHour: null, birthMinute: null }]) {
+  test("facts는 4~10문장(v4.4: 맥락 문장이 빠져 하한 6 → 4), contextFacts 3~5문장, 금지어 없음, 어미는 ~어요", () => {
+    for (const prof of [PROFILE_A, PROFILE_B, PROFILE_C, { ...PROFILE_A, birthHour: null, birthMinute: null }]) {
       const pillars = pillarsOf(prof);
-      for (const date of ["2026-10-05", "2026-01-20", "2026-02-04", "2026-06-15", "2027-03-01", "2026-03-09", "2026-11-23"]) {
+      for (const date of ["2026-10-05", "2026-01-20", "2026-02-04", "2026-06-15", "2027-03-01", "2026-03-09", "2026-11-23", "2026-10-07", "2026-10-08"]) {
         const r = v4(prof, date, pillars);
-        expect(r.facts.length, date).toBeGreaterThanOrEqual(6);
+        expect(r.facts.length, date).toBeGreaterThanOrEqual(4);
         expect(r.facts.length, date).toBeLessThanOrEqual(10);
-        expect(findBanned(r.facts.join(" ")), r.facts.join("\n")).toEqual([]);
-        for (const f of r.facts) expect(f).toMatch(/요\.?$/);
+        expect(r.contextFacts.length, date).toBeGreaterThanOrEqual(3);
+        expect(r.contextFacts.length, date).toBeLessThanOrEqual(5);
+        expect(findBanned([...r.facts, ...r.contextFacts].join(" ")), r.facts.join("\n")).toEqual([]);
+        for (const f of [...r.facts, ...r.contextFacts]) expect(f, date).toMatch(/요\.?$/);
         for (const a of r.areas) expect(findBanned(a.why), a.why).toEqual([]);
       }
     }
@@ -500,13 +510,14 @@ describe("3단계 brief", () => {
     expect(b.banned).toContain("기운");
     expect(b.banned).toContain("반드시");
     expect(b.jargon).toContain("용신");
-    // v4.2: 점수(9.2)는 허용 숫자에 없다 — 점수는 화면이 보여 준다
-    expect(b.allowedNumbers).toEqual(expect.arrayContaining([2026, 6, 15, 10]));
+    // v4.2: 점수(9.2)는 허용 숫자에 없다 — 점수는 화면이 보여 준다. v4.4: 평일엔 "10년 단위 운" 문장이 없으니 10도 없다
+    expect(b.allowedNumbers).toEqual([6, 15, 2026]);
     expect(b.allowedNumbers).not.toContain(9.2);
     expect(b.score.value).toBe(9.2);
     expect(b.rules.numbers).toContain("점수는 화면에 있으니");
     expect(b.rules.areas).toContain("이달엔");
-    expect(b.today).toEqual({ date: "2026-06-15", weekday: "월요일", ganji: "경신일" });
+    // v4.4: 요일·절기가 오늘 재료로
+    expect(b.today).toEqual({ date: "2026-06-15", weekday: "월요일", ganji: "경신일", solarTerm: "망종 열흘째" });
   });
 
   test("기록이 없으면 mine이 null이고 기록 이야기를 금지한다", () => {
@@ -559,7 +570,8 @@ describe("3단계 검사 (validate)", () => {
     expect(validateFortuneText({ ...OK, headline: "좋은 날 ✨" }, brief).some((x) => x.includes("이모지"))).toBe(true);
     // "상관없어요", "힘이 드는 편인 병오", "고른 편인데"는 일상어 (실제 샘플에서 걸렸던 거짓 양성)
     expect(validateFortuneText({ ...OK, dont: "작은 실수는 상관없어요." }, brief)).toEqual([]);
-    expect(validateFortuneText({ ...OK, dont: "올해 운은 힘이 드는 편인 병오라 서두르지 않아요." }, brief)).toEqual([]);
+    // v4.4: 평일(맥락 문장 없음)엔 "올해 운"을 말할 수 없으니 "오늘 일"로 — 보는 건 '편인 병오'가 전문용어로 안 걸리는 것
+    expect(validateFortuneText({ ...OK, dont: "오늘 일은 힘이 드는 편인 병오라 서두르지 않아요." }, brief)).toEqual([]);
     expect(validateFortuneText({ ...OK, dont: "속도가 고른 편인데 서두르지 않아요." }, brief)).toEqual([]);
     expect(validateFortuneText({ ...OK, dont: "편인 글자를 믿지 않아요." }, brief).some((x) => x.includes('전문용어 "편인"'))).toBe(true);
     expect(validateFortuneText({ ...OK, body: OK.body.replace("힘이 덜 들어요", "올해의 큰 흐름은 힘이 드는 쪽이에요") }, brief).some((x) => x.includes('금지어 "흐름"'))).toBe(true);
@@ -581,7 +593,9 @@ describe("3단계 검사 (validate)", () => {
     // headline은 보지 않는다. "한편" 단독(부사)은 통과, "한편이"만 탈락
     expect(validateFortuneText({ ...OK, headline: "글자가 또렷한 날" }, brief)).toEqual([]);
     expect(validateFortuneText({ ...OK, dont: "한편 서두르지는 않아요." }, brief)).toEqual([]);
-    expect(validateFortuneText({ ...OK, dont: "올해 운과 한편이 되니 서두르지 않아요." }, brief)).toEqual(['구조 서술 "한편이"']);
+    expect(validateFortuneText({ ...OK, dont: "그 사람과 한편이 되니 서두르지 않아요." }, brief)).toEqual(['구조 서술 "한편이"']);
+    // v4.4: 맥락 문장 없는 날의 "올해 운" 언급은 따로 걸린다
+    expect(validateFortuneText({ ...OK, dont: "올해 운과 한편이 되니 서두르지 않아요." }, brief)).toEqual(expect.arrayContaining(['구조 서술 "한편이"', "오늘만: facts에 없는 올해·이달·10년 단위 운을 말함"]));
   });
 
   test("숫자 날조: brief에 없는 숫자 / 내 숫자 문장 빠짐", () => {

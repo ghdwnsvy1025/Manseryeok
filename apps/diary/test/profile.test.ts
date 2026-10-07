@@ -1,6 +1,9 @@
 // 온보딩 검증 (B3): 화면 순서대로 걸리고, 어느 묶음인지 field로 알리고, 엔진 문구가 새지 않는다
 import { describe, expect, test } from "vitest";
-import { COMPUTE_ERROR, GENDER_ERROR, dateExists, validateProfile } from "@/lib/profile";
+import { LONGITUDE } from "@saju/core-rules/birth";
+import { CITIES } from "@/lib/cities";
+import { toBirthInput } from "@/lib/fortune/core";
+import { COMPUTE_ERROR, GENDER_ERROR, computeProfile, dateExists, validateProfile } from "@/lib/profile";
 
 const good = {
   name: "테스트",
@@ -95,5 +98,36 @@ describe("validateProfile 순서와 field", () => {
     expect(failOf({ ...good, calendar: "julian" }).field).toBe("calendar");
     expect(failOf({ ...good, city: "mars" }).field).toBe("city");
     expect(COMPUTE_ERROR).not.toMatch(/해주세요/);
+  });
+});
+
+// ---------------- v3.6 온보딩: 출생지 17개 시·도 + 그 외/해외 ----------------
+describe("v3.6 출생지 = 17개 시·도 + 그 외/해외", () => {
+  test("17 + 1개. 이름·경도·순서가 사주 코어 LONGITUDE 표와 같고, 기존 id는 그대로, 새 id는 영문 소문자", () => {
+    expect(CITIES).toHaveLength(18);
+    const korea = CITIES.slice(0, 17);
+    expect(korea.map((c) => c.name)).toEqual(Object.keys(LONGITUDE));
+    for (const c of korea) {
+      expect(c.coreName, c.id).toBe(c.name);
+      expect(c.longitude, c.id).toBe(LONGITUDE[c.name]);
+    }
+    expect(CITIES[17]).toEqual({ id: "other", name: "그 외 / 해외 (서울 기준)", coreName: "서울", longitude: 126.98 });
+    expect(CITIES.map((c) => c.id)).toEqual([
+      "seoul", "busan", "daegu", "incheon", "gwangju", "daejeon", "ulsan", "sejong", "gyeonggi", "gangwon", "chungbuk", "chungnam", "jeonbuk", "jeonnam", "gyeongbuk", "gyeongnam", "jeju", "other",
+    ]);
+    for (const c of CITIES) expect(c.id).toMatch(/^[a-z]+$/);
+  });
+
+  test("새 id로 검증·계산이 되고 toBirthInput은 코어 출생지 이름(coreName)을 넘긴다. '그 외'는 서울과 같은 기둥", () => {
+    for (const city of ["gyeonggi", "sejong", "jeonnam", "other"]) expect(validateProfile({ ...good, city }).ok, city).toBe(true);
+    const base = { name: "x", gender: "female" as const, calendar: "solar" as const, isLeapMonth: false, birthYear: 1995, birthMonth: 3, birthDay: 14, birthHour: 7, birthMinute: 30 };
+    const seoul = computeProfile({ ...base, city: "seoul" });
+    const other = computeProfile({ ...base, city: "other" });
+    const gyeongbuk = computeProfile({ ...base, city: "gyeongbuk" });
+    expect(seoul.ok && other.ok && gyeongbuk.ok).toBe(true);
+    if (seoul.ok && other.ok) expect(other.value.pillars).toEqual(seoul.value.pillars);
+    expect(toBirthInput({ ...base, city: "gyeonggi" }).출생지).toBe("경기");
+    expect(toBirthInput({ ...base, city: "other" }).출생지).toBe("서울");
+    expect(toBirthInput({ ...base, city: "chungbuk" })).not.toHaveProperty("경도");
   });
 });

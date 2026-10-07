@@ -17,9 +17,16 @@ import { templateInputFromCore, templateText } from "./text";
 import type { FortuneContent } from "./types";
 
 /** 캐시 지문에 들어간다. 올리면 기존 캐시가 전부 무효 */
-export const FORTUNE_VERSION = "v4.3";
+export const FORTUNE_VERSION = "v4.4";
 
 export type FortuneOwner = { userId: string; guestKey?: undefined } | { guestKey: string; userId?: undefined };
+
+/** 캐시 행에서 판정에 필요한 열만. 화면이 첫 Promise.all에서 미리 읽어 넘길 수 있다 */
+export interface FortuneCacheLookup {
+  id: string;
+  profile_fingerprint: string;
+  content: unknown;
+}
 
 export interface FortuneRequest {
   date: string;
@@ -29,6 +36,17 @@ export interface FortuneRequest {
   /** 기록 전체. 게스트는 빈 배열 */
   entries: EntryLike[];
   owner: FortuneOwner;
+  /**
+   * 화면이 이미 읽어 둔 캐시 행. `undefined`면 여기서 조회하고, `null`이면 "없음"이 확정된 것, 행이면 그 행을 쓴다
+   * (오늘 화면은 사용자 조회와 같은 단계에서 캐시를 읽어 두므로 두 번 묻지 않는다 — 전수조사 A-2)
+   */
+  cached?: FortuneCacheLookup | null;
+}
+
+/** 읽어 둔 캐시 행이 지금 원국·출생 입력에 맞으면 그 내용. 아니면 null (다시 계산해야 한다) */
+export function cachedFortuneContent(row: FortuneCacheLookup | null, pillars: PillarsSnapshot, profile: BirthProfile | null): FortuneContent | null {
+  if (!row || row.profile_fingerprint !== fingerprint(pillars, profile)) return null;
+  return row.content as FortuneContent;
 }
 
 const WEEKDAYS = ["일요일", "월요일", "화요일", "수요일", "목요일", "금요일", "토요일"];
@@ -62,12 +80,18 @@ async function getTodayFortuneUncached(req: FortuneRequest): Promise<FortuneCont
   const fp = fingerprint(req.pillars, req.profile);
   const { col, val } = ownerFilter(req.owner);
 
-  const { data: cached } = await sb
-    .from("night_fortunes")
-    .select("id, profile_fingerprint, content")
-    .eq(col, val)
-    .eq("fortune_date", req.date)
-    .maybeSingle();
+  let cached: FortuneCacheLookup | null;
+  if (req.cached === undefined) {
+    const { data } = await sb
+      .from("night_fortunes")
+      .select("id, profile_fingerprint, content")
+      .eq(col, val)
+      .eq("fortune_date", req.date)
+      .maybeSingle();
+    cached = (data as FortuneCacheLookup | null) ?? null;
+  } else {
+    cached = req.cached;
+  }
   if (cached && cached.profile_fingerprint === fp) return cached.content as FortuneContent;
 
   const content = await computeFortune(req);

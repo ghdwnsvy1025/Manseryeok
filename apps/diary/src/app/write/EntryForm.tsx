@@ -11,7 +11,7 @@ interface Props {
   initial: { happiness: number; moods: string[]; note: string; promise: Promise_ | null } | null;
 }
 
-/** 약속 세그먼트 3칸. value는 저장 규칙(entry.ts PROMISES)과 같다 */
+/** 약속 도장 3자리. value는 저장 규칙(entry.ts PROMISES)과 같다 */
 const PROMISE_OPTIONS: { value: Promise_; label: string }[] = [
   { value: "kept", label: "지켰어요" },
   { value: "missed", label: "못 지켰어요" },
@@ -75,39 +75,6 @@ export function EntryForm({ date, promiseText, initial }: Props) {
 
       {/* 카드 종이 한 장 */}
       <div className="card-frame card-paper flex flex-col gap-7 p-5">
-        {/* 오늘의 작은 약속 (톤 v3.2) — 운세 "하면 좋아요" 한 줄. 운세 캐시가 없던 날은 통째로 생략.
-            기능 뼈대만: 문장 + 세그먼트 3칸(name="promise") + hidden promise_text. 금색 띠지·세그먼트 시각은 디자이너가 입힌다 */}
-        {promiseText && (
-          <fieldset data-promise-block>
-            {/* 금색 띠지 한 줄: "오늘 약속 · 문장". 운세 카드의 "하면 좋아요" 띠지와 같은 재료(tag--gold) */}
-            <legend className="sr-only">오늘 약속</legend>
-            <input type="hidden" name="promise_text" value={promiseText} />
-            <p className="tag tag--gold min-h-10 w-full justify-start gap-2 px-1 py-1.5 text-[15px] leading-snug text-gold-ink" data-promise-text>
-              <span className="shrink-0 font-bold">오늘 약속</span>
-              <span aria-hidden className="shrink-0 opacity-60">·</span>
-              <span className="min-w-0 break-keep">{promiseText}</span>
-            </p>
-            <div className="promise-seg mt-3" role="radiogroup" aria-label="오늘 약속을 지켰는지">
-              {PROMISE_OPTIONS.map((o) => {
-                const on = promise === o.value;
-                return (
-                  <label key={o.value} className="contents">
-                    <input
-                      type="radio"
-                      name="promise"
-                      value={o.value}
-                      checked={on}
-                      onChange={() => setPromise(o.value)}
-                      className="sr-only"
-                    />
-                    <span className="promise-seg__cell">{o.label}</span>
-                  </label>
-                );
-              })}
-            </div>
-          </fieldset>
-        )}
-
         <fieldset ref={happinessRef}>
           <legend className="text-[17px] font-bold">행복도</legend>
           <p className={`mt-1 h-5 text-sm ${missingHappiness && happiness === null ? "font-bold text-danger" : "text-muted"}`} aria-live="polite">
@@ -138,6 +105,41 @@ export function EntryForm({ date, promiseText, initial }: Props) {
             })}
           </div>
         </fieldset>
+
+        {/* 오늘 약속 = 쪽지 + 도장 3자리 (톤 v3.6, 행복도 아래). 운세 캐시가 없던 날은 통째로 생략.
+            쪽지(키트 note-slip) 위에 "오늘 약속" + 문장, 아래 도장 자리 3개: 지켰어요 = 인주, 못 지켰어요 = 먹, 해당 없음 = 빈 자리.
+            name="promise"·value·hidden promise_text는 그대로 */}
+        {promiseText && (
+          <fieldset data-promise-block>
+            <legend className="sr-only">오늘 약속</legend>
+            <input type="hidden" name="promise_text" value={promiseText} />
+            <div className="note-slip" data-promise-text>
+              <p className="note-slip__label">오늘 약속</p>
+              <p className="note-slip__text">{promiseText}</p>
+            </div>
+            <div className="promise-stamps" role="radiogroup" aria-label="오늘 약속을 지켰는지">
+              {PROMISE_OPTIONS.map((o) => {
+                const on = promise === o.value;
+                return (
+                  <label key={o.value} className="contents">
+                    <input
+                      type="radio"
+                      name="promise"
+                      value={o.value}
+                      checked={on}
+                      onChange={() => setPromise(o.value)}
+                      className="sr-only"
+                    />
+                    <span className="promise-stamp">
+                      <span aria-hidden className="promise-stamp__mark" data-kind={o.value} />
+                      {o.label}
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+          </fieldset>
+        )}
 
         <fieldset>
           <legend className="text-[17px] font-bold">기분</legend>

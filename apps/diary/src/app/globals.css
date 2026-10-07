@@ -31,6 +31,15 @@
   --color-earth: #b58a2e;          /* = gold-ink 계열 */
   --color-metal: #9a9a92;
   --color-water: #1c2b52;          /* = sky 계열 */
+  /* v3.6 오행 글자색 — 나무패 안의 천간·지지 한자에만. 금은 한지 위 흰색 대신 회백. 다크값은 아래 [data-theme="dark"] (앱은 라이트 고정) */
+  --color-el-wood: #2f6b4f;
+  --color-el-fire: #bf2a1f;        /* = seal */
+  --color-el-earth: #a67c2e;
+  --color-el-metal: #6f6f6a;
+  --color-el-water: #1c2b52;       /* = water */
+  /* v3.6 쪽지·먹 도장 측정값 (ui-kit/note-slip-clean 평균 #f3e2be, stamp-inked-ink-clean 평균 #32261b) */
+  --color-note: #f3e2be;
+  --color-ink-stamp: #32261b;
 
   /* 옛 이름 별칭. 01·03 명세가 끝나면 지운다. 새 코드에서 쓰지 않는다 */
   --color-night: var(--color-paper);
@@ -43,6 +52,15 @@
   --font-sans: "Pretendard Variable", "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
   --font-serif: var(--font-song), var(--font-gowun), "AppleMyungjo", "Batang", serif;
   --font-hand: var(--font-pen), var(--font-gowun), cursive;
+}
+
+/* 오행 글자색의 다크값 (톤 v3.6 "다크에선 각각 밝게"). 앱은 라이트 고정이라 data-theme="dark"가 붙을 때만 */
+:root[data-theme="dark"] {
+  --color-el-wood: #7fc49a;
+  --color-el-fire: #ef7a6c;
+  --color-el-earth: #e2b55a;
+  --color-el-metal: #c9c9c2;
+  --color-el-water: #8fa8dc;
 }
 
 html {
@@ -151,16 +169,24 @@ body {
   border-radius: 8px;
   background-color: var(--color-paper-3);
 }
-/* 신호 띠지: 세 종류가 같은 모양·같은 폭(7rem). 모양은 키트 tag-strip(찢긴 한지 띠)을 mask로 쓴다 —
+/* 신호 줄 (v3.6): 띠지를 문장 앞에 인라인으로 붙이고 문장은 전체 폭으로 흐른다. 줄 사이 10px */
+.signal-box__row {
+  margin: 0;
+}
+.signal-box__row + .signal-box__row {
+  margin-top: 10px;
+}
+/* 신호 띠지: 세 종류가 같은 모양. 폭은 글자대로(v3.6 — 고정 7rem 삭제), 문장 앞 인라인. 모양은 키트 tag-strip(찢긴 한지 띠)을 mask로 쓴다 —
    면은 저마다 다르고(한지 / 금색 / 먹색) 찢긴 가장자리는 똑같다. */
 .sig {
   position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 7rem;
-  height: 32px;
-  padding: 0 12px;
+  vertical-align: middle;
+  margin-right: 8px;
+  height: 30px;
+  padding: 0 14px;
   font-size: 14px;
   font-weight: 700;
   line-height: 1;
@@ -346,6 +372,17 @@ input:focus-visible + .seg__cell,
   color: transparent;
   user-select: none;
 }
+/* 카드 안 글자 자리: 제목 한 줄(굵게, 짧게) + 본문 두 줄. 제목 자리와 같은 색·둥글기, 움직이지 않는다 */
+.page-skeleton__line {
+  display: block;
+  height: 14px;
+  border-radius: 4px;
+  background: var(--color-paper-3);
+}
+.page-skeleton__line--title {
+  height: 22px;
+  width: 42%;
+}
 
 /* 도장: 키트 stamp-empty(빈 자리) / stamp-inked-red(인주 찍힌 자국, v3.2 — 금빛 stamp-inked는 더 쓰지 않는다). 숫자는 코드 글자 */
 .stamp {
@@ -450,19 +487,7 @@ input:focus-visible + .promise-seg__cell {
   display: block;
 }
 
-/* 나무패 안의 오행 점 (v3.2): 지름 8px. 오행 색은 여기서만 */
-.element-dot {
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  vertical-align: middle;
-}
-.element-dot--wood { background-color: var(--color-wood); }
-.element-dot--fire { background-color: var(--color-fire); }
-.element-dot--earth { background-color: var(--color-earth); }
-.element-dot--metal { background-color: var(--color-metal); }
-.element-dot--water { background-color: var(--color-water); }
+/* 오행 점(v3.2)은 v3.6에서 뺐다 — 나무패 한자 글자색(el-*)으로 대신한다 */
 
 /* 나무패: 키트 wood-tablet. 뾰족한 머리(위 140px)와 바닥(아래 80px)은 비율대로, 몸통만 늘인다 */
 .wood-tablet {
@@ -672,7 +697,9 @@ details[open] > .fortune-body {
   .burst-stamp,
   .burst-overlay,
   .burst-overlay[data-closing],
+  .burst-ok,
   input:checked + .stamp,
+  input:checked + .promise-stamp > .promise-stamp__mark,
   .brush-loading {
     animation: none;
   }
@@ -680,4 +707,123 @@ details[open] > .fortune-body {
   .burst-bit {
     display: none;
   }
+}
+
+/* ── v3.6 "나 × 오늘" · 쪽지 약속 · 팡 확인 ───────────────────────────── */
+
+/* 두 메달 한 쌍 (오늘 화면 머리): 각 56px 둥근 한지 메달, 녹갈 1.5px, 안은 card-paper. 그림은 위쪽 55%(얼굴·상반신)만.
+   메달 사이 × 는 송명 18px 금색. 어색하게 잘리는 간지는 아래 [data-ganji] 표에서 object-position만 따로 */
+.medal-pair {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 6px;
+  padding-top: 2px;
+}
+.medal {
+  display: block;
+  width: 56px;
+  height: 56px;
+  overflow: hidden;
+  border: 1.5px solid var(--color-frame);
+  border-radius: 50%;
+  background: var(--color-paper-2) url("/ui/card-paper.webp") center / cover;
+}
+.medal > img {
+  display: block;
+  width: 100%;
+  height: 182%; /* 56px 창에 그림의 위 55%가 들어온다 */
+  object-fit: cover;
+  object-position: 50% 12%;
+}
+/* 간지별 보정 표: 필요한 것만. 예) .medal > img[data-ganji="갑자"] { object-position: 50% 0; height: 200%; } */
+.medal-pair__x {
+  font-family: var(--font-serif);
+  font-size: 18px;
+  line-height: 1;
+  color: var(--color-gold);
+}
+
+/* 약속 쪽지 (쓰기 화면, 행복도 아래): 키트 note-slip(위가 살짝 접힌 한지, 1024×512). 접힌 위 90px·양옆 28px·아래 28px은 조각으로,
+   몸통만 늘인다. 안쪽 글자는 접힌 띠 아래에 */
+.note-slip {
+  border-style: solid;
+  border-width: 30px 10px 12px;
+  border-image: url("/ui/note-slip-clean.png") 90 28 30 28 fill / 30px 10px 12px / 0 stretch;
+  padding: 2px 8px 6px;
+  color: var(--color-ink);
+}
+.note-slip__label {
+  font-size: 13px;
+  line-height: 1.2;
+  color: var(--color-muted);
+}
+.note-slip__text {
+  margin-top: 4px;
+  font-family: var(--font-serif);
+  font-size: 18px;
+  line-height: 1.45;
+  word-break: keep-all;
+}
+
+/* 도장 자리 3개 (쪽지 아래, 가로): 지켰어요 = 인주 도장, 못 지켰어요 = 먹 도장, 해당 없음 = 빈 자리.
+   라디오는 sr-only. 고르면 그 자리에 도장이 찍히고(120ms 눌림) 나머지 둘은 빈 자리로 */
+.promise-stamps {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-top: 12px;
+}
+.promise-stamp {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1.2;
+  color: var(--color-muted);
+}
+.promise-stamp__mark {
+  width: 56px;
+  height: 56px;
+  background: url("/ui/stamp-empty-clean.webp") center / contain no-repeat;
+}
+input:checked + .promise-stamp {
+  font-weight: 700;
+  color: var(--color-ink);
+}
+input:checked + .promise-stamp > .promise-stamp__mark {
+  animation: stamp-press 120ms ease-out;
+}
+input:checked + .promise-stamp > .promise-stamp__mark[data-kind="kept"] {
+  background-image: url("/ui/stamp-inked-red-clean.png");
+}
+input:checked + .promise-stamp > .promise-stamp__mark[data-kind="missed"] {
+  background-image: url("/ui/stamp-inked-ink-clean.png");
+}
+/* 해당 없음은 찍히는 도장이 없다 — 빈 자리에 녹갈 테두리 한 겹으로 "골랐다"만 */
+input:checked + .promise-stamp > .promise-stamp__mark[data-kind="na"] {
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1.5px var(--color-frame);
+}
+input:focus-visible + .promise-stamp > .promise-stamp__mark {
+  border-radius: 50%;
+  outline: 2px solid var(--color-gold);
+  outline-offset: 2px;
+}
+
+/* 팡 카드 설명 한 줄 + "확인" 금색 버튼 (v3.6): 글자와 같이 150ms 뒤 나타난다. 버튼으로만 닫힌다 */
+.burst-caption {
+  margin-top: 8px;
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--color-muted);
+  word-break: keep-all;
+}
+.burst-ok {
+  width: 62vw;
+  max-width: 320px;
+  margin-top: 20px;
+  animation: saved-in 300ms ease-out 450ms both;
 }

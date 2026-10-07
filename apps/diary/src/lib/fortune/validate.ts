@@ -1,8 +1,8 @@
 // 3단계 — 출력 검사기. "brief에 없는 것은 글에 나올 수 없다"를 기계로 확인한다. 사유가 하나라도 있으면 그 글은 쓰지 않는다(1회 재작성 → 템플릿).
-// 검사 항목: 금지어 · 전문용어 · 한자 · 이모지 · 숫자 날조 · 어미(~어요) · 명령조 · 기간 약속 · 문장 수 · 영역 일치 · 길이 상한 · 내 숫자 문장 · 구조 서술(v4.1)
+// 검사 항목: 금지어 · 전문용어 · 한자 · 이모지 · 숫자 날조 · 어미(~어요) · 명령조 · 기간 약속 · 문장 수 · 영역 일치 · 길이 상한 · 내 숫자 문장 · 구조 서술(v4.1) · 맥락 없는 운 언급(v4.4)
 //           · 점수 숫자(v4.2: "6.3점", "N점 만점") · 영역 period 일치 · 영역 줄이 본문 첫 문장과 60% 이상 겹침(v4.2). "이달엔/올해는" 접두는 모델 지시일 뿐 검사하지 않는다(템플릿 줄에는 접두가 없다).
 import type { FortuneBrief } from "./brief";
-import { NUMBER_RE } from "./brief";
+import { hasContextFact, NUMBER_RE } from "./brief";
 import type { AreaName, AreaPeriod } from "./types";
 
 /** 모델이 돌려주는 JSON */
@@ -36,6 +36,8 @@ const CERTAIN_RE = /(반드시|틀림없이|꼭\s*(이루어|성공|잘\s*될)|�
 export const STRUCTURE_WORDS = ["글자", "짝이 되", "짝이 맞", "부딪히", "맞서", "한편이", "위아래", "윗글", "아랫글"] as const;
 /** v4.2: 점수는 화면에 있으니 글에 쓰지 않는다. "N점 만점" 꼴은 숫자와 상관없이 탈락 */
 const SCORE_PHRASE_RE = /점\s*만점|만점에/;
+/** v4.4: 올해·이달·10년 단위 운 언급. brief.facts에 맥락 문장이 없는 날 headline·body·do·dont에 나오면 탈락 (areas의 "이달엔/올해는" 줄은 예외) */
+export const CONTEXT_MENTION_RE = /(올해|이달|이번 달|10년 단위)\s*(의\s*)?운|10년\s*단위/;
 /** v4.2: 영역 줄이 본문 첫 문장을 되풀이하면 탈락 — 토큰(띄어쓰기 단위, 문장부호 제거) 겹침 비율 */
 export const AREA_OVERLAP_MAX = 0.6;
 const tokensOf = (s: string): string[] => s.replace(/[.,!?'"()]/g, " ").split(/\s+/).map((t) => t.trim()).filter((t) => t.length >= 2);
@@ -101,6 +103,10 @@ export function validateFortuneText(t: ModelText | null | undefined, b: FortuneB
   // 단정 · 기간 약속 · 명령조
   if (PROMISE_RE.test(everything)) add("기간 약속 (\"N일 더 쓰면\" 꼴)");
   if (CERTAIN_RE.test(everything)) add("길흉 단정 표현");
+
+  // v4.4: 맥락 문장이 없는 날에 올해·이달·10년 단위 운을 말하면 탈락 (영역 줄은 제외)
+  const ownProse = [t.headline, t.body, t.do, t.dont].join(" ");
+  if (!hasContextFact(b.facts ?? []) && CONTEXT_MENTION_RE.test(ownProse)) add("오늘만: facts에 없는 올해·이달·10년 단위 운을 말함");
 
   // 어미: 본문·영역 줄·하면/피해요의 모든 문장이 "~요"로 끝나야 하고, 명령조·반말 어미는 하나도 없어야 한다
   const sentences = [...splitSentences(t.body), ...areaLines.flatMap(splitSentences), ...splitSentences(t.do), ...splitSentences(t.dont)];

@@ -24,7 +24,7 @@ interface Props {
   /** 지난 도장들: 최근 7개 기록의 행복도 (오늘 제외, 최신순). 카드 아래 가장자리에 작은 인주 점으로 — 시각은 디자이너 */
   recentHappiness?: number[];
   /**
-   * "save"(기본) = 저장 완료 팡: 오버레이 + 도장 + 글자 + 1.5초 뒤 자동으로 걷힘.
+   * "save"(기본) = 저장 완료 팡: 오버레이 + 도장 + 글자 + "확인" 버튼으로 걷힘 (v3.6, 자동 닫힘 없음).
    * "reveal" = /welcome 카드 등장: 오버레이·도장·글자·자동 닫힘 없이 카드 팡만 제자리에서 (글·버튼은 부모가 둔다).
    */
   mode?: "save" | "reveal";
@@ -70,8 +70,8 @@ function Bit({ kind, box, size, dx, dy, rot }: { kind: "paper" | "gold"; box: [n
 
 /**
  * 저장 완료 보상 "팡" (톤 v3.1 — 색종이 금지의 유일한 예외).
- * 한지 반투명 오버레이 → 오늘 일진 캐릭터를 char-frame 틀에 넣은 카드(v3.5)가 팡 → 뒤에서 한지 조각 8·금빛 가루 8이 흩어진다 → 1.5초 뒤 걷힌다.
- * 탭하면 바로 닫힌다. reduced-motion이면 팡·흩날림 없이 카드만 보이고 1초 뒤 걷힌다.
+ * 한지 반투명 오버레이 → 오늘 일진 캐릭터를 char-frame 틀에 넣은 카드(v3.5)가 팡 → 뒤에서 한지 조각 8·금빛 가루 8이 1회 흩어진다.
+ * v3.6: 자동으로 닫히지 않고 "확인" 금색 버튼으로만 닫힌다(바깥 탭 무시). 설명 한 줄(행복도·간지·약속 지킴). reduced-motion이면 팡·흩날림 없이 카드만.
  * 오늘 화면(/?saved=날짜)에서 한 번만 뜬다. 저장 자체는 서버 액션이 끝낸 뒤라 성공이 보장된다.
  */
 export function SaveBurst({ ganjiKo, ganjiHanja, cardSrc, characterSrc, happiness, signature = "", kept = false, recentHappiness = [], mode = "save" }: Props) {
@@ -94,21 +94,27 @@ export function SaveBurst({ ganjiKo, ganjiHanja, cardSrc, characterSrc, happines
       /* 저장소를 못 써도 한 번은 보여 준다 */
     }
     opened.current = true;
-    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     setPhase("open");
     try {
       navigator.vibrate?.(30);
     } catch {
       /* 진동 미지원 */
     }
-    const t = window.setTimeout(() => setPhase("closing"), reduced ? 1000 : 1500);
-    return () => window.clearTimeout(t);
+    // v3.6: 자동으로 닫히지 않는다 — "확인" 버튼으로만. reduced-motion도 같다
   }, [signature, reveal]);
 
   useEffect(() => {
     if (phase !== "closing") return;
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const t = window.setTimeout(() => setPhase("hidden"), reduced ? 0 : 200);
+    // 닫히면 /? 의 saved 꼬리를 떼고 오늘 화면만 남긴다 (톤 v3.6 "닫히면 /")
+    const t = window.setTimeout(() => {
+      setPhase("hidden");
+      try {
+        if (window.location.search) window.history.replaceState(null, "", "/");
+      } catch {
+        /* 주소를 못 고쳐도 화면은 닫힌다 */
+      }
+    }, reduced ? 0 : 200);
     return () => window.clearTimeout(t);
   }, [phase]);
 
@@ -163,18 +169,27 @@ export function SaveBurst({ ganjiKo, ganjiHanja, cardSrc, characterSrc, happines
   // reveal (/welcome): 오버레이 없이 제자리에서 카드만 팡. 닫히지 않는다
   if (reveal) return cardBlock;
 
+  // 바깥 탭은 무시한다 — "확인" 버튼으로만 닫힌다 (v3.6). 이 오버레이 안의 금색 면 버튼이 이 화면의 하나
   return createPortal(
     <div
-      role="status"
-      aria-live="polite"
+      role="dialog"
+      aria-modal="true"
+      aria-label="저장 완료"
       data-closing={phase === "closing" ? "" : undefined}
-      onClick={() => setPhase("closing")}
-      className="burst-overlay fixed inset-0 z-50 flex cursor-pointer flex-col items-center justify-center bg-paper/85"
+      className="burst-overlay fixed inset-0 z-50 flex flex-col items-center justify-center bg-paper/85 px-6"
     >
       {cardBlock}
       <p className="burst-text mt-6 text-center">
         <span className="block font-serif text-[22px] leading-snug text-ink">{ganjiKo}일 카드에 오늘 도장을 찍었어요</span>
+        {happiness !== undefined && (
+          <span className="burst-caption block">
+            오늘 행복도 {happiness}점을 {ganjiKo}일 카드에 찍었어요{kept && " · 약속도 지켰어요"}
+          </span>
+        )}
       </p>
+      <button type="button" onClick={() => setPhase("closing")} className="burst-ok gold-plate flex h-14 items-center justify-center rounded-xl text-[17px] font-bold text-gold-ink">
+        확인
+      </button>
     </div>,
     document.body,
   );

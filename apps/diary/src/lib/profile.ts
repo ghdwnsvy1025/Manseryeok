@@ -139,7 +139,7 @@ export function computeProfile(input: ProfileInput): Validation<ComputedProfile>
         calendarType: input.calendar,
         isLeapMonth: input.isLeapMonth,
         timezone: "Asia/Seoul",
-        location: { name: city.name, longitude: city.longitude },
+        location: { name: city.coreName, longitude: city.longitude },
         dayChangeRule: "midnight",
         timeCorrection: "trueSolarTime",
       },

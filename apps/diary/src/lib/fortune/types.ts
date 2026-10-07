@@ -99,8 +99,16 @@ export interface CoreFortune {
   };
   /** 영역 신호. 순서는 오늘(≤2) → 이달(1) → 올해(1). 코어 luckAreas(일운·월운·세운) */
   areas: { period: AreaPeriod; area: AreaName; signal: AreaSignal; why: string }[];
-  /** 글 재료. 사용자용 낱말로 바꾼 사실 문장 6~10개 (금지어 없음) */
+  /**
+   * 글 재료. 사용자용 낱말로 바꾼 오늘의 사실 문장 3~10개 (금지어 없음).
+   * v4.4: 대운·세운·월운 문장은 기본적으로 없고, 바뀌는 날(월운 = 절기 입절일, 세운 = 입춘, 대운 = 교체일)과 그 운이 오늘과 충인 날에만 한 문장씩 들어간다
+   */
   facts: string[];
+  /**
+   * v4.4: "왜 이런 운세" 근거 표시용 맥락 문장 — 대운·세운·월운 판정과 대운 플래그 문장이 날과 상관없이 항상 들어 있다.
+   * 화면(FortuneCard)은 facts 뒤에 이것을 이어 보여 준다. 글(brief)에는 가지 않는다
+   */
+  contextFacts: string[];
   /** luckKeywords (KW-03) */
   keywords: { positive: string[]; negative: string[] };
   /** "시간 모름", "입춘 전" 등 */

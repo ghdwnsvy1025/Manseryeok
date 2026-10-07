@@ -2,6 +2,7 @@
 // 사주 코어 content/src/brief.ts의 축소판: 사실 + 낱말 + 금지 사항 + 분량 규칙. 설계: docs/FORTUNE_V4.md "3단계 — 글".
 import type { TenGod } from "@saju/engine";
 import { AREA_WORD } from "./core";
+import { solarTermOf } from "./solarTerms";
 import { BANNED, batchim } from "./text";
 import type { AreaName, AreaPeriod, AreaSignal, CoreFortune, PersonalAdjustment } from "./types";
 
@@ -46,8 +47,13 @@ export interface BriefInput {
   band: "좋음" | "무난" | "주의";
 }
 
+/** v4.4: facts 안의 맥락 문장(올해·이달·10년 단위 운). 이것이 있을 때만 글이 그 운을 말할 수 있다 — validate가 같은 정규식으로 본다 */
+export const CONTEXT_FACT_RE = /^(올해 운|이달 운|지금 10년 단위 운)/;
+export const hasContextFact = (facts: readonly string[]): boolean => facts.some((f) => CONTEXT_FACT_RE.test(f));
+
 export interface FortuneBrief {
-  today: { date: string; weekday: string; ganji: string };
+  /** v4.4: solarTerm = 그날이 속한 24절기와 며칠째 ("한로 사흘째"). 요일과 함께 장면 재료 — 기록 없는 사람도 날마다 다르게 */
+  today: { date: string; weekday: string; ganji: string; solarTerm: string };
   score: { value: number; band: string; word: string };
   /** 사용자용 낱말로 바뀐 사실 문장 (한자·십신 없음) */
   facts: string[];
@@ -70,6 +76,10 @@ export interface FortuneBrief {
     doDont: string;
     numbers: string;
     mine: string;
+    /** v4.4: 요일·절기 장면 규칙 */
+    scene: string;
+    /** v4.4: 올해·이달·10년 단위 운은 facts에 그 문장이 있을 때만 */
+    context: string;
   };
 }
 
@@ -100,16 +110,19 @@ export function buildBrief(input: BriefInput): FortuneBrief {
   }
 
   const [y, m, d] = input.date.split("-").map(Number) as [number, number, number];
+  const solarTerm = solarTermOf(input.date).label;
   const allowedNumbers = extractNumbers([
     ...facts,
     ...caveats,
     ...areas.map((a) => a.why),
     ...(mine ? [mine] : []),
+    solarTerm,
     String(y), String(m), String(d),
   ]);
+  const withContext = hasContextFact(facts);
 
   return {
-    today: { date: input.date, weekday: input.weekday, ganji: `${today.ko}일` },
+    today: { date: input.date, weekday: input.weekday, ganji: `${today.ko}일`, solarTerm },
     score: { value: input.score10, band: input.band, word: BAND_WORD[input.band] },
     facts,
     areas,
@@ -122,7 +135,7 @@ export function buildBrief(input: BriefInput): FortuneBrief {
     jargon: JARGON,
     rules: {
       headline: "12자 안팎, 한 구절. 오늘 하루의 느낌을 사실 하나와 묶어서",
-      body: "4~6문장. 사실들을 나열하지 말고 하나의 하루 흐름으로 잇기. 아침·점심·저녁 중 한 장면을 구체적으로 하나 넣기. 같은 문형 반복 금지. 같은 성격이 두 번 온 날은 \"겹친다\" 대신 \"아주 강하다/세다\"로",
+      body: "4~6문장. 사실들을 나열하지 말고 하나의 하루 흐름으로 잇기. 오늘의 성격·장면·내 기록으로만 쓰기. 아침·점심·저녁 중 한 장면을 구체적으로 하나 넣기. 같은 문형 반복 금지. 같은 성격이 두 번 온 날은 \"겹친다\" 대신 \"아주 강하다/세다\"로",
       areas: areas.length
         ? `areas 배열은 ${areas.length}개, 순서·period·area 이름은 입력과 똑같이. 각 line은 1문장. period가 "이달"이면 "이달엔", "올해"면 "올해는"으로 시작하는 1문장. line은 본문 첫 문장을 되풀이하지 않기`
         : "areas는 빈 배열 []",
@@ -131,6 +144,10 @@ export function buildBrief(input: BriefInput): FortuneBrief {
       mine: mine
         ? `본문 어딘가에 내 숫자 한 문장을 꼭 넣기 (재료: "${mine}"). 숫자는 그대로 쓰기`
         : "기록이 없으니 내 기록 이야기를 하지 않기 (기록했다는 말, 평균, 횟수 모두 금지)",
+      scene: `오늘은 ${input.weekday}, ${solarTerm}. 요일과 절기는 장면에 자연스럽게 한 번씩만 쓸 수 있고 되풀이하지 않기. "특별한·남다른·다른 날과 달리·차별" 같은 말은 금지`,
+      context: withContext
+        ? "facts에 올해·이달·10년 단위 운 문장이 있는 날이니 그 문장만 한 번 생활어로 풀어 넣기 (없는 운은 말하지 않기)"
+        : "facts에 올해·이달·10년 단위 운 문장이 없으니 올해 운·이달 운·10년 단위 운을 말하지 않기 (areas의 이달·올해 줄은 예외)",
     },
   };
 }
