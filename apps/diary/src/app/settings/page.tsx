@@ -4,7 +4,7 @@ import { ClearAllButton } from "@/components/ClearAllButton";
 import { InstallHint } from "@/components/InstallHint";
 import { LinkGoogleButton } from "@/components/LinkGoogleButton";
 import { NotificationSettings } from "@/components/NotificationSettings";
-import { RetryButton } from "@/components/RetryButton";
+import { Booting } from "@/components/Booting";
 import { getNotificationSettings, getSajuProfile } from "@/lib/db";
 import { hourOf } from "@/lib/remind";
 import { getUser } from "@/lib/supabase/server";
@@ -20,20 +20,8 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
   const { error } = await searchParams;
   const { supabase, user } = await getUser();
 
-  if (!user) {
-    return (
-      <main className="flex flex-col gap-5">
-        <header>
-          <h1 className="font-serif text-[26px] leading-snug">설정</h1>
-        </header>
-        <section className={`${card} p-5`} aria-busy="true" aria-live="polite">
-          <span aria-hidden className="brush-loading" />
-          <p className="mt-3 text-[15px] text-muted">준비하고 있어요</p>
-          <RetryButton className="mt-3" />
-        </section>
-      </main>
-    );
-  }
+  // 세션이 아직 없는 첫 요청: 뼈대만 그린다 (B2)
+  if (!user) return <Booting title="설정" cards={3} />;
 
   const anonymous = Boolean(user.is_anonymous);
   const [profile, notif] = await Promise.all([getSajuProfile(supabase, user.id), getNotificationSettings(supabase, user.id)]);

@@ -72,9 +72,10 @@ describe("사주 프로필", () => {
     const ok = validateProfile({ ...form, calendar: "lunar", birthMonth: "2", birthDay: "30" });
     expect(ok.ok).toBe(true);
     if (ok.ok) expect(computeProfile(ok.value).ok).toBe(true);
+    // B3: 없는 음력 날은 엔진까지 가지 않고 validateProfile이 먼저 잡는다
     const bad = validateProfile({ ...form, calendar: "lunar", birthMonth: "3", birthDay: "30" });
-    expect(bad.ok).toBe(true);
-    if (bad.ok) expect(computeProfile(bad.value).ok).toBe(false);
+    expect(bad.ok).toBe(false);
+    if (!bad.ok) expect(bad.field).toBe("date");
   });
 
   test("성별과 시각 검증", () => {

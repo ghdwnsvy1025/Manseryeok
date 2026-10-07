@@ -7,10 +7,12 @@ import { ensureUserRow, getSajuProfile, markLinkPrompted, saveEntry, saveFortune
 import { isAllowedRemindHour } from "@/lib/remind";
 import { validateEntry } from "@/lib/entry";
 import { dayGanji } from "@/lib/ganji";
-import { computeProfile, validateProfile } from "@/lib/profile";
+import { COMPUTE_ERROR, computeProfile, validateProfile, type ProfileField } from "@/lib/profile";
 
 export interface FormState {
   error: string | null;
+  /** 생년월일 폼: 어느 입력 묶음에서 걸렸는지 (B3). 없으면 폼 아래 한 줄로만 보인다 */
+  field?: ProfileField;
 }
 
 /** 익명 세션이 아직 안 만들어졌을 때 (첫 요청 직후). AnonBoot가 곧 세션을 만들고 화면을 새로 그린다 */
@@ -68,10 +70,14 @@ export async function saveProfileAction(_prev: FormState, form: FormData): Promi
   // 익명 사용자는 이름을 묻지 않는다 → "손님"
   const typedName = typeof raw.name === "string" ? raw.name.trim() : "";
   const checked = validateProfile({ ...raw, name: typedName || "손님" });
-  if (!checked.ok) return { error: checked.error };
+  if (!checked.ok) return { error: checked.error, field: checked.field };
 
   const computed = computeProfile(checked.value);
-  if (!computed.ok) return { error: computed.error };
+  if (!computed.ok) {
+    // 엔진 문구는 그대로 내보내지 않는다 (B3). validateProfile이 먼저 거르므로 여기 오는 일은 드물다
+    console.error("사주 계산 실패", computed.error);
+    return { error: COMPUTE_ERROR, field: "date" };
+  }
 
   // 처음 만드는 프로필인지 — 그때만 /welcome(내 카드 공개, v3.3). 고치기는 next로 돌아간다
   let isFirst = false;

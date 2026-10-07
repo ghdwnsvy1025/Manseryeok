@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { BRANCH_META, STEM_META, getTenGod, type Element, type StemHanja } from "@saju/engine";
 import { getUser } from "@/lib/supabase/server";
 import { GanjiGrid } from "@/components/GanjiGrid";
-import { RetryButton } from "@/components/RetryButton";
+import { Booting } from "@/components/Booting";
 import { ShareCard } from "@/components/ShareCard";
 import { shareCardText, shareMessage } from "@/lib/share";
 import { characterOf } from "@/lib/character";
@@ -72,20 +72,8 @@ function PillarCell({ label, info }: { label: string; info: PillarInfo | null })
 export default async function MePage({ searchParams }: { searchParams: Promise<{ cell?: string }> }) {
   const { cell } = await searchParams;
   const { supabase, user } = await getUser();
-  // 세션이 아직 없는 첫 요청: 리디렉트하지 않고 준비 중을 그린다. AnonBoot가 곧 새로 그린다 (docs/ANON_START.md 1절)
-  if (!user) {
-    return (
-      <main className="flex flex-col gap-6">
-        <header>
-          <h1 className="mt-1 font-serif text-[26px]">나</h1>
-        </header>
-        <section className="card-frame card-paper flex flex-col items-start gap-3 p-5 text-muted" aria-busy="true">
-          준비하고 있어요…
-          <RetryButton />
-        </section>
-      </main>
-    );
-  }
+  // 세션이 아직 없는 첫 요청: 리디렉트하지 않고 뼈대만 그린다. AnonBoot가 곧 새로 그린다 (docs/ANON_START.md 1절, B2)
+  if (!user) return <Booting title="나" cards={3} />;
   const [profile, entries, total, all] = await Promise.all([
     getSajuProfile(supabase, user.id),
     listEntries(supabase, user.id, 30),

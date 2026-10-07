@@ -3,6 +3,7 @@
 import { startTransition, useActionState, useState, type FormEvent } from "react";
 import { saveProfileAction, type FormState } from "@/app/actions";
 import { CITIES } from "@/lib/cities";
+import type { ProfileField } from "@/lib/profile";
 
 export interface ProfileFormValues {
   name: string;
@@ -38,7 +39,7 @@ function SegRadio<T extends string>({
   const on = current === value;
   return (
     <label className="contents">
-      <input type="radio" name={name} value={value} checked={on} onChange={() => onChange(value)} className="peer sr-only" />
+      <input type="radio" name={name} value={value} checked={on} onChange={() => onChange(value)} aria-label={label} className="peer sr-only" />
       <span className="seg__cell">{label}</span>
     </label>
   );
@@ -67,8 +68,17 @@ export function ProfileForm({ next, initial, serverAction = saveProfileAction, a
   const [calendar, setCalendar] = useState<"solar" | "lunar">(initial?.calendar ?? "solar");
   const [leap, setLeap] = useState(initial?.isLeapMonth ?? false);
   const [timeUnknown, setTimeUnknown] = useState(initial?.timeUnknown ?? false);
-  // 서버 오류는 대부분 날짜·시각 검증이라 그 칸들에 먹색 테두리를 입힌다
-  const invalid = state.error ? true : undefined;
+  // 서버 검증이 걸린 묶음(B3). 그 묶음만 오류 표시 — 날짜는 연·월·일 칸, 시각은 시·분 칸, 세그먼트는 먹색 1.5px 테두리
+  const field: ProfileField | undefined = state.error ? state.field : undefined;
+  const invalidAt = (f: ProfileField) => (field === f ? true : undefined);
+  const segClass = (f: ProfileField) => (field === f ? "seg seg--invalid" : "seg");
+  /** 그 묶음 바로 아래 danger 한 줄 */
+  const errorAt = (f: ProfileField) =>
+    field === f ? (
+      <p role="alert" className="text-[15px] text-danger">
+        {state.error}
+      </p>
+    ) : null;
 
   // form action 대신 onSubmit으로 보낸다. React 19는 action 폼을 제출 뒤 비우는데,
   // 서버에서 오류가 났을 때 적은 내용이 사라지면 안 된다.
@@ -87,7 +97,8 @@ export function ProfileForm({ next, initial, serverAction = saveProfileAction, a
           <label htmlFor="name" className={groupLabel}>
             이름
           </label>
-          <input id="name" name="name" defaultValue={initial?.name} maxLength={40} autoComplete="nickname" placeholder="불릴 이름" className="field field--text" required />
+          <input id="name" name="name" defaultValue={initial?.name} maxLength={40} autoComplete="nickname" placeholder="불릴 이름" className="field field--text" aria-invalid={invalidAt("name")} required />
+          {errorAt("name")}
         </div>
       )}
 
@@ -96,7 +107,7 @@ export function ProfileForm({ next, initial, serverAction = saveProfileAction, a
         <span className={groupLabel} id="calendar-label">
           달력
         </span>
-        <div className="seg" role="radiogroup" aria-labelledby="calendar-label">
+        <div className={segClass("calendar")} role="radiogroup" aria-labelledby="calendar-label">
           <SegRadio name="calendar" value="solar" current={calendar} label="양력" onChange={setCalendar} />
           <SegRadio name="calendar" value="lunar" current={calendar} label="음력" onChange={setCalendar} />
         </div>
@@ -106,16 +117,18 @@ export function ProfileForm({ next, initial, serverAction = saveProfileAction, a
             윤달이에요
           </label>
         )}
+        {errorAt("calendar")}
       </div>
 
       {/* 연 · 월 · 일 */}
       <div className="flex flex-col gap-2">
         <span className={groupLabel}>태어난 날 {calendar === "lunar" ? "(음력 그대로)" : ""}</span>
         <div className="grid grid-cols-[2fr_1fr_1fr] gap-2">
-          <input name="birthYear" inputMode="numeric" maxLength={4} placeholder="1995" defaultValue={initial?.birthYear} aria-label="태어난 해" aria-invalid={invalid} className="field" required />
-          <input name="birthMonth" inputMode="numeric" maxLength={2} placeholder="월" defaultValue={initial?.birthMonth} aria-label="태어난 달" aria-invalid={invalid} className="field" required />
-          <input name="birthDay" inputMode="numeric" maxLength={2} placeholder="일" defaultValue={initial?.birthDay} aria-label="태어난 날" aria-invalid={invalid} className="field" required />
+          <input name="birthYear" inputMode="numeric" maxLength={4} placeholder="1995" defaultValue={initial?.birthYear} aria-label="태어난 해" aria-invalid={invalidAt("date")} className="field" required />
+          <input name="birthMonth" inputMode="numeric" maxLength={2} placeholder="월" defaultValue={initial?.birthMonth} aria-label="태어난 달" aria-invalid={invalidAt("date")} className="field" required />
+          <input name="birthDay" inputMode="numeric" maxLength={2} placeholder="일" defaultValue={initial?.birthDay} aria-label="태어난 날" aria-invalid={invalidAt("date")} className="field" required />
         </div>
+        {errorAt("date")}
       </div>
 
       {/* 태어난 시각 — 세그먼트 "알아요 | 몰라요"(체크박스 name=timeUnknown 유지) + 시 · 분 */}
@@ -134,10 +147,11 @@ export function ProfileForm({ next, initial, serverAction = saveProfileAction, a
         </div>
         {!timeUnknown && (
           <div className="grid grid-cols-2 gap-2">
-            <input name="birthHour" inputMode="numeric" maxLength={2} placeholder="시 (0~23)" defaultValue={initial?.birthHour} aria-label="태어난 시" aria-invalid={invalid} className="field" />
-            <input name="birthMinute" inputMode="numeric" maxLength={2} placeholder="분" defaultValue={initial?.birthMinute} aria-label="태어난 분" aria-invalid={invalid} className="field" />
+            <input name="birthHour" inputMode="numeric" maxLength={2} placeholder="시 (0~23)" defaultValue={initial?.birthHour} aria-label="태어난 시" aria-invalid={invalidAt("time")} className="field" />
+            <input name="birthMinute" inputMode="numeric" maxLength={2} placeholder="분" defaultValue={initial?.birthMinute} aria-label="태어난 분" aria-invalid={invalidAt("time")} className="field" />
           </div>
         )}
+        {errorAt("time")}
       </div>
 
       {/* 태어난 곳 — 같은 입력칸 모양의 select */}
@@ -146,7 +160,7 @@ export function ProfileForm({ next, initial, serverAction = saveProfileAction, a
           태어난 곳
         </label>
         <span className="relative block">
-          <select id="city" name="city" defaultValue={initial?.city ?? "seoul"} className="field field--select">
+          <select id="city" name="city" defaultValue={initial?.city ?? "seoul"} aria-invalid={invalidAt("city")} className="field field--select">
             {CITIES.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}
@@ -157,6 +171,7 @@ export function ProfileForm({ next, initial, serverAction = saveProfileAction, a
             ▾
           </span>
         </span>
+        {errorAt("city")}
       </div>
 
       {/* 성별 */}
@@ -164,13 +179,15 @@ export function ProfileForm({ next, initial, serverAction = saveProfileAction, a
         <span className={groupLabel} id="gender-label">
           성별
         </span>
-        <div className="seg" role="radiogroup" aria-labelledby="gender-label">
+        <div className={segClass("gender")} role="radiogroup" aria-labelledby="gender-label">
           <SegRadio name="gender" value="female" current={gender} label="여성" onChange={setGender} />
           <SegRadio name="gender" value="male" current={gender} label="남성" onChange={setGender} />
         </div>
+        {errorAt("gender")}
       </div>
 
-      {state.error && (
+      {/* 묶음을 모르는 오류(저장 실패·준비 중)는 버튼 위 한 줄 */}
+      {state.error && !field && (
         <p role="alert" className="-mt-2 text-[15px] text-danger">
           {state.error}
         </p>

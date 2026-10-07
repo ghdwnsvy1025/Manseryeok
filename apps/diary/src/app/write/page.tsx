@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { RetryButton } from "@/components/RetryButton";
+import { Booting } from "@/components/Booting";
 import { getUser } from "@/lib/supabase/server";
 import { getEntry, getSajuProfile, readCachedFortune } from "@/lib/db";
 import { dayGanji } from "@/lib/ganji";
@@ -17,22 +17,8 @@ export default async function WritePage({ searchParams }: { searchParams: Promis
   const dateLabel = formatKoreanDate(date).replace(/\s*\S+요일$/, "");
 
   const { supabase, user } = await getUser();
-  // 세션이 아직 없는 첫 요청: 리디렉트하지 않고 준비 중을 그린다. AnonBoot가 곧 새로 그린다 (docs/ANON_START.md 1절)
-  if (!user) {
-    return (
-      <main>
-        <header className="mb-5">
-          <h1 className="mt-1 font-serif text-[26px] leading-snug">
-            {dateLabel} <span className="text-ganji">{ganji.ko}일</span>, {date === today ? "오늘" : "그날"} 하루
-          </h1>
-        </header>
-        <section className="card-frame card-paper flex flex-col items-start gap-3 p-5 text-muted" aria-busy="true">
-          준비하고 있어요…
-          <RetryButton />
-        </section>
-      </main>
-    );
-  }
+  // 세션이 아직 없는 첫 요청: 리디렉트하지 않고 뼈대만 그린다. AnonBoot가 곧 새로 그린다 (docs/ANON_START.md 1절, B2)
+  if (!user) return <Booting title={`${dateLabel} ${ganji.ko}일, ${date === today ? "오늘" : "그날"} 하루`} cards={1} />;
 
   // 운세 do 문장은 캐시에서만 읽는다 — 쓰기 화면이 운세 계산·모델 호출을 유발하면 안 된다. 캐시가 없으면 약속 블록 생략
   const [existing, profile, cachedFortune] = await Promise.all([

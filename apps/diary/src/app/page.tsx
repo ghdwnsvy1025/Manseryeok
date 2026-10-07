@@ -1,9 +1,10 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { Suspense } from "react";
+import { Booting } from "@/components/Booting";
 import { FortuneCard } from "@/components/FortuneCard";
 import { FortuneLoading } from "@/components/FortuneLoading";
 import { LinkPromptCard } from "@/components/LinkPromptCard";
-import { RetryButton } from "@/components/RetryButton";
 import { SaveBurst } from "@/components/SaveBurst";
 import { TodayEntryCard } from "@/components/TodayEntryCard";
 import { createClient, getUser } from "@/lib/supabase/server";
@@ -14,7 +15,6 @@ import type { EntryLike } from "@/lib/fortune/personal";
 import { dayGanji } from "@/lib/ganji";
 import { shouldShowLinkPrompt } from "@/lib/linkPrompt";
 import { addDays, formatKoreanDate, hourKST, todayKST } from "@/lib/time";
-import { ProfileForm } from "./onboarding/ProfileForm";
 
 export const dynamic = "force-dynamic";
 
@@ -79,67 +79,42 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
   const night = hour >= 18 || hour < 5;
 
   const { supabase, user } = await getUser();
-  // 세션이 아직 없는 첫 요청: AnonBoot가 곧 익명 세션을 만들고 새로 그린다. 리디렉트하지 않는다
-  const [profile, entry, entries, linkState, entryCount, recent] = user
-    ? await Promise.all([
-        getSajuProfile(supabase, user.id),
-        getEntry(supabase, user.id, today),
-        listEntriesForStats(supabase, user.id),
-        getLinkPromptState(supabase, user.id),
-        countEntries(supabase, user.id),
-        listEntries(supabase, user.id, 8),
-      ])
-    : [null, null, [], { promptedAt: null, promptCount: 0 }, 0, []];
+  // 세션이 아직 없는 첫 요청: 뼈대만 그리고 AnonBoot를 기다린다. 리디렉트하지 않는다 (B2)
+  if (!user) return <Booting title={formatKoreanDate(today)} cards={2} />;
 
-  // 내 캐릭터 = 일주 (톤 v3.3). 프로필이 없으면 아직 모른다
-  const myCharacter = profile ? characterOf(profile.pillars) : null;
+  const [profile, entry, entries, linkState, entryCount, recent] = await Promise.all([
+    getSajuProfile(supabase, user.id),
+    getEntry(supabase, user.id, today),
+    listEntriesForStats(supabase, user.id),
+    getLinkPromptState(supabase, user.id),
+    countEntries(supabase, user.id),
+    listEntries(supabase, user.id, 8),
+  ]);
+  // 생년월일이 없으면 먼저 받는다 — /write·/me와 같은 규칙 (B1). 오늘 화면 안에서 폼을 그리지 않는다
+  if (!profile) redirect("/onboarding?next=/");
+
+  // 내 캐릭터 = 일주 (톤 v3.3)
+  const myCharacter = characterOf(profile.pillars);
   // 팡 카드 아래 지난 도장들: 최근 7개 기록의 행복도 (오늘 제외, 최신순)
   const recentHappiness = recent.filter((e) => e.entry_date !== today).slice(0, 7).map((e) => e.happiness);
 
   const showLinkPrompt =
-    Boolean(user && entry) &&
-    shouldShowLinkPrompt({ isAnonymous: Boolean(user?.is_anonymous), entryCount: entries.length, promptCount: linkState.promptCount });
+    Boolean(entry) && shouldShowLinkPrompt({ isAnonymous: Boolean(user.is_anonymous), entryCount: entries.length, promptCount: linkState.promptCount });
 
-  let fortuneCard: React.ReactNode;
-  if (!user) {
-    fortuneCard = (
-      <section className="fortune-loading card-gold card-paper flex flex-col justify-center p-5" aria-busy="true" aria-live="polite">
-        <h2 className="text-[15px] text-muted">오늘의 운세</h2>
-        <span aria-hidden className="brush-loading mt-3" />
-        <p className="mt-3 text-[15px] text-muted">준비하고 있어요</p>
-        <RetryButton className="mt-3 self-start" />
-      </section>
-    );
-  } else if (profile) {
-    fortuneCard = (
-      <Suspense fallback={<FortuneLoading character={myCharacter?.characterSrc} />}>
-        <FortuneSection userId={user.id} profile={profile} entries={entries} today={today} ganjiKo={ganji.ko} defaultOpen={!night || entries.length === 0} />
-      </Suspense>
-    );
-  } else {
-    // 생년월일을 아직 안 넣었다 — 오늘 화면에서 바로 받는다. 저장 액션은 운세를 기다리지 않고 돌아오고, 운세는 위의 Suspense가 맡는다
-    fortuneCard = (
-      <section className={card}>
-        <h2 className="text-lg font-bold">오늘 운세, 생년월일만 넣으면 바로 보여요</h2>
-        <p className="mt-2 mb-6 text-[15px] text-muted">내 사주로 오늘 운세를 계산해요. 한 번만 넣으면 돼요.</p>
-        <ProfileForm next="/" initial={null} askName={false} submitLabel="내 카드 보기" />
-      </section>
-    );
-  }
+  const fortuneCard = (
+    <Suspense fallback={<FortuneLoading character={myCharacter.characterSrc} />}>
+      <FortuneSection userId={user.id} profile={profile} entries={entries} today={today} ganjiKo={ganji.ko} defaultOpen={!night || entries.length === 0} />
+    </Suspense>
+  );
 
-  const writeCard = !user ? (
-    <section className={card} aria-busy="true">
-      <h2 className="text-[15px] text-muted">오늘의 기록</h2>
-      <p className="mt-2 text-[15px] text-muted">준비하고 있어요</p>
-    </section>
-  ) : entry ? (
+  const writeCard = entry ? (
     <TodayEntryCard entry={entry} today={today} tomorrowKo={tomorrow.ko} justSaved={saved === today} />
   ) : (
     <section className={card}>
       <h2 className="font-serif text-[24px] leading-snug">오늘 하루, 어땠어요?</h2>
       <p className="mt-2 text-[15px] text-muted">행복도 하나만 골라도 돼요. 30초면 끝나요.</p>
-      {/* 금색 면 버튼은 화면에 하나. 생년월일 폼이 보일 때는 그 폼의 버튼이 금색이라 여기서는 테두리형 */}
-      <Link href="/write" className={profile ? goldButton : "mt-5 flex h-13 items-center justify-center rounded-xl border border-frame font-bold text-ink"}>
+      {/* 금색 면 버튼은 화면에 하나 — 이것 */}
+      <Link href="/write" className={goldButton}>
         오늘 기록하기
       </Link>
     </section>
@@ -148,7 +123,7 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
   return (
     <main className="flex flex-col gap-5">
       {/* 저장 완료 "팡" — 방금 저장하고 돌아왔을 때 한 번 (톤 v3.1). 카드는 오늘 일진 캐릭터 + char-frame 틀 (05 v3.5) */}
-      {user && entry && saved === today && myCharacter && (
+      {entry && saved === today && (
         <SaveBurst
           ganjiKo={ganji.ko}
           ganjiHanja={ganji.hanja}
@@ -169,22 +144,18 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
             </span>
           </h1>
           {/* 60칸 띠 대신 한 줄 (v3.3): 오늘 순번 · 기록 일수. 누르면 "나"로 */}
-          {user && (
-            <p className="mt-1 text-[14px] text-muted">
-              <Link href="/me">{todayLine(ganji.index, entryCount)}</Link>
-            </p>
-          )}
+          <p className="mt-1 text-[14px] text-muted">
+            <Link href="/me">{todayLine(ganji.index, entryCount)}</Link>
+          </p>
         </div>
-        {/* 이 화면의 유일한 그림 — 내 캐릭터 (일주, v3.3). 프로필 전에는 없다 */}
-        {myCharacter && (
-          <img
-            src={myCharacter.characterSrc}
-            alt={`내 캐릭터 ${myCharacter.ganjiKo} ${myCharacter.animal}`}
-            width={64}
-            height={64}
-            className="h-16 w-16 shrink-0 object-contain"
-          />
-        )}
+        {/* 이 화면의 유일한 그림 — 내 캐릭터 (일주, v3.3) */}
+        <img
+          src={myCharacter.characterSrc}
+          alt={`내 캐릭터 ${myCharacter.ganjiKo} ${myCharacter.animal}`}
+          width={64}
+          height={64}
+          className="h-16 w-16 shrink-0 object-contain"
+        />
       </header>
 
       {/* 순서 고정: 운세 카드가 늘 위, 기록 카드가 아래 (톤 v3) */}

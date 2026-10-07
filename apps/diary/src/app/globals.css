@@ -279,6 +279,11 @@ input:checked + .seg__cell,
   color: var(--color-paper-2);
   background-color: var(--color-ink);
 }
+/* 세그먼트 오류(B3): 입력칸의 aria-invalid와 같은 먹색 1.5px. 아래 danger 한 줄은 마크업(ProfileForm) */
+.seg--invalid {
+  border-color: var(--color-ink);
+  box-shadow: inset 0 0 0 0.5px var(--color-ink);
+}
 input:focus-visible + .seg__cell,
 .seg__cell:focus-visible {
   outline: 2px solid var(--color-gold);
