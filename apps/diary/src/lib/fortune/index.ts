@@ -17,7 +17,7 @@ import { templateInputFromCore, templateText } from "./text";
 import type { FortuneContent } from "./types";
 
 /** 캐시 지문에 들어간다. 올리면 기존 캐시가 전부 무효 */
-export const FORTUNE_VERSION = "v4.2.1";
+export const FORTUNE_VERSION = "v4.3";
 
 export type FortuneOwner = { userId: string; guestKey?: undefined } | { guestKey: string; userId?: undefined };
 

@@ -122,7 +122,7 @@ export function buildBrief(input: BriefInput): FortuneBrief {
     jargon: JARGON,
     rules: {
       headline: "12자 안팎, 한 구절. 오늘 하루의 느낌을 사실 하나와 묶어서",
-      body: "4~6문장. 사실들을 나열하지 말고 하나의 하루 흐름으로 잇기. 아침·점심·저녁 중 한 장면을 구체적으로 하나 넣기. 같은 문형 반복 금지",
+      body: "4~6문장. 사실들을 나열하지 말고 하나의 하루 흐름으로 잇기. 아침·점심·저녁 중 한 장면을 구체적으로 하나 넣기. 같은 문형 반복 금지. 같은 성격이 두 번 온 날은 \"겹친다\" 대신 \"아주 강하다/세다\"로",
       areas: areas.length
         ? `areas 배열은 ${areas.length}개, 순서·period·area 이름은 입력과 똑같이. 각 line은 1문장. period가 "이달"이면 "이달엔", "올해"면 "올해는"으로 시작하는 1문장. line은 본문 첫 문장을 되풀이하지 않기`
         : "areas는 빈 배열 []",

@@ -8,9 +8,10 @@
 //   v4.2 (코어 240c91d, 2026-10-07 동기화): 전왕표(Y-08) 없음. Y-12 — 비겁 중심 신강의 관성 운은 라벨 "한"이지만 코어가 희신급 점수로 올린다(플래그 "Y-12").
 //        코어 규칙이 우선이므로 그 글자는 v4.1 ①②(한·한 → 보통, 한신 영역 →)에서 빼고 문장도 희신 말로 쓴다.
 //   v4.2 합: 코어대로 점수 없음, 플래그만 (규칙/00_읽는법.md 원칙 4, 삼합.md S-05·S-08, 용신.md Y-09 "함께 내는 상호작용 플래그").
-//        rel에는 충만 남고(방향은 코어 luckRelations), 합은 hits에 direction "중립"·점수 0. 문장은 두 플래그만:
-//        (a) 운 글자가 원국 용신 글자를 합으로 묶음(코어 luck 플래그 "용신 손상 … 합으로 묶음" + 일진 지지 합은 어댑터 판정) (b) 코어 "긴장이 풀리는 시기".
+//        rel에는 충만 남고(방향은 코어 luckRelations), 합은 hits에 direction "중립"·점수 0.
 //   v4.2 영역: 오늘(일운 ≤2) + 이달(월운 1) + 올해(세운 1), 모두 코어 luckAreas. "위아래" 문장 없음.
+//   v4.3: 합 문장 0개 — 어댑터의 "용신 손상 … 합으로 묶음" 판정과 "묶여…"/"누그러져요" 문장 삭제(합은 hits에만 남는다. 코어 luck()이 내는 플래그는 flags에 그대로 두되 문장은 만들지 않는다).
+//        같은 십신이면 첫 문장은 "두 번 겹쳐요" 대신 "아주 강해요". 일진 facts = 십신 성격 · 용신 역할 · 합계 판정 · 충(있을 때) · 대운/세운/월운 판정 · 대운 플래그.
 //
 // 모델 호출은 없다. 문장은 쓰지 않고(facts는 글 재료) 숫자는 영역에 만들지 않는다(코어: 일운 확신도 "낮음").
 import type { TenGod } from "@saju/engine";
@@ -163,11 +164,6 @@ function partOf(dayStem: string, ch: string, isStem: boolean, l: Luck | null): C
   return { char: ch, tenGod, family: FAMILY_OF[tenGod], label: lp ? lp.라벨 : null, score: lp ? lp.점수 : 0 };
 }
 
-type Element5 = "목" | "화" | "토" | "금" | "수";
-const STEM_EL: Record<string, Element5> = { 甲: "목", 乙: "목", 丙: "화", 丁: "화", 戊: "토", 己: "토", 庚: "금", 辛: "금", 壬: "수", 癸: "수" };
-/** 지지의 본래 오행 (정기 기준) */
-const branchEl = (ch: string): Element5 => STEM_EL[MAIN_STEM[ch]!]!;
-
 /** 두 지지가 합인가 — 육합이면 그대로, 삼합 짝이면 그 오행이 용·희일 때. v4.2: 표시용 플래그일 뿐 점수에는 넣지 않는다 */
 function unionOf(a: string, b: string, y: Yongsin | null): "육합" | "삼합" | undefined {
   if (YUKHAP[a] === b) return "육합";
@@ -220,20 +216,13 @@ export function computeCoreFortune(input: CoreInput): CoreFortune {
     hits.push({ pos, kind: "충", direction, strength: c.강도, chars: c.상대 });
   }
   const natalBranches = p.map((x, i) => (x ? { pos: POS[i]!, ch: x[1]! } : null)).filter((x): x is { pos: CoreRelationHit["pos"]; ch: string } => !!x);
-  // v4.2: 합은 점수 없이 플래그만 (코어 00_읽는법 원칙 4 · 삼합 S-05·S-08). direction은 항상 "중립", strength는 단계 표시용
-  const adapterFlags: string[] = [];
+  // v4.2: 합은 점수 없이 표시만 (코어 00_읽는법 원칙 4 · 삼합 S-05·S-08). direction은 항상 "중립", strength는 단계 표시용
+  // v4.3: 어댑터 "용신 손상 … 합으로 묶음" 판정은 없다 — 합은 hits에만 남고 flags·facts에 합 문장은 0개
   for (const h of lr.합) {
     if (h.단계 === "불성립") continue;
     const strength = h.단계 === "강" ? 2 : h.단계 === "중" ? 1 : 0.5;
     const natal = natalBranches.find((nb) => nb.ch !== g[1] && h.글자.includes(nb.ch)) ?? natalBranches.find((nb) => h.글자.includes(nb.ch));
     hits.push({ pos: natal?.pos ?? "일", kind: h.종류 as CoreRelationHit["kind"], direction: "중립", strength, chars: h.글자 });
-    // 용신 손상(Y-09 "합으로 묶음")의 지지판: 오늘 지지가 원국 용신 오행 지지를 합으로 묶으면. 삼합·반합이 용신 오행으로 모이는 건 묶임이 아니다(그 오행이 더 세짐)
-    if (y && h.오행 !== y.용신오행) {
-      for (const nb of natalBranches) {
-        if (nb.ch === g[1] || !h.글자.includes(nb.ch) || branchEl(nb.ch) !== y.용신오행) continue;
-        adapterFlags.push(`용신 손상: 운 ${g[1]}이 ${nb.pos}지 ${nb.ch}을(를) ${h.종류}으로 묶음`);
-      }
-    }
   }
   for (const nb of natalBranches) if (nb.ch === g[1]) hits.push({ pos: nb.pos, kind: "복음", direction: "중립", strength: 0, chars: nb.ch });
   let relScore = 0;
@@ -243,7 +232,7 @@ export function computeCoreFortune(input: CoreInput): CoreFortune {
     relScore += !y ? -COEF.relNoYongsin * h.strength : h.direction === "유리" ? COEF.rel * h.strength : h.direction === "불리" ? -COEF.rel * h.strength : 0;
   }
   relScore = clamp(relScore, -COEF.relMax, COEF.relMax);
-  const flags = [...(l?.플래그 ?? []), ...lr.플래그, ...adapterFlags];
+  const flags = [...(l?.플래그 ?? []), ...lr.플래그];
 
   // ---- 맥락: 대운·세운·월운 ----
   const seun = seunOf(input.date);
@@ -346,9 +335,9 @@ export function computeCoreFortune(input: CoreInput): CoreFortune {
 
   // ---- 사실 문장 (글 재료, 6~10개) ----
   const ko = (gj: string) => gj; // 간지는 한자 그대로 둔다. 한글로 바꾸는 건 3단계(글)의 일
-  // v4.2: 첫 문장은 구조(윗글자·아랫글자·위아래) 없이 성격만. 같은 십신이면 "두 번 겹쳐요", 다르면 "함께 와요"
+  // v4.2: 첫 문장은 구조(윗글자·아랫글자·위아래) 없이 성격만. 같은 십신이면 "아주 강해요"(v4.3, 전엔 "두 번 겹쳐요"), 다르면 "함께 와요"
   const st = TEN_GOD_THEME[stem.tenGod], bt = TEN_GOD_THEME[branch.tenGod];
-  if (stem.tenGod === branch.tenGod) facts.push(`오늘은 '${st}'(${stem.tenGod})의 성격이 두 번 겹쳐요.`);
+  if (stem.tenGod === branch.tenGod) facts.push(`오늘은 '${st}'(${stem.tenGod})의 성격이 아주 강해요.`);
   else facts.push(`오늘은 '${st}'(${stem.tenGod})${batchim(st) ? "과" : "와"} '${bt}'(${branch.tenGod})${batchim(bt) ? "이" : "가"} 함께 와요.`);
   // 라벨 문장은 같은 것이면 한 번만
   const labelFacts = new Set<string>();
@@ -365,14 +354,13 @@ export function computeCoreFortune(input: CoreInput): CoreFortune {
       facts.push(`오늘 아랫글자 ${g[1]}는 내 ${POS_WORD[h.pos]}와 같은 글자예요.`);
     }
   }
-  // 오늘 플래그 문장 (같은 문장은 한 번만). 맥락 문장보다 앞 — 10문장 상한에서 오늘 것이 먼저 남는다. v4.2 합 문장은 (a) 용신 묶임 (b) 긴장이 풀리는 시기 — 둘뿐
+  // 오늘 플래그 문장 (같은 문장은 한 번만). 맥락 문장보다 앞 — 10문장 상한에서 오늘 것이 먼저 남는다.
+  // v4.3: 합 관련 플래그("… 합으로 묶음", "긴장이 풀리는 시기")는 문장을 만들지 않는다 — 큰 특징만 나열
   const flagFacts = new Set<string>();
   for (const f of flags) {
-    if (f.startsWith("용신 손상") && f.includes("묶음")) flagFacts.add("오늘은 내게 필요한 쪽이 묶여 힘을 못 쓰기 쉬워요.");
-    else if (f.startsWith("용신 손상")) flagFacts.add("오늘 글자가 내 사주에 모자란 쪽 글자를 누르는 날이라 평소보다 힘이 들 수 있어요.");
+    if (f.startsWith("용신 손상") && !f.includes("묶음")) flagFacts.add("오늘 글자가 내 사주에 모자란 쪽 글자를 누르는 날이라 평소보다 힘이 들 수 있어요.");
     else if (f.startsWith("운 내부 상충")) flagFacts.add("오늘은 겉과 속이 달라 힘이 한곳에 모이지 않아요.");
     else if (f.startsWith("중화 사주")) flagFacts.add("내 사주는 치우침이 적어 운의 좋고 나쁨보다 하는 일의 성격이 더 크게 작용해요.");
-    else if (f.startsWith("긴장이 풀리는")) flagFacts.add("오늘은 원래 부딪히던 자리가 잠시 누그러져요.");
   }
   facts.push(...flagFacts);
   if (daeun) {

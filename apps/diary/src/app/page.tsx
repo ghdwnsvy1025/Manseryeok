@@ -8,7 +8,7 @@ import { SaveBurst } from "@/components/SaveBurst";
 import { TodayEntryCard } from "@/components/TodayEntryCard";
 import { createClient, getUser } from "@/lib/supabase/server";
 import { birthProfileOf, countEntries, getEntry, getFortuneVote, getLinkPromptState, getSajuProfile, listEntries, listEntriesForStats, type SajuProfileRow } from "@/lib/db";
-import { characterOf, todayLine } from "@/lib/character";
+import { characterOf, characterOfGanji, todayLine } from "@/lib/character";
 import { getTodayFortune } from "@/lib/fortune";
 import type { EntryLike } from "@/lib/fortune/personal";
 import { dayGanji } from "@/lib/ganji";
@@ -147,11 +147,12 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
 
   return (
     <main className="flex flex-col gap-5">
-      {/* 저장 완료 "팡" — 방금 저장하고 돌아왔을 때 한 번 (톤 v3.1). 카드는 내 일주 카드 (v3.3) */}
+      {/* 저장 완료 "팡" — 방금 저장하고 돌아왔을 때 한 번 (톤 v3.1). 카드는 오늘 일진 캐릭터 + char-frame 틀 (05 v3.5) */}
       {user && entry && saved === today && myCharacter && (
         <SaveBurst
-          ganjiKo={myCharacter.ganjiKo}
-          cardSrc={myCharacter.cardSrc}
+          ganjiKo={ganji.ko}
+          ganjiHanja={ganji.hanja}
+          characterSrc={characterOfGanji(ganji.ko).characterSrc}
           recentHappiness={recentHappiness}
           happiness={entry.happiness}
           kept={entry.promise === "kept"}

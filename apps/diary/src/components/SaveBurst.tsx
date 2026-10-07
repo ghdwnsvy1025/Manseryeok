@@ -1,13 +1,20 @@
 "use client";
 
-import { useEffect, useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 
 interface Props {
-  /** 내 일주 한글 ("기축", v3.3). 글자 "{ganjiKo} 카드에 오늘 도장을 찍었어요"에 쓴다 */
+  /**
+   * save 모드(v3.5): 오늘 일진 한글 ("갑인"). 틀 안 간지 글자와 "{ganjiKo}일 카드에 오늘 도장을 찍었어요"에 쓴다.
+   * reveal 모드: 내 일주 한글 ("기축").
+   */
   ganjiKo: string;
-  /** 내 일주 카드 그림 (characterOf().cardSrc = /cards/{일주}.webp) */
-  cardSrc: string;
+  /** 오늘 일진 한자 ("甲寅", save 모드). 틀 안 간지 글자 옆에 ink색으로 */
+  ganjiHanja?: string;
+  /** reveal 모드 전용 — 내 일주 카드 전체 (characterOf().cardSrc = /cards/{일주}.webp) */
+  cardSrc?: string;
+  /** save 모드(v3.5) — 오늘 일진의 캐릭터 그림 (characterOfGanji(today).characterSrc = /characters/{간지}.webp). char-frame 틀 안에 들어간다 */
+  characterSrc?: string;
   /** 오늘 행복도. reveal 모드에서는 쓰지 않는다 */
   happiness?: number;
   /** 같은 저장을 두 번 터뜨리지 않기 위한 열쇠 (날짜·내용). 바뀌면 다시 터진다. reveal 모드에서는 쓰지 않는다 */
@@ -63,13 +70,16 @@ function Bit({ kind, box, size, dx, dy, rot }: { kind: "paper" | "gold"; box: [n
 
 /**
  * 저장 완료 보상 "팡" (톤 v3.1 — 색종이 금지의 유일한 예외).
- * 한지 반투명 오버레이 → 내 일주 카드(v3.3)가 팡 → 뒤에서 한지 조각 8·금빛 가루 8이 흩어진다 → 1.5초 뒤 걷힌다.
+ * 한지 반투명 오버레이 → 오늘 일진 캐릭터를 char-frame 틀에 넣은 카드(v3.5)가 팡 → 뒤에서 한지 조각 8·금빛 가루 8이 흩어진다 → 1.5초 뒤 걷힌다.
  * 탭하면 바로 닫힌다. reduced-motion이면 팡·흩날림 없이 카드만 보이고 1초 뒤 걷힌다.
  * 오늘 화면(/?saved=날짜)에서 한 번만 뜬다. 저장 자체는 서버 액션이 끝낸 뒤라 성공이 보장된다.
  */
-export function SaveBurst({ ganjiKo, cardSrc, happiness, signature = "", kept = false, recentHappiness = [], mode = "save" }: Props) {
+export function SaveBurst({ ganjiKo, ganjiHanja, cardSrc, characterSrc, happiness, signature = "", kept = false, recentHappiness = [], mode = "save" }: Props) {
   const [phase, setPhase] = useState<"hidden" | "open" | "closing">("hidden");
   const reveal = mode === "reveal";
+  // 이 인스턴스가 이미 한 번 열었는지. 개발 모드 StrictMode가 effect를 두 번 돌릴 때
+  // 두 번째 실행이 sessionStorage 열쇠를 보고 빠져나가 닫힘 타이머가 사라지는 것을 막는다
+  const opened = useRef(false);
 
   useEffect(() => {
     if (reveal) {
@@ -78,11 +88,12 @@ export function SaveBurst({ ganjiKo, cardSrc, happiness, signature = "", kept = 
     }
     const key = `saju-burst:${signature}`;
     try {
-      if (sessionStorage.getItem(key)) return;
+      if (sessionStorage.getItem(key) && !opened.current) return;
       sessionStorage.setItem(key, "1");
     } catch {
       /* 저장소를 못 써도 한 번은 보여 준다 */
     }
+    opened.current = true;
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     setPhase("open");
     try {
@@ -118,14 +129,26 @@ export function SaveBurst({ ganjiKo, cardSrc, happiness, signature = "", kept = 
       {bits.map((b, i) => (
         <Bit key={i} {...b} />
       ))}
-      <img src={cardSrc} alt={`${ganjiKo} 카드`} width={768} height={1030} data-kept={kept ? "" : undefined} className="burst-card relative h-auto w-full" />
-      {/* 행복도 인주 도장 — 카드 팡 150ms 뒤 꽝 (v3.2). 숫자 한지색. reveal에는 없다 */}
-      {!reveal && happiness !== undefined && (
-        <span className="burst-stamp" aria-label={`행복도 ${happiness}`}>
-          {happiness}
-        </span>
+      {reveal || !characterSrc ? (
+        // reveal (/welcome): 내 일주 카드 전체 — 여기만 바이럴 카드
+        <img src={cardSrc} alt={`${ganjiKo} 카드`} width={768} height={1030} data-kept={kept ? "" : undefined} className="burst-card relative h-auto w-full" />
+      ) : (
+        // save (v3.5): char-frame 틀(3:4) 안에 위 간지 글자 · 가운데 오늘 일진 캐릭터 · 아래 행복도 인주 도장. 설명·별점 없음
+        <div data-kept={kept ? "" : undefined} className="burst-card char-card relative w-full">
+          <p className="char-card__ganji font-serif text-[22px] leading-none">
+            <span className="text-ganji">{ganjiKo}</span>
+            {ganjiHanja && <span className="ml-2 text-ink">{ganjiHanja}</span>}
+          </p>
+          <img src={characterSrc} alt={`${ganjiKo} 캐릭터`} width={777} height={900} className="char-card__figure" />
+          {/* 행복도 인주 도장 — 카드 팡 150ms 뒤 꽝 (v3.2). 숫자 한지색 */}
+          {happiness !== undefined && (
+            <span className="burst-stamp" aria-label={`행복도 ${happiness}`}>
+              {happiness}
+            </span>
+          )}
+        </div>
       )}
-      {/* 지난 도장들 (v3.3): 최근 7개, 최신순. 번호 없음. 카드 아래 가장자리 안쪽 왼쪽에 12px 인주 점, 간격 6px.
+      {/* 지난 도장들 (v3.3 → v3.5에서 틀 아래 바깥으로): 최근 7개, 최신순. 번호 없음. 12px 인주 점, 간격 6px.
           점의 농도 = 그날 행복도 (--h). 글자와 같은 150ms 뒤에 나타난다 */}
       {!reveal && recentHappiness.length > 0 && (
         <ul className="burst-past" aria-label="지난 도장들">
@@ -150,7 +173,7 @@ export function SaveBurst({ ganjiKo, cardSrc, happiness, signature = "", kept = 
     >
       {cardBlock}
       <p className="burst-text mt-6 text-center">
-        <span className="block font-serif text-[22px] leading-snug text-ink">{ganjiKo} 카드에 오늘 도장을 찍었어요</span>
+        <span className="block font-serif text-[22px] leading-snug text-ink">{ganjiKo}일 카드에 오늘 도장을 찍었어요</span>
       </p>
     </div>,
     document.body,

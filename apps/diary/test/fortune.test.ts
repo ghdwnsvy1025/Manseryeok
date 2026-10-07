@@ -162,8 +162,9 @@ describe("v4.1 보강 (乙亥 丙戌 己丑 辛未 × 2026-10-07 甲寅: 천간�
     expect(r.dayLuck.raw).toBe(2.5);
     expect(r.dayLuck.total).toBe("유리");
     expect(r.facts).toContain("둘을 합치면 오늘은 수월한 편이에요.");
-    // v4.2: "위아래" 문장은 없다. 같은 십신이면 구조 없는 한 문장
-    expect(r.facts[0]).toBe("오늘은 '약속과 역할'(정관)의 성격이 두 번 겹쳐요.");
+    // v4.2: "위아래" 문장은 없다. 같은 십신이면 구조 없는 한 문장 — v4.3: "두 번 겹쳐요" → "아주 강해요"
+    expect(r.facts[0]).toBe("오늘은 '약속과 역할'(정관)의 성격이 아주 강해요.");
+    expect(r.facts.some((f) => f.includes("겹"))).toBe(false);
     expect(r.facts.some((f) => f.includes("위아래"))).toBe(false);
     expect(r.facts.filter((f) => f.includes("모자란 쪽에 힘을 보태요"))).toHaveLength(1);
     expect(r.facts.some((f) => f.includes("기울지 않고"))).toBe(false);
@@ -213,7 +214,7 @@ describe("v4.1 보강 (乙亥 丙戌 己丑 辛未 × 2026-10-07 甲寅: 천간�
 });
 
 describe("v4.2 합은 점수 없이 플래그만 · 위아래 문장 없음 · 영역 기간", () => {
-  // 1995-10-25 14:00 남 (乙亥 丙戌 己丑 辛未, 용신 수) × 2026-10-07 甲寅: 오늘 寅이 연지 亥(수 = 용신)를 육합으로 묶는다
+  // 1995-10-25 14:00 남 (乙亥 丙戌 己丑 辛未, 용신 수) × 2026-10-07 甲寅: 오늘 寅이 연지 亥(수 = 용신)와 육합 — v4.3: hits에만 남고 플래그·문장은 없다
   const c = v4(PROFILE_C, "2026-10-07");
 
   test("합(육합·삼합·반합)은 hits에 direction '중립'으로 남고 rel에는 들어가지 않는다 — 충만 rel", () => {
@@ -235,28 +236,26 @@ describe("v4.2 합은 점수 없이 플래그만 · 위아래 문장 없음 · �
     expect("union" in COEF).toBe(false);
   });
 
-  test("(a) 오늘 지지가 원국 용신 글자를 합으로 묶으면 플래그 + 문장 '내게 필요한 쪽이 묶여…' (Y-09 용신 손상의 지지판)", () => {
-    expect(c.relations.flags).toContain("용신 손상: 운 寅이 연지 亥을(를) 육합으로 묶음");
-    expect(c.facts).toContain("오늘은 내게 필요한 쪽이 묶여 힘을 못 쓰기 쉬워요.");
-    expect(c.facts.filter((f) => f.includes("묶여"))).toHaveLength(1);
-    // 용신 글자가 아닌 합(A 2026-06-15 申巳 육합: 巳는 화, 용신은 수)은 플래그도 문장도 없다
+  test("v4.3 (a) 합 묶임 판정 삭제: 오늘 寅 × 연지 亥(용신) 육합이어도 '용신 손상 … 묶음' 플래그와 '묶여…' 문장이 없다 (hits에는 남는다)", () => {
+    expect(c.relations.hits.some((h) => h.kind === "육합")).toBe(true);
+    expect(c.relations.flags.some((f) => f.includes("묶음"))).toBe(false);
+    expect(c.facts.some((f) => f.includes("묶"))).toBe(false);
+    // 용신 글자가 아닌 합(A 2026-06-15 申巳 육합)도 마찬가지
     const other = v4(PROFILE_A, "2026-06-15");
     expect(other.relations.hits.some((h) => h.kind === "육합")).toBe(true);
     expect(other.relations.flags.some((f) => f.includes("묶음"))).toBe(false);
-    expect(other.facts.some((f) => f.includes("묶여"))).toBe(false);
+    expect(other.facts.some((f) => f.includes("묶"))).toBe(false);
   });
 
-  test("(b) 코어 '긴장이 풀리는 시기' 플래그 → '원래 부딪히던 자리가 잠시 누그러져요' (C 원국 丑未충 × 午일: 午가 未와 육합)", () => {
+  test("v4.3 (b) 코어 '긴장이 풀리는 시기' 플래그는 flags에 남되 '누그러져요' 문장은 없다 (C 원국 丑未충 × 午일: 午가 未와 육합)", () => {
     const r = computeCoreFortune({ pillars: pillarsOf(PROFILE_C), profile: PROFILE_C, date: "2026-10-07", todayHanja: "丙午" });
     expect(r.relations.flags).toContain("긴장이 풀리는 시기: 운 午이 未와 합해 원국 丑未충을 늦춤");
-    expect(r.facts).toContain("오늘은 원래 부딪히던 자리가 잠시 누그러져요.");
-    expect(r.facts.filter((f) => f.includes("누그러져요"))).toHaveLength(1);
+    expect(r.facts.some((f) => f.includes("누그러"))).toBe(false);
     expect(r.parts.rel).toBe(0); // 육합은 점수 없음
-    // 오늘 플래그 문장은 맥락 문장보다 앞이라 10문장 상한에 잘리지 않는다 (壬午: 절각 + 긴장 풀림 = 11문장 후보)
+    // 오늘 플래그 문장(절각 = 운 내부 상충)은 맥락 문장보다 앞이라 10문장 상한에 잘리지 않는다
     const full = computeCoreFortune({ pillars: pillarsOf(PROFILE_C), profile: PROFILE_C, date: "2026-10-07", todayHanja: "壬午" });
-    expect(full.facts).toContain("오늘은 원래 부딪히던 자리가 잠시 누그러져요.");
     expect(full.facts).toContain("오늘은 겉과 속이 달라 힘이 한곳에 모이지 않아요.");
-    expect(full.facts.length).toBe(10);
+    expect(full.facts.length).toBeLessThanOrEqual(10);
   });
 
   test("그 밖의 합 문장('짝이 돼요/한편이 돼요/한편이에요')과 '위아래' 문장은 어디에도 없다", () => {
@@ -265,8 +264,9 @@ describe("v4.2 합은 점수 없이 플래그만 · 위아래 문장 없음 · �
       for (const date of ["2026-10-05", "2026-10-07", "2026-01-20", "2026-02-04", "2026-06-15", "2027-03-01", "2026-03-09", "2026-11-23"]) {
         const r = v4(prof, date, pillars);
         const all = r.facts.join(" ");
-        expect(all, `${date} ${all}`).not.toMatch(/짝이 돼요|한편이 돼요|한편이에요|도움을 받기 쉬운|위아래|윗글자/);
-        expect(r.facts[0]).toMatch(/^오늘은 '.+'\(.+\)(의 성격이 두 번 겹쳐요|[과와] '.+'\(.+\)[이가] 함께 와요)\.$/);
+        // v4.3: 합 관련 문장("묶여/누그러져요")과 "두 번 겹쳐요"도 없다 (대운 충의 "변동이 겹치는 날"은 그대로)
+        expect(all, `${date} ${all}`).not.toMatch(/짝이 돼요|한편이 돼요|한편이에요|도움을 받기 쉬운|위아래|윗글자|묶여|누그러|두 번 겹쳐요/);
+        expect(r.facts[0]).toMatch(/^오늘은 '.+'\(.+\)(의 성격이 아주 강해요|[과와] '.+'\(.+\)[이가] 함께 와요)\.$/);
       }
     }
     // 십신이 다르면 "함께 와요" (A 2026-10-05 壬子: 편관 + 정관)

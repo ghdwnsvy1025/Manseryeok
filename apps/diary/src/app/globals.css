@@ -555,18 +555,43 @@ details[open] > .fortune-body {
 .burst-text--late {
   animation-delay: 450ms;
 }
-/* 지난 도장들 (v3.3): 카드 아래 가장자리 안쪽 왼쪽, 인주 12px 점, 간격 6px. 농도 = 그날 행복도(--h 1~10).
-   오른쪽 아래 행복도 도장과 겹치지 않게 왼쪽 60%까지만. 글자와 같이 150ms 뒤 나타난다 */
+/* 팡 카드 (05 v3.5): 키트 char-frame(투명 3:4, 한지·녹갈 이중선 + 네 귀퉁이 장식) 틀을 card-paper 위에 얹는다.
+   틀 이미지는 카드와 같은 3:4라 100%/100%로 늘려도 선 두께가 변하지 않는다(border-image 대신 배경 두 겹).
+   안은 위 1/5 간지 글자 · 가운데 3/5 캐릭터(폭 70%) · 아래 1/5 행복도 도장. 글자·배치만 코드다 */
+.char-card {
+  aspect-ratio: 3 / 4;
+  display: grid;
+  grid-template-rows: 1fr 3fr 1fr;
+  place-items: center;
+  padding: 7%;
+  background:
+    url("/ui/char-frame-clean.webp") center / 100% 100% no-repeat,
+    url("/ui/card-paper.webp") center / cover var(--color-paper-2);
+}
+.char-card__ganji {
+  margin: 0;
+  align-self: end;
+}
+.char-card__figure {
+  width: 70%;
+  height: 100%;
+  object-fit: contain;
+}
+/* 틀 안 아래 1/5의 행복도 도장: 지름 64px, 숫자 32px 한지색 (오른쪽 아래 절대 위치가 아니라 제자리) */
+.char-card > .burst-stamp {
+  position: static;
+  width: 64px;
+  font-size: 32px;
+}
+/* 지난 도장들 (v3.3 → v3.5): 틀 아래 바깥에 인주 12px 점, 간격 6px. 농도 = 그날 행복도(--h 1~10).
+   글자와 같이 150ms 뒤 나타난다 */
 .burst-past {
-  position: absolute;
-  left: 7%;
-  bottom: 6%;
   display: flex;
+  justify-content: center;
   gap: 6px;
-  max-width: 60%;
   flex-wrap: wrap;
   list-style: none;
-  margin: 0;
+  margin: 10px 0 0;
   padding: 0;
   animation: saved-in 300ms ease-out 150ms both;
 }
