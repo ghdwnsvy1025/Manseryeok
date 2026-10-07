@@ -40,7 +40,7 @@
   --color-lamp-ink: var(--color-gold-ink);
   --color-moon: var(--color-ganji);
 
-  --font-sans: "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+  --font-sans: "Pretendard Variable", "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
   --font-serif: var(--font-song), var(--font-gowun), "AppleMyungjo", "Batang", serif;
   --font-hand: var(--font-pen), var(--font-gowun), cursive;
 }
