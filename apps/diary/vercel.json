@@ -1,5 +1,11 @@
 {
+  "regions": [
+    "icn1"
+  ],
   "crons": [
-    { "path": "/api/cron/remind", "schedule": "0 12 * * *" }
+    {
+      "path": "/api/cron/remind",
+      "schedule": "0 12 * * *"
+    }
   ]
 }
