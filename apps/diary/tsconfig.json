@@ -14,13 +14,8 @@
     "jsx": "preserve",
     "incremental": true,
     "plugins": [{ "name": "next" }],
-    "paths": {
-      "@/*": ["./src/*"],
-      "@saju/engine": ["../../packages/saju-engine/src/index.ts"],
-      "@saju/engine/*": ["../../packages/saju-engine/src/*"],
-      "@saju/core-rules": ["../../packages/saju-core-rules/src/index.ts"],
-      "@saju/core-rules/*": ["../../packages/saju-core-rules/src/*"]
-    }
+    "paths": { "@/*": ["./src/*"] },
+    "preserveSymlinks": true
   },
   "include": ["next-env.d.ts", "src/**/*.ts", "src/**/*.tsx", "test/**/*.ts", ".next/types/**/*.ts"],
   "exclude": ["node_modules"]
