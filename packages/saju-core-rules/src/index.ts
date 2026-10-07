@@ -12,7 +12,13 @@ export { relations, luckRelations, luckClash } from "./relations";
 export type { Gyeok } from "./gyeokguk";
 export { gyeokguk, gyeokInLuck } from "./gyeokguk";
 
+export type { Johu } from "./extras";
 export { johu, extraTags } from "./extras";
+
+// Y-12 쓰는 기운 · K-09 T존 조합 (코어 240c91d, 2026-10-07) · 이론 버전
+export type { Usable, UsableItem, TzoneCombo } from "./usable";
+export { usable, tzoneCombo } from "./usable";
+export { THEORY_VERSION } from "./version";
 
 export type { Options as AreaOptions } from "./areas";
 export { areas, luckAreas } from "./areas";

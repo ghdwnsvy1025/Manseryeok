@@ -55,7 +55,8 @@ function loadImage(src: string): Promise<HTMLImageElement | null> {
   });
 }
 
-export async function drawShareCard(canvas: HTMLCanvasElement, text: ShareCardText, characterSrc: string): Promise<void> {
+/** @param imageSrc 가운데 그림 (v3.3: 내 일주 카드 /cards/{일주}.webp). 비율을 지켜 폭 560에 맞춘다 */
+export async function drawShareCard(canvas: HTMLCanvasElement, text: ShareCardText, imageSrc: string): Promise<void> {
   canvas.width = CARD_W;
   canvas.height = CARD_H;
   const ctx = canvas.getContext("2d");
@@ -67,7 +68,7 @@ export async function drawShareCard(canvas: HTMLCanvasElement, text: ShareCardTe
   } catch {
     // 무시
   }
-  const img = await loadImage(characterSrc);
+  const img = await loadImage(imageSrc);
 
   ctx.fillStyle = COLORS.paper;
   ctx.fillRect(0, 0, CARD_W, CARD_H);
@@ -102,8 +103,14 @@ export async function drawShareCard(canvas: HTMLCanvasElement, text: ShareCardTe
 
   const imgSize = 560;
   const imgY = y + 10;
+  // 그림 비율 유지 (카드 768×1030은 세로가 길다). 폭 560 안에 넣는다
+  let imgH = imgSize;
   if (img) {
-    ctx.drawImage(img, (CARD_W - imgSize) / 2, imgY, imgSize, imgSize);
+    const ratio = img.naturalHeight && img.naturalWidth ? img.naturalHeight / img.naturalWidth : 1;
+    const maxH = CARD_H - imgY - 320;
+    const drawW = Math.min(imgSize, maxH / ratio);
+    imgH = drawW * ratio;
+    ctx.drawImage(img, (CARD_W - drawW) / 2, imgY, drawW, imgH);
   } else {
     ctx.fillStyle = COLORS.ganji;
     ctx.font = `700 320px ${SERIF}`;
@@ -111,7 +118,7 @@ export async function drawShareCard(canvas: HTMLCanvasElement, text: ShareCardTe
     ctx.fillText(text.hanja, CARD_W / 2, imgY + 100);
     ctx.textAlign = "left";
   }
-  y = imgY + imgSize + 40;
+  y = imgY + imgH + 40;
 
   ctx.fillStyle = COLORS.ink;
   ctx.font = `700 40px ${SANS}`;

@@ -4,6 +4,7 @@ import { ClearAllButton } from "@/components/ClearAllButton";
 import { InstallHint } from "@/components/InstallHint";
 import { LinkGoogleButton } from "@/components/LinkGoogleButton";
 import { NotificationSettings } from "@/components/NotificationSettings";
+import { RetryButton } from "@/components/RetryButton";
 import { getNotificationSettings, getSajuProfile } from "@/lib/db";
 import { hourOf } from "@/lib/remind";
 import { getUser } from "@/lib/supabase/server";
@@ -28,6 +29,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
         <section className={`${card} p-5`} aria-busy="true" aria-live="polite">
           <span aria-hidden className="brush-loading" />
           <p className="mt-3 text-[15px] text-muted">준비하고 있어요</p>
+          <RetryButton className="mt-3" />
         </section>
       </main>
     );

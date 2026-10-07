@@ -6,6 +6,9 @@ const saved: Record<string, unknown>[] = [];
 const fakeUser = { id: "anon-1", is_anonymous: true, email: undefined };
 let currentUser: typeof fakeUser | null = fakeUser;
 
+/** night_saju_profiles에 이미 있는 프로필 (getSajuProfile 응답). null이면 처음 만드는 것 */
+let existingProfile: Record<string, unknown> | null = null;
+
 function fakeSupabase() {
   return {
     from(table: string) {
@@ -14,11 +17,32 @@ function fakeSupabase() {
           saved.push({ table, ...row });
           return Promise.resolve({ error: null });
         },
+        select() {
+          return {
+            eq() {
+              return { maybeSingle: () => Promise.resolve({ data: table === "night_saju_profiles" ? existingProfile : null, error: null }) };
+            },
+          };
+        },
       };
     },
-    auth: { signOut: () => Promise.resolve({ error: null }) },
+    auth: {
+      signOut: () => {
+        authCalls.push("signOut");
+        currentUser = null;
+        return Promise.resolve({ error: null });
+      },
+      signInAnonymously: () => {
+        authCalls.push("signInAnonymously");
+        if (anonSignInFails) return Promise.resolve({ data: { user: null, session: null }, error: new Error("rate limit") });
+        currentUser = { id: "anon-2", is_anonymous: true, email: undefined };
+        return Promise.resolve({ data: { user: currentUser, session: {} }, error: null });
+      },
+    },
   };
 }
+const authCalls: string[] = [];
+let anonSignInFails = false;
 
 vi.mock("@/lib/supabase/server", () => ({
   getUser: async () => ({ supabase: fakeSupabase(), user: currentUser }),
@@ -36,13 +60,16 @@ vi.mock("@supabase/ssr", () => ({
   createServerClient: () => ({ auth: { getUser: async () => ({ data: { user: null } }) } }),
 }));
 
-import { saveEntryAction, saveProfileAction } from "@/app/actions";
+import { saveEntryAction, saveProfileAction, signOutAction } from "@/app/actions";
 import { googleButtonLabel, shouldShowLinkPrompt } from "@/lib/linkPrompt";
 import { middleware } from "@/middleware";
 import { NextRequest } from "next/server";
 
 beforeEach(() => {
   saved.length = 0;
+  authCalls.length = 0;
+  anonSignInFails = false;
+  existingProfile = null;
   currentUser = fakeUser;
   process.env.NEXT_PUBLIC_SUPABASE_URL = "https://example.supabase.co";
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = "anon";
@@ -80,6 +107,27 @@ describe("익명 세션에서 저장", () => {
     const row = saved.find((r) => r.table === "night_saju_profiles");
     expect(row!.name).toBe("손님");
     expect(row!.user_id).toBe("anon-1");
+  });
+});
+
+describe("로그아웃 / 기록 모두 지우기 (2026-10-07 버그: 로그아웃 뒤 '준비하고 있어요'에 멈춤)", () => {
+  test("signOutAction은 세션을 끊은 자리에서 바로 새 익명 세션을 만들고('손님' 행 포함) 오늘 화면으로 간다", async () => {
+    await expect(signOutAction()).rejects.toThrow("REDIRECT:/");
+    expect(authCalls).toEqual(["signOut", "signInAnonymously"]);
+    const row = saved.find((r) => r.table === "night_profiles");
+    expect(row).toBeTruthy();
+    expect(row!.user_id).toBe("anon-2");
+    expect(row!.display_name).toBe("손님");
+  });
+
+  test("새 익명 세션 만들기가 실패해도 오류를 삼키지 않고(console.error) 오늘 화면으로는 간다", async () => {
+    anonSignInFails = true;
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    await expect(signOutAction()).rejects.toThrow("REDIRECT:/");
+    expect(authCalls).toEqual(["signOut", "signInAnonymously"]);
+    expect(saved).toHaveLength(0);
+    expect(spy).toHaveBeenCalledWith("로그아웃 뒤 익명 시작 실패", expect.any(Error));
+    spy.mockRestore();
   });
 });
 

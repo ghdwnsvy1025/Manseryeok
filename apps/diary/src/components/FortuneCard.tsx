@@ -6,6 +6,7 @@ import type { AreaSignal, FortuneContent } from "@/lib/fortune/types";
 /** 화살표 색: ↑ 금색, → 보조, ↓ 먹색. 빨강 없음 (톤 결정표 "길흉을 색으로 말하지 않는다") */
 const SIGNAL_COLOR: Record<AreaSignal, string> = { "↑": "text-gold", "→": "text-muted", "↓": "text-ink" };
 const SIGNAL_WORD: Record<AreaSignal, string> = { "↑": "좋아요", "→": "보통이에요", "↓": "조심해요" };
+type Period = "오늘" | "이달" | "올해";
 
 /** 받침 유무 — 조사 고르기 */
 function batchim(s: string): boolean {
@@ -45,7 +46,7 @@ interface Props {
   fortune: FortuneContent;
   /** 카드 머리에 들어가는 날짜 ("10월 5일") */
   dateLabel: string;
-  /** 카드 머리에 들어가는 간지 한글 ("임자"). 카드 머리 오른쪽 동물 그림도 이 이름으로 찾는다 */
+  /** 카드 머리에 들어가는 간지 한글 ("임자"). 글자로만 쓴다 (그림 없음, v3.3) */
   ganjiKo: string;
   /** 로그인한 사용자만 투표할 수 있다 */
   canVote: boolean;
@@ -57,15 +58,16 @@ interface Props {
 /**
  * 오늘의 운세. 한지 카드에 금색 이중 테두리 (톤 v3.1 — 밤 패널 없음).
  * 이 화면에서 그림이 있는 카드는 이것뿐: 머리 오른쪽에 그날 일진의 동물(바이럴 60갑자 세트) 하나.
- * 닫혀 있어도 날짜·간지와 밴드 단어·동물까지는 보이고, 숫자·눈금·본문은 열어야 보인다.
+ * 닫혀 있어도 날짜·간지와 밴드 단어·점수까지는 보이고, 본문은 열어야 보인다 (v3.4: 눈금 없음, 숫자가 주인공).
  * 접힘/펼침은 details 요소로 처리해 자바스크립트 없이도 열린다.
  * 열리는 전환은 globals.css의 .fortune-body (디자인 명세 02).
- * v3.2: 본문과 영역 줄 사이 "내 기록으로 본 오늘" 블록, 하면/피해요는 띠지, 맨 아래 "왜 이런 운세인가요?" details.
+ * v3.2: 본문 아래 "내 기록으로 본 오늘" 블록, 맨 아래 "왜 이런 운세인가요?" details.
+ * v3.4: 영역 줄(오늘/이달/올해)과 하면/피해요가 "오늘의 신호" 상자 하나에 같은 모양의 띠지로 들어간다.
  */
 export function FortuneCard({ fortune, dateLabel, ganjiKo, canVote, vote, defaultOpen }: Props) {
   const scoreText = fortune.score.toFixed(1);
-  const filled = Math.max(0, Math.min(10, Math.round(fortune.score)));
-  const areas = (fortune.areas ?? []).slice(0, 3);
+  /** 영역 줄 최대 4 (오늘 ≤2 · 이달 1 · 올해 1). period는 기능 쪽이 곧 넣는다 — 없으면 "오늘" */
+  const areas = (fortune.areas ?? []).slice(0, 4).map((a) => ({ ...a, period: (a as { period?: Period }).period ?? "오늘" }));
   const personal = personalLines(fortune, ganjiKo);
   const facts = (fortune.core?.facts ?? fortune.base?.facts ?? []).slice(0, 10);
   return (
@@ -75,17 +77,16 @@ export function FortuneCard({ fortune, dateLabel, ganjiKo, canVote, vote, defaul
           <span className="block text-[15px] text-muted">
             {dateLabel} · {ganjiKo}일의 운세
           </span>
-          {/* 카드의 주인공 — 밴드 단어. 좋음/무난/주의 모두 같은 색, 색으로 길흉을 말하지 않는다 */}
-          <span className="mt-1 block font-serif text-[44px] leading-none">{fortune.band}</span>
+          {/* 카드의 주인공 — 밴드 단어 + 점수 (v3.4). 좋음/무난/주의 모두 같은 색, 색으로 길흉을 말하지 않는다 */}
+          <span className="mt-1 flex items-baseline gap-3 font-serif leading-none">
+            <span className="text-[44px]">{fortune.band}</span>
+            <span className="text-[32px] tabular-nums">
+              {scoreText}
+              <span className="font-sans text-[14px] text-muted">/10</span>
+            </span>
+          </span>
         </span>
-        {/* 이 화면의 유일한 그림 — 그날 일진의 동물 */}
-        <img
-          src={`/characters/${ganjiKo}.webp`}
-          alt={`${ganjiKo} 동물`}
-          width={64}
-          height={64}
-          className="h-16 w-16 shrink-0 object-contain"
-        />
+        {/* 그날 동물은 없다 (v3.3) — 그림은 제목 옆 내 캐릭터 하나. 머리 오른쪽은 +/×만 */}
         <span aria-hidden className="mt-1 text-2xl leading-none text-gold transition-transform group-open:rotate-45">
           +
         </span>
@@ -94,19 +95,6 @@ export function FortuneCard({ fortune, dateLabel, ganjiKo, canVote, vote, defaul
       <div className="fortune-body">
         <div>
           <div className="px-5 pb-5">
-            {/* 점수 눈금: 0~10 열 칸, 점수까지 금색. 숫자는 오른쪽에 작게 */}
-            <div className="mb-5 flex items-center gap-3">
-              <div aria-hidden className="flex flex-1 gap-1">
-                {Array.from({ length: 10 }, (_, i) => (
-                  <span key={i} className={`h-1 flex-1 rounded-full ${i < filled ? "bg-gold" : "bg-line/20"}`} />
-                ))}
-              </div>
-              <span className="font-serif text-[17px] tabular-nums">
-                {scoreText}
-                <span className="text-[13px] text-muted">/10</span>
-              </span>
-            </div>
-
             <h2 className="border-l-2 border-gold pl-3 font-serif text-[24px] leading-snug">{fortune.headline}</h2>
             <p className="mt-3 text-[16px] leading-[1.7] text-ink/90">{fortune.body}</p>
 
@@ -118,29 +106,26 @@ export function FortuneCard({ fortune, dateLabel, ganjiKo, canVote, vote, defaul
               {fortune.fitNote && <p className="mt-1 text-[14px] leading-[1.6] text-muted">{fortune.fitNote}</p>}
             </div>
 
-            {/* 영역 줄 (v4): 신호 있는 영역 1~3개. 화살표는 글자, 색으로 길흉을 말하지 않는다(↓도 ink) */}
-            {areas.length > 0 && (
-              <dl className="mt-5 grid grid-cols-[4.5rem_1fr] gap-x-3 gap-y-2 text-[16px] leading-[1.5]">
-                {areas.map((a) => (
-                  <Fragment key={a.area}>
-                    <dt className="flex items-baseline gap-1.5 font-serif text-[17px] text-ink">
-                      <span>{AREA_WORD[a.area]}</span>
-                      <span aria-hidden className={SIGNAL_COLOR[a.signal]}>
-                        {a.signal}
-                      </span>
-                      <span className="sr-only">{SIGNAL_WORD[a.signal]}</span>
-                    </dt>
-                    <dd className="min-w-0 break-keep text-ink/90">{a.line}</dd>
-                  </Fragment>
-                ))}
-              </dl>
-            )}
-
-            {/* 하면 좋아요 = 금색 띠지, 피해요 = 먹색 테두리 띠지. 라벨은 띠지 안, 문장은 오른쪽 (v3.2) */}
-            <dl className="mt-5 grid grid-cols-[auto_1fr] items-start gap-x-3 gap-y-3 text-[16px] leading-[1.5]">
-              <dt className="tag tag--gold h-8 px-0.5 text-[14px] font-bold text-gold-ink">하면 좋아요</dt>
+            {/* 오늘의 신호 (v3.4): 한 상자에 같은 띠지. 영역 = 먹색 테두리, 하면 좋아요 = 금색 면, 피해요 = 먹색 면.
+                화살표는 글자, 색으로 길흉을 말하지 않는다(↓도 ink) */}
+            <dl className="signal-box mt-5 grid grid-cols-[7rem_1fr] items-start gap-x-3 gap-y-2.5 text-[16px] leading-[1.5]">
+              {areas.map((a) => (
+                <Fragment key={`${a.period}-${a.area}`}>
+                  <dt className="sig sig--line">
+                    <span className="text-muted">{a.period}</span>
+                    <span aria-hidden className="mx-1 text-faint">·</span>
+                    <span>{AREA_WORD[a.area]}</span>
+                    <span aria-hidden className={`ml-1 ${SIGNAL_COLOR[a.signal]}`}>
+                      {a.signal}
+                    </span>
+                    <span className="sr-only">{SIGNAL_WORD[a.signal]}</span>
+                  </dt>
+                  <dd className="min-w-0 break-keep pt-1 text-ink/90">{a.line}</dd>
+                </Fragment>
+              ))}
+              <dt className="sig sig--gold">하면 좋아요</dt>
               <dd className="min-w-0 break-keep pt-1">{fortune.do}</dd>
-              <dt className="tag tag--ink h-8 px-0.5 text-[14px] font-bold text-ink">피해요</dt>
+              <dt className="sig sig--ink">피해요</dt>
               <dd className="min-w-0 break-keep pt-1 text-ink/85">{fortune.dont}</dd>
             </dl>
 

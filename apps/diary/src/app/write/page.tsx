@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { RetryButton } from "@/components/RetryButton";
 import { getUser } from "@/lib/supabase/server";
 import { getEntry, getSajuProfile, readCachedFortune } from "@/lib/db";
 import { dayGanji } from "@/lib/ganji";
@@ -25,8 +26,9 @@ export default async function WritePage({ searchParams }: { searchParams: Promis
             {dateLabel} <span className="text-ganji">{ganji.ko}일</span>, {date === today ? "오늘" : "그날"} 하루
           </h1>
         </header>
-        <section className="card-frame card-paper p-5 text-muted" aria-busy="true">
+        <section className="card-frame card-paper flex flex-col items-start gap-3 p-5 text-muted" aria-busy="true">
           준비하고 있어요…
+          <RetryButton />
         </section>
       </main>
     );

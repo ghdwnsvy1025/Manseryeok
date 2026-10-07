@@ -18,14 +18,11 @@ export interface ProfileFormValues {
   city: string;
 }
 
-/** 양식지 칸 위 작은 라벨 */
-const cellLabel = "text-[12px] leading-none text-muted";
-/** 띠지 고르기 — 안 고름: 한지 띠 + 보조색 글자 / 고름: 남색 띠 + 한지색 글자 */
-const tagOff = "tag h-9 cursor-pointer px-1 text-[15px] text-muted";
-const tagOn = "tag tag--on h-9 cursor-pointer px-1 text-[15px] font-bold text-paper-2";
+/** 입력 묶음 위 작은 라벨 (Pretendard 14px 보조색) */
+const groupLabel = "text-[14px] leading-none text-muted";
 
-/** 띠지로 고르는 라디오 — 고른 띠지만 남색으로 물든다 */
-function TagRadio<T extends string>({
+/** 두 칸 세그먼트의 한 칸 — 라디오 (name/value 그대로). 고른 쪽 = 먹색 면 + 한지색 글자, 안 고른 쪽 = 테두리만 */
+function SegRadio<T extends string>({
   name,
   value,
   current,
@@ -40,9 +37,9 @@ function TagRadio<T extends string>({
 }) {
   const on = current === value;
   return (
-    <label className="inline-flex">
+    <label className="contents">
       <input type="radio" name={name} value={value} checked={on} onChange={() => onChange(value)} className="peer sr-only" />
-      <span className={`${on ? tagOn : tagOff} peer-focus-visible:outline-2 peer-focus-visible:outline-gold`}>{label}</span>
+      <span className="seg__cell">{label}</span>
     </label>
   );
 }
@@ -58,10 +55,11 @@ interface ProfileFormProps {
 }
 
 /**
- * 생년월일 입력 = 호적 서류 (톤 v3.2). 키트 form-sheet 양식지 위에 괘선 칸마다 숫자(Song Myung 22px).
- * 칸은 globals.css의 .form-sheet__rows 격자로 양식지 행에 맞춘다 — 절대 위치 없음.
- * 양식지 행 순서: 양력/음력(반) · 이름 또는 "태어난 날"(한 칸) · 연월일(삼분) · 시각·몰라요(한 칸) · 시분(반) · 태어난 곳(낮은 칸) · 성별(삼분).
- * name=·value=·서버 액션·검증 문구는 기능 쪽 그대로.
+ * 생년월일 입력 (톤 v3.3 "양식지 제거, 깨끗하게"). 한지 카드 한 장 안에 입력칸만.
+ * 입력칸 .field: 56px · 녹갈 1px · paper-3 바탕 · 숫자 Song Myung 22px. 상태만 분명히 —
+ * 빈 칸 = 흐린 자리표시 / 입력 중 = 금색 2px / 채움 = 먹색 글자 / 오류 = 먹색 1.5px + 아래 danger 한 줄.
+ * 양·음력, 성별, 시간 모름은 두 칸 세그먼트 .seg (띠지 없음). 윤달은 음력일 때만 체크 한 줄. 도시 select도 같은 입력칸 모양.
+ * name=·value=·서버 액션·검증 문구는 기능 쪽 그대로. 카드 틀은 부모(온보딩 페이지·오늘 화면)가 두른다.
  */
 export function ProfileForm({ next, initial, serverAction = saveProfileAction, askName = true, submitLabel = "저장" }: ProfileFormProps) {
   const [state, action, pending] = useActionState<FormState, FormData>(serverAction, { error: null });
@@ -69,6 +67,8 @@ export function ProfileForm({ next, initial, serverAction = saveProfileAction, a
   const [calendar, setCalendar] = useState<"solar" | "lunar">(initial?.calendar ?? "solar");
   const [leap, setLeap] = useState(initial?.isLeapMonth ?? false);
   const [timeUnknown, setTimeUnknown] = useState(initial?.timeUnknown ?? false);
+  // 서버 오류는 대부분 날짜·시각 검증이라 그 칸들에 먹색 테두리를 입힌다
+  const invalid = state.error ? true : undefined;
 
   // form action 대신 onSubmit으로 보낸다. React 19는 action 폼을 제출 뒤 비우는데,
   // 서버에서 오류가 났을 때 적은 내용이 사라지면 안 된다.
@@ -79,149 +79,99 @@ export function ProfileForm({ next, initial, serverAction = saveProfileAction, a
   }
 
   return (
-    <form onSubmit={onSubmit} className="flex flex-col gap-5">
+    <form onSubmit={onSubmit} className="flex flex-col gap-6">
       <input type="hidden" name="next" value={next} />
 
-      <div className="form-sheet">
-        <div className="form-sheet__rows">
-          {/* 1. 양력 | 음력 (음력이면 윤달 띠지가 옆에) */}
-          <div className="form-sheet__row form-sheet__row--half" role="radiogroup" aria-label="달력">
-            <div className="form-sheet__cell form-sheet__cell--row">
-              <span className={cellLabel}>달력</span>
-              <TagRadio name="calendar" value="solar" current={calendar} label="양력" onChange={setCalendar} />
-            </div>
-            <div className="form-sheet__cell form-sheet__cell--row">
-              <TagRadio name="calendar" value="lunar" current={calendar} label="음력" onChange={setCalendar} />
-              {calendar === "lunar" && (
-                <label className="inline-flex">
-                  <input type="checkbox" name="isLeapMonth" checked={leap} onChange={(e) => setLeap(e.target.checked)} className="peer sr-only" />
-                  <span className={`${leap ? tagOn : tagOff} peer-focus-visible:outline-2 peer-focus-visible:outline-gold`}>윤달</span>
-                </label>
-              )}
-            </div>
-          </div>
+      {askName && (
+        <div className="flex flex-col gap-2">
+          <label htmlFor="name" className={groupLabel}>
+            이름
+          </label>
+          <input id="name" name="name" defaultValue={initial?.name} maxLength={40} autoComplete="nickname" placeholder="불릴 이름" className="field field--text" required />
+        </div>
+      )}
 
-          {/* 2. 이름(Google 사용자) 또는 "태어난 날" 머리 칸 */}
-          <div className="form-sheet__row">
-            {askName ? (
-              <div className="form-sheet__cell form-sheet__cell--row">
-                <label htmlFor="name" className={`${cellLabel} shrink-0`}>
-                  이름
-                </label>
-                <input
-                  id="name"
-                  name="name"
-                  defaultValue={initial?.name}
-                  maxLength={40}
-                  autoComplete="nickname"
-                  placeholder="불릴 이름"
-                  className="form-sheet__input form-sheet__input--right"
-                  required
-                />
-              </div>
-            ) : (
-              <div className="form-sheet__cell form-sheet__cell--row">
-                <span className="font-serif text-[17px] text-ink">태어난 날</span>
-                <span className="text-[13px] text-muted">{calendar === "lunar" ? "음력 날짜 그대로" : "양력 날짜 그대로"}</span>
-              </div>
-            )}
-          </div>
+      {/* 양력 | 음력 — 음력이면 아래 윤달 체크 한 줄 */}
+      <div className="flex flex-col gap-2">
+        <span className={groupLabel} id="calendar-label">
+          달력
+        </span>
+        <div className="seg" role="radiogroup" aria-labelledby="calendar-label">
+          <SegRadio name="calendar" value="solar" current={calendar} label="양력" onChange={setCalendar} />
+          <SegRadio name="calendar" value="lunar" current={calendar} label="음력" onChange={setCalendar} />
+        </div>
+        {calendar === "lunar" && (
+          <label className="mt-1 flex items-center gap-2 text-[15px] text-ink">
+            <input type="checkbox" name="isLeapMonth" checked={leap} onChange={(e) => setLeap(e.target.checked)} className="check" />
+            윤달이에요
+          </label>
+        )}
+      </div>
 
-          {/* 3. 연 | 월 | 일 */}
-          <div className="form-sheet__row form-sheet__row--third">
-            <div className="form-sheet__cell">
-              <span className={cellLabel}>태어난 해</span>
-              <input name="birthYear" inputMode="numeric" maxLength={4} placeholder="1995" defaultValue={initial?.birthYear} aria-label="태어난 해" className="form-sheet__input" required />
-            </div>
-            <div className="form-sheet__cell">
-              <span className={cellLabel}>달</span>
-              <input name="birthMonth" inputMode="numeric" maxLength={2} placeholder="월" defaultValue={initial?.birthMonth} aria-label="태어난 달" className="form-sheet__input" required />
-            </div>
-            <div className="form-sheet__cell">
-              <span className={cellLabel}>날</span>
-              <input name="birthDay" inputMode="numeric" maxLength={2} placeholder="일" defaultValue={initial?.birthDay} aria-label="태어난 날" className="form-sheet__input" required />
-            </div>
-          </div>
+      {/* 연 · 월 · 일 */}
+      <div className="flex flex-col gap-2">
+        <span className={groupLabel}>태어난 날 {calendar === "lunar" ? "(음력 그대로)" : ""}</span>
+        <div className="grid grid-cols-[2fr_1fr_1fr] gap-2">
+          <input name="birthYear" inputMode="numeric" maxLength={4} placeholder="1995" defaultValue={initial?.birthYear} aria-label="태어난 해" aria-invalid={invalid} className="field" required />
+          <input name="birthMonth" inputMode="numeric" maxLength={2} placeholder="월" defaultValue={initial?.birthMonth} aria-label="태어난 달" aria-invalid={invalid} className="field" required />
+          <input name="birthDay" inputMode="numeric" maxLength={2} placeholder="일" defaultValue={initial?.birthDay} aria-label="태어난 날" aria-invalid={invalid} className="field" required />
+        </div>
+      </div>
 
-          {/* 4. 태어난 시각 머리 칸 + 시간을 몰라요 띠지 */}
-          <div className="form-sheet__row">
-            <div className="form-sheet__cell form-sheet__cell--row">
-              <span className="font-serif text-[17px] text-ink">태어난 시각</span>
-              <label className="inline-flex">
-                <input
-                  type="checkbox"
-                  name="timeUnknown"
-                  checked={timeUnknown}
-                  onChange={(e) => setTimeUnknown(e.target.checked)}
-                  className="peer sr-only"
-                />
-                <span className={`${timeUnknown ? tagOn : tagOff} peer-focus-visible:outline-2 peer-focus-visible:outline-gold`}>시간을 몰라요</span>
-              </label>
-            </div>
+      {/* 태어난 시각 — 세그먼트 "알아요 | 몰라요"(체크박스 name=timeUnknown 유지) + 시 · 분 */}
+      <div className="flex flex-col gap-2">
+        <span className={groupLabel} id="time-label">
+          태어난 시각
+        </span>
+        <input type="checkbox" name="timeUnknown" checked={timeUnknown} onChange={(e) => setTimeUnknown(e.target.checked)} className="sr-only" tabIndex={-1} aria-hidden />
+        <div className="seg" role="group" aria-labelledby="time-label">
+          <button type="button" aria-pressed={!timeUnknown} data-on={!timeUnknown ? "" : undefined} onClick={() => setTimeUnknown(false)} className="seg__cell">
+            알아요
+          </button>
+          <button type="button" aria-pressed={timeUnknown} data-on={timeUnknown ? "" : undefined} onClick={() => setTimeUnknown(true)} className="seg__cell">
+            몰라요
+          </button>
+        </div>
+        {!timeUnknown && (
+          <div className="grid grid-cols-2 gap-2">
+            <input name="birthHour" inputMode="numeric" maxLength={2} placeholder="시 (0~23)" defaultValue={initial?.birthHour} aria-label="태어난 시" aria-invalid={invalid} className="field" />
+            <input name="birthMinute" inputMode="numeric" maxLength={2} placeholder="분" defaultValue={initial?.birthMinute} aria-label="태어난 분" aria-invalid={invalid} className="field" />
           </div>
+        )}
+      </div>
 
-          {/* 5. 시 | 분 — 몰라요를 고르면 칸은 그대로 두고 비운다 (양식지 행이 흔들리지 않게) */}
-          <div className="form-sheet__row form-sheet__row--half">
-            <div className="form-sheet__cell">
-              <span className={cellLabel}>시 (0~23)</span>
-              {timeUnknown ? (
-                <span aria-hidden className="h-10 text-center font-serif text-[22px] leading-10 text-faint">
-                  —
-                </span>
-              ) : (
-                <input name="birthHour" inputMode="numeric" maxLength={2} placeholder="시" defaultValue={initial?.birthHour} aria-label="태어난 시" className="form-sheet__input" />
-              )}
-            </div>
-            <div className="form-sheet__cell">
-              <span className={cellLabel}>분</span>
-              {timeUnknown ? (
-                <span aria-hidden className="h-10 text-center font-serif text-[22px] leading-10 text-faint">
-                  —
-                </span>
-              ) : (
-                <input name="birthMinute" inputMode="numeric" maxLength={2} placeholder="분" defaultValue={initial?.birthMinute} aria-label="태어난 분" className="form-sheet__input" />
-              )}
-            </div>
-          </div>
+      {/* 태어난 곳 — 같은 입력칸 모양의 select */}
+      <div className="flex flex-col gap-2">
+        <label htmlFor="city" className={groupLabel}>
+          태어난 곳
+        </label>
+        <span className="relative block">
+          <select id="city" name="city" defaultValue={initial?.city ?? "seoul"} className="field field--select">
+            {CITIES.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+          <span aria-hidden className="pointer-events-none absolute top-1/2 right-4 -translate-y-1/2 text-[13px] text-muted">
+            ▾
+          </span>
+        </span>
+      </div>
 
-          {/* 6. 태어난 곳 (낮은 칸) */}
-          <div className="form-sheet__row">
-            <div className="form-sheet__cell form-sheet__cell--row">
-              <label htmlFor="city" className="font-serif text-[17px] text-ink">
-                태어난 곳
-              </label>
-              <span className="relative inline-flex items-center">
-                <select id="city" name="city" defaultValue={initial?.city ?? "seoul"} className="form-sheet__select">
-                  {CITIES.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
-                <span aria-hidden className="pointer-events-none absolute right-0 text-[13px] text-muted">
-                  ▾
-                </span>
-              </span>
-            </div>
-          </div>
-
-          {/* 7. 성별 | 여성 | 남성 */}
-          <div className="form-sheet__row form-sheet__row--third" role="radiogroup" aria-label="성별">
-            <div className="form-sheet__cell">
-              <span className="font-serif text-[17px] text-ink">성별</span>
-            </div>
-            <div className="form-sheet__cell items-center">
-              <TagRadio name="gender" value="female" current={gender} label="여성" onChange={setGender} />
-            </div>
-            <div className="form-sheet__cell items-center">
-              <TagRadio name="gender" value="male" current={gender} label="남성" onChange={setGender} />
-            </div>
-          </div>
+      {/* 성별 */}
+      <div className="flex flex-col gap-2">
+        <span className={groupLabel} id="gender-label">
+          성별
+        </span>
+        <div className="seg" role="radiogroup" aria-labelledby="gender-label">
+          <SegRadio name="gender" value="female" current={gender} label="여성" onChange={setGender} />
+          <SegRadio name="gender" value="male" current={gender} label="남성" onChange={setGender} />
         </div>
       </div>
 
       {state.error && (
-        <p role="alert" className="text-[15px] text-danger">
+        <p role="alert" className="-mt-2 text-[15px] text-danger">
           {state.error}
         </p>
       )}

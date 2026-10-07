@@ -4,13 +4,23 @@ import { useEffect, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 
 interface Props {
-  /** 그날 간지 한글 ("임자"). 카드 파일은 /cards/{간지}.webp (바이럴 60갑자 세트 복사본) */
+  /** 내 일주 한글 ("기축", v3.3). 글자 "{ganjiKo} 카드에 오늘 도장을 찍었어요"에 쓴다 */
   ganjiKo: string;
-  happiness: number;
-  /** 같은 저장을 두 번 터뜨리지 않기 위한 열쇠 (날짜·내용). 바뀌면 다시 터진다 */
-  signature: string;
+  /** 내 일주 카드 그림 (characterOf().cardSrc = /cards/{일주}.webp) */
+  cardSrc: string;
+  /** 오늘 행복도. reveal 모드에서는 쓰지 않는다 */
+  happiness?: number;
+  /** 같은 저장을 두 번 터뜨리지 않기 위한 열쇠 (날짜·내용). 바뀌면 다시 터진다. reveal 모드에서는 쓰지 않는다 */
+  signature?: string;
   /** 오늘의 작은 약속을 지킨 날 (톤 v3.2) → 카드가 금테. 시각은 디자이너가 data-kept로 입힌다 */
   kept?: boolean;
+  /** 지난 도장들: 최근 7개 기록의 행복도 (오늘 제외, 최신순). 카드 아래 가장자리에 작은 인주 점으로 — 시각은 디자이너 */
+  recentHappiness?: number[];
+  /**
+   * "save"(기본) = 저장 완료 팡: 오버레이 + 도장 + 글자 + 1.5초 뒤 자동으로 걷힘.
+   * "reveal" = /welcome 카드 등장: 오버레이·도장·글자·자동 닫힘 없이 카드 팡만 제자리에서 (글·버튼은 부모가 둔다).
+   */
+  mode?: "save" | "reveal";
 }
 
 /** 키트 sprite sheet(1024×1024) 안의 조각 위치 [x, y, w, h] — ui-kit/pop-pieces.json에서 측정 */
@@ -53,14 +63,19 @@ function Bit({ kind, box, size, dx, dy, rot }: { kind: "paper" | "gold"; box: [n
 
 /**
  * 저장 완료 보상 "팡" (톤 v3.1 — 색종이 금지의 유일한 예외).
- * 한지 반투명 오버레이 → 그날 간지의 바이럴 카드가 팡 → 뒤에서 한지 조각 8·금빛 가루 8이 흩어진다 → 1.5초 뒤 걷힌다.
+ * 한지 반투명 오버레이 → 내 일주 카드(v3.3)가 팡 → 뒤에서 한지 조각 8·금빛 가루 8이 흩어진다 → 1.5초 뒤 걷힌다.
  * 탭하면 바로 닫힌다. reduced-motion이면 팡·흩날림 없이 카드만 보이고 1초 뒤 걷힌다.
  * 오늘 화면(/?saved=날짜)에서 한 번만 뜬다. 저장 자체는 서버 액션이 끝낸 뒤라 성공이 보장된다.
  */
-export function SaveBurst({ ganjiKo, happiness, signature, kept = false }: Props) {
+export function SaveBurst({ ganjiKo, cardSrc, happiness, signature = "", kept = false, recentHappiness = [], mode = "save" }: Props) {
   const [phase, setPhase] = useState<"hidden" | "open" | "closing">("hidden");
+  const reveal = mode === "reveal";
 
   useEffect(() => {
+    if (reveal) {
+      setPhase("open");
+      return;
+    }
     const key = `saju-burst:${signature}`;
     try {
       if (sessionStorage.getItem(key)) return;
@@ -77,7 +92,7 @@ export function SaveBurst({ ganjiKo, happiness, signature, kept = false }: Props
     }
     const t = window.setTimeout(() => setPhase("closing"), reduced ? 1000 : 1500);
     return () => window.clearTimeout(t);
-  }, [signature]);
+  }, [signature, reveal]);
 
   useEffect(() => {
     if (phase !== "closing") return;
@@ -98,6 +113,33 @@ export function SaveBurst({ ganjiKo, happiness, signature, kept = false }: Props
     },
   );
 
+  const cardBlock = (
+    <div className="relative flex w-[62vw] max-w-[320px] flex-col items-center">
+      {bits.map((b, i) => (
+        <Bit key={i} {...b} />
+      ))}
+      <img src={cardSrc} alt={`${ganjiKo} 카드`} width={768} height={1030} data-kept={kept ? "" : undefined} className="burst-card relative h-auto w-full" />
+      {/* 행복도 인주 도장 — 카드 팡 150ms 뒤 꽝 (v3.2). 숫자 한지색. reveal에는 없다 */}
+      {!reveal && happiness !== undefined && (
+        <span className="burst-stamp" aria-label={`행복도 ${happiness}`}>
+          {happiness}
+        </span>
+      )}
+      {/* 지난 도장들 (v3.3): 최근 7개, 최신순. 번호 없음. 카드 아래 가장자리 안쪽 왼쪽에 12px 인주 점, 간격 6px.
+          점의 농도 = 그날 행복도 (--h). 글자와 같은 150ms 뒤에 나타난다 */}
+      {!reveal && recentHappiness.length > 0 && (
+        <ul className="burst-past" aria-label="지난 도장들">
+          {recentHappiness.map((h, i) => (
+            <li key={i} data-happiness={h} className="burst-past__dot" style={{ "--h": h } as CSSProperties} />
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+
+  // reveal (/welcome): 오버레이 없이 제자리에서 카드만 팡. 닫히지 않는다
+  if (reveal) return cardBlock;
+
   return createPortal(
     <div
       role="status"
@@ -106,25 +148,9 @@ export function SaveBurst({ ganjiKo, happiness, signature, kept = false }: Props
       onClick={() => setPhase("closing")}
       className="burst-overlay fixed inset-0 z-50 flex cursor-pointer flex-col items-center justify-center bg-paper/85"
     >
-      <div className="relative flex w-[62vw] max-w-[320px] flex-col items-center">
-        {bits.map((b, i) => (
-          <Bit key={i} {...b} />
-        ))}
-        <img
-          src={`/cards/${ganjiKo}.webp`}
-          alt={`${ganjiKo}일 카드`}
-          width={768}
-          height={1030}
-          data-kept={kept ? "" : undefined}
-          className="burst-card relative h-auto w-full"
-        />
-        {/* 행복도 인주 도장 — 카드 팡 150ms 뒤 꽝 (v3.2). 숫자 한지색 */}
-        <span className="burst-stamp" aria-label={`행복도 ${happiness}`}>
-          {happiness}
-        </span>
-      </div>
+      {cardBlock}
       <p className="burst-text mt-6 text-center">
-        <span className="block font-serif text-[22px] leading-snug text-ink">{ganjiKo}일 카드를 모았어요</span>
+        <span className="block font-serif text-[22px] leading-snug text-ink">{ganjiKo} 카드에 오늘 도장을 찍었어요</span>
       </p>
     </div>,
     document.body,

@@ -3,8 +3,10 @@ import { redirect } from "next/navigation";
 import { BRANCH_META, STEM_META, getTenGod, type Element, type StemHanja } from "@saju/engine";
 import { getUser } from "@/lib/supabase/server";
 import { GanjiGrid } from "@/components/GanjiGrid";
+import { RetryButton } from "@/components/RetryButton";
 import { ShareCard } from "@/components/ShareCard";
 import { shareCardText, shareMessage } from "@/lib/share";
+import { characterOf } from "@/lib/character";
 import { StatsSummary } from "@/components/StatsSummary";
 import { countEntries, getSajuProfile, listEntries, listEntriesForStats } from "@/lib/db";
 import { fitPercent } from "@/lib/fortune/personal";
@@ -77,8 +79,9 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
         <header>
           <h1 className="mt-1 font-serif text-[26px]">나</h1>
         </header>
-        <section className="card-frame card-paper p-5 text-muted" aria-busy="true">
+        <section className="card-frame card-paper flex flex-col items-start gap-3 p-5 text-muted" aria-busy="true">
           준비하고 있어요…
+          <RetryButton />
         </section>
       </main>
     );
@@ -91,6 +94,7 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
   ]);
   // 생년월일이 없으면 먼저 받는다 (로그인 사용자와 같은 규칙)
   if (!profile) redirect("/onboarding?next=/me");
+  const me = characterOf(profile.pillars);
   const h = highlights(all);
   const card = shareCardText(h, profile?.name ?? null);
   const share = card ? shareMessage(card) : null;
@@ -99,12 +103,16 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
 
   return (
     <main className="flex flex-col gap-6">
-      <header className="flex items-baseline justify-between">
-        <h1 className="mt-1 font-serif text-[26px]">{profile.name === "손님" ? "나의 밤" : `${profile.name}의 밤`}</h1>
+      <header className="relative flex flex-col items-center pt-2">
         {/* 설정은 한곳에 모았다 (docs/ANON_START.md 3절): Google 연결 · 알림 · 생년월일 · 앱으로 두기 · 로그아웃 */}
-        <Link href="/settings" className="text-sm text-muted underline underline-offset-4">
+        <Link href="/settings" className="absolute top-0 right-0 text-sm text-muted underline underline-offset-4">
           설정
         </Link>
+        {/* 제목 자리 = 내 카드 (v3.3): 폭 56%, 이 화면의 그림 하나. 카드 자체가 테두리를 가지고 있어 틀을 더 두르지 않는다 */}
+        <img src={me.cardSrc} alt={`내 카드 ${me.ganjiKo}`} width={768} height={1030} className="h-auto w-[56%] max-w-[240px]" />
+        <h1 className="mt-4 font-serif text-[20px] leading-snug">
+          {profile.name} · <span className="text-ganji">{me.ganjiKo}일</span> · {me.animal}
+        </h1>
       </header>
 
       <section className="card-frame card-paper p-5">
@@ -138,7 +146,7 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
       <section className="flex flex-col gap-4">
         <div>
           <h2 className="font-serif text-[22px]">간지별 내 행복도</h2>
-          <p className="mt-1 text-sm text-muted">60가지 날 가운데 나는 어떤 날에 행복했는지. 기록한 날의 카드가 칸에 모여요.</p>
+          <p className="mt-1 text-sm text-muted">60가지 날 가운데 나는 어떤 날에 행복했는지. 기록한 날의 동물이 칸에 찍혀요.</p>
         </div>
         <GanjiGrid
           cells={ganjiGrid(all)}
@@ -151,7 +159,7 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
       </section>
 
       <section className="flex flex-col gap-3">
-        <ShareCard card={card} title={share?.title ?? ""} text={share?.text ?? ""} />
+        <ShareCard card={card} cardSrc={me.cardSrc} title={share?.title ?? ""} text={share?.text ?? ""} />
       </section>
 
       <section>

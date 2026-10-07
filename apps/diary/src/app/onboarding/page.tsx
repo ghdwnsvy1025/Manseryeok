@@ -1,3 +1,4 @@
+import { RetryButton } from "@/components/RetryButton";
 import { getUser } from "@/lib/supabase/server";
 import { getSajuProfile } from "@/lib/db";
 import { ProfileForm } from "./ProfileForm";
@@ -19,6 +20,7 @@ export default async function OnboardingPage({ searchParams }: { searchParams: P
         <section className="card-frame card-paper p-5" aria-busy="true" aria-live="polite">
           <span aria-hidden className="brush-loading" />
           <p className="mt-3 text-[15px] text-muted">준비하고 있어요</p>
+          <RetryButton className="mt-3" />
         </section>
       </main>
     );
@@ -35,10 +37,12 @@ export default async function OnboardingPage({ searchParams }: { searchParams: P
         <h1 className="mt-1 font-serif text-[26px] leading-snug">태어난 날을 적어요</h1>
         <p className="mt-2 text-[15px] text-muted">내 사주로 오늘 운세를 계산해요. 이 정보는 나만 볼 수 있어요.</p>
       </header>
+      {/* 한지 카드 한 장 안에 입력칸 (v3.3 — 양식지 없음) */}
+      <section className="card-frame card-paper p-5">
       <ProfileForm
         next={safeNext}
         askName={askName}
-        submitLabel="오늘 운세 보기"
+        submitLabel="내 카드 보기"
         initial={
           existing
             ? {
@@ -57,6 +61,7 @@ export default async function OnboardingPage({ searchParams }: { searchParams: P
             : null
         }
       />
+      </section>
     </main>
   );
 }

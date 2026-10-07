@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getUser } from "@/lib/supabase/server";
-import { ensureUserRow, markLinkPrompted, saveEntry, saveFortuneVote, saveNotificationSettings, saveSajuProfile } from "@/lib/db";
+import { ensureUserRow, getSajuProfile, markLinkPrompted, saveEntry, saveFortuneVote, saveNotificationSettings, saveSajuProfile } from "@/lib/db";
 import { isAllowedRemindHour } from "@/lib/remind";
 import { validateEntry } from "@/lib/entry";
 import { dayGanji } from "@/lib/ganji";
@@ -73,20 +73,39 @@ export async function saveProfileAction(_prev: FormState, form: FormData): Promi
   const computed = computeProfile(checked.value);
   if (!computed.ok) return { error: computed.error };
 
+  // 처음 만드는 프로필인지 — 그때만 /welcome(내 카드 공개, v3.3). 고치기는 next로 돌아간다
+  let isFirst = false;
   try {
+    isFirst = (await getSajuProfile(supabase, user.id)) === null;
     await saveSajuProfile(supabase, user.id, checked.value, computed.value);
   } catch (e) {
     console.error(e);
     return { error: "저장하지 못했어요. 잠시 뒤 다시 눌러 주세요." };
   }
   revalidatePath("/", "layout");
-  redirect(safeNext(form.get("next"), "/"));
+  redirect(isFirst ? "/welcome" : safeNext(form.get("next"), "/"));
 }
 
-/** 로그아웃(또는 익명 "기록 모두 지우기"). 중간 화면 없이 액션 안에서 끝낸다 */
+/**
+ * 로그아웃(또는 익명 "기록 모두 지우기"). 중간 화면 없이 액션 안에서 끝낸다.
+ * 끊은 자리에서 바로 새 익명 세션을 만들어 쿠키에 심는다 — 서버 액션의 redirect는 소프트 내비게이션이라
+ * 이미 마운트된 AnonBoot가 다시 돌지 않고, 돌아간 화면이 "준비하고 있어요"에 멈춰 있던 버그(2026-10-07).
+ * 새 익명 세션 만들기가 실패하면 세션 없이 돌아가고, AnonBoot(경로 변경 감지)나 "다시 시도"가 이어받는다.
+ */
 export async function signOutAction(): Promise<void> {
   const { supabase } = await getUser();
-  await supabase.auth.signOut();
+  const { error: outError } = await supabase.auth.signOut();
+  if (outError) console.error("로그아웃 실패", outError);
+  const { data, error } = await supabase.auth.signInAnonymously();
+  if (error || !data.user) {
+    console.error("로그아웃 뒤 익명 시작 실패", error ?? new Error("사용자 없음"));
+  } else {
+    try {
+      await ensureUserRow(supabase, data.user.id, "손님");
+    } catch (e) {
+      console.error(e);
+    }
+  }
   revalidatePath("/", "layout");
   redirect("/");
 }

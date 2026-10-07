@@ -1,4 +1,4 @@
-// 원본: 사주 코어 core/src/extras.ts @ ebf972d4c44c02f6f6bf01bbd4fa396b2d6907cc (2026-10-05 복사). 판정 로직 수정 금지 — 바꾸려면 코어에서 먼저 바꾸고 다시 복사.
+// 원본: 사주 코어 core/src/extras.ts @ 240c91dbe54a60059d42b74148db88a31aebd16d (2026-10-07 복사, 이전 ebf972d). 판정 로직 수정 금지 — 바꾸려면 코어에서 먼저 바꾸고 다시 복사.
 // 규칙/부가태그.md (판정에 쓰지 않는 태그) + 규칙/조후.md (J-01~J-03 보조 태그)
 import { type Element, type Pillars, type Role, STEMS, BRANCHES, STEM_EL, BRANCH_EL, POS_NAME } from "./base";
 import type { Yongsin } from "./yongsin";
@@ -54,7 +54,13 @@ export function extraTags(p: Pillars): Tag[] {
 }
 
 // ---------- 조후 ----------
-export type Johu = { 점수: number; 온도: "조열 뚜렷" | "조열 경향" | "무난" | "한습 경향" | "한습 뚜렷"; 습조: "습" | "조" | null; 필요오행: Element | null; 용신과: "조후 일치" | "조후 상충" | null; 계산: string[] };
+export type Johu = { 점수: number; 온도: "조열 뚜렷" | "조열 경향" | "무난" | "한습 경향" | "한습 뚜렷"; 습조: "습" | "조" | null; 필요오행: Element | null; 용신과: "조후 일치" | "조후 상충" | null;
+  극단: boolean; 조후용신: Element | null; 활력: string | null; 계산: string[] };
+// J-04 [합의·조건부 2026-10-07 카드 005]: 극단으로 뜨겁거나 차면 억부 용신보다 조후용신을 먼저 찾는다. 극단 기준 |점수| ≥ 6 [가설]
+// — 운 판정(Y-09)은 아직 억부 용신 그대로. 조후용신을 운에 어떻게 반영할지는 충돌 카드 009가 정함
+const JOHU_EXTREME = 6;
+// J-04 역할: 조후는 "활력·기분의 기복" 보조 태그(정신 건강·질병·성격 판정에 쓰지 않음). 에너지 섹션의 재료
+const VITALITY: Partial<Record<Johu["온도"], string>> = { "조열 뚜렷": "열이 쌓이는 쪽 — 밖으로 내보내는(발산) 일이 먼저", "조열 경향": "열이 쌓이기 쉬운 쪽", "한습 경향": "가라앉기 쉬운 쪽", "한습 뚜렷": "가라앉는 쪽 — 몸을 데우고 움직이는 일이 먼저" };
 
 export function johu(p: Pillars, y: Yongsin): Johu {
   const 계산: string[] = []; let s = 0; const plus = (n: number, why: string) => { if (n) { s += n; 계산.push(`${why} ${n > 0 ? "+" : ""}${n}`); } };
@@ -67,5 +73,7 @@ export function johu(p: Pillars, y: Yongsin): Johu {
   const 습조 = wet - dry >= 2 ? "습" : dry - wet >= 2 ? "조" : null;
   const 필요오행: Element | null = 온도.startsWith("한습") ? "화" : 온도.startsWith("조열") ? "수" : null;
   const r: Role | null = 필요오행 ? y.오행역할[필요오행] : null;
-  return { 점수: s, 온도, 습조, 필요오행, 용신과: !r ? null : "용희".includes(r) ? "조후 일치" : "기구".includes(r) ? "조후 상충" : null, 계산 };
+  const 극단 = Math.abs(s) >= JOHU_EXTREME;
+  return { 점수: s, 온도, 습조, 필요오행, 용신과: !r ? null : "용희".includes(r) ? "조후 일치" : "기구".includes(r) ? "조후 상충" : null,
+    극단, 조후용신: 극단 ? 필요오행 : null, 활력: VITALITY[온도] ?? null, 계산 };
 }

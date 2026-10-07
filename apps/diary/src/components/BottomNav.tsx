@@ -12,7 +12,7 @@ const TABS = [
 /** 오늘 · 쓰기 · 나. 로그인·프로필 입력 화면에서는 숨긴다. */
 export function BottomNav() {
   const path = usePathname();
-  if (path.startsWith("/login") || path.startsWith("/onboarding")) return null;
+  if (path.startsWith("/login") || path.startsWith("/onboarding") || path.startsWith("/welcome")) return null;
 
   return (
     <nav

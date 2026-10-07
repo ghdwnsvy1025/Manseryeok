@@ -3,7 +3,7 @@
 import type { TenGod } from "@saju/engine";
 import { AREA_WORD } from "./core";
 import { BANNED, batchim } from "./text";
-import type { AreaName, AreaSignal, CoreFortune, PersonalAdjustment } from "./types";
+import type { AreaName, AreaPeriod, AreaSignal, CoreFortune, PersonalAdjustment } from "./types";
 
 /** 사주 코어 content/validate.ts의 COMMON_BAN·HEALTH_BAN 복사. 하루 운세에서도 같은 선을 지킨다 */
 export const CORE_BANNED = [
@@ -51,15 +51,15 @@ export interface FortuneBrief {
   score: { value: number; band: string; word: string };
   /** 사용자용 낱말로 바뀐 사실 문장 (한자·십신 없음) */
   facts: string[];
-  /** 신호 있는 영역. 이 순서·개수대로 areas 줄을 쓴다 */
-  areas: { area: AreaName; word: string; signal: AreaSignal; why: string }[];
+  /** 신호 있는 영역. 이 순서·개수·period·area대로 areas 줄을 쓴다. v4.2: 오늘(≤2) → 이달(1) → 올해(1) */
+  areas: { period: AreaPeriod; area: AreaName; word: string; signal: AreaSignal; why: string }[];
   keywords: { positive: string[]; negative: string[] };
   caveats: string[];
   /** 내 기록 숫자. 기록이 없으면 null */
   personal: { n: number; mean: number; sameGanjiCount: number; sameGanjiMean: number | null } | null;
   /** 본문에 넣어야 하는 "내 숫자 한 문장"의 재료. 기록이 없으면 null이고 그때는 기록 이야기를 하지 않는다 */
   mine: string | null;
-  /** 글에 써도 되는 숫자 전부. 이 밖의 숫자는 날조로 본다 */
+  /** 글에 써도 되는 숫자 전부. 이 밖의 숫자는 날조로 본다. v4.2: 점수(score.value)는 들어 있지 않다 — 점수는 화면이 보여 준다 */
   allowedNumbers: number[];
   banned: readonly string[];
   jargon: readonly string[];
@@ -87,7 +87,7 @@ export function buildBrief(input: BriefInput): FortuneBrief {
   const { core, personal, today } = input;
   const facts = core.facts.map(plainFact);
   const caveats = core.caveats.map(hanjaToKo);
-  const areas = core.areas.map((a) => ({ area: a.area, word: AREA_WORD[a.area], signal: a.signal, why: plainFact(a.why) }));
+  const areas = core.areas.map((a) => ({ period: a.period, area: a.area, word: AREA_WORD[a.area], signal: a.signal, why: plainFact(a.why) }));
 
   let mine: string | null = null;
   let personalOut: FortuneBrief["personal"] = null;
@@ -106,7 +106,6 @@ export function buildBrief(input: BriefInput): FortuneBrief {
     ...areas.map((a) => a.why),
     ...(mine ? [mine] : []),
     String(y), String(m), String(d),
-    String(input.score10),
   ]);
 
   return {
@@ -124,9 +123,11 @@ export function buildBrief(input: BriefInput): FortuneBrief {
     rules: {
       headline: "12자 안팎, 한 구절. 오늘 하루의 느낌을 사실 하나와 묶어서",
       body: "4~6문장. 사실들을 나열하지 말고 하나의 하루 흐름으로 잇기. 아침·점심·저녁 중 한 장면을 구체적으로 하나 넣기. 같은 문형 반복 금지",
-      areas: areas.length ? `areas 배열은 ${areas.length}개, 순서와 area 이름은 입력과 똑같이. 각 line은 1문장` : "areas는 빈 배열 []",
+      areas: areas.length
+        ? `areas 배열은 ${areas.length}개, 순서·period·area 이름은 입력과 똑같이. 각 line은 1문장. period가 "이달"이면 "이달엔", "올해"면 "올해는"으로 시작하는 1문장. line은 본문 첫 문장을 되풀이하지 않기`
+        : "areas는 빈 배열 []",
       doDont: "do(하면)와 dont(피해요)는 각각 1문장, 구체적 행동. '~해요/~않아요' 꼴",
-      numbers: "숫자는 allowedNumbers에 있는 것만. 사실에 없는 숫자·사건·시간·금액을 만들지 않기",
+      numbers: "숫자는 allowedNumbers에 있는 것만. 사실에 없는 숫자·사건·시간·금액을 만들지 않기. 점수는 화면에 있으니 글에 쓰지 않기 (\"N점\", \"N점 만점\" 금지)",
       mine: mine
         ? `본문 어딘가에 내 숫자 한 문장을 꼭 넣기 (재료: "${mine}"). 숫자는 그대로 쓰기`
         : "기록이 없으니 내 기록 이야기를 하지 않기 (기록했다는 말, 평균, 횟수 모두 금지)",

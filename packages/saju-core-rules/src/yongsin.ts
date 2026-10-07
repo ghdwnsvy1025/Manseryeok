@@ -1,6 +1,6 @@
-// 원본: 사주 코어 core/src/yongsin.ts @ ebf972d4c44c02f6f6bf01bbd4fa396b2d6907cc (2026-10-05 복사). 판정 로직 수정 금지 — 바꾸려면 코어에서 먼저 바꾸고 다시 복사.
+// 원본: 사주 코어 core/src/yongsin.ts @ 240c91dbe54a60059d42b74148db88a31aebd16d (2026-10-07 복사, 이전 ebf972d). 판정 로직 수정 금지 — 바꾸려면 코어에서 먼저 바꾸고 다시 복사.
 // 규칙/용신.md — 세력(Y-02)·신강약(Y-03)·중심기운(Y-04)·용신(Y-05)·희기구한(Y-06)
-// ·용신 등급(Y-07)·균형붕괴(Y-08)·운의 유불리(Y-09)·시간 모름(Y-10)
+// ·용신 등급(Y-07)·운의 유불리(Y-09)·시간 모름(Y-10). 균형붕괴·전왕표(Y-08)는 2026-10-07 사용자 결정으로 뺌("비겁이 많으면 식재관이 전부 좋다"와 양립 불가)
 import {
   type Element, type Group, type Pillars, type Role, type Node,
   ELEMENTS, GROUPS, STEMS, BRANCHES, STEM_EL, BRANCH_EL, GEN, CTRL, CTRL_BY,
@@ -131,20 +131,11 @@ export function yongsinGrade(p: Pillars, b: Balance, y: Yongsin): YongsinGrade {
   return { 등급: g, 원국에있음, T존에있음, 힘, 극당함, 천간합강등, 용신글자: yn.map(nodeName), 근거 };
 }
 
-/** Y-08 균형이 무너진 사주: 중심기운 ≥ 50% 그리고 용신 오행 ≤ 8% */
-export const isCollapsed = (b: Balance, y: Yongsin): boolean => b.그룹퍼센트[b.중심기운] >= 50 && b.판정용퍼센트[y.용신오행] <= 8;
-const JEONWANG: Record<Group, { good: Group[]; bad: Group[]; must: Group }> = {
-  비겁: { good: ["인성", "비겁", "식상"], bad: ["재성", "관성"], must: "재성" },
-  식상: { good: ["비겁", "식상", "재성"], bad: ["관성", "인성"], must: "관성" },
-  재성: { good: ["식상", "재성", "관성"], bad: ["인성", "비겁"], must: "인성" },
-  관성: { good: ["재성", "관성", "인성"], bad: ["비겁", "식상"], must: "비겁" },
-  인성: { good: ["관성", "인성", "비겁"], bad: ["식상", "재성"], must: "식상" },
-};
 
 export type LuckVerdict = "매우 유리" | "유리" | "보통" | "주의" | "어려움";
 export type LuckPart = { 글자: string; 오행: Element; 십신: string; 그룹: Group; 라벨: Role; 점수: number; 판정: LuckVerdict };
 export type Luck = {
-  간지: string; 방식: "라벨 점수" | "전왕표";
+  간지: string; 방식: "라벨 점수";
   천간: LuckPart; 지지: LuckPart; 합계: number; 판정: LuckVerdict;
   확신도: "보통" | "낮음"; 플래그: string[];
 };
@@ -153,11 +144,15 @@ const verdict = (s: number): LuckVerdict => (s >= 3 ? "매우 유리" : s > 0 ? 
 
 /** Y-09 운의 유불리. 충·합 플래그는 chung.ts / hap.ts가 따로 붙입니다 */
 export function luck(p: Pillars, ganji: string, b: Balance, y: Yongsin): Luck {
-  const day = p[2][0]; const collapsed = isCollapsed(b, y); const { toGroup } = groupMap(day);
+  const day = p[2][0]; const { toGroup } = groupMap(day);
+  // Y-12 [합의 2026-10-07 카드 002]: 비겁이 중심인 신강 사주에서 관성은 한신(0.5)이 아니라 희신급(1)으로 — "식·재·관 전부 +, 다만 운에서 결국 기다리는 건 재성"
+  // 비겁이 1순위면 1, 인성이 앞서는 혼합(인비)이면 비겁 비율만큼(5라운드 Q2), 그 밖은 0
+  const assistW = b.신강약 !== "신강" ? 0 : b.중심기운 === "비겁" ? 1 : b.묶음이름 === "인비" ? b.그룹퍼센트.비겁 / Math.max(1, b.그룹퍼센트.비겁 + b.그룹퍼센트.인성) : 0;
+  const assist = assistW > 0;
   const part = (ch: string, isStem: boolean): LuckPart => {
     const stem = isStem ? ch : mainStem(ch); const el = STEM_EL[stem]; const g = toGroup[el]; const 라벨 = y.역할[g];
     let 점수 = SCORE[라벨] * (isStem ? 1.5 : 1);
-    if (collapsed) { const t = JEONWANG[b.중심기운]; 점수 = (t.must === g ? -3 : t.bad.includes(g) ? -1.5 : 1.5); }
+    if (assist && g === "관성" && 라벨 === "한") 점수 = (SCORE.한 + (SCORE.희 - SCORE.한) * assistW) * (isStem ? 1.5 : 1);
     return { 글자: ch, 오행: el, 십신: tenGod(day, stem).god, 그룹: g, 라벨, 점수, 판정: verdict(점수) };
   };
   const 천간 = part(ganji[0], true), 지지 = part(ganji[1], false);
@@ -171,10 +166,13 @@ export function luck(p: Pillars, ganji: string, b: Balance, y: Yongsin): Luck {
   const se = STEM_EL[ganji[0]], be = BRANCH_EL[ganji[1]];
   if (CTRL[se] === be) 플래그.push("운 내부 상충: 천간이 지지를 극함(절각)");
   if (CTRL[be] === se) 플래그.push("운 내부 상충: 지지가 천간을 극함(개두)");
-  if (collapsed) 플래그.push("균형이 무너진 사주 → 전왕표로 판정 (Y-08)");
+  if (assist && (천간.그룹 === "관성" || 지지.그룹 === "관성")) 플래그.push(assistW === 1 ? "관성은 보조 용신 — 희신급으로 셈 (Y-12)" : `관성은 보조 용신 — 비겁 비율(${Math.round(assistW * 100)}%)만큼 (Y-12)`);
   if (y.중화) 플래그.push("중화 사주 → 운의 유불리보다 T존 십신 위주로 볼 것");
   const 합계 = 천간.점수 + 지지.점수;
-  return { 간지: ganji, 방식: collapsed ? "전왕표" : "라벨 점수", 천간, 지지, 합계, 판정: verdict(합계),
+  // 6라운드 Q1-b: 인성이 앞서는 혼합에서 관성 보조로 0 근처가 된 합계는 '보통' — 0.1 차이로 유리·주의가 갈리는 자리는 보통이 정직
+  const capped = assistW > 0 && assistW < 1 && (천간.그룹 === "관성" || 지지.그룹 === "관성") && Math.abs(합계) < 0.5;
+  if (capped) 플래그.push("혼합 사주의 관성 보조 — 합계가 0 근처라 '보통'으로 (Y-12)");
+  return { 간지: ganji, 방식: "라벨 점수", 천간, 지지, 합계, 판정: capped ? "보통" : verdict(합계),
     확신도: y.판정불안정 || y.중화 ? "낮음" : "보통", 플래그 };
 }
 

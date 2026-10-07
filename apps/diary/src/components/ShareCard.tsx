@@ -7,12 +7,14 @@ import { canvasToPng, drawShareCard } from "@/lib/shareCanvas";
 interface Props {
   /** 같은 간지 2번 이상이면 값이 있고, 아니면 null */
   card: ShareCardText | null;
+  /** 카드에 그릴 그림 = 내 일주 카드 (characterOf().cardSrc, v3.3) */
+  cardSrc: string;
   title: string;
   text: string;
 }
 
 /** 브라우저에서 카드를 그려 공유 시트로 넘긴다. 공유가 안 되는 환경이면 내려받는다 */
-export function ShareCard({ card, title, text }: Props) {
+export function ShareCard({ card, cardSrc, title, text }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
@@ -22,7 +24,7 @@ export function ShareCard({ card, title, text }: Props) {
     setBusy(true);
     setNote(null);
     try {
-      await drawShareCard(canvasRef.current, card, `/characters/${card.ganjiKo}.webp`);
+      await drawShareCard(canvasRef.current, card, cardSrc);
       const blob = await canvasToPng(canvasRef.current);
       const fileName = `saju-night-${card.ganjiKo}.png`;
       const file = new File([blob], fileName, { type: "image/png" });

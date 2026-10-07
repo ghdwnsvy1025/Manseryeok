@@ -47,15 +47,16 @@ export interface CoreLuckPart {
   tenGod: TenGod;
   family: TenGodFamily;
   label: RoleLabel;
-  /** 코어 점수 (용 +2, 희 +1, 한 +0.5, 구 −1, 기 −2; 천간 ×1.5. 전왕표면 ±1.5/−3). 용신 없으면 0 */
+  /** 코어 점수 (용 +2, 희 +1, 한 +0.5, 구 −1, 기 −2; 천간 ×1.5. 코어 Y-12 보조 용신이면 한신 관성이 희신급). 용신 없으면 0 */
   score: number;
 }
 
 export interface CoreRelationHit {
   pos: "연" | "월" | "일" | "시";
   kind: "충" | "육합" | "삼합" | "반합" | "복음";
+  /** 충은 코어 luckRelations가 주는 방향. 합·복음은 항상 "중립" (v4.2: 합은 점수 없이 플래그만 — 코어 00_읽는법 원칙 4) */
   direction: "유리" | "불리" | "중립";
-  /** 충은 자리 비중(1~3), 합은 단계(강 2 / 중 1 / 약 0.5) */
+  /** 충은 자리 비중(1~3), 합은 단계(강 2 / 중 1 / 약 0.5). 합의 강도는 점수에 들어가지 않는다 */
   strength: number;
   /** 상대 글자(원국 지지) 또는 합 글자 */
   chars: string;
@@ -64,22 +65,28 @@ export interface CoreRelationHit {
 export interface CoreLuckContextItem {
   간지: string;
   판정: Verdict5 | null;
+  /** 코어 luck 합계점수 (v4.1 ③: 대운·세운은 ctx에 소폭 반영). 용신 없으면 없음 */
+  합계?: number;
+  /** 코어 luck 플래그 ("용신 손상 …", "운 내부 상충 …"). 대운 것은 facts 문장이 된다 */
+  플래그?: string[];
   /** 이 운의 지지와 오늘 지지가 충이면 */
   clash?: { 강도: number; 최고경보: boolean };
-  /** 이 운의 지지와 오늘 지지가 유리한 합이면 (육합 또는 용·희 오행 삼합) */
+  /** 이 운의 지지와 오늘 지지가 합이면 (육합 또는 용·희 오행 삼합). v4.2: 표시용 플래그일 뿐 점수·문장에는 쓰지 않는다 */
   union?: "육합" | "삼합";
 }
 
 export type AreaName = "대인" | "재물" | "직업" | "학업" | "연애" | "가족" | "건강";
 export type AreaSignal = "↑" | "→" | "↓";
+/** v4.2: 영역 줄의 기간. 오늘 = 일진(최대 2), 이달 = 월운(1), 올해 = 세운(1) */
+export type AreaPeriod = "오늘" | "이달" | "올해";
 
 export interface CoreFortune {
   dayLuck: {
     stem: CoreLuckPart;
     branch: CoreLuckPart;
     total: Verdict5;
-    /** "라벨 점수" | "전왕표" | "용신 없음"(시간 모름) */
-    method: "라벨 점수" | "전왕표" | "용신 없음";
+    /** "라벨 점수" | "용신 없음"(시간 모름). 전왕표는 코어 240c91d(2026-10-07)에서 제거됨 */
+    method: "라벨 점수" | "용신 없음";
     /** 천간+지지 합계 (raw) */
     raw: number;
   };
@@ -90,7 +97,8 @@ export interface CoreFortune {
     wolun?: CoreLuckContextItem;
     입춘전: boolean;
   };
-  areas: { area: AreaName; signal: AreaSignal; why: string }[];
+  /** 영역 신호. 순서는 오늘(≤2) → 이달(1) → 올해(1). 코어 luckAreas(일운·월운·세운) */
+  areas: { period: AreaPeriod; area: AreaName; signal: AreaSignal; why: string }[];
   /** 글 재료. 사용자용 낱말로 바꾼 사실 문장 6~10개 (금지어 없음) */
   facts: string[];
   /** luckKeywords (KW-03) */
@@ -113,8 +121,8 @@ export interface FortuneContent {
   body: string;
   do: string;
   dont: string;
-  /** 영역 신호 줄 (v4). 신호 있는 영역만 1~3개 */
-  areas?: { area: AreaName; signal: AreaSignal; line: string }[];
+  /** 영역 신호 줄 (v4). v4.2: period가 붙고 순서는 오늘(≤2) → 이달(1) → 올해(1), 최대 4. line에 기간 접두는 없다(모델 글은 "이달엔/올해는"으로 시작) */
+  areas?: { period: AreaPeriod; area: AreaName; signal: AreaSignal; line: string }[];
   source: "llm" | "template";
   /** 3단계: 모델을 부른 횟수 (0이면 부르지 않았다) */
   attempts?: number;

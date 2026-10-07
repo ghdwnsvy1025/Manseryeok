@@ -1,13 +1,14 @@
 import Link from "next/link";
 import { Suspense } from "react";
-import { BandHint } from "@/components/BandHint";
 import { FortuneCard } from "@/components/FortuneCard";
 import { FortuneLoading } from "@/components/FortuneLoading";
 import { LinkPromptCard } from "@/components/LinkPromptCard";
+import { RetryButton } from "@/components/RetryButton";
 import { SaveBurst } from "@/components/SaveBurst";
 import { TodayEntryCard } from "@/components/TodayEntryCard";
 import { createClient, getUser } from "@/lib/supabase/server";
-import { birthProfileOf, getEntry, getFortuneVote, getLinkPromptState, getSajuProfile, listEntriesForStats, type SajuProfileRow } from "@/lib/db";
+import { birthProfileOf, countEntries, getEntry, getFortuneVote, getLinkPromptState, getSajuProfile, listEntries, listEntriesForStats, type SajuProfileRow } from "@/lib/db";
+import { characterOf, todayLine } from "@/lib/character";
 import { getTodayFortune } from "@/lib/fortune";
 import type { EntryLike } from "@/lib/fortune/personal";
 import { dayGanji } from "@/lib/ganji";
@@ -79,17 +80,21 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
 
   const { supabase, user } = await getUser();
   // 세션이 아직 없는 첫 요청: AnonBoot가 곧 익명 세션을 만들고 새로 그린다. 리디렉트하지 않는다
-  const [profile, entry, entries, linkState] = user
+  const [profile, entry, entries, linkState, entryCount, recent] = user
     ? await Promise.all([
         getSajuProfile(supabase, user.id),
         getEntry(supabase, user.id, today),
         listEntriesForStats(supabase, user.id),
         getLinkPromptState(supabase, user.id),
+        countEntries(supabase, user.id),
+        listEntries(supabase, user.id, 8),
       ])
-    : [null, null, [], { promptedAt: null, promptCount: 0 }];
+    : [null, null, [], { promptedAt: null, promptCount: 0 }, 0, []];
 
-  // 60칸 띠에 기록한 간지를 표시한다
-  const recordedGanji = new Set<number>(entries.map((e) => Number(e.day_ganji_index)));
+  // 내 캐릭터 = 일주 (톤 v3.3). 프로필이 없으면 아직 모른다
+  const myCharacter = profile ? characterOf(profile.pillars) : null;
+  // 팡 카드 아래 지난 도장들: 최근 7개 기록의 행복도 (오늘 제외, 최신순)
+  const recentHappiness = recent.filter((e) => e.entry_date !== today).slice(0, 7).map((e) => e.happiness);
 
   const showLinkPrompt =
     Boolean(user && entry) &&
@@ -102,11 +107,12 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
         <h2 className="text-[15px] text-muted">오늘의 운세</h2>
         <span aria-hidden className="brush-loading mt-3" />
         <p className="mt-3 text-[15px] text-muted">준비하고 있어요</p>
+        <RetryButton className="mt-3 self-start" />
       </section>
     );
   } else if (profile) {
     fortuneCard = (
-      <Suspense fallback={<FortuneLoading />}>
+      <Suspense fallback={<FortuneLoading character={myCharacter?.characterSrc} />}>
         <FortuneSection userId={user.id} profile={profile} entries={entries} today={today} ganjiKo={ganji.ko} defaultOpen={!night || entries.length === 0} />
       </Suspense>
     );
@@ -116,7 +122,7 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
       <section className={card}>
         <h2 className="text-lg font-bold">오늘 운세, 생년월일만 넣으면 바로 보여요</h2>
         <p className="mt-2 mb-6 text-[15px] text-muted">내 사주로 오늘 운세를 계산해요. 한 번만 넣으면 돼요.</p>
-        <ProfileForm next="/" initial={null} askName={false} submitLabel="오늘 운세 보기" />
+        <ProfileForm next="/" initial={null} askName={false} submitLabel="내 카드 보기" />
       </section>
     );
   }
@@ -141,33 +147,44 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
 
   return (
     <main className="flex flex-col gap-5">
-      {/* 저장 완료 "팡" — 방금 저장하고 돌아왔을 때 한 번 (톤 v3.1). 그림은 운세 카드 안의 동물 하나뿐이므로 제목 줄에는 없다 */}
-      {user && entry && saved === today && (
+      {/* 저장 완료 "팡" — 방금 저장하고 돌아왔을 때 한 번 (톤 v3.1). 카드는 내 일주 카드 (v3.3) */}
+      {user && entry && saved === today && myCharacter && (
         <SaveBurst
-          ganjiKo={ganji.ko}
+          ganjiKo={myCharacter.ganjiKo}
+          cardSrc={myCharacter.cardSrc}
+          recentHappiness={recentHappiness}
           happiness={entry.happiness}
           kept={entry.promise === "kept"}
           signature={`${today}|${entry.happiness}|${entry.moods.join(",")}|${entry.note ?? ""}|${entry.promise ?? ""}`}
         />
       )}
-      <header>
-        {/* 제목 한 줄 (v3.2): 날짜도 송명 같은 크기. 흐린 날짜 줄은 없다 */}
-        <h1 className="font-serif text-[26px] leading-snug break-keep">
-          {formatKoreanDate(today)}, <span className="text-ganji">{ganji.ko}일</span> <span className="text-muted">{ganji.hanja}</span>
-        </h1>
+      <header className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          {/* 제목 한 줄 (v3.2): 날짜도 송명 같은 크기. 흐린 날짜 줄은 없다 */}
+          <h1 className="font-serif text-[26px] leading-snug break-keep">
+            {formatKoreanDate(today)},{" "}
+            <span className="whitespace-nowrap">
+              <span className="text-ganji">{ganji.ko}일</span> <span className="text-muted">{ganji.hanja}</span>
+            </span>
+          </h1>
+          {/* 60칸 띠 대신 한 줄 (v3.3): 오늘 순번 · 기록 일수. 누르면 "나"로 */}
+          {user && (
+            <p className="mt-1 text-[14px] text-muted">
+              <Link href="/me">{todayLine(ganji.index, entryCount)}</Link>
+            </p>
+          )}
+        </div>
+        {/* 이 화면의 유일한 그림 — 내 캐릭터 (일주, v3.3). 프로필 전에는 없다 */}
+        {myCharacter && (
+          <img
+            src={myCharacter.characterSrc}
+            alt={`내 캐릭터 ${myCharacter.ganjiKo} ${myCharacter.animal}`}
+            width={64}
+            height={64}
+            className="h-16 w-16 shrink-0 object-contain"
+          />
+        )}
       </header>
-
-      {/* 60칸 띠 — 60갑자 중 오늘 위치에 금빛 점, 기록한 간지는 흐린 점. 누르면 "나"로 */}
-      <div className="-mt-1 flex flex-col gap-1.5">
-        <p className="text-[12px] leading-none text-muted">60갑자 중 오늘 · 기록한 날은 찍혀요</p>
-        <Link href="/me" aria-label={`60갑자 띠 — 오늘은 ${ganji.index + 1}번째 ${ganji.ko}일. 나 화면으로`} className="grid grid-cols-30 gap-px">
-          {Array.from({ length: 60 }, (_, i) => (
-            <span key={i} aria-hidden className={`h-[10px] ${i === ganji.index ? "bg-gold" : recordedGanji.has(i) ? "bg-line/40" : "border border-line/20"}`} />
-          ))}
-        </Link>
-      </div>
-      {/* 첫 방문 1회: 띠가 무엇인지 한 줄 (localStorage band-hint-seen) */}
-      <BandHint ganjiKo={ganji.ko} nth={ganji.index + 1} />
 
       {/* 순서 고정: 운세 카드가 늘 위, 기록 카드가 아래 (톤 v3) */}
       {fortuneCard}

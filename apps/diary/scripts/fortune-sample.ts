@@ -79,7 +79,7 @@ test("fortune sample: 기록 없음 / 기록 20건 — 모델 호출 2회", asyn
     if (t) {
       lines.push(`[모델 글] headline: ${t.headline}`);
       lines.push(`body: ${t.body}`);
-      for (const a of t.areas) lines.push(`  ${a.area}: ${a.line}`);
+      for (const a of t.areas) lines.push(`  [${a.period}] ${a.area}: ${a.line}`);
       lines.push(`do: ${t.do}`);
       lines.push(`dont: ${t.dont}`);
     }

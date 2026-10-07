@@ -145,91 +145,162 @@ body {
   box-shadow: inset 0 0 0 1.5px var(--color-ink);
 }
 
-/* 호적 양식지 (v3.2 생년월일 입력): 키트 form-sheet(1024×1536)의 괘선 칸에 입력칸을 맞춘다.
-   절대 위치가 아니라 컨테이너 폭 기준(cqw) 격자 — 양식지는 폭 100%로 깔리고, 행 높이는 그 폭에 비례한다.
-   이미지 행 경계(y, 1024 기준 %): 21.2 / 39.7 / 58.2 / 77.1 / 96.8 / 115.4 / 129.0 / 147.6.
-   맨 위 행(0~21.2)은 쓰지 않아 바닥 기준으로 깔고, 두 번째 행부터 7행을 쓴다.
-   세로 칸 경계: 반 = 49.95, 삼분 = 34.5 · 65.4 (바깥 테두리 2.15 · 97.75). */
-.form-sheet {
-  container-type: inline-size;
-  background-color: var(--color-sheet);
-  background-image: url("/ui/form-sheet.webp");
-  background-size: 100% auto;
-  background-position: center bottom;
-  background-repeat: no-repeat;
+/* 오늘의 신호 상자 (v3.4, 운세 카드): paper-3 바탕, 둥글기 8px, 안쪽 여백 14px. 제목 없이 줄만 */
+.signal-box {
+  padding: 14px;
+  border-radius: 8px;
+  background-color: var(--color-paper-3);
 }
-.form-sheet__rows {
-  display: grid;
-  grid-template-rows: 18.5cqw 18.5cqw 18.9cqw 19.7cqw 18.6cqw 13.6cqw 18.65cqw;
-  padding: 0 2.25cqw 2.4cqw;
-}
-.form-sheet__row {
-  display: grid;
-  min-width: 0;
-  grid-template-columns: 1fr;
-}
-.form-sheet__row--half {
-  grid-template-columns: 47.8cqw 47.7cqw;
-}
-.form-sheet__row--third {
-  grid-template-columns: 32.35cqw 30.9cqw 32.25cqw;
-}
-.form-sheet__cell {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  min-width: 0;
-  padding: 0 3cqw;
-}
-.form-sheet__cell--row {
-  flex-direction: row;
+/* 신호 띠지: 세 종류가 같은 모양·같은 폭(7rem). 모양은 키트 tag-strip(찢긴 한지 띠)을 mask로 쓴다 —
+   면은 저마다 다르고(한지 / 금색 / 먹색) 찢긴 가장자리는 똑같다. */
+.sig {
+  position: relative;
+  display: inline-flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+  justify-content: center;
+  width: 7rem;
+  height: 32px;
+  padding: 0 12px;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+  color: var(--color-ink);
+  background: var(--color-paper-2) url("/ui/tag-strip-paper-clean.webp") center / 100% 100% no-repeat;
+  -webkit-mask: url("/ui/tag-strip-paper-clean.webp") center / 100% 100% no-repeat;
+  mask: url("/ui/tag-strip-paper-clean.webp") center / 100% 100% no-repeat;
 }
-/* 양식지 칸 안의 입력: 테두리 없이 숫자만 (칸은 양식지가 그린다). 포커스는 칸 아래 금색 밑줄 */
-.form-sheet__input {
+/* 영역 줄 = 먹색 테두리: 찢긴 가장자리를 따라가는 1.5px 띠 (바깥 mask − 안쪽 mask) */
+.sig--line::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-color: var(--color-ink);
+  -webkit-mask-image: url("/ui/tag-strip-paper-clean.webp"), url("/ui/tag-strip-paper-clean.webp");
+  -webkit-mask-size: 100% 100%, calc(100% - 3px) calc(100% - 3px);
+  -webkit-mask-position: center, center;
+  -webkit-mask-repeat: no-repeat, no-repeat;
+  -webkit-mask-composite: source-out;
+  mask-image: url("/ui/tag-strip-paper-clean.webp"), url("/ui/tag-strip-paper-clean.webp");
+  mask-size: 100% 100%, calc(100% - 3px) calc(100% - 3px);
+  mask-position: center, center;
+  mask-repeat: no-repeat, no-repeat;
+  mask-composite: subtract;
+}
+/* 하면 좋아요 = 금색 면 (gold-wash), 피해요 = 먹색 면 + 한지색 글자. 남색은 쓰지 않는다 */
+.sig--gold {
+  color: var(--color-gold-ink);
+  background: var(--color-gold) url("/ui/gold-wash.webp") center / 512px 512px;
+}
+.sig--ink {
+  color: var(--color-paper-2);
+  background: var(--color-ink);
+}
+
+/* 생년월일 입력칸 (v3.3 — 양식지 form-sheet 참조는 지웠다, 파일은 public/ui에 둔다).
+   56px · 녹갈 1px · 눌린 한지색(paper-3) · 숫자 Song Myung 22px. 상태만 분명히:
+   빈 칸 = 흐린 자리표시 / 입력 중 = 금색 2px / 채움 = 먹색 글자 / 오류(aria-invalid) = 먹색 1.5px */
+.field {
+  display: block;
   width: 100%;
   min-width: 0;
-  height: 40px;
-  background: transparent;
-  border: 0;
-  border-radius: 0;
+  height: 56px;
+  padding: 0 12px;
+  border: 1px solid var(--color-frame);
+  border-radius: 6px;
+  background-color: var(--color-paper-3);
   text-align: center;
   font-family: var(--font-serif);
   font-size: 22px;
+  line-height: 1;
   color: var(--color-ink);
 }
-.form-sheet__input--right {
-  text-align: right;
-}
-.form-sheet__input::placeholder {
+.field::placeholder {
   color: var(--color-faint);
-  font-size: 17px;
   font-family: var(--font-sans);
+  font-size: 16px;
 }
-.form-sheet__input:focus {
+.field:focus {
   outline: none;
-  box-shadow: inset 0 -2px 0 var(--color-gold);
+  border-color: var(--color-gold);
+  box-shadow: inset 0 0 0 1px var(--color-gold);
 }
-.form-sheet__input:disabled {
-  color: var(--color-faint);
+.field[aria-invalid="true"]:not(:focus) {
+  border-color: var(--color-ink);
+  box-shadow: inset 0 0 0 0.5px var(--color-ink);
 }
-.form-sheet__select {
+/* 이름 칸: 글자는 본문 서체, 왼쪽 정렬 */
+.field--text {
+  text-align: left;
+  font-family: var(--font-sans);
+  font-size: 17px;
+}
+/* 도시 select: 같은 입력칸 모양. 화살표는 마크업의 ▾ */
+.field--select {
   appearance: none;
   -webkit-appearance: none;
+  padding-right: 36px;
+  text-align: left;
+  font-size: 20px;
+}
+
+/* 두 칸 세그먼트 (v3.3): 양·음력, 성별, 시간 모름. 띠지 그림 없음.
+   고른 쪽 = 먹색 면 + 한지색 글자, 안 고른 쪽 = 테두리만. 라디오는 sr-only, 시각은 옆의 .seg__cell */
+.seg {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  height: 48px;
+  border: 1px solid var(--color-frame);
+  border-radius: 6px;
+  overflow: hidden;
+  background-color: var(--color-paper-2);
+}
+.seg__cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  cursor: pointer;
+  font-size: 16px;
+  color: var(--color-ink);
   background: transparent;
   border: 0;
   border-radius: 0;
-  padding: 0 1.4em 0 0;
-  font-family: var(--font-serif);
-  font-size: 20px;
-  color: var(--color-ink);
-  text-align: right;
 }
-.form-sheet__select:focus {
-  outline: none;
-  box-shadow: inset 0 -2px 0 var(--color-gold);
+.seg__cell + label > .seg__cell,
+.seg__cell + .seg__cell,
+label + label > .seg__cell {
+  border-left: 1px solid var(--color-frame);
+}
+input:checked + .seg__cell,
+.seg__cell[data-on] {
+  font-weight: 700;
+  color: var(--color-paper-2);
+  background-color: var(--color-ink);
+}
+input:focus-visible + .seg__cell,
+.seg__cell:focus-visible {
+  outline: 2px solid var(--color-gold);
+  outline-offset: -3px;
+}
+
+/* 윤달 체크 한 줄 (음력일 때만): 네모 체크, 고르면 먹색 면 */
+.check {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  border: 1px solid var(--color-frame);
+  border-radius: 4px;
+  background-color: var(--color-paper-3);
+  cursor: pointer;
+}
+.check:checked {
+  border-color: var(--color-ink);
+  background-color: var(--color-ink);
+  box-shadow: inset 0 0 0 4px var(--color-paper-2);
 }
 
 /* 붓선 로딩 (v3.2): divider 붓선을 마스크로 왼→오 1.8s 반복 드러내기. 금색. 스피너·점·회전 없음 */
@@ -256,7 +327,7 @@ body {
     opacity: 0;
   }
 }
-/* 운세 카드 자리 로딩 — 닫힌 운세 카드와 같은 높이 (summary p-5 + 64px 동물) */
+/* 운세 카드 자리 로딩 — 닫힌 운세 카드와 같은 높이 (summary p-5 + 밴드 단어 44px) */
 .fortune-loading {
   min-height: 116px; /* 닫힌 운세 카드와 같은 높이 — 로딩→카드 전환 때 튀지 않게 */
 }
@@ -337,19 +408,20 @@ input:focus-visible + .promise-seg__cell {
   opacity: var(--ink, 0);
 }
 
-/* 카드 앨범 칸 (v3.2): 모은 칸은 바이럴 카드 썸네일을 칸에 맞춰 cover.
-   금 테두리 농도 = 평균 행복도(--ink 0.35~1), 약속 지킨 날이 있으면(data-kept) 금 2px 고정.
-   오른쪽 아래 작은 인장(seal-collected)은 인주 — 인장 밖에서는 쓰지 않는다 */
+/* 모은 칸 (v3.3): 캐릭터만(contain) + 금 테두리. 카드 틀·썸네일·인장 없음.
+   테두리 농도 = 평균 행복도 --ink(0.35~1): 굵기 1px → 2px, 색 옅음 → 진함.
+   약속 지킨 날이 있는 칸(data-kept) = 두 겹: 금 2px + 안쪽 한지 1px + 금 1px */
 .album-cell {
   position: relative;
   overflow: hidden;
-  background-color: var(--color-paper-3);
+  background-color: var(--color-paper-2);
 }
-.album-cell > img {
+.album-cell__img {
   display: block;
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  padding: 8%;
+  object-fit: contain;
 }
 .album-cell::before {
   content: "";
@@ -357,20 +429,13 @@ input:focus-visible + .promise-seg__cell {
   inset: 0;
   pointer-events: none;
   border-radius: inherit;
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-gold) calc(var(--ink, 0) * 100%), transparent);
+  box-shadow: inset 0 0 0 calc(1px + var(--ink, 0) * 1px) color-mix(in srgb, var(--color-gold) calc(35% + var(--ink, 0) * 65%), var(--color-paper-2));
 }
 .album-cell[data-kept]::before {
-  box-shadow: inset 0 0 0 2px var(--color-gold);
-}
-.album-cell::after {
-  content: "";
-  position: absolute;
-  right: 2px;
-  bottom: 2px;
-  width: 10px;
-  height: 10px;
-  pointer-events: none;
-  background: url("/ui/seal-collected-clean.png") center / contain no-repeat;
+  box-shadow:
+    inset 0 0 0 2px var(--color-gold),
+    inset 0 0 0 3px var(--color-paper-2),
+    inset 0 0 0 4px var(--color-gold);
 }
 
 /* 선택 칸 상세의 큰 카드 (폭 60%) */
@@ -486,6 +551,32 @@ details[open] > .fortune-body {
 .burst-text {
   animation: saved-in 300ms ease-out 150ms both;
 }
+/* /welcome의 버튼: 글 다음에 (카드 팡이 끝난 뒤) */
+.burst-text--late {
+  animation-delay: 450ms;
+}
+/* 지난 도장들 (v3.3): 카드 아래 가장자리 안쪽 왼쪽, 인주 12px 점, 간격 6px. 농도 = 그날 행복도(--h 1~10).
+   오른쪽 아래 행복도 도장과 겹치지 않게 왼쪽 60%까지만. 글자와 같이 150ms 뒤 나타난다 */
+.burst-past {
+  position: absolute;
+  left: 7%;
+  bottom: 6%;
+  display: flex;
+  gap: 6px;
+  max-width: 60%;
+  flex-wrap: wrap;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  animation: saved-in 300ms ease-out 150ms both;
+}
+.burst-past__dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background-color: var(--color-seal);
+  opacity: calc(0.4 + (var(--h, 5) - 1) / 9 * 0.6);
+}
 /* 약속 지킨 날의 금테 카드 (v3.2): 카드 바깥에 금 2px */
 .burst-card[data-kept] {
   outline: 2px solid var(--color-gold);
@@ -547,6 +638,7 @@ details[open] > .fortune-body {
   .saved-line,
   .burst-card,
   .burst-text,
+  .burst-past,
   .burst-stamp,
   .burst-overlay,
   .burst-overlay[data-closing],

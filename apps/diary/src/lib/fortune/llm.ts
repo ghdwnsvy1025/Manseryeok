@@ -27,12 +27,13 @@ export const SYSTEM = `당신은 "사주읽는밤" 일기 앱의 작가입니다
 - 기간을 약속하지 않습니다 ("3일 더 쓰면 ~해져요" 같은 문장 금지).
 - 전문용어를 쓰지 않습니다: brief.jargon의 낱말(십신·용신·기신·일간·일지·천간·지지·오행·삼합·육합·대운·세운, 비견~정인 같은 이름)은 괄호 안에서도 쓰지 않습니다. brief.banned의 낱말도 쓰지 않습니다.
 - 숫자는 brief.allowedNumbers에 있는 것만 씁니다. 시각("오전 7시"), 횟수, 금액, 퍼센트를 새로 만들지 않습니다. 시간대는 "아침·점심·저녁·밤"처럼 말로만 씁니다.
+- 점수는 화면에 있으니 글에 쓰지 않습니다. brief.score.value를 글에 적지 않고, "6.3점", "10점 만점" 같은 점수 표현을 만들지 않습니다 (brief.mine의 기록 평균 "평균 7.5점"은 예외로 그대로 씁니다).
 
 [구성 — JSON 하나]
 - headline: 12자 안팎 한 구절. 오늘의 느낌을 사실 하나와 묶어서. 다른 날에도 그대로 쓸 수 있는 말이면 실패입니다.
 - body: 4~6문장. 사실들을 번호 매기듯 나열하지 말고 아침부터 밤까지 하나의 하루 흐름으로 잇습니다. 아침·점심·저녁 중 한 장면을 구체적으로 하나 넣습니다(장소나 행동이 보이게, 단 숫자 없이). 같은 문형을 되풀이하지 않습니다. 사실의 조합이 드러나야 합니다 — 오늘이 나에게 어떤 쪽의 날인지, 올해·이달·지금 10년 단위의 운과 어떻게 겹치는지가 한 흐름 안에 자연스럽게 들어갑니다. **"글자" 이야기는 하지 않습니다**: "윗글자·아랫글자·오늘 글자·내 글자·태어난 날 글자·부딪히다·맞서다·한편이다" 같은 사주 구조 설명을 쓰지 말고, 그 결과만 생활어로 말합니다(예: "오늘은 경쟁심이 세지는 날이라" / "올해 운과 겹쳐 조급해지기 쉬워요"). 근거는 화면이 따로 보여 주므로 글에 넣지 않습니다.
 - body에 brief.mine이 있으면 그 숫자를 그대로 넣은 "내 숫자 한 문장"을 꼭 씁니다 (예: "지난 임자일 3번은 평균 7.5점이었어요"). brief.mine이 null이면 기록·평균·횟수 이야기를 하지 않습니다.
-- areas: brief.areas와 개수·순서·area 이름이 똑같은 배열. 각 line은 그 영역의 오늘 한 문장(1문장, 신호 ↑→↓의 뜻을 말로). brief.areas가 비어 있으면 [].
+- areas: brief.areas와 개수·순서·period·area 이름이 똑같은 배열. 각 line은 그 영역의 한 문장(1문장, 신호 ↑→↓의 뜻을 말로). period가 "오늘"이면 오늘 이야기, "이달"이면 "이달엔"으로 시작하는 1문장, "올해"면 "올해는"으로 시작하는 1문장. line은 본문 첫 문장을 되풀이하지 않습니다. brief.areas가 비어 있으면 [].
 - do: 오늘 하면 좋은 구체적 행동 1문장. dont: 오늘 피하면 좋은 구체적 행동 1문장. 둘 다 사실과 연결되어야 합니다.
 
 [표현]
@@ -51,8 +52,9 @@ export const OUTPUT_SCHEMA = {
       items: {
         type: "object",
         additionalProperties: false,
-        required: ["area", "line"],
+        required: ["period", "area", "line"],
         properties: {
+          period: { type: "string", enum: ["오늘", "이달", "올해"] },
           area: { type: "string", enum: ["대인", "재물", "직업", "학업", "연애", "가족", "건강"] },
           line: { type: "string" },
         },
@@ -165,7 +167,7 @@ export async function generateFortuneText(input: BriefInput, fallback: TemplateT
     const issues = validateFortuneText(parsed, brief);
     result.issues.push(issues);
     if (issues.length === 0) {
-      result.text = { headline: parsed.headline, body: parsed.body, do: parsed.do, dont: parsed.dont, ...(parsed.areas.length ? { areas: parsed.areas.map((a, i) => ({ area: a.area, signal: brief.areas[i]!.signal, line: a.line })) } : {}) };
+      result.text = { headline: parsed.headline, body: parsed.body, do: parsed.do, dont: parsed.dont, ...(parsed.areas.length ? { areas: parsed.areas.map((a, i) => ({ period: brief.areas[i]!.period, area: a.area, signal: brief.areas[i]!.signal, line: a.line })) } : {}) };
       result.source = "llm";
       result.model = model;
       return result;

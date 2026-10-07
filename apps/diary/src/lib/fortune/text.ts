@@ -1,7 +1,7 @@
 // 모델 없이 만드는 운세 문장. 1~7일차 즉시 표시와 모델 실패 시 대체용.
 // 규칙: 어미 "~어요", 전문용어 없음, 금지어(기운·흐름·두근·"결을/결이") 없음, 사건 단정 없음.
 import type { TenGod } from "@saju/engine";
-import type { AreaName, AreaSignal, BaseFortune, CoreFortune, PersonalAdjustment } from "./types";
+import type { AreaName, AreaPeriod, AreaSignal, BaseFortune, CoreFortune, PersonalAdjustment } from "./types";
 
 /** 사용자 문장에 쓰면 안 되는 말. 테스트가 전 조합을 검사한다 */
 export const BANNED = ["기운", "흐름", "두근", "결을", "결이 ", "결로", "용신", "기신", "십신", "일간", "일지"];
@@ -69,11 +69,12 @@ const BY_TEN_GOD: Record<TenGod, { headline: string; lead: string; do: string; d
   },
 };
 
+// v4.1: 템플릿도 검사기의 구조 서술 검사("글자·부딪히·한편이…")를 지킨다
 const RELATION_LINE = {
-  육합: "내 사주와 잘 맞물리는 글자가 들어와서 사람 일이 순한 편이에요.",
-  삼합: "내 사주와 한편이 되는 글자라 도움을 받기 쉬워요.",
-  충: "내 사주와 부딪히는 글자라 예정이 틀어지거나 마음이 들썩일 수 있어요.",
-  복음: "내 사주와 같은 글자가 겹치는 날이라 익숙한 하루가 돼요.",
+  육합: "내 사주와 잘 맞물리는 날이라 사람 일이 순한 편이에요.",
+  삼합: "내 사주와 힘을 합치는 날이라 도움을 받기 쉬워요.",
+  충: "내 사주와 어긋나는 날이라 예정이 틀어지거나 마음이 들썩일 수 있어요.",
+  복음: "내 사주와 같은 성격이 겹치는 날이라 익숙한 하루가 돼요.",
 } as const;
 
 const YONGSIN_LINE = {
@@ -102,11 +103,11 @@ export interface TemplateText {
   body: string;
   do: string;
   dont: string;
-  /** v4 영역 줄 (신호 있는 영역만) */
-  areas?: { area: AreaName; signal: AreaSignal; line: string }[];
+  /** v4 영역 줄 (신호 있는 영역만). v4.2: period는 데이터로만 — line에 "이달엔/올해는" 접두를 붙이지 않는다 */
+  areas?: { period: AreaPeriod; area: AreaName; signal: AreaSignal; line: string }[];
 }
 
-/** 영역 × 신호 템플릿 한 줄. 아이콘 없이 글자 화살표만 (디자인 명세 02) */
+/** 영역 × 신호 템플릿 한 줄. 아이콘 없이 글자 화살표만 (디자인 명세 02). 기간(오늘·이달·올해)은 문장에 넣지 않는다 — period 데이터가 말한다 */
 const AREA_LINE: Record<AreaName, Record<AreaSignal, string>> = {
   대인: { "↑": "사람 일이 순한 편이라 먼저 연락해도 좋아요.", "→": "사람 일은 평소와 비슷해요.", "↓": "사람 사이 말이 엇갈리기 쉬워 짧게 말해요." },
   재물: { "↑": "돈 쓰는 일은 계획대로 가요.", "→": "돈 일은 평소와 비슷해요.", "↓": "지출을 하루 미뤄도 손해가 없어요." },
@@ -119,7 +120,7 @@ const AREA_LINE: Record<AreaName, Record<AreaSignal, string>> = {
 
 /** 템플릿이 쓰는 재료. v3 BaseFortune도 그대로 들어간다 */
 export type TemplateInput = Pick<BaseFortune, "tenGod" | "relation" | "yongsin"> & {
-  areas?: { area: AreaName; signal: AreaSignal }[];
+  areas?: { period?: AreaPeriod; area: AreaName; signal: AreaSignal }[];
   /** 맞춤도 옆 안내 (예: 시간 모름) */
   fitNote?: string;
 };
@@ -136,7 +137,7 @@ export function templateText(
   const mine = personalLine(personal, today.ko, today.stemKo, today.branchKo);
   if (mine) lines.push(mine);
   if (base.fitNote) lines.push(base.fitNote);
-  const areas = (base.areas ?? []).map((a) => ({ area: a.area, signal: a.signal, line: AREA_LINE[a.area][a.signal] }));
+  const areas = (base.areas ?? []).map((a) => ({ period: a.period ?? "오늘", area: a.area, signal: a.signal, line: AREA_LINE[a.area][a.signal] }));
   return { headline: t.headline, body: lines.join(" "), do: t.do, dont: t.dont, ...(areas.length ? { areas } : {}) };
 }
 

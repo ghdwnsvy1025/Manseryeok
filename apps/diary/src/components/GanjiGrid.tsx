@@ -15,8 +15,9 @@ interface Props {
 }
 
 /**
- * 60갑자 카드 앨범 10×6 (톤 v3.2). 자바스크립트 없이 링크로 칸을 고른다 (?cell=N).
- * 모은 칸 = 그 간지의 바이럴 카드 썸네일(cover) + 평균 행복도 농도의 금 테두리(약속 지킨 날이 있으면 금 2px 고정) + 작은 인장.
+ * 60갑자 도장판 10×6 (톤 v3.3). 자바스크립트 없이 링크로 칸을 고른다 (?cell=N).
+ * 모은 칸 = 그 간지의 캐릭터만(contain) + 금 테두리. 농도 = 평균 행복도(옅음 1px → 진함 2px, --ink).
+ * 약속 지킨 날이 있는 칸은 두 겹(금 2px + 안쪽 한지 1px + 금 1px). 카드 틀·썸네일·인장 없음.
  * 안 모은 칸 = 빈 도장 자리 + 지지 한 글자. 숫자·이모지는 넣지 않는다. 전환 효과 없음.
  */
 export function GanjiGrid({ cells, selected, todayIndex, basePath, pickedEntries = [] }: Props) {
@@ -48,8 +49,8 @@ export function GanjiGrid({ cells, selected, todayIndex, basePath, pickedEntries
                 style={{ "--ink": ink } as React.CSSProperties}
               >
                 {c.n ? (
-                  // 모은 카드 (바이럴 60갑자 세트). 칸에 맞춰 cover, 지연 로딩
-                  <img src={`/cards/${c.ko}.webp`} alt="" width={64} height={86} loading="lazy" decoding="async" />
+                  // 모은 칸 = 캐릭터만 (v3.3). 지연 로딩
+                  <img src={`/characters/${c.ko}.webp`} alt="" width={64} height={64} loading="lazy" decoding="async" className="album-cell__img" />
                 ) : (
                   <span className="font-serif text-[12px] leading-none text-faint">{c.hanja[1]}</span>
                 )}

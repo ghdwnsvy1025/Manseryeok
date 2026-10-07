@@ -6,6 +6,8 @@
  *
  * - Supabase service role로 night_entries(user_id, entry_date, happiness)와 night_saju_profiles를 읽는다. 쓰지 않는다.
  * - v3 = computeBaseFortune(기록 보정 없이 base만), v4 = computeCoreFortune(parts.score01). 둘 다 10점 환산 뒤 비교.
+ * - v4.1 ③: ctx에 대운·세운 판정(합계점수 × COEF.daeunVerdict/seunVerdict)이 더해졌다. "v4 (기존 계수)"는 그 몫을 빼서 다시 센 값.
+ * - v4.2: rel에서 합 점수(±0.5×단계)와 ctx의 운 지지 합(+0.3)이 빠졌다. parts.score01이 곧 v4.2. v4.1 값은 이 스크립트로 재현하지 않는다(문서 표의 전 측정값과 비교).
  * - 모델 호출은 하지 않는다. .env.local은 읽기만 하고 값은 출력하지 않는다.
  */
 import { readFileSync } from "node:fs";
@@ -45,7 +47,7 @@ const r3 = (x: number) => (Number.isFinite(x) ? x.toFixed(3) : "n/a");
 
 interface EntryRow { user_id: string; entry_date: string; happiness: number }
 
-test("fortune backtest: v3 vs v4 피어슨 상관", async () => {
+test("fortune backtest: v3 vs v4.2 피어슨 상관", async () => {
   const env = loadEnv();
   const url = env.NEXT_PUBLIC_SUPABASE_URL, key = env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) throw new Error(".env.local에 NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY가 필요합니다");
@@ -61,7 +63,8 @@ test("fortune backtest: v3 vs v4 피어슨 상관", async () => {
   const byUser = new Map<string, SajuProfileRow>();
   for (const p of (profiles ?? []) as (SajuProfileRow & { user_id: string })[]) byUser.set(p.user_id, p);
 
-  const v3: number[] = [], v4: number[] = [], raw: number[] = [], rawRel: number[] = [], happy: number[] = [];
+  const v3: number[] = [], v4: number[] = [], v4old: number[] = [], raw: number[] = [], rawRel: number[] = [], happy: number[] = [];
+  const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n));
   let skipped = 0;
   const warn = console.warn;
   console.warn = () => {}; // 원국 불일치 경고는 건수만 센다
@@ -79,6 +82,8 @@ test("fortune backtest: v3 vs v4 피어슨 상관", async () => {
       const c = computeCoreFortune({ pillars: prof.pillars, profile: birthProfileOf(prof), date: e.entry_date, todayHanja: today.hanja });
       v3.push(toTenPoint(b.score));
       v4.push(toTenPoint(c.parts.score01));
+      const verdictPart = (c.context.daeun?.합계 ?? 0) * COEF.daeunVerdict + (c.context.seun.합계 ?? 0) * COEF.seunVerdict;
+      v4old.push(toTenPoint(clamp(0.5 + (c.parts.raw + c.parts.rel + c.parts.ctx - verdictPart) / COEF.scale, COEF.min, COEF.max)));
       raw.push(c.parts.raw);
       rawRel.push(c.parts.raw + c.parts.rel);
       happy.push(e.happiness);
@@ -92,10 +97,11 @@ test("fortune backtest: v3 vs v4 피어슨 상관", async () => {
   const lines = [
     `n = ${n} (사용자 ${users}명, 프로필 없는 기록 ${skipped}건 제외, 원국 불일치 경고 ${mismatch}건)`,
     `v3 (base만)            r = ${r3(pearson(v3, happy))}`,
-    `v4 (raw+rel+ctx)       r = ${r3(pearson(v4, happy))}`,
+    `v4 (기존 계수, 판정 제외) r = ${r3(pearson(v4old, happy))}`,
+    `v4.2 (+대운·세운 판정, 합 점수 없음) r = ${r3(pearson(v4, happy))}`,
     `  v4 raw만             r = ${r3(pearson(raw, happy))}`,
     `  v4 raw+rel           r = ${r3(pearson(rawRel, happy))}`,
-    `  계수: scale ${COEF.scale}, rel ±${COEF.rel}×강도(상한 ${COEF.relMax}), 대운충 ${COEF.daeunClash}/${COEF.daeunClashAlert}, 세운충 ${COEF.seunClash}, 월운충 ${COEF.wolunClash}, 합 +${COEF.union}(상한 ${COEF.unionMax})`,
+    `  계수: scale ${COEF.scale}, 충 ±${COEF.rel}×강도(상한 ${COEF.relMax}; 합은 0), 대운충 ${COEF.daeunClash}/${COEF.daeunClashAlert}, 세운충 ${COEF.seunClash}, 월운충 ${COEF.wolunClash}, 대운 판정 ×${COEF.daeunVerdict}, 세운 판정 ×${COEF.seunVerdict}`,
     `  v4 점수 분포: 평균 ${(v4.reduce((a, b) => a + b, 0) / n).toFixed(2)}, 최소 ${Math.min(...v4)}, 최대 ${Math.max(...v4)}`,
     `  행복도 분포: 평균 ${(happy.reduce((a, b) => a + b, 0) / n).toFixed(2)}`,
     ...(mismatchKinds.size ? [`  원국 불일치 종류 (일기 앱 / 코어): ${[...mismatchKinds].join(" | ")}`] : []),
