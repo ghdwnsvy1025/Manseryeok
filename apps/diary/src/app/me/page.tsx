@@ -155,6 +155,8 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
     pillarInfo(profile.pillars.year, profile.pillars.day.stem, false, bt.year),
   ];
   const elements = elementPercents(profile.pillars);
+  // v3.10: 오늘 화면에서 뺀 "기록 N일째"를 여기로. 60칸 중 채운 칸 = 기록이 1건 이상인 간지 수
+  const filledCells = cells.filter((c) => c.n > 0).length;
 
   return (
     <main className="flex flex-col gap-6">
@@ -168,6 +170,9 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
         <h1 className="mt-3 font-serif text-[20px] leading-snug">
           {profile.name !== "손님" && <>{profile.name} · </>}<span className="text-ganji">{me.ganjiKo}일</span> · {me.animal}
         </h1>
+        <p className="me-progress mt-1 text-[14px] text-muted">
+          {total > 0 ? `기록 ${total}일째 · 60칸 중 ${filledCells}칸` : "첫 기록을 기다려요 · 60칸 중 0칸"}
+        </p>
         {/* 익명일 때만: 기록이 이 기기에 묶여 있다는 작은 줄 (전수조사 C "익명 기기 종속 상시 안내") */}
         {user.is_anonymous && (
           <p className="mt-1 text-[13px] text-muted">

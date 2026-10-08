@@ -44,14 +44,3 @@ export function characterOfGanji(ganjiKo: string): MyCharacter {
 export function characterOf(pillars: PillarsSnapshot): MyCharacter {
   return characterOfGanji(pillars.day.ko);
 }
-
-/**
- * 오늘 화면 제목 아래 한 줄 (00 v3.3 "60칸 띠 삭제"):
- * "60갑자 중 51번째 · 기록 12일째". 기록이 없으면 "60갑자 중 51번째 · 첫 기록을 기다려요".
- * @param todayIndex 오늘 일진의 60갑자 순번 (甲子 = 0)
- * @param entryCount 지금까지 기록한 날 수
- */
-export function todayLine(todayIndex: number, entryCount: number): string {
-  const nth = `60갑자 중 ${todayIndex + 1}번째`;
-  return entryCount > 0 ? `${nth} · 기록 ${entryCount}일째` : `${nth} · 첫 기록을 기다려요`;
-}

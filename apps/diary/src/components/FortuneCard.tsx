@@ -61,11 +61,7 @@ function personalLines(fortune: FortuneContent, ganjiKo: string): { main: string
   } else {
     return { main: "아직 기록이 없어 사주만으로 계산했어요", compare: null, mean: null };
   }
-  const scaled = mean * (10 / 9);
-  const gap = scaled - fortune.score;
-  const compare =
-    Math.abs(gap) >= 1.5 ? `사주 점수는 ${fortune.score.toFixed(1)}이지만 내 기록은 ${gap > 0 ? "좋은" : "낮은"} 편` : null;
-  return { main, compare, mean };
+  return { main, compare: null, mean };
 }
 
 interface Props {
@@ -92,34 +88,37 @@ interface Props {
  * v3.6: 띠지는 문장 앞 인라인, 문장은 전체 폭으로 흐른다 (라벨 열 고정폭 없음).
  * v3.7: 띠지는 첫 줄에 혼자, 문장은 둘째 줄부터 왼쪽 끝에서 (라벨 위 · 문장 아래). 줄 사이 14px.
  */
-/** 운세 점수와 내 기록 평균의 차이 판정. 1.5 이상 "차이 커요", 0.8 이상 "조금 달라요", 그 아래 "비슷해요" */
+/** 행복도 평균(1~10) → 운세와 같은 10점 척도. happinessToScore와 같은 식 ((h−1)/9×10). 평균 10 = 10.0, 1 = 0.0 */
+export function happinessMeanToTen(mean: number): number {
+  return Math.round(((mean - 1) / 9) * 100) / 10;
+}
+
+/** 운세 점수와 내 기록 평균의 차이 판정 (v3.10). 기준 = 밴드 폭 2.0(주의<4.8≤무난<6.8≤좋음):
+    2.0 이상 "차이 커요"(밴드가 하나 넘어감), 1.0 이상 "조금 달라요", 그 아래 "비슷해요" */
 export function compareVerdict(gap: number): "차이 커요" | "조금 달라요" | "비슷해요" {
   const a = Math.abs(gap);
-  return a >= 1.5 ? "차이 커요" : a >= 0.8 ? "조금 달라요" : "비슷해요";
+  return a >= 2 ? "차이 커요" : a >= 1 ? "조금 달라요" : "비슷해요";
 }
 
 function PersonalCompare({ personal, fortune }: { personal: ReturnType<typeof personalLines>; fortune: FortuneContent }) {
   const mean = personal.mean;
   if (mean === null) {
     return (
-      <div className="compare mt-5">
-        <p className="compare__title">내 기록으로 본 오늘</p>
+      <div className="compare mt-3.5">
         <p className="compare__empty">{personal.main}</p>
         {fortune.fitNote && <p className="compare__note">{fortune.fitNote}</p>}
       </div>
     );
   }
-  const mine = Math.round(mean * (10 / 9) * 10) / 10;
+  const mine = happinessMeanToTen(mean);
   const verdict = compareVerdict(mine - fortune.score);
   const rows: { label: string; value: number; kind: "fortune" | "mine" }[] = [
     { label: "운세", value: fortune.score, kind: "fortune" },
     { label: "내 기록", value: mine, kind: "mine" },
   ];
   return (
-    <div className="compare mt-5" aria-label={`운세 ${fortune.score.toFixed(1)}점, 내 기록 ${mine.toFixed(1)}점, ${verdict}`}>
-      <p className="compare__title">
-        내 기록으로 본 오늘 <span className="compare__sub">· {personal.main}</span>
-      </p>
+    <div className="compare mt-3.5" aria-label={`운세 ${fortune.score.toFixed(1)}점, 내 기록 ${mine.toFixed(1)}점, ${verdict}`}>
+      {/* v3.10: 제목 없음. 막대 → 띠지 → 작은 한 줄(몇 번 기록 기준인지) */}
       <ul className="compare__bars">
         {rows.map((r) => (
           <li key={r.kind} className="compare__row" data-kind={r.kind}>
@@ -134,6 +133,7 @@ function PersonalCompare({ personal, fortune }: { personal: ReturnType<typeof pe
       <p className="compare__verdict" data-verdict={verdict}>
         {verdict}
       </p>
+      <p className="compare__sub">{personal.main}</p>
       {fortune.fitNote && <p className="compare__note">{fortune.fitNote}</p>}
     </div>
   );

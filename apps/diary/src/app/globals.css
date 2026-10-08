@@ -713,7 +713,20 @@ details[open] > .fortune-body {
   background-color: var(--color-seal);
   opacity: calc(0.4 + (var(--h, 5) - 1) / 9 * 0.6);
 }
-/* 약속 지킨 날의 금테 카드 (v3.2): 카드 바깥에 금 2px */
+/* 저장 팡 = 오늘 일진 정사각 카드 (v3.10, 명세 11): 카드 이미지 전체 폭(62vw·최대 320px, 1:1). 카드가 제 테두리를 가지니 틀 없음.
+   행복도 인주 도장은 오른쪽 아래 모서리 안쪽(10px·10px), 지름 64px, −8° — 꽝 키프레임은 .burst-stamp 그대로. .char-card는 폴백으로 남긴다 */
+.today-card {
+  aspect-ratio: 1;
+}
+.today-card > img {
+  display: block;
+}
+.today-card > .burst-stamp {
+  right: 10px;
+  bottom: 10px;
+  width: 64px;
+}
+/* 약속 지킨 날의 금테 카드 (v3.2): 카드 바깥에 금 2px (.today-card도 .burst-card라 그대로 받는다) */
 .burst-card[data-kept] {
   outline: 2px solid var(--color-gold);
   outline-offset: 0;
@@ -800,6 +813,14 @@ details[open] > .fortune-body {
 /* 두 캐릭터 한 쌍 (오늘 화면 머리, v3.9): 제목 아래 가운데에 둥근 한지 틀 두 개, 각 100px(375px에서 둘 + × 가 한 줄).
    내 쪽 틀은 금색 1px(나), 오늘 쪽은 녹갈 1px — 색으로 길흉을 말하지 않는다. 안은 card-paper, 그림은 위쪽 55%(얼굴·상반신)만.
    사이 × 는 송명 20px 보조색. 라벨 13px. 어색하게 잘리는 간지는 아래 [data-ganji] 표에서 object-position만 따로 */
+/* v3.10: 날짜는 위 한 줄(16px 보조색, 가운데), 아래 캐릭터 쌍과 14px */
+.today-date {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.4;
+  font-weight: 400;
+  color: var(--color-muted);
+}
 .medal-pair {
   display: flex;
   align-items: flex-start;
@@ -814,10 +835,24 @@ details[open] > .fortune-body {
   gap: 8px;
 }
 .medal-pair__label {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  width: 100px;
+  white-space: nowrap;
+}
+/* v3.10: "나"/"오늘" 13px 보조색, 바로 아래 간지 한자만 송명 22px 먹색(한글 없음) */
+.medal-pair__who {
   font-size: 13px;
   line-height: 1;
-  white-space: nowrap;
   color: var(--color-muted);
+}
+.medal-pair__hanja {
+  font-family: var(--font-serif);
+  font-size: 22px;
+  line-height: 1.1;
+  color: var(--color-ink);
 }
 .medal {
   display: block;
@@ -975,21 +1010,22 @@ input:focus-visible + .promise-stamp > .promise-stamp__mark {
   background-image: linear-gradient(color-mix(in srgb, var(--color-paper-3) 82%, transparent), color-mix(in srgb, var(--color-paper-3) 82%, transparent)), url("/ui/card-paper.webp");
   background-size: auto, 256px 256px;
 }
-.compare__title {
-  margin: 0;
-  font-size: 15px;
-  line-height: 1.4;
+/* v3.10: 제목 없음. 띠지 아래 작은 두 줄(몇 번 기록 기준 · 맞춤도) 13px 보조색, 둘 사이 2px */
+.compare__sub {
+  margin: 10px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
   color: var(--color-muted);
   word-break: keep-all;
 }
-.compare__sub {
-  color: var(--color-muted);
+.compare__sub + .compare__note {
+  margin-top: 2px;
 }
 .compare__bars {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  margin: 12px 0 0;
+  margin: 0;
   padding: 0;
   list-style: none;
 }
@@ -1061,7 +1097,7 @@ input:focus-visible + .promise-stamp > .promise-stamp__mark {
 }
 .compare__note {
   margin: 8px 0 0;
-  font-size: 14px;
+  font-size: 13px;
   line-height: 1.5;
   color: var(--color-muted);
   word-break: keep-all;

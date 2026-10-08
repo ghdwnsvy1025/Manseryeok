@@ -1,6 +1,6 @@
 // 내 캐릭터 (톤 v3.3 / 07-내캐릭터): 일주 → 동물·그림 경로, 오늘 화면 한 줄
 import { describe, expect, test } from "vitest";
-import { BRANCH_ANIMAL, characterOf, characterOfGanji, todayLine } from "@/lib/character";
+import { BRANCH_ANIMAL, characterOf, characterOfGanji } from "@/lib/character";
 
 describe("characterOf", () => {
   test("일주 기축 → 소, characters/cards 경로", () => {
@@ -21,12 +21,3 @@ describe("characterOf", () => {
   });
 });
 
-describe("todayLine (오늘 화면 제목 아래 한 줄)", () => {
-  test("기록이 있으면 '기록 N일째'", () => {
-    expect(todayLine(50, 12)).toBe("60갑자 중 51번째 · 기록 12일째");
-  });
-  test("기록이 없으면 '첫 기록을 기다려요'", () => {
-    expect(todayLine(50, 0)).toBe("60갑자 중 51번째 · 첫 기록을 기다려요");
-    expect(todayLine(0, 0)).toBe("60갑자 중 1번째 · 첫 기록을 기다려요");
-  });
-});

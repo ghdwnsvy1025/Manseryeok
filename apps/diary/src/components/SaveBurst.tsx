@@ -11,7 +11,7 @@ interface Props {
   ganjiKo: string;
   /** 오늘 일진 한자 ("甲寅", save 모드). 틀 안 간지 글자 옆에 ink색으로 */
   ganjiHanja?: string;
-  /** reveal 모드 전용 — 내 일주 카드 전체 (characterOf().cardSrc = /cards-square/{일주}.webp) */
+  /** reveal: 내 일주 정사각 카드. save(v3.10): 오늘 일진 정사각 카드 — 있으면 틀+캐릭터 대신 이 카드에 점수 도장 */
   cardSrc?: string;
   /** save 모드(v3.5) — 오늘 일진의 캐릭터 그림 (characterOfGanji(today).characterSrc = /characters/{간지}.webp). char-frame 틀 안에 들어간다 */
   characterSrc?: string;
@@ -193,7 +193,17 @@ export function SaveBurst({ ganjiKo, ganjiHanja, cardSrc, characterSrc, happines
       {bits.map((b, i) => (
         <Bit key={i} {...b} />
       ))}
-      {!characterSrc ? (
+      {!reveal && cardSrc ? (
+        // save (v3.10): 오늘 일진의 정사각 카드 그대로 + 오른쪽 아래 모서리에 행복도 인주 도장. 틀·간지 글자 없음(카드가 가짐). 모양은 디자이너(.today-card)
+        <div data-kept={kept ? "" : undefined} className="burst-card today-card relative w-full">
+          <img src={cardSrc} alt={`${ganjiKo} 카드`} width={1080} height={1080} className="h-auto w-full" />
+          {happiness !== undefined && (
+            <span className="burst-stamp" aria-label={`행복도 ${happiness}`}>
+              {happiness}
+            </span>
+          )}
+        </div>
+      ) : !characterSrc ? (
         <img src={cardSrc} alt={`${ganjiKo} 카드`} width={1080} height={1080} data-kept={kept ? "" : undefined} className="burst-card relative h-auto w-full" />
       ) : (
         // save (v3.5): char-frame 틀(3:4) 안에 위 간지 글자 · 가운데 오늘 일진 캐릭터 · 아래 행복도 인주 도장. 설명·별점 없음

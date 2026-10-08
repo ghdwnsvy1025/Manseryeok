@@ -5,10 +5,10 @@
  */
 export const BURST_ASSETS = ["/ui/char-frame-clean.webp", "/ui/stamp-inked-red-clean.png", "/ui/pop-paper-bits-clean.png", "/ui/pop-gold-dust-clean.png"] as const;
 
-export function BurstPreload({ characterSrc }: { characterSrc: string }) {
+export function BurstPreload({ characterSrc, cardSrc }: { characterSrc?: string; cardSrc?: string }) {
   return (
     <>
-      {[characterSrc, ...BURST_ASSETS].map((href) => (
+      {[characterSrc, cardSrc, ...BURST_ASSETS].filter((h): h is string => Boolean(h)).map((href) => (
         <link key={href} rel="preload" as="image" href={href} />
       ))}
     </>

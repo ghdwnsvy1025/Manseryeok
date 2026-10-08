@@ -67,7 +67,7 @@ export default async function WritePage({ searchParams }: { searchParams: Promis
         </nav>
       </header>
       {/* 저장 뒤 팡에 쓸 그날 캐릭터·틀·도장을 미리 받아 둔다 (전수조사 B8) */}
-      <BurstPreload characterSrc={characterOfGanji(ganji.ko).characterSrc} />
+      <BurstPreload cardSrc={characterOfGanji(ganji.ko).cardSrc} />
       <WritePreload />
       <EntryForm
         date={date}
