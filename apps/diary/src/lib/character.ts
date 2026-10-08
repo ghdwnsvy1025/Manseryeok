@@ -36,7 +36,8 @@ export function characterOfGanji(ganjiKo: string): MyCharacter {
     ganjiKo,
     animal: BRANCH_ANIMAL[branch] ?? "",
     characterSrc: `/characters/${ganjiKo}.webp`,
-    cardSrc: `/cards-square/${ganjiKo}.webp`,
+    // ?v=2: 2026-10-09 가장자리 검은 띠(0~7px)를 잘라 다시 저장. 1년 immutable 캐시라 주소를 바꿔야 폰이 새 파일을 받는다
+    cardSrc: `/cards-square/${ganjiKo}.webp?v=2`,
   };
 }
 

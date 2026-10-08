@@ -156,8 +156,8 @@ export function FortuneCard({ fortune, ganjiKo, canVote, vote, defaultOpen }: Pr
           </span>
         </span>
         {/* 카드의 주인공 — 밴드 단어 + 점수, 카드 폭 가운데, 뒤에 금빛 붓 자국 (v3.7).
-            좋음/무난/주의 모두 같은 색·같은 붓바탕 — 색으로 길흉을 말하지 않는다 */}
-        <span className="score-brush mt-2">
+            v3.11: 붓 자국 색만 단계별(data-band: 좋음 금빛 · 무난 녹갈 · 주의 옅은 먹빛). 카드 바탕·숫자 색은 같다 */}
+        <span className="score-brush mt-2" data-band={fortune.band}>
           <span className="font-serif text-[44px] text-ink">{fortune.band}</span>
           <span className="font-serif text-[34px] tabular-nums text-gold-ink">{scoreText}</span>
           <span className="text-[14px] text-muted">/10</span>

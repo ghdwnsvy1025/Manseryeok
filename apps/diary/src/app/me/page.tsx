@@ -8,7 +8,10 @@ import { ShareCard } from "@/components/ShareCard";
 import { shareCardText, shareMessage } from "@/lib/share";
 import { characterOf, characterOfGanji } from "@/lib/character";
 import { StatsSummary } from "@/components/StatsSummary";
-import { countEntries, getSajuProfile, listEntries, listEntriesForStats } from "@/lib/db";
+import { countEntries, getSajuProfile, listEntries, listEntriesForStats, listFortuneScores } from "@/lib/db";
+import { happinessSeries, moodTop, pointStats, streakOf } from "@/lib/stats/extra";
+import { HappinessChart } from "@/components/HappinessChart";
+import { addDays } from "@/lib/time";
 import { fitPercent } from "@/lib/fortune/personal";
 import { dayGanji } from "@/lib/ganji";
 import { byBranch, byElement, byStem, ganjiGrid, highlights } from "@/lib/stats/ganji";
@@ -94,10 +97,7 @@ function PillarCell({ label, info }: { label: string; info: PillarInfo | null })
         <span className={info ? ELEMENT_TEXT[info.branchElement] : undefined}>{info ? info.p.branch : "·"}</span>
         {info && <span className="pillar-god pillar-god--branch font-sans text-[12px] leading-tight text-ink">{info.branchTenGod}</span>}
       </div>
-      <span className="text-[13px] text-muted">
-        {label}
-        {info && <span className="text-muted"> · {info.p.ko}</span>}
-      </span>
+      <span className="text-[13px] text-muted">{label}</span>
     </div>
   );
 }
@@ -131,11 +131,13 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
   const { supabase, user } = await getUser();
   // 세션이 아직 없는 첫 요청: 리디렉트하지 않고 뼈대만 그린다. AnonBoot가 곧 새로 그린다 (docs/ANON_START.md 1절, B2)
   if (!user) return <Booting title="나" cards={3} />;
-  const [profile, entries, total, all] = await Promise.all([
+  const today = todayKST();
+  const [profile, entries, total, all, fortuneScores] = await Promise.all([
     getSajuProfile(supabase, user.id),
     listEntries(supabase, user.id, 30),
     countEntries(supabase, user.id),
     listEntriesForStats(supabase, user.id),
+    listFortuneScores(supabase, user.id, addDays(today, -29)),
   ]);
   // 생년월일이 없으면 먼저 받는다 (로그인 사용자와 같은 규칙)
   if (!profile) redirect("/onboarding?next=/me");
@@ -144,7 +146,12 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
   const card = shareCardText(h, profile?.name ?? null);
   const share = card ? shareMessage(card) : null;
   const selected = cell !== undefined && /^\d{1,2}$/.test(cell) && Number(cell) < 60 ? Number(cell) : null;
-  const todayIndex = dayGanji(todayKST()).index;
+  const todayIndex = dayGanji(today).index;
+  // 2026-10-09 Q4·Q7: 행복도 말고 보여 줄 지표 + 최근 30일 그래프(운세 점수 겹침, 빈 날은 비움)
+  const points = pointStats(all);
+  const moods = moodTop(all, 3);
+  const streak = streakOf(all, today);
+  const series = happinessSeries(all, fortuneScores, today, 30);
   const cells = ganjiGrid(all);
   const pickedAnimal = selected === null ? "" : characterOfGanji(cells[selected].ko).animal;
   const bt = branchTenGods(profile.pillars);
@@ -226,7 +233,7 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
           pickedEntries={selected === null ? [] : all.filter((e) => e.day_ganji_index === selected)}
           pickedAnimal={pickedAnimal}
         />
-        <StatsSummary h={h} fitPercent={fitPercent(all.length)} stems={byStem(all)} branches={byBranch(all)} elements={byElement(all)} />
+        <StatsSummary h={h} fitPercent={fitPercent(all.length)} stems={byStem(all)} branches={byBranch(all)} elements={byElement(all)} points={points} moods={moods} streak={streak} chart={<HappinessChart series={series} />} />
       </section>
 
       <section className="flex flex-col gap-3">

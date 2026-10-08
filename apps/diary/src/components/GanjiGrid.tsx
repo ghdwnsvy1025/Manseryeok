@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { STEMS } from "@saju/engine";
 import type { GanjiCell } from "@/lib/stats/ganji";
+import { characterOfGanji } from "@/lib/character";
 
 interface Props {
   cells: GanjiCell[];
@@ -68,7 +69,8 @@ export function GanjiGrid({ cells, selected, todayIndex, basePath, pickedEntries
         {picked ? (
           picked.n ? (
             <div className="flex flex-col items-center gap-2">
-              <img src={`/characters/${picked.ko}.webp`} alt="" width={120} height={120} className="block h-auto w-[120px]" />
+              {/* 2026-10-09 Q5: 캐릭터 대신 그 간지의 정사각 카드 */}
+              <img src={characterOfGanji(picked.ko).cardSrc} alt={`${picked.ko} 카드`} width={1080} height={1080} className="grid-card block h-auto w-[56%] max-w-[220px]" />
               <p className="font-serif text-[20px] leading-none">
                 <span className="text-ganji">{picked.ko}</span>
                 {pickedAnimal && <span className="text-ink"> · {pickedAnimal}</span>}
@@ -99,12 +101,16 @@ export function GanjiGrid({ cells, selected, todayIndex, basePath, pickedEntries
               )}
             </div>
           ) : (
-            <p>
-              <b className="text-ganji">{picked.ko}일</b>은 아직 기록이 없어요.
-            </p>
+            // 기록 없는 칸: 흐린 카드 = "아직 못 만난 카드" (Q5)
+            <div className="flex flex-col items-center gap-2">
+              <img src={characterOfGanji(picked.ko).cardSrc} alt={`${picked.ko} 카드 (아직 못 만남)`} width={1080} height={1080} data-unmet="" className="grid-card block h-auto w-[56%] max-w-[220px]" />
+              <p>
+                <b className="text-ganji">{picked.ko}일</b>은 아직 못 만난 카드예요.
+              </p>
+            </div>
           )
         ) : (
-          <p className="text-muted">칸을 누르면 그날의 캐릭터가 크게 보여요. 남색 테두리가 오늘이에요.</p>
+          <p className="text-muted">칸을 누르면 그 간지의 카드가 보여요. 남색 테두리가 오늘이에요.</p>
         )}
       </div>
     </div>

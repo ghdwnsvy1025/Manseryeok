@@ -969,7 +969,7 @@ input:focus-visible + .promise-stamp > .promise-stamp__mark {
 /* ── v3.7 점수 붓바탕 (운세 카드 머리) ──────────────────────────────────── */
 
 /* "무난 6.1/10"을 카드 폭 가운데, 뒤에 금빛 붓 자국: 키트 gold-wash를 divider 붓선(세로로 늘림) 모양으로 mask.
-   폭 60%·높이 64px·글자 뒤. 밴드와 무관하게 금색 하나 — 길흉을 색으로 말하지 않는다 */
+   폭 60%·높이 64px·글자 뒤. 기본 = 금빛(좋음). 무난·주의 색은 아래 v3.11 절 */
 .score-brush {
   position: relative;
   display: flex;
@@ -1183,5 +1183,263 @@ input:focus-visible + .promise-stamp > .promise-stamp__mark {
   .nav-pending[data-on] {
     animation: none;
     opacity: 1;
+  }
+}
+
+/* ── v3.11 나 통계 시각화 · 격자 칸 카드 · 운세 단계별 붓 색 (명세 12) ───────────── */
+
+/* 운세 단계별 붓 자국 — 같은 붓 모양(divider mask), 같은 gold-wash 결, 색만 다르다. 숫자 색은 셋 다 그대로.
+   좋음 = 금빛(기본), 무난 = 연한 녹갈(frame을 결 위에 곱해 30%), 주의 = 옅은 먹빛(ink 곱해 18%). 빨강·파랑 없음 */
+.score-brush[data-band="무난"]::before {
+  background-color: var(--color-frame);
+  background-blend-mode: multiply;
+  opacity: 0.28;
+}
+.score-brush[data-band="주의"]::before {
+  background-color: var(--color-ink);
+  background-blend-mode: multiply;
+  opacity: 0.18;
+}
+
+/* 격자 칸 상세 카드 — 카드가 제 테두리를 가진다. 틀·그림자 없음. 못 만난 카드는 흐리게 */
+.grid-card {
+  border: 0;
+  box-shadow: none;
+}
+.grid-card[data-unmet] {
+  filter: grayscale(1) opacity(0.35);
+}
+
+/* 맞춤도 게이지 — 6px paper-3 트랙, 금빛 fill */
+.meter {
+  display: block;
+  height: 6px;
+  overflow: hidden;
+  border-radius: 3px;
+  background: var(--color-paper-3);
+}
+.meter__fill {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  background: var(--color-gold) url("/ui/gold-wash.webp") center / 512px 512px;
+  animation: bar-in 300ms ease-out;
+}
+
+/* 지표 세 칸 — paper-3 면만(틀 안의 틀 금지), 모서리 4px */
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.metric {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  padding: 12px 10px;
+  border-radius: 4px;
+  background: var(--color-paper-3);
+}
+.metric__label {
+  font-size: 13px;
+  line-height: 1.3;
+  color: var(--color-muted);
+  word-break: keep-all;
+}
+.metric__value {
+  font-family: var(--font-serif);
+  font-size: 30px;
+  line-height: 1.05;
+  color: var(--color-ink);
+  font-variant-numeric: tabular-nums;
+}
+.metric__value small {
+  margin-left: 2px;
+  font-size: 14px;
+  color: var(--color-muted);
+}
+.metric__sub {
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--color-muted);
+  word-break: keep-all;
+}
+.metric__chips {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  margin-top: 2px;
+}
+.metric__chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  max-width: 100%;
+  padding: 2px 9px;
+  border: 1px solid color-mix(in srgb, var(--color-frame) 60%, transparent);
+  border-radius: 9999px;
+  font-size: 13px;
+  line-height: 1.35;
+  color: var(--color-ink);
+  white-space: nowrap;
+}
+.metric__chip small {
+  font-size: 11px;
+  color: var(--color-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 최근 30일 그래프 — 눈금 녹갈 0.5px 25%, 축 10px, 점 먹색, 7일 평균 금색 2.5px, 운세 점수 muted 점선 */
+.hchart {
+  margin: 0;
+}
+.hchart__grid {
+  stroke: color-mix(in srgb, var(--color-frame) 25%, transparent);
+  stroke-width: 0.5;
+}
+.hchart__axis {
+  font-family: var(--font-sans);
+  font-size: 10px;
+  fill: var(--color-muted);
+}
+.hchart__fortune {
+  stroke: var(--color-muted);
+  stroke-width: 1.5;
+  stroke-dasharray: 4 3;
+  stroke-linecap: butt;
+  opacity: 0.7;
+}
+.hchart__avg {
+  stroke: var(--color-gold);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.hchart__dot {
+  fill: var(--color-ink);
+}
+.hchart__key {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.hchart__key::before {
+  content: "";
+  display: inline-block;
+  flex: none;
+}
+.hchart__key--dot::before {
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+  background: var(--color-ink);
+}
+.hchart__key--avg::before {
+  width: 16px;
+  height: 2.5px;
+  border-radius: 2px;
+  background: var(--color-gold);
+}
+.hchart__key--fortune::before {
+  width: 16px;
+  height: 0;
+  border-top: 1.5px dashed var(--color-muted);
+}
+
+/* 글자별 내 행복도 — 세로 막대. 트랙 paper-3 아래 정렬, fill 금빛(오행 줄은 오행 색) */
+.bars__title {
+  margin: 0 0 8px;
+  color: var(--color-ink);
+}
+.bars__row {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.bars[data-kind="element"] .bars__row {
+  gap: 4px;
+}
+.bars__col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 0;
+}
+.bars__value {
+  min-height: 14px;
+  font-size: 11px;
+  line-height: 14px;
+  color: var(--color-ink);
+  font-variant-numeric: tabular-nums;
+}
+.bars__track {
+  display: flex;
+  align-items: flex-end;
+  width: 100%;
+  max-width: 22px;
+  height: 64px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: var(--color-paper-3);
+}
+.bars[data-kind="element"] .bars__track {
+  max-width: 36px;
+  height: 80px;
+}
+.bars__fill {
+  display: block;
+  width: 100%;
+  border-radius: 2px 2px 0 0;
+  background: var(--color-gold) url("/ui/gold-wash.webp") center / 512px 512px;
+  animation: bar-up 300ms ease-out;
+}
+.bars__col[data-el="목"] .bars__fill { background: var(--color-el-wood); }
+.bars__col[data-el="화"] .bars__fill { background: var(--color-el-fire); }
+.bars__col[data-el="토"] .bars__fill { background: var(--color-el-earth); }
+.bars__col[data-el="금"] .bars__fill { background: var(--color-el-metal); }
+.bars__col[data-el="수"] .bars__fill { background: var(--color-el-water); }
+.bars__label {
+  margin-top: 4px;
+  font-family: var(--font-serif);
+  font-size: 15px;
+  line-height: 1.1;
+  color: var(--color-ink);
+}
+.bars[data-kind="element"] .bars__label {
+  font-size: 16px;
+  letter-spacing: -0.04em;
+  white-space: nowrap;
+}
+.bars__n {
+  min-height: 12px;
+  font-size: 10px;
+  line-height: 12px;
+  color: var(--color-muted);
+  font-variant-numeric: tabular-nums;
+}
+.bars__col[data-empty] .bars__track {
+  background: transparent;
+  border: 1px dashed color-mix(in srgb, var(--color-frame) 55%, transparent);
+}
+.bars__col[data-empty] .bars__label {
+  color: var(--color-muted);
+}
+/* bar-in(가로)의 세로판 — 같은 300ms, 처음 그릴 때만 */
+@keyframes bar-up {
+  from {
+    height: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .meter__fill,
+  .bars__fill {
+    animation: none;
   }
 }

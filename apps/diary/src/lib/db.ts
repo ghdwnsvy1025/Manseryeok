@@ -248,14 +248,29 @@ export async function deleteEntry(sb: SupabaseClient, userId: string, date: stri
 export async function listEntriesForStats(
   sb: SupabaseClient,
   userId: string,
-): Promise<Pick<EntryRow, "entry_date" | "happiness" | "day_ganji_index" | "day_stem" | "day_branch" | "promise">[]> {
-  const legacy = "entry_date, happiness, day_ganji_index, day_stem, day_branch";
+): Promise<Pick<EntryRow, "entry_date" | "happiness" | "day_ganji_index" | "day_stem" | "day_branch" | "promise" | "moods">[]> {
+  const legacy = "entry_date, happiness, moods, day_ganji_index, day_stem, day_branch";
   const q = (cols: string) =>
     sb.from("night_entries").select(cols).eq("user_id", userId).order("entry_date", { ascending: false }).limit(2000);
   let { data, error } = await q(`${legacy}, promise`);
   if (error && isMissingColumnError(error)) ({ data, error } = await q(legacy));
   if (error) fail("기록 통계 읽기", error);
-  return (data ?? []) as unknown as Pick<EntryRow, "entry_date" | "happiness" | "day_ganji_index" | "day_stem" | "day_branch" | "promise">[];
+  return (data ?? []) as unknown as Pick<EntryRow, "entry_date" | "happiness" | "day_ganji_index" | "day_stem" | "day_branch" | "promise" | "moods">[];
+}
+
+/** 행복도 그래프에 겹칠 운세 점수(10점). fromDate 이후. 운세를 안 연 날은 행이 없다 — 그래프에서 비운다 */
+export async function listFortuneScores(sb: SupabaseClient, userId: string, fromDate: string): Promise<{ fortune_date: string; score: number }[]> {
+  const { data, error } = await sb
+    .from("night_fortunes")
+    .select("fortune_date, score")
+    .eq("user_id", userId)
+    .gte("fortune_date", fromDate)
+    .order("fortune_date", { ascending: true });
+  if (error) {
+    console.error("운세 점수 읽기", error);
+    return [];
+  }
+  return ((data ?? []) as { fortune_date: string; score: number | string }[]).map((r) => ({ fortune_date: r.fortune_date, score: Number(r.score) }));
 }
 
 export interface CachedFortuneDo {
