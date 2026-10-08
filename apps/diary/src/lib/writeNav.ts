@@ -18,3 +18,16 @@ export function writeDateLinks(date: string, today: string): WriteDateLinks {
     next: next ? `/write?date=${next}` : null,
   };
 }
+
+export interface ResolvedWriteDate {
+  date: string;
+  /** 요청한 날짜가 없거나 잘못됐거나 미래(또는 2020-01-01 이전)라 오늘로 바꿨으면 true → "오늘 날짜로 열었어요" */
+  adjusted: boolean;
+}
+
+/** `/write?date=` 값을 실제 열 날짜로. 값이 없으면 오늘(adjusted=false), 잘못됐거나 미래면 오늘(adjusted=true) */
+export function resolveWriteDate(param: string | null | undefined, today: string): ResolvedWriteDate {
+  if (param == null || param === "") return { date: today, adjusted: false };
+  const ok = !!parseYmd(param) && param <= today && param >= EARLIEST_ENTRY_DATE;
+  return ok ? { date: param, adjusted: false } : { date: today, adjusted: true };
+}

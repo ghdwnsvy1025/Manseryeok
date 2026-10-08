@@ -6,7 +6,8 @@ import { GanjiGrid } from "@/components/GanjiGrid";
 import { Booting } from "@/components/Booting";
 import { ShareCard } from "@/components/ShareCard";
 import { shareCardText, shareMessage } from "@/lib/share";
-import { characterOf } from "@/lib/character";
+import { characterOf, characterOfGanji } from "@/lib/character";
+import { TEN_GOD_THEME } from "@/lib/fortune/base";
 import { StatsSummary } from "@/components/StatsSummary";
 import { countEntries, getSajuProfile, listEntries, listEntriesForStats } from "@/lib/db";
 import { fitPercent } from "@/lib/fortune/personal";
@@ -70,9 +71,35 @@ function PillarCell({ label, info }: { label: string; info: PillarInfo | null })
       </div>
       <span className="text-[13px] text-muted">
         {label}
-        {info && <span className="text-faint"> · {info.p.ko}</span>}
+        {info && <span className="text-muted"> · {info.p.ko}</span>}
       </span>
     </div>
+  );
+}
+
+/** 나무패 아래 "자세히" — 내 기둥에 든 십신의 한글 뜻 한 줄씩 (TEN_GOD_THEME 읽기만). 접힘 기본 */
+function TenGodDetails({ infos }: { infos: (PillarInfo | null)[] }) {
+  const theme = TEN_GOD_THEME as Record<string, string>;
+  const rows: PillarInfo[] = [];
+  for (const i of infos) {
+    if (!i || i.tenGod === "나" || !theme[i.tenGod]) continue;
+    if (rows.some((r) => r.tenGod === i.tenGod)) continue;
+    rows.push(i);
+  }
+  if (rows.length === 0) return null;
+  return (
+    <details className="mt-3">
+      <summary className="tap cursor-pointer list-none text-[15px] text-muted underline underline-offset-4 [&::-webkit-details-marker]:hidden">
+        자세히
+      </summary>
+      <ul className="mt-1 flex flex-col gap-1 text-[15px] leading-relaxed text-ink">
+        {rows.map((i) => (
+          <li key={i.tenGod}>
+            {i.tenGod}: {theme[i.tenGod]}
+          </li>
+        ))}
+      </ul>
+    </details>
   );
 }
 
@@ -95,12 +122,20 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
   const share = card ? shareMessage(card) : null;
   const selected = cell !== undefined && /^\d{1,2}$/.test(cell) && Number(cell) < 60 ? Number(cell) : null;
   const todayIndex = dayGanji(todayKST()).index;
+  const cells = ganjiGrid(all);
+  const pickedAnimal = selected === null ? "" : characterOfGanji(cells[selected].ko).animal;
+  const infos = [
+    pillarInfo(profile.pillars.hour, profile.pillars.day.stem, false),
+    pillarInfo(profile.pillars.day, profile.pillars.day.stem, true),
+    pillarInfo(profile.pillars.month, profile.pillars.day.stem, false),
+    pillarInfo(profile.pillars.year, profile.pillars.day.stem, false),
+  ];
 
   return (
     <main className="flex flex-col gap-6">
       <header className="relative flex flex-col items-center pt-2">
         {/* 설정은 한곳에 모았다 (docs/ANON_START.md 3절): Google 연결 · 알림 · 생년월일 · 앱으로 두기 · 로그아웃 */}
-        <Link href="/settings" className="absolute top-0 right-0 text-sm text-muted underline underline-offset-4">
+        <Link href="/settings" className="tap absolute -top-3 right-0 text-sm text-muted underline underline-offset-4">
           설정
         </Link>
         {/* 제목 자리 = 내 카드 (v3.3): 폭 56%, 이 화면의 그림 하나. 카드 자체가 테두리를 가지고 있어 틀을 더 두르지 않는다 */}
@@ -108,12 +143,21 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
         <h1 className="mt-4 font-serif text-[20px] leading-snug">
           {profile.name !== "손님" && <>{profile.name} · </>}<span className="text-ganji">{me.ganjiKo}일</span> · {me.animal}
         </h1>
+        {/* 익명일 때만: 기록이 이 기기에 묶여 있다는 작은 줄 (전수조사 C "익명 기기 종속 상시 안내") */}
+        {user.is_anonymous && (
+          <p className="mt-1 text-[13px] text-muted">
+            이 기기에만 저장돼요 ·{" "}
+            <Link href="/settings" className="underline underline-offset-4">
+              설정에서 Google 연결
+            </Link>
+          </p>
+        )}
       </header>
 
       <section className="card-frame card-paper p-5">
         <div className="flex items-baseline justify-between">
           <h2 className="font-serif text-[22px]">내 사주</h2>
-          <Link href="/onboarding?next=/me" className="text-sm text-muted underline underline-offset-4">
+          <Link href="/onboarding?next=/me" className="tap text-sm text-muted underline underline-offset-4">
             {profile ? "고치기" : "넣기"}
           </Link>
         </div>
@@ -127,11 +171,12 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
             </p>
             {/* 사주는 오른쪽에서 왼쪽으로 읽는다: 시 · 일 · 월 · 년 */}
             <div className="mt-4 grid grid-cols-4 gap-2">
-              <PillarCell label="시" info={pillarInfo(profile.pillars.hour, profile.pillars.day.stem, false)} />
-              <PillarCell label="일" info={pillarInfo(profile.pillars.day, profile.pillars.day.stem, true)} />
-              <PillarCell label="월" info={pillarInfo(profile.pillars.month, profile.pillars.day.stem, false)} />
-              <PillarCell label="년" info={pillarInfo(profile.pillars.year, profile.pillars.day.stem, false)} />
+              <PillarCell label="시" info={infos[0]} />
+              <PillarCell label="일" info={infos[1]} />
+              <PillarCell label="월" info={infos[2]} />
+              <PillarCell label="년" info={infos[3]} />
             </div>
+            <TenGodDetails infos={infos} />
           </>
         ) : (
           <p className="mt-2 text-[15px] text-muted">생년월일을 넣으면 내 사주와 운세가 보여요.</p>
@@ -144,11 +189,12 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
           <p className="mt-1 text-sm text-muted">60가지 날 가운데 나는 어떤 날에 행복했는지. 기록한 날의 동물이 칸에 찍혀요.</p>
         </div>
         <GanjiGrid
-          cells={ganjiGrid(all)}
+          cells={cells}
           selected={selected}
           todayIndex={todayIndex}
           basePath="/me"
           pickedEntries={selected === null ? [] : all.filter((e) => e.day_ganji_index === selected)}
+          pickedAnimal={pickedAnimal}
         />
         <StatsSummary h={h} fitPercent={fitPercent(all.length)} stems={byStem(all)} branches={byBranch(all)} elements={byElement(all)} />
       </section>
@@ -180,7 +226,7 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
                     {e.note ? (
                       <span className="mt-0.5 block truncate font-hand text-[20px] leading-snug text-ink">{e.note}</span>
                     ) : (
-                      e.moods.length === 0 && <span className="block text-sm text-faint">행복도만 남김</span>
+                      e.moods.length === 0 && <span className="block text-sm text-muted">행복도만 남김</span>
                     )}
                     {e.moods.length > 0 && (
                       <span className="mt-1.5 flex flex-wrap gap-1.5">

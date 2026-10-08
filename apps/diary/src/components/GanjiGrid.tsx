@@ -12,6 +12,8 @@ interface Props {
   basePath: string;
   /** 선택 칸의 그 날들 (최신순). 상세 아래 기록 목록. 없으면 생략 */
   pickedEntries?: { entry_date: string; happiness: number; promise?: "kept" | "missed" | "na" | null }[];
+  /** 선택 칸의 동물 이름 ("토끼") — 상세에 "을묘 · 토끼"로 */
+  pickedAnimal?: string;
 }
 
 /**
@@ -20,17 +22,18 @@ interface Props {
  * 약속 지킨 날이 있는 칸은 두 겹(금 2px + 안쪽 한지 1px + 금 1px). 카드 틀·썸네일·인장 없음.
  * 안 모은 칸 = 빈 도장 자리 + 지지 한 글자. 숫자·이모지는 넣지 않는다. 전환 효과 없음.
  */
-export function GanjiGrid({ cells, selected, todayIndex, basePath, pickedEntries = [] }: Props) {
+export function GanjiGrid({ cells, selected, todayIndex, basePath, pickedEntries = [], pickedAnimal = "" }: Props) {
   const picked = selected !== null ? cells[selected] : null;
   return (
-    <div className="-mx-2">
+    // 좌우 여백을 화면 가장자리까지 줄여 칸이 36px 이상 (375px 기준 36.6px). 칸 사이 1px
+    <div className="-mx-5">
       {/* 열마다 천간이 같다: 甲 열, 乙 열 … 癸 열 */}
-      <div className="mb-1 grid grid-cols-10 gap-1 text-center font-serif text-[12px] text-faint" aria-hidden>
+      <div className="mb-1 grid grid-cols-10 gap-px text-center font-serif text-[12px] text-muted" aria-hidden>
         {STEMS.map((s) => (
           <span key={s}>{s}</span>
         ))}
       </div>
-      <ol className="grid grid-cols-10 gap-1" aria-label="60갑자별 내 행복도">
+      <ol className="grid grid-cols-10 gap-px" aria-label="60갑자별 내 행복도">
         {cells.map((c) => {
           const isSel = c.index === selected;
           const isToday = c.index === todayIndex;
@@ -52,7 +55,7 @@ export function GanjiGrid({ cells, selected, todayIndex, basePath, pickedEntries
                   // 모은 칸 = 캐릭터만 (v3.3). 지연 로딩
                   <img src={`/characters/${c.ko}.webp`} alt="" width={64} height={64} loading="lazy" decoding="async" className="album-cell__img" />
                 ) : (
-                  <span className="font-serif text-[12px] leading-none text-faint">{c.hanja[1]}</span>
+                  <span className="font-serif text-[12px] leading-none text-muted">{c.hanja[1]}</span>
                 )}
               </Link>
             </li>
@@ -60,23 +63,24 @@ export function GanjiGrid({ cells, selected, todayIndex, basePath, pickedEntries
         })}
       </ol>
 
-      {/* 선택 칸 상세: 카드 크게(폭 60%) + 숫자 줄. 기록 목록은 아래 "내 기록"이 맡는다 */}
-      <div className="mx-2 mt-3 min-h-6 text-[15px]" aria-live="polite">
+      {/* 선택 칸 상세: 캐릭터만 + "을묘 · 토끼" 글자 + 숫자 줄 (카드 전체는 안 쓴다 — 작은 글씨). 기록 목록은 아래 "내 기록"이 맡는다 */}
+      <div className="mx-5 mt-3 min-h-6 text-[15px]" aria-live="polite">
         {picked ? (
           picked.n ? (
-            <div className="flex flex-col items-center gap-3">
-              <img
-                src={`/cards/${picked.ko}.webp`}
-                alt={`${picked.ko}일 카드`}
-                width={768}
-                height={1030}
-                data-kept={picked.keptCount > 0 ? "" : undefined}
-                className={`album-pick ${picked.keptCount > 0 ? "outline-2 outline-gold" : ""}`}
-              />
+            <div className="flex flex-col items-center gap-2">
+              <img src={`/characters/${picked.ko}.webp`} alt="" width={120} height={120} className="block h-auto w-[120px]" />
+              <p className="font-serif text-[20px] leading-none">
+                <span className="text-ganji">{picked.ko}</span>
+                {pickedAnimal && <span className="text-ink"> · {pickedAnimal}</span>}
+              </p>
               <p className="text-center">
                 <b className="text-ganji">{picked.ko}일</b> {picked.n}번 · 평균 <b className="font-serif">{picked.mean}</b>
-                {picked.keptCount > 0 && <> · 지킨 약속 {picked.keptCount}</>}
-                <span className="text-faint"> · 신호 {picked.signal}</span>
+                {picked.keptCount > 0 && <> · 오늘 포인트 {picked.keptCount}번</>}
+                {picked.signal === "약함" ? (
+                  <span className="text-muted"> (기록 3번부터 믿을 만해요)</span>
+                ) : (
+                  <span className="text-muted"> · 신호 {picked.signal}</span>
+                )}
               </p>
               {pickedEntries.length > 0 && (
                 <ul className="flex w-full flex-col gap-1.5 text-[15px]">
@@ -86,7 +90,7 @@ export function GanjiGrid({ cells, selected, todayIndex, basePath, pickedEntries
                         <span>{e.entry_date.replace(/-/g, ".")}</span>
                         <span className="font-serif tabular-nums">
                           행복도 {e.happiness}
-                          {e.promise === "kept" && <span className="ml-2 text-[13px] font-sans text-gold-ink">약속 지킴</span>}
+                          {e.promise === "kept" && <span className="ml-2 text-[13px] font-sans text-gold-ink">포인트 해냄</span>}
                         </span>
                       </Link>
                     </li>
@@ -100,7 +104,7 @@ export function GanjiGrid({ cells, selected, todayIndex, basePath, pickedEntries
             </p>
           )
         ) : (
-          <p className="text-faint">칸을 누르면 그날의 카드가 크게 보여요. 남색 테두리가 오늘이에요.</p>
+          <p className="text-muted">칸을 누르면 그날의 캐릭터가 크게 보여요. 남색 테두리가 오늘이에요.</p>
         )}
       </div>
     </div>

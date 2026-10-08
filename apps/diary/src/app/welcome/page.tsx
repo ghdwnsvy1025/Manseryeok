@@ -28,7 +28,11 @@ export default async function WelcomePage() {
         <h1 className="font-serif text-[24px] leading-snug break-keep">
           당신의 카드는 <span className="text-ganji">{me.ganjiKo}</span> · {me.animal}예요
         </h1>
-        <p className="mt-2 text-[16px] leading-[1.6] text-muted break-keep">60갑자 중 당신의 날이에요. 매일 밤 한 줄이 이 카드에 쌓여요</p>
+        <p className="mt-2 text-[16px] leading-[1.6] text-muted break-keep">
+          {me.ganjiKo}({profile.pillars.day.stem}
+          {profile.pillars.day.branch}) = 태어난 날의 간지예요
+        </p>
+        <p className="mt-1 text-[16px] leading-[1.6] text-muted break-keep">60갑자 중 당신의 날이에요. 매일 밤 한 줄이 이 카드에 쌓여요</p>
       </div>
       {/* 금색 면 버튼 — 이 화면에 하나. 자동 이동 없음 */}
       <Link href="/" className="burst-text burst-text--late gold-plate flex h-14 w-full max-w-[320px] items-center justify-center rounded-xl text-[17px] font-bold text-gold-ink">

@@ -23,7 +23,7 @@ export function LinkPromptCard({ nextCount }: { nextCount: number }) {
       <p className="mt-2 text-[15px] leading-relaxed text-muted">지금 기록은 이 기기에만 묶여 있어요. 연결하면 어디서든 이어서 써요.</p>
       <div className="mt-5 flex flex-col gap-3">
         <LinkGoogleButton next="/" />
-        <button type="button" onClick={() => setHidden(true)} className="text-sm text-faint underline underline-offset-4">
+        <button type="button" onClick={() => setHidden(true)} className="tap self-center text-sm text-muted underline underline-offset-4">
           나중에
         </button>
       </div>

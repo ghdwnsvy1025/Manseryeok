@@ -6,6 +6,8 @@ import { getUser } from "@/lib/supabase/server";
 import { adminClient } from "@/lib/supabase/admin";
 import {
   deleteAllUserRows,
+  deleteEntry,
+  deleteFortuneVote,
   deleteFortunesAsAdmin,
   ensureUserRow,
   getSajuProfile,
@@ -17,7 +19,7 @@ import {
   saveSajuProfile,
 } from "@/lib/db";
 import { isAllowedRemindHour } from "@/lib/remind";
-import { validateEntry } from "@/lib/entry";
+import { validateEntry, validateEntryDate } from "@/lib/entry";
 import { dayGanji } from "@/lib/ganji";
 import { COMPUTE_ERROR, computeProfile, validateName, validateProfile, type ProfileField } from "@/lib/profile";
 
@@ -70,7 +72,29 @@ export async function saveEntryAction(_prev: FormState, form: FormData): Promise
   }
   revalidatePath("/");
   revalidatePath("/me");
+  revalidatePath("/write");
   redirect(`/?saved=${checked.value.entryDate}`);
+}
+
+/**
+ * 그 날짜의 내 기록 지우기 (쓰기 화면 고치기 모드 "지우기"). 날짜 규칙은 저장과 같다(validateEntryDate).
+ * 지운 뒤 /me로 — 지운 날짜의 쓰기 화면에 머물면 빈 폼이 "저장 전"처럼 보여 헷갈린다.
+ */
+export async function deleteEntryAction(form: FormData): Promise<void> {
+  const checked = validateEntryDate(form.get("date"));
+  if (!checked.ok) return;
+  const { supabase, user } = await getUser();
+  if (!user) return;
+  try {
+    await deleteEntry(supabase, user.id, checked.value);
+  } catch (e) {
+    console.error("기록 지우기 실패", e);
+    return;
+  }
+  revalidatePath("/");
+  revalidatePath("/me");
+  revalidatePath("/write");
+  redirect("/me");
 }
 
 /** 생년월일 저장. 운세는 기다리지 않고 바로 돌아간다 — 오늘 화면의 Suspense가 맡는다 */
@@ -192,14 +216,16 @@ export async function markLinkPromptedAction(nextCount: number): Promise<void> {
   }
 }
 
+/** 운세 투표. vote 1·-1은 저장(바꾸기), "0"은 취소 — 눌린 쪽을 다시 누르면 그 날짜 행을 지운다 */
 export async function fortuneVoteAction(form: FormData): Promise<void> {
   const date = String(form.get("date") ?? "");
   const vote = Number(form.get("vote"));
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || (vote !== 1 && vote !== -1)) return;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || (vote !== 1 && vote !== -1 && vote !== 0)) return;
   const { supabase, user } = await getUser();
   if (!user) return;
   try {
-    await saveFortuneVote(supabase, user.id, date, vote);
+    if (vote === 0) await deleteFortuneVote(supabase, user.id, date);
+    else await saveFortuneVote(supabase, user.id, date, vote);
   } catch (e) {
     console.error(e);
   }

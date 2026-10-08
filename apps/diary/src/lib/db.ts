@@ -238,6 +238,12 @@ export async function saveEntry(sb: SupabaseClient, userId: string, input: Entry
   fail("기록 저장", error);
 }
 
+/** 그 날짜의 내 기록 하나 지우기 (쓰기 화면 "지우기"). RLS가 본인 행만 허용한다. 없는 날짜는 0 rows — 오류가 아니다 */
+export async function deleteEntry(sb: SupabaseClient, userId: string, date: string): Promise<void> {
+  const { error } = await sb.from("night_entries").delete().eq("user_id", userId).eq("entry_date", date);
+  if (error) fail("기록 지우기", error);
+}
+
 /** 운세 보정용: 전체 기록을 가볍게 (날짜 역순 제한 없음, 간지 통계에도 쓴다) */
 export async function listEntriesForStats(
   sb: SupabaseClient,
@@ -314,6 +320,12 @@ export async function saveFortuneVote(sb: SupabaseClient, userId: string, date: 
     .from("night_fortune_feedback")
     .upsert({ user_id: userId, fortune_date: date, vote }, { onConflict: "user_id,fortune_date" });
   if (error) fail("운세 피드백 저장", error);
+}
+
+/** 투표 취소: 눌린 쪽을 다시 누르면 그 날짜 행을 지운다. 없는 날짜는 0 rows — 오류가 아니다 */
+export async function deleteFortuneVote(sb: SupabaseClient, userId: string, date: string): Promise<void> {
+  const { error } = await sb.from("night_fortune_feedback").delete().eq("user_id", userId).eq("fortune_date", date);
+  if (error) fail("운세 피드백 지우기", error);
 }
 
 export interface NotificationSettingsRow {

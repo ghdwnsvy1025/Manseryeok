@@ -38,7 +38,7 @@ export function ClearAllButton() {
       onClick={press}
       disabled={busy}
       aria-live="polite"
-      className={`text-sm underline underline-offset-4 disabled:opacity-60 ${armed ? "font-bold text-danger" : "text-danger"}`}
+      className={`tap text-sm underline underline-offset-4 disabled:opacity-60 ${armed ? "font-bold text-danger" : "text-danger"}`}
     >
       {busy ? "지우는 중…" : armed ? "정말 지우기" : "기록 모두 지우기"}
     </button>

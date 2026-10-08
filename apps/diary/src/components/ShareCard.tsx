@@ -50,7 +50,7 @@ export function ShareCard({ card, cardSrc, title, text }: Props) {
   }
 
   return (
-    <div className="rounded-2xl border border-line bg-surface px-5 py-4">
+    <div className="card-frame card-paper px-5 py-4">
       <p className="text-[15px] font-bold">내 카드 공유</p>
       <p className="mt-0.5 text-sm text-muted">
         {card ? `가장 행복한 날 ${card.title}을 60갑자 카드로 만들어요.` : "같은 간지 날을 두 번 이상 기록하면 카드가 열려요."}
@@ -59,7 +59,7 @@ export function ShareCard({ card, cardSrc, title, text }: Props) {
         type="button"
         onClick={share}
         disabled={!card || busy}
-        className="mt-3 h-10 rounded-full bg-lamp px-4 text-sm font-bold text-lamp-ink disabled:opacity-40"
+        className="gold-plate mt-3 h-11 rounded-full px-5 text-sm font-bold text-gold-ink disabled:opacity-40"
       >
         {busy ? "만드는 중…" : "카드 공유"}
       </button>

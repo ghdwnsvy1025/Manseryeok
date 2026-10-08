@@ -1,4 +1,6 @@
+import { BRANCHES, BRANCHES_KO, STEMS, STEMS_KO } from "@saju/engine";
 import { fortuneVoteAction } from "@/app/actions";
+import { SignalLegend } from "@/components/SignalLegend";
 import { AREA_WORD } from "@/lib/fortune/core";
 import type { AreaSignal, FortuneContent } from "@/lib/fortune/types";
 
@@ -6,6 +8,17 @@ import type { AreaSignal, FortuneContent } from "@/lib/fortune/types";
 const SIGNAL_COLOR: Record<AreaSignal, string> = { "↑": "text-gold", "→": "text-muted", "↓": "text-ink" };
 const SIGNAL_WORD: Record<AreaSignal, string> = { "↑": "좋아요", "→": "보통이에요", "↓": "조심해요" };
 type Period = "오늘" | "이달" | "올해";
+
+/** 한자 천간·지지 → 한글 (근거 문장 병기용). 표시만 바꾼다 — 데이터는 그대로 */
+const HANJA_KO: Record<string, string> = {};
+STEMS.forEach((h, i) => (HANJA_KO[h] = STEMS_KO[i]));
+BRANCHES.forEach((h, i) => (HANJA_KO[h] = BRANCHES_KO[i]));
+const HANJA_RE = /(?<![(甲乙丙丁戊己庚辛壬癸子丑寅卯辰巳午未申酉戌亥])(?:[甲乙丙丁戊己庚辛壬癸][子丑寅卯辰巳午未申酉戌亥]?|[子丑寅卯辰巳午未申酉戌亥])/g;
+
+/** "癸未" → "계미(癸未)", "癸" → "계(癸)". 이미 "계미(癸未)"처럼 괄호 안이면 건드리지 않는다 */
+export function annotateHanja(text: string): string {
+  return text.replace(HANJA_RE, (m) => `${[...m].map((c) => HANJA_KO[c] ?? c).join("")}(${m})`);
+}
 
 /** 받침 유무 — 조사 고르기 */
 function batchim(s: string): boolean {
@@ -131,12 +144,13 @@ export function FortuneCard({ fortune, ganjiKo, canVote, vote, defaultOpen }: Pr
 
             {/* 오늘의 신호 (v3.4 → v3.7 라벨 위·문장 아래): 한 상자에 같은 띠지. 영역 = 먹색 테두리, 하면 좋아요 = 금색 면, 피해요 = 먹색 면.
                 화살표는 글자, 색으로 길흉을 말하지 않는다(↓도 ink) */}
+            <SignalLegend />
             <ul className="signal-box mt-5 list-none text-[16px] leading-[1.5]">
               {areas.map((a) => (
                 <li key={`${a.period}-${a.area}`} className="signal-box__row break-keep text-ink/90">
                   <span className="sig sig--line">
                     <span className="text-muted">{a.period}</span>
-                    <span aria-hidden className="mx-1 text-faint">·</span>
+                    <span aria-hidden className="mx-1 text-muted">·</span>
                     <span>{AREA_WORD[a.area]}</span>
                     <span aria-hidden className={`ml-1 ${SIGNAL_COLOR[a.signal]}`}>
                       {a.signal}
@@ -160,27 +174,30 @@ export function FortuneCard({ fortune, ganjiKo, canVote, vote, defaultOpen }: Pr
             <span aria-hidden className="rule rule--light mt-5" />
 
             {canVote && (
-              <form action={fortuneVoteAction} className="mt-4 flex items-center gap-2 text-sm text-muted">
+              <form action={fortuneVoteAction} className="mt-4 flex flex-wrap items-center gap-2 text-sm text-muted">
                 <input type="hidden" name="date" value={fortune.date} />
                 <span className="mr-1">오늘과 맞았어요?</span>
+                {/* 눌린 쪽을 다시 누르면 value "0" → 투표 취소 (actions.ts fortuneVoteAction) */}
                 <button
                   type="submit"
                   name="vote"
-                  value="1"
+                  value={vote === 1 ? "0" : "1"}
                   aria-pressed={vote === 1}
-                  className={`h-9 rounded-full border px-4 ${vote === 1 ? "border-gold font-bold text-ink" : "border-frame/50 text-ink"}`}
+                  className={`h-11 rounded-full border px-4 ${vote === 1 ? "border-gold font-bold text-ink" : "border-frame/50 text-ink"}`}
                 >
                   맞아요
                 </button>
                 <button
                   type="submit"
                   name="vote"
-                  value="-1"
+                  value={vote === -1 ? "0" : "-1"}
                   aria-pressed={vote === -1}
-                  className={`h-9 rounded-full border px-4 ${vote === -1 ? "border-gold font-bold text-ink" : "border-frame/50 text-ink"}`}
+                  className={`h-11 rounded-full border px-4 ${vote === -1 ? "border-gold font-bold text-ink" : "border-frame/50 text-ink"}`}
                 >
                   아니에요
                 </button>
+                {/* 투표 뒤 한 줄 — 눌린 상태일 때만 */}
+                {vote !== null && <span className="basis-full text-[14px] text-muted">고마워요, 내일 운세에 반영해요 · 다시 누르면 취소돼요</span>}
               </form>
             )}
 
@@ -193,7 +210,7 @@ export function FortuneCard({ fortune, ganjiKo, canVote, vote, defaultOpen }: Pr
                 <ul className="mt-3 flex flex-col gap-1.5 border-l-2 border-gold pl-3 text-[14px] leading-[1.6] text-muted">
                   {facts.map((f, i) => (
                     <li key={i} className="break-keep">
-                      {f}
+                      {annotateHanja(f)}
                     </li>
                   ))}
                 </ul>

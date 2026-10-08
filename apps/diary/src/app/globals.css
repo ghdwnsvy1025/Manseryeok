@@ -130,6 +130,21 @@ body {
   opacity: 0.85;
 }
 
+/* 글자 링크·작은 버튼의 손가락 자리 (전수조사 C): 글자 크기는 그대로, 세로 44px를 패딩으로 채운다.
+   좌우 8px 패딩은 음수 여백으로 상쇄해 글자 줄맞춤이 바뀌지 않는다 */
+.tap {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding-inline: 8px;
+  margin-inline: -8px;
+}
+.tap--box {
+  margin-inline: 0;
+  min-width: 44px;
+  justify-content: center;
+}
+
 /* 편지지 괘선: 키트 ruled-paper (손으로 그은 녹갈 먹선 2줄 타일, 주기 = 타일 높이의 절반).
    --lh 줄 높이마다 한 줄. 선은 글자 기준선 조금 아래(0.9lh)에 놓인다. */
 .ruled {
@@ -150,8 +165,11 @@ body {
   border-width: 0 12px;
   border-image: url("/ui/tag-strip-paper-clean.webp") 0 44 fill / 0 12px / 0 stretch;
 }
-.tag--on {
+.tag--on,
+input:checked + .tag {
   border-image-source: url("/ui/tag-strip-navy-clean.webp");
+  color: var(--color-paper-2);
+  font-weight: 700;
 }
 
 /* 띠지 변형 (v3.2 운세 카드): 하면 좋아요 = 금색 띠지(gold-wash 면), 피해요 = 먹색 테두리 띠지 */
@@ -391,12 +409,20 @@ input:focus-visible + .seg__cell,
 .stamp {
   background: url("/ui/stamp-empty-clean.webp") center / contain no-repeat;
 }
-.stamp--on {
+.stamp--on,
+input:checked + .stamp {
   background-image: url("/ui/stamp-inked-red-clean.png");
+  color: var(--color-paper-2);
 }
-/* 도장을 고를 때 120ms 눌림 한 번 (톤 v3 허용 모션) */
+/* 도장을 고를 때 120ms 눌림 한 번 (톤 v3 허용 모션). 찍힘 자체는 위 `input:checked +`가 그린다 — JS가 붙기 전에도 바로 */
 input:checked + .stamp {
   animation: stamp-press 120ms ease-out;
+}
+/* 손가락이 닿는 순간 눌림 — JS와 무관하게 즉시 */
+.stamp:active,
+.tag:active,
+.promise-stamp:active > .promise-stamp__mark {
+  transform: scale(0.94);
 }
 @keyframes stamp-press {
   from {

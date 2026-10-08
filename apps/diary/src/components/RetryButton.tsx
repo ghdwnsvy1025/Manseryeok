@@ -6,7 +6,7 @@
  */
 export function RetryButton({ className = "" }: { className?: string }) {
   return (
-    <button type="button" onClick={() => window.location.reload()} className={`text-sm text-muted underline underline-offset-4 ${className}`}>
+    <button type="button" onClick={() => window.location.reload()} className={`tap text-sm text-muted underline underline-offset-4 ${className}`}>
       다시 시도
     </button>
   );

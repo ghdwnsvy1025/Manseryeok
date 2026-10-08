@@ -44,14 +44,15 @@ export function InstallHint() {
   };
 
   return (
-    <div className="rounded-2xl border border-line bg-surface px-5 py-4">
+    <div className="border-t border-line/40 pt-4">
       <p className="text-[15px] font-bold">홈 화면에 앱으로 두기</p>
-      <p className="mt-0.5 text-sm text-muted">저녁 알림은 앱으로 두어야 받을 수 있어요.</p>
+      {/* 아이폰만 앱으로 두어야 알림이 온다 — 안드로이드·데스크톱엔 이 줄이 틀린 말 (전수조사 C) */}
+      {(env === "ios" || env === "kakao-ios") && <p className="mt-0.5 text-sm text-muted">저녁 알림은 앱으로 두어야 받을 수 있어요.</p>}
       {promptEvent ? (
         <button
           type="button"
           onClick={() => promptEvent.prompt().finally(() => setPromptEvent(null))}
-          className="mt-3 h-10 rounded-full border border-frame bg-transparent px-4 text-sm font-bold text-ink"
+          className="mt-3 h-11 rounded-full border border-frame bg-transparent px-4 text-sm font-bold text-ink"
         >
           앱으로 설치
         </button>

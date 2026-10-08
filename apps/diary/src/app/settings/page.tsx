@@ -1,10 +1,10 @@
 import Link from "next/link";
-import { signOutAction } from "@/app/actions";
 import { ClearAllButton } from "@/components/ClearAllButton";
 import { InstallHint } from "@/components/InstallHint";
 import { LinkGoogleButton } from "@/components/LinkGoogleButton";
 import { NameForm } from "@/components/NameForm";
 import { NotificationSettings } from "@/components/NotificationSettings";
+import { SignOutButton } from "@/components/SignOutButton";
 import { Booting } from "@/components/Booting";
 import { getNotificationSettings, getSajuProfile } from "@/lib/db";
 import { hourOf } from "@/lib/remind";
@@ -31,8 +31,8 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
     <main className="flex flex-col gap-5">
       <header className="flex items-baseline justify-between">
         <h1 className="font-serif text-[26px] leading-snug">설정</h1>
-        <Link href="/me" className="text-sm text-muted underline underline-offset-4">
-          나로
+        <Link href="/me" className="tap text-sm text-muted underline underline-offset-4">
+          ← 나
         </Link>
       </header>
 
@@ -44,8 +44,12 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
             <>
               <p className="mt-2 text-[15px] leading-relaxed text-muted">아직 이 기기에만 있는 기록이에요. Google로 연결하면 기기를 바꿔도 남아요.</p>
               {error === "link" && (
-                <p role="alert" className="mt-3 text-[15px] text-danger">
-                  이 Google 계정은 이미 다른 기록과 연결돼 있어요. 그 기록으로 가려면 아래에서 기록을 지운 뒤 로그인 화면에서 Google로 들어가요.
+                <p role="alert" className="mt-3 text-[15px] leading-relaxed text-danger">
+                  이 Google 계정은 이미 다른 기록과 연결돼 있어요. 그 기록으로 가려면{" "}
+                  <Link href="/login" className="underline underline-offset-4">
+                    로그인 화면
+                  </Link>
+                  의 &apos;기존 Google 계정으로 로그인하기&apos;를 눌러 주세요.
                 </p>
               )}
               {error === "1" && (
@@ -82,7 +86,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
         <div className={row}>
           <div className="flex items-baseline justify-between">
             <h2 className="font-serif text-[20px] leading-snug">생년월일</h2>
-            <Link href="/onboarding?next=/settings" className="text-sm text-muted underline underline-offset-4">
+            <Link href="/onboarding?next=/settings" className="tap text-sm text-muted underline underline-offset-4">
               {profile ? "고치기" : "넣기"}
             </Link>
           </div>
@@ -106,7 +110,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
           {anonymous ? (
             <>
               <ClearAllButton />
-              <p className="mt-2 text-sm text-faint">이 기기의 기록을 모두 지워요. 되돌릴 수 없어요.</p>
+              <p className="mt-2 text-sm text-muted">이 기기의 기록을 모두 지워요. 되돌릴 수 없어요.</p>
               {error === "delete" && (
                 <p role="alert" className="mt-2 text-sm text-danger">
                   지우지 못했어요. 잠시 뒤 다시 눌러 주세요.
@@ -114,11 +118,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
               )}
             </>
           ) : (
-            <form action={signOutAction}>
-              <button type="submit" className="text-sm text-faint underline underline-offset-4">
-                로그아웃
-              </button>
-            </form>
+            <SignOutButton />
           )}
         </div>
       </section>

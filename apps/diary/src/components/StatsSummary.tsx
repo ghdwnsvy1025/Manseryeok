@@ -12,7 +12,7 @@ function Row({ b }: { b: Bucket }) {
   const width = b.mean === null ? 0 : ((b.mean - 1) / 9) * 100;
   return (
     <li className="grid grid-cols-[4.5rem_1fr_3.5rem] items-center gap-3 text-[15px]">
-      <span className={b.n ? "" : "text-faint"}>{b.ko}</span>
+      <span className={b.n ? "" : "text-muted"}>{b.ko}</span>
       <span className="h-1.5 rounded-full bg-paper-3">
         <span className="block h-full rounded-full bg-gold" style={{ width: `${width}%` }} />
       </span>
@@ -21,16 +21,18 @@ function Row({ b }: { b: Bucket }) {
   );
 }
 
-function Group({ title, items }: { title: string; items: Bucket[] }) {
-  if (items.every((b) => b.n === 0)) return null;
-  // 기록이 1건이라도 있으면 펼친 상태가 기본 (v3.2)
+function Group({ title, items, open }: { title: string; items: Bucket[]; open: boolean }) {
+  // n=0 줄은 숨긴다 — 아직 안 겪은 글자는 아래 "안 겪은 간지" 수가 말해 준다 (전수조사 C)
+  const rows = items.filter((b) => b.n > 0);
+  if (rows.length === 0) return null;
+  // 기록 3건부터 펼친 상태가 기본, 그 전엔 접힘 (전수조사 C "통계 3개가 1건에도 전부 펼쳐져")
   return (
-    <details open className="card-frame card-paper px-5 py-3">
-      <summary className="cursor-pointer list-none text-[15px] font-bold [&::-webkit-details-marker]:hidden">
-        {title} <span className="ml-1 text-sm font-normal text-faint">평균 / 횟수</span>
+    <details open={open} className="card-frame card-paper px-5 py-3">
+      <summary className="tap cursor-pointer list-none text-[15px] font-bold [&::-webkit-details-marker]:hidden">
+        {title} <span className="ml-1 text-sm font-normal text-muted">평균 / 횟수</span>
       </summary>
       <ul className="mt-3 flex flex-col gap-2">
-        {items.map((b) => (
+        {rows.map((b) => (
           <Row key={b.key} b={b} />
         ))}
       </ul>
@@ -58,8 +60,9 @@ export function StatsSummary({ h, fitPercent, stems, branches, elements }: Props
           </span>
         </div>
         <span aria-hidden className="rule mt-2" />
-        <p className="mt-2 text-sm text-muted">
-          기록 {h.total}일{h.overallMean !== null && <> · 평균 행복도 {h.overallMean}</>} · 아직 안 겪은 간지 {h.unseen}개
+        <p className="mt-2 text-sm text-muted">기록이 쌓일수록 올라요 · 지금 {h.total}일</p>
+        <p className="mt-1 text-sm text-muted">
+          {h.overallMean !== null && <>평균 행복도 {h.overallMean} · </>}아직 안 겪은 간지 {h.unseen}개
         </p>
       </div>
 
@@ -79,9 +82,9 @@ export function StatsSummary({ h, fitPercent, stems, branches, elements }: Props
         <p className="card-frame card-paper px-5 py-4 text-[15px] text-muted">첫 기록을 남기면 여기에 천간·지지·오행별 평균이 쌓여요.</p>
       ) : (
         <>
-          <Group title="천간별" items={stems} />
-          <Group title="지지별" items={branches} />
-          <Group title="오행별" items={elements} />
+          <Group title="천간별" items={stems} open={h.total >= 3} />
+          <Group title="지지별" items={branches} open={h.total >= 3} />
+          <Group title="오행별" items={elements} open={h.total >= 3} />
         </>
       )}
     </div>

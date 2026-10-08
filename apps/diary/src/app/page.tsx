@@ -6,6 +6,7 @@ import { BurstPreload } from "@/components/BurstPreload";
 import { FortuneCard } from "@/components/FortuneCard";
 import { FortuneLoading } from "@/components/FortuneLoading";
 import { LinkPromptCard } from "@/components/LinkPromptCard";
+import { RetryButton } from "@/components/RetryButton";
 import { SaveBurst } from "@/components/SaveBurst";
 import { SavedPastNotice } from "@/components/SavedPastNotice";
 import { TodayEntryCard } from "@/components/TodayEntryCard";
@@ -69,6 +70,7 @@ async function FortuneSection({
       <section className={`${card} text-muted`}>
         <h2 className="text-lg font-bold text-ink">오늘의 운세</h2>
         <p className="mt-2 text-[15px]">운세를 불러오지 못했어요. 잠시 뒤 다시 열어 주세요.</p>
+        <RetryButton className="mt-1" />
       </section>
     );
   }
@@ -112,7 +114,8 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
     Boolean(entry) && shouldShowLinkPrompt({ isAnonymous: Boolean(user.is_anonymous), entryCount: entries.length, promptCount: linkState.promptCount });
 
   const fortuneDateLabel = formatKoreanDate(today).replace(/\s*\S+요일$/, "");
-  const defaultOpen = !night || entries.length === 0;
+  // 밤에 저장하고 막 돌아온 순간(?saved)은 접지 않는다 — 팡 뒤에 바로 운세를 본다 (전수조사 C)
+  const defaultOpen = !night || entries.length === 0 || Boolean(saved);
   // 캐시 히트: 기다릴 것이 없으니 fallback 없이 바로 카드. 미스(또는 지문 불일치): 계산·모델 호출은 Suspense 안에서
   // B5: 캐시는 날짜 단위라 오늘 저장한 기록이 "내 기록으로 본 오늘"에 없다. 내 기록 블록·맞춤도만 현재 기록으로 다시 센다 (점수·글은 캐시 그대로)
   const cachedRaw = cachedFortuneContent(cachedRow ?? null, profile.pillars, birthProfileOf(profile));
@@ -177,7 +180,9 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
           </h1>
           {/* 60칸 띠 대신 한 줄 (v3.3): 오늘 순번 · 기록 일수. 누르면 "나"로 */}
           <p className="mt-1 text-[14px] text-muted">
-            <Link href="/me">{todayLine(ganji.index, entryCount)}</Link>
+            <Link href="/me" className="tap">
+              {todayLine(ganji.index, entryCount)}
+            </Link>
           </p>
           {savedPast && <SavedPastNotice date={savedPast} label={savedPastLabel} />}
         </div>

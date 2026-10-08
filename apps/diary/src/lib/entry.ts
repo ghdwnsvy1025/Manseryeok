@@ -41,14 +41,22 @@ export interface EntryInput {
 
 export type Validation<T> = { ok: true; value: T } | { ok: false; error: string };
 
+/** 기록 날짜 규칙 하나로: 형식 · 미래 금지 · 2020-01-01 이후. 저장(validateEntry)과 지우기(deleteEntryAction)가 같이 쓴다 */
+export function validateEntryDate(raw: unknown, today: string = todayKST()): Validation<string> {
+  const entryDate = typeof raw === "string" ? raw : "";
+  if (!parseYmd(entryDate)) return { ok: false, error: "날짜가 올바르지 않아요." };
+  if (entryDate > today) return { ok: false, error: "아직 오지 않은 날은 기록할 수 없어요." };
+  if (entryDate < EARLIEST_ENTRY_DATE) return { ok: false, error: "너무 오래된 날짜예요." };
+  return { ok: true, value: entryDate };
+}
+
 export function validateEntry(
   raw: { entryDate: unknown; happiness: unknown; moods: unknown; note: unknown; promise?: unknown; promiseText?: unknown },
   today: string = todayKST(),
 ): Validation<EntryInput> {
-  const entryDate = typeof raw.entryDate === "string" ? raw.entryDate : "";
-  if (!parseYmd(entryDate)) return { ok: false, error: "날짜가 올바르지 않아요." };
-  if (entryDate > today) return { ok: false, error: "아직 오지 않은 날은 기록할 수 없어요." };
-  if (entryDate < EARLIEST_ENTRY_DATE) return { ok: false, error: "너무 오래된 날짜예요." };
+  const dateChecked = validateEntryDate(raw.entryDate, today);
+  if (!dateChecked.ok) return dateChecked;
+  const entryDate = dateChecked.value;
 
   const happiness = Number(raw.happiness);
   if (!Number.isInteger(happiness) || happiness < 1 || happiness > 10) {

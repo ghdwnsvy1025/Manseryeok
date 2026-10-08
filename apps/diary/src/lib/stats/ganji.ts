@@ -97,12 +97,23 @@ export interface Highlights {
   bestBranch: Bucket | null;
   /** 아직 한 번도 안 겪은 간지 수 */
   unseen: number;
+  /** 가장 최근 기록 (entry_date가 있으면 그 최대값, 없으면 입력 순서의 첫 항목 — listEntriesForStats는 날짜 역순). 기록 0이면 null */
+  latest: EntryLike | null;
 }
 
 function top(buckets: Bucket[], minN: number, dir: 1 | -1): Bucket | null {
   const ok = buckets.filter((b) => b.n >= minN && b.mean !== null);
   if (ok.length === 0) return null;
   return ok.reduce((best, b) => (dir * (b.mean! - best.mean!) > 0 ? b : best));
+}
+
+function latestOf(entries: EntryLike[]): EntryLike | null {
+  let best: EntryLike | null = null;
+  for (const e of entries) {
+    if (!best) best = e;
+    else if (e.entry_date && best.entry_date && e.entry_date > best.entry_date) best = e;
+  }
+  return best;
 }
 
 export function highlights(entries: EntryLike[]): Highlights {
@@ -112,6 +123,7 @@ export function highlights(entries: EntryLike[]): Highlights {
   return {
     total,
     overallMean,
+    latest: latestOf(entries),
     bestGanji: top(grid, 2, 1) as GanjiCell | null,
     worstGanji: top(grid, 2, -1) as GanjiCell | null,
     bestStem: top(byStem(entries), 3, 1),

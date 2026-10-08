@@ -34,7 +34,7 @@ export function BandHint({ ganjiKo, nth }: { ganjiKo: string; nth: number }) {
       <span>
         달력 대신 60갑자로 하루를 세요. 오늘은 {nth}번째 <span className="text-ganji">{ganjiKo}일</span>이에요
       </span>
-      <button type="button" onClick={close} aria-label="설명 닫기" className="-mr-1 shrink-0 px-1 text-[18px] leading-none text-faint">
+      <button type="button" onClick={close} aria-label="설명 닫기" className="tap tap--box -mr-2 shrink-0 text-[18px] leading-none text-muted">
         ×
       </button>
     </p>

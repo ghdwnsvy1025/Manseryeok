@@ -1,7 +1,8 @@
 "use client";
 
-import { startTransition, useActionState, useRef, useState, type FormEvent } from "react";
+import { startTransition, useActionState, useEffect, useRef, useState, type FormEvent } from "react";
 import { saveEntryAction, type FormState } from "@/app/actions";
+import { DeleteEntryButton } from "@/components/DeleteEntryButton";
 import { MAX_MOODS, MAX_NOTE, MOODS, type Promise_ } from "@/lib/entry";
 
 interface Props {
@@ -15,8 +16,8 @@ interface Props {
 
 /** 약속 도장 3자리. value는 저장 규칙(entry.ts PROMISES)과 같다 */
 const PROMISE_OPTIONS: { value: Promise_; label: string }[] = [
-  { value: "kept", label: "지켰어요" },
-  { value: "missed", label: "못 지켰어요" },
+  { value: "kept", label: "해봤어요" },
+  { value: "missed", label: "못 했어요" },
   { value: "na", label: "해당 없음" },
 ];
 
@@ -48,6 +49,24 @@ export function EntryForm({ date, promiseText, notePlaceholder, initial }: Props
   // 행복도 없이 저장을 누르면 그 자리로 데려가 이유를 보여 준다 (버튼을 막아 두면 눌러도 반응이 없어 저장된 줄 안다)
   const [missingHappiness, setMissingHappiness] = useState(false);
   const happinessRef = useRef<HTMLFieldSetElement>(null);
+  const formRef = useRef<HTMLFormElement>(null);
+
+  // 하이드레이션 전에 누른 값을 잃지 않는다 (2026-10-08 진단: 폰에서 JS가 붙기 전 첫 탭은 native 라디오만 바뀌고
+  // React 상태는 null이라 "첫 클릭이 안 먹은" 것처럼 보였고, 같은 도장을 다시 눌러도 change가 안 났다).
+  // 그림(도장·띠지)은 CSS `input:checked +`가 바로 그리고, 여기서는 DOM에 남은 값을 상태로 끌어온다.
+  useEffect(() => {
+    const form = formRef.current;
+    if (!form) return;
+    const fd = new FormData(form);
+    const h = Number(fd.get("happiness"));
+    if (h >= 1 && h <= 10) setHappiness((cur) => cur ?? h);
+    const p = fd.get("promise");
+    if (p === "kept" || p === "missed" || p === "na") setPromise((cur) => cur ?? p);
+    const ms = fd.getAll("moods").filter((m): m is string => typeof m === "string").slice(0, MAX_MOODS);
+    if (ms.length) setMoods((cur) => (cur.length ? cur : ms));
+    const n = fd.get("note");
+    if (typeof n === "string" && n) setNote((cur) => cur || n);
+  }, []);
 
   function toggleMood(m: string) {
     setMoods((cur) => (cur.includes(m) ? cur.filter((x) => x !== m) : cur.length < MAX_MOODS ? [...cur, m] : cur));
@@ -72,7 +91,8 @@ export function EntryForm({ date, promiseText, notePlaceholder, initial }: Props
   // 버튼만 흐려진다. 오류면 pending이 풀리며 적은 내용이 그대로 남는다.
 
   return (
-    <form onSubmit={onSubmit} className="flex flex-col gap-5">
+    <>
+    <form ref={formRef} onSubmit={onSubmit} className="flex flex-col gap-5">
       <input type="hidden" name="entryDate" value={date} />
 
       {/* 카드 종이 한 장 */}
@@ -113,13 +133,14 @@ export function EntryForm({ date, promiseText, notePlaceholder, initial }: Props
             name="promise"·value·hidden promise_text는 그대로 */}
         {promiseText && (
           <fieldset data-promise-block>
-            <legend className="sr-only">오늘 약속</legend>
+            <legend className="sr-only">오늘의 포인트</legend>
             <input type="hidden" name="promise_text" value={promiseText} />
             <div className="note-slip" data-promise-text>
-              <p className="note-slip__label">오늘 약속</p>
+              <p className="note-slip__label">오늘의 포인트 · 운세의 "하면 좋아요"</p>
               <p className="note-slip__text">{promiseText}</p>
             </div>
-            <div className="promise-stamps" role="radiogroup" aria-label="오늘 약속을 지켰는지">
+            <p className="mt-2 text-[15px] text-muted">오늘 이걸 해봤나요?</p>
+            <div className="promise-stamps" role="radiogroup" aria-label="오늘 포인트를 해봤는지">
               {PROMISE_OPTIONS.map((o) => {
                 const on = promise === o.value;
                 return (
@@ -210,5 +231,8 @@ export function EntryForm({ date, promiseText, notePlaceholder, initial }: Props
         {pending ? "저장하는 중…" : "저장하기"}
       </button>
     </form>
+    {/* 고치기 모드에서만: 두 번 눌러 지우기 (actions.ts deleteEntryAction) */}
+    {initial && <DeleteEntryButton date={date} />}
+    </>
   );
 }

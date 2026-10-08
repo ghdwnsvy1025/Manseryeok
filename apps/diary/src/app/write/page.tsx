@@ -6,8 +6,9 @@ import { characterOfGanji } from "@/lib/character";
 import { getUser } from "@/lib/supabase/server";
 import { getEntry, getSajuProfile, readCachedFortune } from "@/lib/db";
 import { dayGanji } from "@/lib/ganji";
-import { formatKoreanDate, parseYmd, todayKST } from "@/lib/time";
-import { writeDateLinks } from "@/lib/writeNav";
+import { formatKoreanDate, todayKST } from "@/lib/time";
+import { resolveWriteDate, writeDateLinks } from "@/lib/writeNav";
+import { WritePreload } from "@/components/WritePreload";
 import { EntryForm } from "./EntryForm";
 
 export const dynamic = "force-dynamic";
@@ -15,7 +16,8 @@ export const dynamic = "force-dynamic";
 export default async function WritePage({ searchParams }: { searchParams: Promise<{ date?: string }> }) {
   const { date: requested } = await searchParams;
   const today = todayKST();
-  const date = requested && parseYmd(requested) && requested <= today ? requested : today;
+  // 잘못됐거나 미래·2020년 이전 날짜면 오늘로 열고 한 줄 알려 준다
+  const { date, adjusted } = resolveWriteDate(requested, today);
   const ganji = dayGanji(date);
   // "10월 5일" — 요일은 뺀다
   const dateLabel = formatKoreanDate(date).replace(/\s*\S+요일$/, "");
@@ -42,6 +44,7 @@ export default async function WritePage({ searchParams }: { searchParams: Promis
     <main>
       <header className="mb-5">
         {existing && <p className="text-sm text-muted">기록 고치기</p>}
+        {adjusted && <p className="text-sm text-muted">그 날짜는 쓸 수 없어 오늘 날짜로 열었어요</p>}
         <h1 className="mt-1 font-serif text-[26px] leading-snug">
           {dateLabel} <span className="text-ganji">{ganji.ko}일</span>, {isToday ? "오늘" : "그날"} 하루
         </h1>
@@ -65,6 +68,7 @@ export default async function WritePage({ searchParams }: { searchParams: Promis
       </header>
       {/* 저장 뒤 팡에 쓸 그날 캐릭터·틀·도장을 미리 받아 둔다 (전수조사 B8) */}
       <BurstPreload characterSrc={characterOfGanji(ganji.ko).characterSrc} />
+      <WritePreload />
       <EntryForm
         date={date}
         notePlaceholder={isToday ? "오늘 기억하고 싶은 일 하나" : "그날 기억하고 싶은 일 하나"}

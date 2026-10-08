@@ -80,26 +80,26 @@ export function NotificationSettings({ enabled, remindHour, kakaoChannelUrl }: P
   }
 
   return (
-    <div className="flex flex-col gap-4 rounded-2xl border border-line bg-surface px-5 py-4">
+    <div className="flex flex-col gap-4 border-t border-line/40 pt-4">
+      {/* 중첩 제목 없음 — 바깥 줄 제목 "알림"이 이미 있다. 설명 한 줄 + 켜기/끄기 */}
       <div className="flex items-center justify-between gap-4">
-        <div>
-          <p className="text-[15px] font-bold">저녁 알림</p>
-          <p className="mt-0.5 text-sm text-muted">
-            {enabled ? `매일 밤 ${remindHour}시, 아직 안 썼을 때만 한 번` : "기록 안 한 날 밤 9시에 한 번만 알려 드려요"}
-          </p>
-        </div>
+        <p className="text-[15px] leading-relaxed text-ink">
+          {enabled ? `매일 밤 ${remindHour}시, 아직 안 썼을 때만 한 번 보내요` : "기록 안 한 날 밤 9시에 한 번만 알려 드려요"}
+        </p>
         {support === "ok" ? (
           enabled ? (
-            <button type="button" onClick={disable} disabled={busy} className="h-10 shrink-0 rounded-full border border-line px-4 text-sm text-muted">
+            <button type="button" onClick={disable} disabled={busy} className="h-11 shrink-0 rounded-full border border-line px-4 text-sm text-muted">
               끄기
             </button>
           ) : (
-            <button type="button" onClick={enable} disabled={busy} className="h-10 shrink-0 rounded-full border border-frame bg-transparent px-4 text-sm font-bold text-ink disabled:opacity-60">
+            <button type="button" onClick={enable} disabled={busy} className="h-11 shrink-0 rounded-full border border-frame bg-transparent px-4 text-sm font-bold text-ink disabled:opacity-60">
               {busy ? "켜는 중…" : "켜기"}
             </button>
           )
         ) : null}
       </div>
+      {/* 시각 고르기가 아직 없을 때의 안내 (REMIND_HOURS가 하나) */}
+      {REMIND_HOURS.length <= 1 && <p className="-mt-2 text-sm text-muted">지금은 밤 9시에만 보내요.</p>}
 
       {support === "ios-not-installed" && (
         <p className="text-sm text-muted">아이폰은 홈 화면에 앱으로 추가한 뒤에 알림을 켤 수 있어요. 아래 "앱으로 두기"를 먼저 해 주세요.</p>
@@ -118,14 +118,14 @@ export function NotificationSettings({ enabled, remindHour, kakaoChannelUrl }: P
           <label htmlFor="remind-hour" className="text-muted">
             알림 시각
           </label>
-          <select id="remind-hour" name="hour" defaultValue={remindHour} className="h-9 rounded-lg border border-line bg-surface-2 px-2">
+          <select id="remind-hour" name="hour" defaultValue={remindHour} className="h-11 rounded-lg border border-line bg-paper-3 px-2">
             {REMIND_HOURS.map((h) => (
               <option key={h} value={h}>
                 {h}시
               </option>
             ))}
           </select>
-          <button type="submit" className="h-9 rounded-lg border border-line px-3 text-muted">
+          <button type="submit" className="h-11 rounded-lg border border-line px-3 text-muted">
             바꾸기
           </button>
         </form>
@@ -134,7 +134,7 @@ export function NotificationSettings({ enabled, remindHour, kakaoChannelUrl }: P
       <div className="border-t border-line pt-3">
         <p className="text-[15px] font-bold">카카오 채널</p>
         <p className="mt-0.5 text-sm text-muted">앱 알림이 어려우면 채널 추가로 소식을 받을 수 있어요.</p>
-        <a href={kakaoChannelUrl} target="_blank" rel="noreferrer" className="mt-2 inline-block text-sm text-lamp underline underline-offset-4">
+        <a href={kakaoChannelUrl} target="_blank" rel="noreferrer" className="tap mt-1 text-sm text-muted underline underline-offset-4">
           사주읽는밤 채널 추가
         </a>
       </div>

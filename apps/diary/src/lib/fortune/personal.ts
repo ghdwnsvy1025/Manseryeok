@@ -16,6 +16,8 @@ export interface EntryLike {
   happiness: number;
   /** 오늘의 작은 약속 (톤 v3.2). 컬럼 적용 전이거나 약속이 없던 날은 없음 */
   promise?: "kept" | "missed" | "na" | null;
+  /** 기록 날짜 (YYYY-MM-DD). 통계·공유에서 "가장 최근 기록"을 고를 때만 쓴다 */
+  entry_date?: string;
 }
 
 function mean(xs: number[]): number | null {

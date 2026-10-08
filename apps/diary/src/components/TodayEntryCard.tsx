@@ -12,10 +12,10 @@ interface Props {
   justSaved: boolean;
 }
 
-/** 약속 줄 (v3.7): 글자 + 점. 지켰어요 = 인주 점, 못 지켰어요 = 먹 점, 해당 없음 = 점 없음 */
+/** 오늘 포인트 줄 (v3.7 → 전수조사 C 문구): 글자 + 점. 해봤어요 = 인주 점, 못 했어요 = 먹 점, 해당 없음 = 점 없음 */
 const PROMISE_LINE: Record<Promise_, { word: string; dot: string | null }> = {
-  kept: { word: "지켰어요", dot: "bg-seal" },
-  missed: { word: "못 지켰어요", dot: "bg-ink-stamp" },
+  kept: { word: "해봤어요", dot: "bg-seal" },
+  missed: { word: "못 했어요", dot: "bg-ink-stamp" },
   na: { word: "해당 없음", dot: null },
 };
 
@@ -33,7 +33,7 @@ export function TodayEntryCard({ entry, today, tomorrowKo, justSaved }: Props) {
       {justSaved && <p className="saved-line mb-2 text-sm font-bold text-gold">저장했어요</p>}
       <div className="flex items-baseline justify-between">
         <h2 className="text-sm text-muted">오늘의 기록</h2>
-        <Link href={`/write?date=${today}`} className="text-sm text-muted underline underline-offset-4">
+        <Link href={`/write?date=${today}`} className="tap text-sm text-muted underline underline-offset-4">
           고치기
         </Link>
       </div>
@@ -65,7 +65,7 @@ export function TodayEntryCard({ entry, today, tomorrowKo, justSaved }: Props) {
 
       {promise && (
         <p className="mt-4 flex items-center gap-1.5 text-[13px] text-muted">
-          <span>약속 · {promise.word}</span>
+          <span>오늘 포인트 · {promise.word}</span>
           {promise.dot && <span aria-hidden className={`inline-block h-2 w-2 rounded-full ${promise.dot}`} />}
         </p>
       )}

@@ -1,14 +1,14 @@
 {
   "name": "사주읽는밤 일기",
   "short_name": "사주읽는밤",
-  "description": "밤에 한 줄 쓰면, 내 기록으로 운세가 점점 내 것이 됩니다.",
+  "description": "밤에 한 줄 쓰면, 내 기록으로 운세가 점점 내 것이 돼요.",
   "lang": "ko",
   "start_url": "/?source=pwa",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#f3e7c9",
-  "theme_color": "#0f2c55",
+  "theme_color": "#f1debb",
   "icons": [
     { "src": "/icons/app-icon-192.png", "sizes": "192x192", "type": "image/png" },
     { "src": "/icons/app-icon-512.png", "sizes": "512x512", "type": "image/png" },

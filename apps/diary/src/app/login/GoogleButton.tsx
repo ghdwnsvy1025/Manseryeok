@@ -14,7 +14,7 @@ function callbackUrl(next?: string): string {
   return callback.toString();
 }
 
-const PRIMARY = "flex h-14 items-center justify-center gap-3 rounded-2xl bg-lamp text-[17px] font-bold text-lamp-ink disabled:opacity-60";
+const PRIMARY = "flex h-14 items-center justify-center gap-3 rounded-2xl bg-gold text-[17px] font-bold text-gold-ink disabled:opacity-60";
 const SECONDARY = "flex h-13 items-center justify-center rounded-xl border border-frame text-[16px] font-bold text-ink disabled:opacity-60";
 
 /**

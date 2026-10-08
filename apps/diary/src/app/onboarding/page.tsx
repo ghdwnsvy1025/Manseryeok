@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Booting } from "@/components/Booting";
 import { getUser } from "@/lib/supabase/server";
 import { getSajuProfile } from "@/lib/db";
@@ -29,7 +30,7 @@ export default async function OnboardingPage({ searchParams }: { searchParams: P
       <ProfileForm
         next={safeNext}
         askName={askName}
-        submitLabel="내 카드 보기"
+        submitLabel={existing ? "저장" : "내 카드 보기"}
         initial={
           existing
             ? {
@@ -48,6 +49,15 @@ export default async function OnboardingPage({ searchParams }: { searchParams: P
             : null
         }
       />
+      {/* 편집 모드(프로필이 이미 있을 때)만: 취소 글자 링크 + 경고 한 줄 (전수조사 C) */}
+      {existing && (
+        <div className="mt-4 flex flex-col items-center gap-1 text-center">
+          <Link href={safeNext} className="tap text-sm text-muted underline underline-offset-4">
+            취소
+          </Link>
+          <p className="text-[14px] text-muted">생년월일을 바꾸면 내 캐릭터와 운세가 바뀌어요.</p>
+        </div>
+      )}
       </section>
     </main>
   );
