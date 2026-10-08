@@ -46,7 +46,7 @@ export function splitParagraphs(body: string): string[] {
  * 둘 다 없으면 "아직 기록이 없어 사주만으로 계산했어요".
  * 비교 문장은 |M×(10/9) − score| ≥ 1.5일 때만.
  */
-function personalLines(fortune: FortuneContent, ganjiKo: string): { main: string; compare: string | null } {
+function personalLines(fortune: FortuneContent, ganjiKo: string): { main: string; compare: string | null; mean: number | null } {
   const p = fortune.personal;
   const stem = ganjiKo.slice(0, 1);
   const branch = ganjiKo.slice(1);
@@ -59,13 +59,13 @@ function personalLines(fortune: FortuneContent, ganjiKo: string): { main: string
     mean = p.mean;
     main = `${stem}${batchim(stem) ? "이나" : "나"} ${branch}${batchim(branch) ? "이" : "가"} 든 날에 ${p.n}번 · 평균 ${mean.toFixed(1)}`;
   } else {
-    return { main: "아직 기록이 없어 사주만으로 계산했어요", compare: null };
+    return { main: "아직 기록이 없어 사주만으로 계산했어요", compare: null, mean: null };
   }
   const scaled = mean * (10 / 9);
   const gap = scaled - fortune.score;
   const compare =
     Math.abs(gap) >= 1.5 ? `사주 점수는 ${fortune.score.toFixed(1)}이지만 내 기록은 ${gap > 0 ? "좋은" : "낮은"} 편` : null;
-  return { main, compare };
+  return { main, compare, mean };
 }
 
 interface Props {
@@ -92,16 +92,59 @@ interface Props {
  * v3.6: 띠지는 문장 앞 인라인, 문장은 전체 폭으로 흐른다 (라벨 열 고정폭 없음).
  * v3.7: 띠지는 첫 줄에 혼자, 문장은 둘째 줄부터 왼쪽 끝에서 (라벨 위 · 문장 아래). 줄 사이 14px.
  */
+/** 운세 점수와 내 기록 평균의 차이 판정. 1.5 이상 "차이 커요", 0.8 이상 "조금 달라요", 그 아래 "비슷해요" */
+export function compareVerdict(gap: number): "차이 커요" | "조금 달라요" | "비슷해요" {
+  const a = Math.abs(gap);
+  return a >= 1.5 ? "차이 커요" : a >= 0.8 ? "조금 달라요" : "비슷해요";
+}
+
+function PersonalCompare({ personal, fortune }: { personal: ReturnType<typeof personalLines>; fortune: FortuneContent }) {
+  const mean = personal.mean;
+  if (mean === null) {
+    return (
+      <div className="compare mt-5">
+        <p className="compare__title">내 기록으로 본 오늘</p>
+        <p className="compare__empty">{personal.main}</p>
+        {fortune.fitNote && <p className="compare__note">{fortune.fitNote}</p>}
+      </div>
+    );
+  }
+  const mine = Math.round(mean * (10 / 9) * 10) / 10;
+  const verdict = compareVerdict(mine - fortune.score);
+  const rows: { label: string; value: number; kind: "fortune" | "mine" }[] = [
+    { label: "운세", value: fortune.score, kind: "fortune" },
+    { label: "내 기록", value: mine, kind: "mine" },
+  ];
+  return (
+    <div className="compare mt-5" aria-label={`운세 ${fortune.score.toFixed(1)}점, 내 기록 ${mine.toFixed(1)}점, ${verdict}`}>
+      <p className="compare__title">
+        내 기록으로 본 오늘 <span className="compare__sub">· {personal.main}</span>
+      </p>
+      <ul className="compare__bars">
+        {rows.map((r) => (
+          <li key={r.kind} className="compare__row" data-kind={r.kind}>
+            <span className="compare__label">{r.label}</span>
+            <span className="compare__track">
+              <span className="compare__fill" style={{ width: `${Math.max(4, Math.min(100, r.value * 10))}%` }} />
+            </span>
+            <span className="compare__value">{r.value.toFixed(1)}</span>
+          </li>
+        ))}
+      </ul>
+      <p className="compare__verdict" data-verdict={verdict}>
+        {verdict}
+      </p>
+      {fortune.fitNote && <p className="compare__note">{fortune.fitNote}</p>}
+    </div>
+  );
+}
+
 export function FortuneCard({ fortune, ganjiKo, canVote, vote, defaultOpen }: Props) {
   const scoreText = fortune.score.toFixed(1);
   const paragraphs = splitParagraphs(fortune.body);
   /** 영역 줄 최대 4 (오늘 ≤2 · 이달 1 · 올해 1). period는 기능 쪽이 곧 넣는다 — 없으면 "오늘" */
   const areas = (fortune.areas ?? []).slice(0, 4).map((a) => ({ ...a, period: (a as { period?: Period }).period ?? "오늘" }));
   const personal = personalLines(fortune, ganjiKo);
-  // 근거: core.facts 뒤에 core.contextFacts(기능 쪽이 넣는 중 — 없으면 빈 배열)를 이어서
-  const contextFacts: string[] = (fortune.core as { contextFacts?: string[] } | undefined)?.contextFacts ?? [];
-  // 절기일엔 같은 맥락 문장이 facts와 contextFacts 양쪽에 있어 중복을 뺀다
-  const facts = Array.from(new Set([...(fortune.core?.facts ?? fortune.base?.facts ?? []), ...contextFacts])).slice(0, 12);
   return (
     <details open={defaultOpen} className="group card-gold card-paper text-ink">
       <summary className="cursor-pointer list-none p-5 [&::-webkit-details-marker]:hidden">
@@ -134,13 +177,9 @@ export function FortuneCard({ fortune, ganjiKo, canVote, vote, defaultOpen }: Pr
               ))}
             </div>
 
-            {/* 내 기록으로 본 오늘 (v3.2): 한지보다 한 단계 어두운 네모. 기록이 없으면 같은 자리에 사주만으로 계산했다는 말 */}
-            <div className="mt-5 rounded-[4px] bg-paper-3 px-4 py-3">
-              <p className="text-[13px] text-muted">내 기록으로 본 오늘</p>
-              <p className="mt-1 text-[16px] leading-[1.6] text-ink">{personal.main}</p>
-              {personal.compare && <p className="mt-0.5 text-[15px] leading-[1.6] text-ink/85">{personal.compare}</p>}
-              {fortune.fitNote && <p className="mt-1 text-[14px] leading-[1.6] text-muted">{fortune.fitNote}</p>}
-            </div>
+            {/* 내 기록으로 본 오늘 (v3.2 → v3.9 그림으로): 운세 점수 vs 내 기록 평균(10점 환산) 두 막대 + 차이 판정.
+                기록이 없으면 "아직 기록이 없어 사주만으로" 한 줄. 모양은 디자이너(.compare-*) */}
+            <PersonalCompare personal={personal} fortune={fortune} />
 
             {/* 오늘의 신호 (v3.4 → v3.7 라벨 위·문장 아래): 한 상자에 같은 띠지. 영역 = 먹색 테두리, 하면 좋아요 = 금색 면, 피해요 = 먹색 면.
                 화살표는 글자, 색으로 길흉을 말하지 않는다(↓도 ink) */}
@@ -174,16 +213,17 @@ export function FortuneCard({ fortune, ganjiKo, canVote, vote, defaultOpen }: Pr
             <span aria-hidden className="rule rule--light mt-5" />
 
             {canVote && (
-              <form action={fortuneVoteAction} className="mt-4 flex flex-wrap items-center gap-2 text-sm text-muted">
+              <form action={fortuneVoteAction} className="vote mt-4 flex flex-wrap items-center gap-2 text-sm text-muted" data-voted={vote !== null ? "" : undefined}>
                 <input type="hidden" name="date" value={fortune.date} />
                 <span className="mr-1">오늘과 맞았어요?</span>
-                {/* 눌린 쪽을 다시 누르면 value "0" → 투표 취소 (actions.ts fortuneVoteAction) */}
+                {/* 눌린 쪽을 다시 누르면 value "0" → 투표 취소 (actions.ts fortuneVoteAction).
+                    모양(v3.9): 안 눌림 = 녹갈 테두리 pill 44px, 눌림(aria-pressed) = 금색 면 + 먹색 굵게 + 1.04, 반대쪽 흐림 — globals.css .vote */}
                 <button
                   type="submit"
                   name="vote"
                   value={vote === 1 ? "0" : "1"}
                   aria-pressed={vote === 1}
-                  className={`h-11 rounded-full border px-4 ${vote === 1 ? "border-gold font-bold text-ink" : "border-frame/50 text-ink"}`}
+                  className="vote__btn"
                 >
                   맞아요
                 </button>
@@ -192,30 +232,15 @@ export function FortuneCard({ fortune, ganjiKo, canVote, vote, defaultOpen }: Pr
                   name="vote"
                   value={vote === -1 ? "0" : "-1"}
                   aria-pressed={vote === -1}
-                  className={`h-11 rounded-full border px-4 ${vote === -1 ? "border-gold font-bold text-ink" : "border-frame/50 text-ink"}`}
+                  className="vote__btn"
                 >
                   아니에요
                 </button>
                 {/* 투표 뒤 한 줄 — 눌린 상태일 때만 */}
-                {vote !== null && <span className="basis-full text-[14px] text-muted">고마워요, 내일 운세에 반영해요 · 다시 누르면 취소돼요</span>}
+                {vote !== null && <span className="basis-full break-keep text-[14px] text-muted">고마워요, 내일 운세에 반영해요 · 다시 누르면 취소돼요</span>}
               </form>
             )}
 
-            {/* 왜 이런 운세인가요? — core.facts 6~10줄, 왼쪽 금색 세로선 (v3.2) */}
-            {facts.length > 0 && (
-              <details className="group/why mt-4">
-                <summary className="cursor-pointer list-none text-[15px] text-muted underline underline-offset-4 [&::-webkit-details-marker]:hidden">
-                  왜 이런 운세인가요?
-                </summary>
-                <ul className="mt-3 flex flex-col gap-1.5 border-l-2 border-gold pl-3 text-[14px] leading-[1.6] text-muted">
-                  {facts.map((f, i) => (
-                    <li key={i} className="break-keep">
-                      {annotateHanja(f)}
-                    </li>
-                  ))}
-                </ul>
-              </details>
-            )}
           </div>
         </div>
       </div>

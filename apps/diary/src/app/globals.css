@@ -797,51 +797,55 @@ details[open] > .fortune-body {
 
 /* ── v3.6 "나 × 오늘" · 쪽지 약속 · 팡 확인 ───────────────────────────── */
 
-/* 두 메달 한 쌍 (오늘 화면 머리): 각 56px 둥근 한지 메달, 녹갈 1.5px, 안은 card-paper. 그림은 위쪽 55%(얼굴·상반신)만.
-   메달 사이 × 는 송명 18px 금색. 어색하게 잘리는 간지는 아래 [data-ganji] 표에서 object-position만 따로 */
+/* 두 캐릭터 한 쌍 (오늘 화면 머리, v3.9): 제목 아래 가운데에 둥근 한지 틀 두 개, 각 100px(375px에서 둘 + × 가 한 줄).
+   내 쪽 틀은 금색 1px(나), 오늘 쪽은 녹갈 1px — 색으로 길흉을 말하지 않는다. 안은 card-paper, 그림은 위쪽 55%(얼굴·상반신)만.
+   사이 × 는 송명 20px 보조색. 라벨 13px. 어색하게 잘리는 간지는 아래 [data-ganji] 표에서 object-position만 따로 */
 .medal-pair {
   display: flex;
-  flex-shrink: 0;
   align-items: flex-start;
-  gap: 6px;
-  padding-top: 2px;
+  justify-content: center;
+  gap: 14px;
+  margin-top: 14px;
 }
-/* v3.7: 메달 아래 11px 라벨 "나 · 기축" / "오늘 · 을묘". ×는 메달 높이(56px) 가운데에 */
 .medal-pair__item {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
+  gap: 8px;
 }
 .medal-pair__label {
-  font-size: 11px;
+  font-size: 13px;
   line-height: 1;
   white-space: nowrap;
   color: var(--color-muted);
 }
 .medal {
   display: block;
-  width: 56px;
-  height: 56px;
+  width: 100px;
+  height: 100px;
   overflow: hidden;
-  border: 1.5px solid var(--color-frame);
+  border: 1px solid var(--color-frame);
   border-radius: 50%;
   background: var(--color-paper-2) url("/ui/card-paper.webp") center / cover;
+}
+.medal--me {
+  border-color: var(--color-gold);
 }
 .medal > img {
   display: block;
   width: 100%;
-  height: 182%; /* 56px 창에 그림의 위 55%가 들어온다 */
+  height: 182%; /* 창에 그림의 위 55%가 들어온다 */
   object-fit: cover;
   object-position: 50% 12%;
 }
 /* 간지별 보정 표: 필요한 것만. 예) .medal > img[data-ganji="갑자"] { object-position: 50% 0; height: 200%; } */
 .medal-pair__x {
   font-family: var(--font-serif);
-  font-size: 18px;
-  line-height: 56px;
-  color: var(--color-gold);
+  font-size: 20px;
+  line-height: 100px;
+  color: var(--color-muted);
 }
+
 
 /* 약속 쪽지 (쓰기 화면, 행복도 아래): 키트 note-slip(위가 살짝 접힌 한지, 1024×512). 접힌 위 90px·양옆 28px·아래 28px은 조각으로,
    몸통만 늘인다. 안쪽 글자는 접힌 띠 아래에 */
@@ -958,4 +962,190 @@ input:focus-visible + .promise-stamp > .promise-stamp__mark {
 .score-brush > * {
   position: relative;
   z-index: 1;
+}
+
+/* ── v3.9 오늘 머리 · 기록 비교 그림 · 투표 눌림 · 만세력 십신/오행 (명세 10) ───────────── */
+
+/* 내 기록으로 본 오늘 — 글 대신 막대 두 줄. paper-3 면만(틀 안의 틀 아님). 운세 = 금색(gold-wash), 내 기록 = 먹색 70%.
+   값은 송명 16px 오른쪽, 눈금 없음. 판정은 띠지(tag-strip-paper) 하나 — 글자 굵기로만 말한다, 빨강 없음 */
+.compare {
+  padding: 14px;
+  border-radius: 8px;
+  background-color: var(--color-paper-3);
+  background-image: linear-gradient(color-mix(in srgb, var(--color-paper-3) 82%, transparent), color-mix(in srgb, var(--color-paper-3) 82%, transparent)), url("/ui/card-paper.webp");
+  background-size: auto, 256px 256px;
+}
+.compare__title {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.4;
+  color: var(--color-muted);
+  word-break: keep-all;
+}
+.compare__sub {
+  color: var(--color-muted);
+}
+.compare__bars {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.compare__row {
+  display: grid;
+  grid-template-columns: 56px 1fr auto;
+  align-items: center;
+  gap: 10px;
+}
+.compare__label {
+  font-size: 14px;
+  line-height: 1;
+  color: var(--color-ink);
+}
+.compare__track {
+  display: block;
+  height: 10px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: var(--color-paper-2);
+  box-shadow: inset 0 0 0 0.5px var(--color-frame);
+}
+.compare__fill {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+  animation: bar-in 300ms ease-out;
+}
+.compare__row[data-kind="fortune"] .compare__fill {
+  background: var(--color-gold) url("/ui/gold-wash.webp") center / 512px 512px;
+}
+.compare__row[data-kind="mine"] .compare__fill {
+  background: color-mix(in srgb, var(--color-ink) 70%, transparent);
+}
+.compare__value {
+  min-width: 2.2em;
+  font-family: var(--font-serif);
+  font-size: 16px;
+  line-height: 1;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-ink);
+}
+.compare__verdict {
+  display: inline-flex;
+  align-items: center;
+  height: 30px;
+  margin: 12px 0 0;
+  padding: 0 14px;
+  border-style: solid;
+  border-width: 0 12px;
+  border-image: url("/ui/tag-strip-paper-clean.webp") 0 44 fill / 0 12px / 0 stretch;
+  font-size: 14px;
+  line-height: 1;
+  color: var(--color-ink);
+}
+.compare__verdict[data-verdict="차이 커요"] {
+  font-weight: 700;
+}
+.compare__verdict[data-verdict="비슷해요"] {
+  color: var(--color-muted);
+}
+.compare__empty {
+  margin: 8px 0 0;
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--color-ink);
+  word-break: keep-all;
+}
+.compare__note {
+  margin: 8px 0 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--color-muted);
+  word-break: keep-all;
+}
+/* 막대가 처음 그려질 때만 0→값 300ms */
+@keyframes bar-in {
+  from {
+    width: 0;
+  }
+}
+
+/* "오늘과 맞았어요?" 투표 — 안 눌림: 녹갈 테두리 pill 44px. 눌림(aria-pressed): 금색 면(gold-wash) + 먹색 굵게 + 1.04.
+   한쪽이 눌리면 반대쪽은 흐려진다. 전환 120ms (톤 v3 "눌림 한 번" 범위) */
+.vote__btn {
+  height: 44px;
+  padding: 0 16px;
+  border: 1px solid color-mix(in srgb, var(--color-frame) 50%, transparent);
+  border-radius: 9999px;
+  font-size: 14px;
+  color: var(--color-ink);
+  transition: transform 120ms ease-out, opacity 120ms ease-out;
+}
+.vote__btn[aria-pressed="true"] {
+  border-color: transparent;
+  font-weight: 700;
+  color: var(--color-gold-ink);
+  background: var(--color-gold) url("/ui/gold-wash.webp") center / 512px 512px;
+  transform: scale(1.04);
+}
+.vote[data-voted] .vote__btn[aria-pressed="false"] {
+  opacity: 0.55;
+}
+.vote__btn:focus-visible {
+  outline: 2px solid var(--color-gold);
+  outline-offset: 2px;
+}
+
+/* 나무패 안 (v3.9): 위 천간 십신 / 천간 / 지지 / 아래 지지 십신. 십신 글자는 패 위·아래 가장자리에서 10px 안쪽.
+   가장자리 = 키트 테두리(border-width 34/20px, 머리·바닥 그림)라 그 안쪽 4px + 글자 상자로 10px 안쪽이 된다. 패 156px */
+.pillar {
+  padding: 4px 0;
+}
+.pillar-god {
+  font-size: 12px;
+  line-height: 1;
+}
+
+/* 오행 분포 막대 (나 · 자세히): 라벨 송명 16px 오행 색, 트랙 8px paper-3, fill 오행 색(bg-current), 값 14px. 처음 그려질 때만 0→값 300ms */
+.elements__fill {
+  animation: bar-in 300ms ease-out;
+}
+
+/* 탭을 눌렀는데 아직 화면이 안 바뀐 동안 — 라벨 오른쪽 위 금색 점이 깜빡인다 (BottomNav Pending, v3.9). 뼈대·스피너 대신 */
+.nav-pending {
+  position: absolute;
+  top: -2px;
+  right: -10px;
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+  background: var(--color-gold);
+  opacity: 0;
+}
+.nav-pending[data-on] {
+  animation: nav-pending 0.8s ease-in-out infinite alternate;
+}
+@keyframes nav-pending {
+  from {
+    opacity: 0.25;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .compare__fill,
+  .elements__fill {
+    animation: none;
+  }
+  .vote__btn {
+    transition: none;
+  }
+  .nav-pending[data-on] {
+    animation: none;
+    opacity: 1;
+  }
 }

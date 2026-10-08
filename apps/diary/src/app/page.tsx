@@ -169,29 +169,27 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
           signature={`${today}|${entry.happiness}|${entry.moods.join(",")}|${entry.note ?? ""}|${entry.promise ?? ""}`}
         />
       )}
-      <header className="flex items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          {/* 제목 한 줄 (v3.2): 날짜도 송명 같은 크기. 흐린 날짜 줄은 없다 */}
-          <h1 className="font-serif text-[26px] leading-snug break-keep">
-            {formatKoreanDate(today)},{" "}
-            <span className="whitespace-nowrap">
-              <span className="text-ganji">{ganji.ko}일</span> <span className="text-muted">{ganji.hanja}</span>
-            </span>
-          </h1>
-          {/* 60칸 띠 대신 한 줄 (v3.3): 오늘 순번 · 기록 일수. 누르면 "나"로 */}
-          <p className="mt-1 text-[14px] text-muted">
-            <Link href="/me" className="tap">
-              {todayLine(ganji.index, entryCount)}
-            </Link>
-          </p>
-          {savedPast && <SavedPastNotice date={savedPast} label={savedPastLabel} />}
-        </div>
-        {/* 이 화면의 그림 하나 = 두 메달 한 쌍 "나 × 오늘" (v3.6): 왼쪽 내 캐릭터(일주), 오른쪽 오늘 일진 캐릭터. 얼굴·상반신만.
-            v3.7: 메달 아래 11px 라벨 "나 · 기축" / "오늘 · 을묘" — 메달이 무엇인지 글자로 */}
+      {/* 머리 (v3.9): 가운데 축. 제목(날짜·간지) → 한 줄 → 두 캐릭터 "나 × 오늘"을 가운데에 크게(각 100px).
+          그림은 이 한 쌍이 전부. 내 쪽 틀은 금색 선(나), 오늘 쪽은 녹갈 선 — 색으로 길흉을 말하지 않는다 */}
+      <header className="flex flex-col items-center text-center">
+        {/* 제목 한 줄 (v3.2): 날짜도 송명 같은 크기. 흐린 날짜 줄은 없다 */}
+        <h1 className="font-serif text-[26px] leading-snug break-keep">
+          {formatKoreanDate(today)},{" "}
+          <span className="whitespace-nowrap">
+            <span className="text-ganji">{ganji.ko}일</span> <span className="text-muted">{ganji.hanja}</span>
+          </span>
+        </h1>
+        {/* 60칸 띠 대신 한 줄 (v3.3): 오늘 순번 · 기록 일수. 누르면 "나"로 */}
+        <p className="mt-1 text-[14px] text-muted">
+          <Link href="/me" className="tap">
+            {todayLine(ganji.index, entryCount)}
+          </Link>
+        </p>
+        {savedPast && <SavedPastNotice date={savedPast} label={savedPastLabel} />}
         <div className="medal-pair" aria-label={`나 ${myCharacter.ganjiKo} × 오늘 ${ganji.ko}`}>
           <span className="medal-pair__item">
-            <span className="medal" title={`내 일주 캐릭터 ${myCharacter.ganjiKo}(${myCharacter.animal})`}>
-              <img src={myCharacter.characterSrc} alt={`내 캐릭터 ${myCharacter.ganjiKo} ${myCharacter.animal}`} width={56} height={56} data-ganji={myCharacter.ganjiKo} />
+            <span className="medal medal--me" title={`내 일주 캐릭터 ${myCharacter.ganjiKo}(${myCharacter.animal})`}>
+              <img src={myCharacter.characterSrc} alt={`내 캐릭터 ${myCharacter.ganjiKo} ${myCharacter.animal}`} width={100} height={100} data-ganji={myCharacter.ganjiKo} />
             </span>
             <span className="medal-pair__label">나 · {myCharacter.ganjiKo}</span>
           </span>
@@ -199,8 +197,8 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
             ×
           </span>
           <span className="medal-pair__item">
-            <span className="medal" title={`오늘 일진 캐릭터 ${ganji.ko}(${todayCharacter.animal})`}>
-              <img src={todayCharacter.characterSrc} alt={`오늘 ${ganji.ko}일 캐릭터 ${todayCharacter.animal}`} width={56} height={56} data-ganji={ganji.ko} />
+            <span className="medal medal--today" title={`오늘 일진 캐릭터 ${ganji.ko}(${todayCharacter.animal})`}>
+              <img src={todayCharacter.characterSrc} alt={`오늘 ${ganji.ko}일 캐릭터 ${todayCharacter.animal}`} width={100} height={100} data-ganji={ganji.ko} />
             </span>
             <span className="medal-pair__label">오늘 · {ganji.ko}</span>
           </span>

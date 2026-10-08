@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link, { useLinkStatus } from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
 
@@ -9,6 +9,13 @@ const TABS = [
   { href: "/write", label: "쓰기", match: (p: string) => p.startsWith("/write") },
   { href: "/me", label: "나", match: (p: string) => p.startsWith("/me") },
 ];
+
+/** 탭을 눌렀는데 아직 화면이 안 바뀐 동안(서버 응답 대기) 라벨 옆에 보이는 점. loading.tsx 뼈대를 없앤 대신(2026-10-08:
+    뼈대가 "빈 박스"로 보인다는 피드백) 이전 화면이 그대로 남고 이 점만 깜빡인다. 모양은 globals.css .nav-pending */
+function Pending() {
+  const { pending } = useLinkStatus();
+  return <span aria-hidden className="nav-pending" data-on={pending ? "" : undefined} />;
+}
 
 /** 오늘 · 쓰기 · 나. 로그인·프로필 입력 화면에서는 숨긴다. */
 export function BottomNav() {
@@ -53,7 +60,10 @@ export function BottomNav() {
                 }`}
               >
                 <span aria-hidden className={`h-1 w-1 rounded-full ${active ? "bg-lamp" : "bg-transparent"}`} />
-                {t.label}
+                <span className="relative">
+                  {t.label}
+                  <Pending />
+                </span>
               </Link>
             </li>
           );

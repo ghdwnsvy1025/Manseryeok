@@ -115,17 +115,15 @@ export async function saveProfileAction(_prev: FormState, form: FormData): Promi
     return { error: COMPUTE_ERROR, field: "date" };
   }
 
-  // 처음 만드는 프로필인지 — 그때만 /welcome(내 카드 공개, v3.3). 고치기는 next로 돌아간다
-  let isFirst = false;
+  // v3.9: 처음이든 고치기든 /welcome(내 카드 공개). 고치면 일주가 바뀔 수 있어 카드를 다시 보여 주는 게 맞다
   try {
-    isFirst = (await getSajuProfile(supabase, user.id)) === null;
     await saveSajuProfile(supabase, user.id, checked.value, computed.value);
   } catch (e) {
     console.error(e);
     return { error: "저장하지 못했어요. 잠시 뒤 다시 눌러 주세요." };
   }
   revalidatePath("/", "layout");
-  redirect(isFirst ? "/welcome" : safeNext(form.get("next"), "/"));
+  redirect("/welcome");
 }
 
 /** 설정 "이름" 저장 (B4). 1~40자. night_saju_profiles.name과 night_profiles.display_name을 같이 바꾼다 */
