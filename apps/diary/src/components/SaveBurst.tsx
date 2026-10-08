@@ -11,7 +11,7 @@ interface Props {
   ganjiKo: string;
   /** 오늘 일진 한자 ("甲寅", save 모드). 틀 안 간지 글자 옆에 ink색으로 */
   ganjiHanja?: string;
-  /** reveal 모드 전용 — 내 일주 카드 전체 (characterOf().cardSrc = /cards/{일주}.webp) */
+  /** reveal 모드 전용 — 내 일주 카드 전체 (characterOf().cardSrc = /cards-square/{일주}.webp) */
   cardSrc?: string;
   /** save 모드(v3.5) — 오늘 일진의 캐릭터 그림 (characterOfGanji(today).characterSrc = /characters/{간지}.webp). char-frame 틀 안에 들어간다 */
   characterSrc?: string;
@@ -25,7 +25,8 @@ interface Props {
   recentHappiness?: number[];
   /**
    * "save"(기본) = 저장 완료 팡: 오버레이 + 도장 + 글자 + "확인" 버튼으로 걷힘 (v3.6, 자동 닫힘 없음).
-   * "reveal" = /welcome 카드 등장: 오버레이·도장·글자·자동 닫힘 없이 카드 팡만 제자리에서 (글·버튼은 부모가 둔다).
+   * "reveal" = /welcome 카드 등장: 오버레이·도장·자동 닫힘 없이 제자리에서. v3.8: characterSrc가 있으면
+   *   실루엣(검은 컷아웃, 1.2초 정지) → 팡 → 같은 자리·같은 크기의 정사각 카드. 글·버튼은 부모가 둔다(형제 .burst-text — 실루엣 동안 CSS가 숨긴다).
    */
   mode?: "save" | "reveal";
 }
@@ -77,9 +78,41 @@ function Bit({ kind, box, size, dx, dy, rot }: { kind: "paper" | "gold"; box: [n
 export function SaveBurst({ ganjiKo, ganjiHanja, cardSrc, characterSrc, happiness, signature = "", kept = false, recentHappiness = [], mode = "save" }: Props) {
   const [phase, setPhase] = useState<"hidden" | "open" | "closing">("hidden");
   const reveal = mode === "reveal";
+  // reveal(v3.8): 실루엣 → 열림. 실루엣 1.2초(reduced-motion 0.6초) 동안 cardSrc를 미리 받고, 받아진 뒤에 팡(최대 3초, 그 뒤엔 그냥 교체).
+  // 컷아웃이 없으면 실루엣 없이 바로 카드
+  const [revealPhase, setRevealPhase] = useState<"silhouette" | "open">(reveal && characterSrc ? "silhouette" : "open");
   // 이 인스턴스가 이미 한 번 열었는지. 개발 모드 StrictMode가 effect를 두 번 돌릴 때
   // 두 번째 실행이 sessionStorage 열쇠를 보고 빠져나가 닫힘 타이머가 사라지는 것을 막는다
   const opened = useRef(false);
+
+  useEffect(() => {
+    if (!reveal || !characterSrc || !cardSrc) return;
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const hold = reduced ? 600 : 1200;
+    let held = false;
+    let loaded = false;
+    let done = false;
+    const open = () => {
+      if (done) return;
+      done = true;
+      setRevealPhase("open");
+    };
+    const img = new Image();
+    img.onload = img.onerror = () => {
+      loaded = true;
+      if (held) open();
+    };
+    img.src = cardSrc;
+    const t1 = window.setTimeout(() => {
+      held = true;
+      if (loaded) open();
+    }, hold);
+    const t2 = window.setTimeout(open, 3000);
+    return () => {
+      window.clearTimeout(t1);
+      window.clearTimeout(t2);
+    };
+  }, [reveal, characterSrc, cardSrc]);
 
   useEffect(() => {
     if (reveal) {
@@ -118,7 +151,8 @@ export function SaveBurst({ ganjiKo, ganjiHanja, cardSrc, characterSrc, happines
     return () => window.clearTimeout(t);
   }, [phase]);
 
-  if (phase === "hidden") return null;
+  // save 모드만 숨김 상태가 있다. reveal은 처음부터 실루엣을 그린다(첫 그림이 비면 안 된다)
+  if (!reveal && phase === "hidden") return null;
 
   // 16조각이 둥글게 퍼진다. 방향·거리·회전은 고정값 — 매번 같아야 "장치"가 아니라 "물건"으로 읽힌다
   const bits = [...PAPER_BITS.map((b) => ({ kind: "paper" as const, box: b })), ...GOLD_BITS.map((b) => ({ kind: "gold" as const, box: b }))].map(
@@ -130,14 +164,37 @@ export function SaveBurst({ ganjiKo, ganjiHanja, cardSrc, characterSrc, happines
     },
   );
 
+  // reveal (/welcome, v3.8): 정사각 무대 하나. 실루엣(card-frame 틀 + paper-2 + 검은 컷아웃, 정지) → 1.2초 뒤 팡 → 정사각 카드가 같은 자리·같은 크기로.
+  // 글·버튼은 부모의 형제 .burst-text — data-phase가 "silhouette"인 동안 CSS가 숨긴다. 캡션 한 줄은 여기서
+  if (reveal) {
+    const opened = revealPhase === "open";
+    return (
+      <>
+        <div className="reveal-stage" data-phase={revealPhase}>
+          {opened && bits.map((b, i) => <Bit key={i} {...b} />)}
+          {characterSrc && (
+            <div className="reveal-silhouette card-frame" aria-hidden={opened ? true : undefined}>
+              <img src={characterSrc} alt="" width={675} height={900} />
+            </div>
+          )}
+          {opened && <img src={cardSrc} alt={`${ganjiKo} 카드`} width={1080} height={1080} className="burst-card relative h-auto w-full" />}
+        </div>
+        {characterSrc && (
+          <p className="reveal-caption" aria-live="polite">
+            당신의 카드를 찾고 있어요
+          </p>
+        )}
+      </>
+    );
+  }
+
   const cardBlock = (
     <div className="relative flex w-[62vw] max-w-[320px] flex-col items-center">
       {bits.map((b, i) => (
         <Bit key={i} {...b} />
       ))}
-      {reveal || !characterSrc ? (
-        // reveal (/welcome): 내 일주 카드 전체 — 여기만 바이럴 카드
-        <img src={cardSrc} alt={`${ganjiKo} 카드`} width={768} height={1030} data-kept={kept ? "" : undefined} className="burst-card relative h-auto w-full" />
+      {!characterSrc ? (
+        <img src={cardSrc} alt={`${ganjiKo} 카드`} width={1080} height={1080} data-kept={kept ? "" : undefined} className="burst-card relative h-auto w-full" />
       ) : (
         // save (v3.5): char-frame 틀(3:4) 안에 위 간지 글자 · 가운데 오늘 일진 캐릭터 · 아래 행복도 인주 도장. 설명·별점 없음
         <div data-kept={kept ? "" : undefined} className="burst-card char-card relative w-full">
@@ -165,9 +222,6 @@ export function SaveBurst({ ganjiKo, ganjiHanja, cardSrc, characterSrc, happines
       )}
     </div>
   );
-
-  // reveal (/welcome): 오버레이 없이 제자리에서 카드만 팡. 닫히지 않는다
-  if (reveal) return cardBlock;
 
   // 바깥 탭은 무시한다 — "확인" 버튼으로만 닫힌다 (v3.6). 이 오버레이 안의 금색 면 버튼이 이 화면의 하나
   return createPortal(

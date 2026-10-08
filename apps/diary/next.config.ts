@@ -19,7 +19,7 @@ const nextConfig: NextConfig = {
     const immutable = [{ key: "Cache-Control", value: "public, max-age=31536000, immutable" }];
     return [
       { source: "/ui/:path*", headers: immutable },
-      { source: "/cards/:path*", headers: immutable },
+      { source: "/cards-square/:path*", headers: immutable },
       { source: "/characters/:path*", headers: immutable },
       { source: "/icons/:path*", headers: immutable },
     ];

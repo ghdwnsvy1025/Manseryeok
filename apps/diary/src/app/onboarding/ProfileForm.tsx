@@ -22,7 +22,7 @@ export interface ProfileFormValues {
 /** 입력 묶음 위 작은 라벨 (Pretendard 14px 보조색) */
 const groupLabel = "text-[14px] leading-none text-muted";
 
-/** 두 칸 세그먼트의 한 칸 — 라디오 (name/value 그대로). 고른 쪽 = 먹색 면 + 한지색 글자, 안 고른 쪽 = 테두리만 */
+/** 세그먼트의 한 칸 = 종이 띠지 (v3.8, 쓰기 화면 `.tag`와 같은 재료). 라디오는 sr-only(name/value 그대로), 고른 쪽은 `input:checked + .tag`가 남색 띠로 그린다 */
 function SegRadio<T extends string>({
   name,
   value,
@@ -40,7 +40,7 @@ function SegRadio<T extends string>({
   return (
     <label className="contents">
       <input type="radio" name={name} value={value} checked={on} onChange={() => onChange(value)} aria-label={label} className="peer sr-only" />
-      <span className="seg__cell">{label}</span>
+      <span className="tag seg__cell">{label}</span>
     </label>
   );
 }
@@ -59,7 +59,7 @@ interface ProfileFormProps {
  * 생년월일 입력 (톤 v3.3 "양식지 제거, 깨끗하게"). 한지 카드 한 장 안에 입력칸만.
  * 입력칸 .field: 56px · 녹갈 1px · paper-3 바탕 · 숫자 Song Myung 22px. 상태만 분명히 —
  * 빈 칸 = 흐린 자리표시 / 입력 중 = 금색 2px / 채움 = 먹색 글자 / 오류 = 먹색 1.5px + 아래 danger 한 줄.
- * 양·음력, 성별, 시간 모름은 두 칸 세그먼트 .seg (띠지 없음). 윤달은 음력일 때만 체크 한 줄. 도시 select도 같은 입력칸 모양.
+ * 양·음력, 성별, 시간 모름은 종이 띠지 두 장 .seg > .tag (v3.8 — 쓰기 화면의 기분 띠지와 같은 재료). 윤달은 음력일 때만 띠지 하나. 도시 select도 같은 입력칸 모양.
  * name=·value=·서버 액션·검증 문구는 기능 쪽 그대로. 카드 틀(card-frame card-paper)은 부모(온보딩 페이지)가 두른다.
  * v3.6: 연→월→일→시→분 자동 포커스 이동(자릿수가 차면 다음, 백스페이스로 비면 이전). 시·도 목록은 CITIES 그대로.
  */
@@ -146,9 +146,9 @@ export function ProfileForm({ next, initial, serverAction = saveProfileAction, a
           <SegRadio name="calendar" value="lunar" current={calendar} label="음력" onChange={setCalendar} />
         </div>
         {calendar === "lunar" && (
-          <label className="mt-1 flex items-center gap-2 text-[15px] text-ink">
-            <input type="checkbox" name="isLeapMonth" checked={leap} onChange={(e) => setLeap(e.target.checked)} className="check" />
-            윤달이에요
+          <label className="seg seg--one">
+            <input type="checkbox" name="isLeapMonth" checked={leap} onChange={(e) => setLeap(e.target.checked)} className="peer sr-only" />
+            <span className="tag seg__cell">윤달이에요</span>
           </label>
         )}
         {errorAt("calendar")}
@@ -172,10 +172,10 @@ export function ProfileForm({ next, initial, serverAction = saveProfileAction, a
         </span>
         <input type="checkbox" name="timeUnknown" checked={timeUnknown} onChange={(e) => setTimeUnknown(e.target.checked)} className="sr-only" tabIndex={-1} aria-hidden />
         <div className="seg" role="group" aria-labelledby="time-label">
-          <button type="button" aria-pressed={!timeUnknown} data-on={!timeUnknown ? "" : undefined} onClick={() => setTimeUnknown(false)} className="seg__cell">
+          <button type="button" aria-pressed={!timeUnknown} onClick={() => setTimeUnknown(false)} className={`tag seg__cell${!timeUnknown ? " tag--on" : ""}`}>
             알아요
           </button>
-          <button type="button" aria-pressed={timeUnknown} data-on={timeUnknown ? "" : undefined} onClick={() => setTimeUnknown(true)} className="seg__cell">
+          <button type="button" aria-pressed={timeUnknown} onClick={() => setTimeUnknown(true)} className={`tag seg__cell${timeUnknown ? " tag--on" : ""}`}>
             몰라요
           </button>
         </div>
@@ -205,6 +205,8 @@ export function ProfileForm({ next, initial, serverAction = saveProfileAction, a
             ▾
           </span>
         </span>
+        {/* 지역은 진태양시 보정에만 쓰인다 (lib/profile.ts computeProfile) — 왜 묻는지 한 줄 */}
+        <p className="text-[13px] leading-[1.5] text-muted break-keep">태어난 곳의 경도로 시간을 보정해요. 시간을 모르면 영향이 없어요.</p>
         {errorAt("city")}
       </div>
 

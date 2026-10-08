@@ -29,5 +29,5 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   // 정적 파일(ui·cards·characters·icons)은 세션 갱신이 필요 없다 — 이미지 요청마다 엣지에서 getUser가 돌던 것을 막는다
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|icons/|ui/|cards/|characters/|manifest.webmanifest|sw.js).*)"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|icons/|ui/|cards-square/|characters/|manifest.webmanifest|sw.js).*)"],
 };

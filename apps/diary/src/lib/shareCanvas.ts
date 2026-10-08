@@ -55,7 +55,7 @@ function loadImage(src: string): Promise<HTMLImageElement | null> {
   });
 }
 
-/** @param imageSrc 가운데 그림 (v3.3: 내 일주 카드 /cards/{일주}.webp). 비율을 지켜 폭 560에 맞춘다 */
+/** @param imageSrc 가운데 그림 (v3.3: 내 일주 카드 /cards-square/{일주}.webp). 비율을 지켜 폭 560에 맞춘다 */
 export async function drawShareCard(canvas: HTMLCanvasElement, text: ShareCardText, imageSrc: string): Promise<void> {
   canvas.width = CARD_W;
   canvas.height = CARD_H;
@@ -101,9 +101,10 @@ export async function drawShareCard(canvas: HTMLCanvasElement, text: ShareCardTe
   ctx.fillText(text.title, x + hanjaW + 28, y + 150 - 64 - 14);
   y += 190;
 
+  // 그림 560×560 (v3.8 정사각 카드 1080×1080). 제목 아래 16px, 그림 아래 글 블록까지 48px.
+  // 글 2줄(1002~1114)과 아래 괘선(1158) 사이가 44px 남는다. 비율이 다른 그림이 와도 폭 560·남은 높이 안에 맞춘다
   const imgSize = 560;
-  const imgY = y + 10;
-  // 그림 비율 유지 (카드 768×1030은 세로가 길다). 폭 560 안에 넣는다
+  const imgY = y + 16;
   let imgH = imgSize;
   if (img) {
     const ratio = img.naturalHeight && img.naturalWidth ? img.naturalHeight / img.naturalWidth : 1;
@@ -118,7 +119,7 @@ export async function drawShareCard(canvas: HTMLCanvasElement, text: ShareCardTe
     ctx.fillText(text.hanja, CARD_W / 2, imgY + 100);
     ctx.textAlign = "left";
   }
-  y = imgY + imgH + 40;
+  y = imgY + imgH + 48;
 
   ctx.fillStyle = COLORS.ink;
   ctx.font = `700 40px ${SANS}`;

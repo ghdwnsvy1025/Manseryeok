@@ -20,9 +20,11 @@ export default async function WelcomePage() {
   const me = characterOf(profile.pillars);
 
   return (
-    <main className="flex min-h-[calc(100dvh-7rem)] flex-col items-center justify-center gap-7 overflow-clip py-6 text-center">
-      {/* 팡 연출의 카드 부분만 재사용 (mode="reveal": 오버레이·도장·자동 이동 없음). 조각 흩날림은 카드 뒤에서 */}
-      <SaveBurst mode="reveal" ganjiKo={me.ganjiKo} cardSrc={me.cardSrc} />
+    <main className="flex min-h-[calc(100dvh-7rem)] flex-col items-center justify-start gap-7 overflow-clip pt-12 pb-6 text-center">
+      {/* 팡 연출의 카드 부분만 재사용 (mode="reveal": 오버레이·도장·자동 이동 없음). 조각 흩날림은 카드 뒤에서.
+          v3.8: characterSrc를 넘기면 실루엣(검은 컷아웃) → 1.2초 뒤 팡 → 정사각 카드. 무대는 위에서 고정(justify-start) —
+          실루엣 글자가 사라지고 글·버튼이 나타나도 카드 자리가 움직이지 않는다. 글·버튼(.burst-text)은 실루엣 동안 CSS가 숨긴다 */}
+      <SaveBurst mode="reveal" ganjiKo={me.ganjiKo} cardSrc={me.cardSrc} characterSrc={me.characterSrc} />
       {/* 글은 카드 팡 뒤 150ms, 버튼은 그 다음 — 같은 saved-in 전환 한 번씩 */}
       <div className="burst-text px-2">
         <h1 className="font-serif text-[24px] leading-snug break-keep">

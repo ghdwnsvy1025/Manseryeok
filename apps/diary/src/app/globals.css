@@ -185,7 +185,10 @@ input:checked + .tag {
 .signal-box {
   padding: 14px;
   border-radius: 8px;
+  /* v3.8: 온보딩 입력칸(.field)과 같은 재질 — paper-3 + 옅은 card-paper 결 */
   background-color: var(--color-paper-3);
+  background-image: linear-gradient(color-mix(in srgb, var(--color-paper-3) 82%, transparent), color-mix(in srgb, var(--color-paper-3) 82%, transparent)), url("/ui/card-paper.webp");
+  background-size: auto, 256px 256px;
 }
 /* 신호 줄 (v3.7): 첫 줄에 띠지만, 문장은 둘째 줄부터 왼쪽 끝에서 들여쓰기 없이. 줄 사이 14px */
 .signal-box__row {
@@ -256,7 +259,10 @@ input:checked + .tag {
   padding: 0 12px;
   border: 1px solid var(--color-frame);
   border-radius: 6px;
+  /* v3.8 재질: 신호 상자와 같은 paper-3 위에 card-paper 결을 아주 옅게(단색 82% 덮음) — 밋밋한 네모가 아니라 눌린 한지 */
   background-color: var(--color-paper-3);
+  background-image: linear-gradient(color-mix(in srgb, var(--color-paper-3) 82%, transparent), color-mix(in srgb, var(--color-paper-3) 82%, transparent)), url("/ui/card-paper.webp");
+  background-size: auto, 256px 256px;
   text-align: center;
   font-family: var(--font-serif);
   font-size: 22px;
@@ -292,67 +298,44 @@ input:checked + .tag {
   font-size: 20px;
 }
 
-/* 두 칸 세그먼트 (v3.3): 양·음력, 성별, 시간 모름. 띠지 그림 없음.
-   고른 쪽 = 먹색 면 + 한지색 글자, 안 고른 쪽 = 테두리만. 라디오는 sr-only, 시각은 옆의 .seg__cell */
+/* 세그먼트 = 종이 띠지 (v3.8, v3.3의 먹색 면 세그먼트를 대체): 양·음력, 성별, 시간 알아요/몰라요, 윤달.
+   칸 하나가 쓰기 화면의 기분 띠지(.tag, 키트 tag-strip)와 같은 재료. 고른 쪽은 `input:checked + .tag`/`.tag--on`이 남색 띠로 그린다.
+   라디오·체크는 sr-only, 시각은 옆의 .tag.seg__cell. 틀 안의 틀 없음 — 띠지가 한지 카드 위에 그대로 놓인다 */
 .seg {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  height: 48px;
-  border: 1px solid var(--color-frame);
-  border-radius: 6px;
-  overflow: hidden;
-  background-color: var(--color-paper-2);
+  display: flex;
+  gap: 10px;
+}
+.seg--one {
+  margin-top: 2px;
 }
 .seg__cell {
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  flex: 1 1 0;
   min-width: 0;
+  height: 44px;
+  padding: 0 8px;
   cursor: pointer;
   font-size: 16px;
   color: var(--color-ink);
   background: transparent;
-  border: 0;
   border-radius: 0;
 }
-.seg__cell + label > .seg__cell,
-.seg__cell + .seg__cell,
-label + label > .seg__cell {
-  border-left: 1px solid var(--color-frame);
-}
-input:checked + .seg__cell,
-.seg__cell[data-on] {
+/* 버튼 칸(시간 알아요/몰라요)의 고른 쪽: 라디오의 input:checked + .tag와 같은 글자 */
+.seg__cell.tag--on {
   font-weight: 700;
   color: var(--color-paper-2);
-  background-color: var(--color-ink);
 }
-/* 세그먼트 오류(B3): 입력칸의 aria-invalid와 같은 먹색 1.5px. 아래 danger 한 줄은 마크업(ProfileForm) */
-.seg--invalid {
-  border-color: var(--color-ink);
-  box-shadow: inset 0 0 0 0.5px var(--color-ink);
+.seg--one > .seg__cell {
+  flex: 0 1 auto;
+  padding: 0 16px;
+}
+/* 세그먼트 오류(B3): 입력칸의 aria-invalid와 같은 먹색 1.5px. 띠지 안쪽에 선 한 겹. 아래 danger 한 줄은 마크업(ProfileForm) */
+.seg--invalid .seg__cell {
+  box-shadow: inset 0 0 0 1.5px var(--color-ink);
 }
 input:focus-visible + .seg__cell,
 .seg__cell:focus-visible {
   outline: 2px solid var(--color-gold);
-  outline-offset: -3px;
-}
-
-/* 윤달 체크 한 줄 (음력일 때만): 네모 체크, 고르면 먹색 면 */
-.check {
-  appearance: none;
-  -webkit-appearance: none;
-  width: 20px;
-  height: 20px;
-  margin: 0;
-  border: 1px solid var(--color-frame);
-  border-radius: 4px;
-  background-color: var(--color-paper-3);
-  cursor: pointer;
-}
-.check:checked {
-  border-color: var(--color-ink);
-  background-color: var(--color-ink);
-  box-shadow: inset 0 0 0 4px var(--color-paper-2);
+  outline-offset: 2px;
 }
 
 /* 붓선 로딩 (v3.2): divider 붓선을 마스크로 왼→오 1.8s 반복 드러내기. 금색. 스피너·점·회전 없음 */
@@ -614,6 +597,75 @@ details[open] > .fortune-body {
 .burst-text--late {
   animation-delay: 450ms;
 }
+/* /welcome 실루엣 → 팡 → 정사각 카드 (v3.8, SaveBurst reveal 가지).
+   무대 .reveal-stage는 정사각(폭 62vw·최대 320px) 하나. 실루엣 동안엔 키트 card-frame(1:1) 틀 + paper-2 바탕 안에
+   내 캐릭터 컷아웃을 검게(brightness 0) 가운데 둔다 — 정지. 숨쉬기·스피너·그림자 없음. 1.2초 뒤 같은 자리·같은 크기의 정사각 카드로 바뀐다.
+   교체는 opacity 교차 120ms 하나(reveal-swap), 카드의 팡은 기존 burst-pop 조각 16개와 함께. */
+.reveal-stage {
+  position: relative;
+  width: 62vw;
+  max-width: 320px;
+  aspect-ratio: 1;
+}
+.reveal-silhouette {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--color-paper-2);
+  background-clip: padding-box;
+}
+.reveal-silhouette > img {
+  width: 66%;
+  height: 72%;
+  object-fit: contain;
+  filter: brightness(0);
+}
+.reveal-stage[data-phase="open"] > .reveal-silhouette {
+  animation: reveal-swap 120ms ease-out both reverse;
+  pointer-events: none;
+}
+.reveal-stage[data-phase="open"] > .burst-card {
+  animation:
+    reveal-swap 120ms ease-out both,
+    reveal-pop 400ms cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
+}
+@keyframes reveal-swap {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+/* 실루엣과 같은 크기에서 시작해(0.9) 살짝 튀고 제자리 — 크기가 튀지 않는다 */
+@keyframes reveal-pop {
+  from {
+    transform: scale(0.9);
+  }
+  70% {
+    transform: scale(1.05);
+  }
+  to {
+    transform: scale(1);
+  }
+}
+/* 실루엣 아래 한 줄 "당신의 카드를 찾고 있어요": 16px 보조색. 팡 때 사라진다 */
+.reveal-caption {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--color-muted);
+}
+.reveal-stage[data-phase="open"] ~ .reveal-caption {
+  display: none;
+}
+/* 실루엣 동안엔 그 뒤의 글·버튼(.burst-text)이 없다. 팡 뒤에 제 지연(150·450ms)으로 나타난다 */
+.reveal-stage[data-phase="silhouette"] ~ .burst-text {
+  opacity: 0;
+  animation: none;
+}
 /* 팡 카드 (05 v3.5): 키트 char-frame(투명 3:4, 한지·녹갈 이중선 + 네 귀퉁이 장식) 틀을 card-paper 위에 얹는다.
    틀 이미지는 카드와 같은 3:4라 100%/100%로 늘려도 선 두께가 변하지 않는다(border-image 대신 배경 두 겹).
    안은 위 1/5 간지 글자 · 가운데 3/5 캐릭터(폭 70%) · 아래 1/5 행복도 도장. 글자·배치만 코드다 */
@@ -727,6 +779,8 @@ details[open] > .fortune-body {
   .burst-overlay,
   .burst-overlay[data-closing],
   .burst-ok,
+  .reveal-stage[data-phase="open"] > .reveal-silhouette,
+  .reveal-stage[data-phase="open"] > .burst-card,
   input:checked + .stamp,
   input:checked + .promise-stamp > .promise-stamp__mark,
   .brush-loading {
@@ -734,6 +788,9 @@ details[open] > .fortune-body {
   }
   /* 팡·흩날림 없이 카드만 바로 보인다 */
   .burst-bit {
+    display: none;
+  }
+  .reveal-stage[data-phase="open"] > .reveal-silhouette {
     display: none;
   }
 }

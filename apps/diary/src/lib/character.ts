@@ -1,5 +1,5 @@
 // 내 캐릭터 = 일주 캐릭터 (톤 v3.3 / 07-내캐릭터). 가입 때 정해지고 바뀌지 않는다.
-// 그림은 바이럴 60갑자 세트 복사본: public/characters/{간지}.webp (동물만), public/cards/{간지}.webp (카드 전체).
+// 그림은 바이럴 60갑자 세트 복사본: public/characters/{간지}.webp (동물만), public/cards-square/{간지}.webp (정사각 카드(능력·설명 없음, 1080×1080)).
 import type { PillarsSnapshot } from "./profile";
 
 /** 지지 한글 → 동물 (07 명세 표). 子쥐 丑소 寅호랑이 卯토끼 辰용 巳뱀 午말 未양 申원숭이 酉닭 戌개 亥돼지 */
@@ -25,7 +25,7 @@ export interface MyCharacter {
   animal: string;
   /** 동물만 그려진 그림 (제목 옆·로딩·격자 칸) */
   characterSrc: string;
-  /** 카드 전체 (팡·welcome·나 화면 머리·공유 카드) */
+  /** 정사각 카드(능력·설명 없음, 1080×1080) (팡·welcome·나 화면 머리·공유 카드) */
   cardSrc: string;
 }
 
@@ -36,7 +36,7 @@ export function characterOfGanji(ganjiKo: string): MyCharacter {
     ganjiKo,
     animal: BRANCH_ANIMAL[branch] ?? "",
     characterSrc: `/characters/${ganjiKo}.webp`,
-    cardSrc: `/cards/${ganjiKo}.webp`,
+    cardSrc: `/cards-square/${ganjiKo}.webp`,
   };
 }
 

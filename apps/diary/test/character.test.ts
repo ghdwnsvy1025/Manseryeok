@@ -10,7 +10,7 @@ describe("characterOf", () => {
       day: { stem: "己", branch: "丑", ko: "기축" },
       hour: null,
     });
-    expect(me).toEqual({ ganjiKo: "기축", animal: "소", characterSrc: "/characters/기축.webp", cardSrc: "/cards/기축.webp" });
+    expect(me).toEqual({ ganjiKo: "기축", animal: "소", characterSrc: "/characters/기축.webp", cardSrc: "/cards-square/기축.webp" });
   });
 
   test("12지지 전부 동물이 있다 (07 명세 표)", () => {
