@@ -36,11 +36,8 @@ const ORDINAL = ["", "첫", "두", "세", "네", "다섯", "여섯", "일곱", "
  */
 export function TodayEntryCard({ entry, today, ganjiKo, sameGanjiTimes, metCards, streak, pointRate, justSaved }: Props) {
   const promise = entry.promise ? PROMISE_LINE[entry.promise] : null;
-  const cardLine =
-    sameGanjiTimes <= 1
-      ? `${ganjiKo} 카드를 처음 만났어요 · 60장 중 ${metCards}장`
-      : `${ganjiKo} 카드에 ${ORDINAL[sameGanjiTimes] ?? `${sameGanjiTimes}번째`}${sameGanjiTimes <= 10 ? " 번째" : ""} 도장 · 60장 중 ${metCards}장`;
-  const metricLine = [`연속 ${streak}일째`, pointRate !== null ? `포인트 해본 비율 ${pointRate}%` : null].filter(Boolean).join(" · ");
+  const nth = sameGanjiTimes <= 10 ? `${ORDINAL[sameGanjiTimes]} 번째` : `${sameGanjiTimes}번째`;
+  const cardLine = sameGanjiTimes <= 1 ? `${ganjiKo} 카드를 처음 만났어요` : `${ganjiKo} 카드에 ${nth} 도장을 찍었어요`;
   return (
     <section className="card-frame card-paper p-5">
       {justSaved && <p className="saved-line mb-2 text-sm font-bold text-gold">저장했어요</p>}
@@ -76,18 +73,35 @@ export function TodayEntryCard({ entry, today, ganjiKo, sameGanjiTimes, metCards
         </>
       )}
 
-      {promise && (
-        <p className="mt-4 flex items-center gap-1.5 text-[13px] text-muted">
-          <span>오늘 포인트 · {promise.word}</span>
-          {promise.dot && <span aria-hidden className={`inline-block h-2 w-2 rounded-full ${promise.dot}`} />}
-        </p>
-      )}
-
-      <div className={`entry-news ${promise ? "mt-3" : "mt-4"}`}>
+      {/* v3.13: 점 대신 줄맞춤 — 첫 줄 카드 소식, 그 아래 이름–값 줄(오늘 포인트 · 모은 카드 + 막대), 맨 아래 지표 칩 */}
+      <div className="entry-news mt-4">
         <p className="entry-news__card" data-first={sameGanjiTimes <= 1 ? "" : undefined}>
           {cardLine}
         </p>
-        <p className="entry-news__metric">{metricLine}</p>
+        <dl className="kv mt-2">
+          {promise && (
+            <div className="kv__row">
+              <dt>오늘 포인트</dt>
+              <dd>
+                {promise.word}
+                {promise.dot && <span aria-hidden className={`ml-1.5 inline-block h-2 w-2 rounded-full ${promise.dot}`} />}
+              </dd>
+            </div>
+          )}
+          <div className="kv__row">
+            <dt>모은 카드</dt>
+            <dd>
+              {metCards} / 60장
+              <span className="kv__bar" aria-hidden>
+                <span style={{ width: `${(metCards / 60) * 100}%` }} />
+              </span>
+            </dd>
+          </div>
+        </dl>
+        <ul className="entry-news__chips" aria-label="지표">
+          <li className="chip">연속 {streak}일</li>
+          {pointRate !== null && <li className="chip">포인트 {pointRate}%</li>}
+        </ul>
       </div>
     </section>
   );

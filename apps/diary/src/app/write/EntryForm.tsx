@@ -100,7 +100,7 @@ export function EntryForm({ date, promiseText, notePlaceholder, initial }: Props
         <fieldset ref={happinessRef}>
           <legend className="text-[17px] font-bold">행복도</legend>
           <p className={`mt-1 h-5 text-sm ${missingHappiness && happiness === null ? "font-bold text-danger" : "text-muted"}`} aria-live="polite">
-            {happiness ? `${happiness} · ${hint(happiness)}` : missingHappiness ? "행복도를 먼저 골라 주세요" : "1부터 10까지, 도장 하나"}
+            {happiness ? `${happiness}점, ${hint(happiness)}` : missingHappiness ? "행복도를 먼저 골라 주세요" : "1부터 10까지, 도장 하나"}
           </p>
           <div className="mt-3 grid grid-cols-5 gap-2">
             {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => {
@@ -136,7 +136,9 @@ export function EntryForm({ date, promiseText, notePlaceholder, initial }: Props
             <legend className="sr-only">오늘의 포인트</legend>
             <input type="hidden" name="promise_text" value={promiseText} />
             <div className="note-slip" data-promise-text>
-              <p className="note-slip__label">오늘의 포인트 · 운세의 "하면 좋아요"</p>
+              <p className="note-slip__label">
+                오늘의 포인트 <span className="note-slip__sub">운세의 &ldquo;하면 좋아요&rdquo;</span>
+              </p>
               <p className="note-slip__text">{promiseText}</p>
             </div>
             <p className="mt-2 text-[15px] text-muted">오늘 이걸 해봤나요?</p>
@@ -167,7 +169,7 @@ export function EntryForm({ date, promiseText, notePlaceholder, initial }: Props
         <fieldset>
           <legend className="text-[17px] font-bold">기분</legend>
           <p className="mt-1 text-sm text-muted">
-            {MAX_MOODS}개까지 · 안 골라도 돼요 {moods.length > 0 && <span className="text-ganji">({moods.length}/{MAX_MOODS})</span>}
+            {MAX_MOODS}개까지, 안 골라도 돼요 {moods.length > 0 && <span className="text-ganji">({moods.length}/{MAX_MOODS})</span>}
           </p>
           <div className="mt-3 flex flex-wrap gap-x-2 gap-y-3">
             {MOODS.map((m) => {

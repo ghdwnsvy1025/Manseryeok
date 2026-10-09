@@ -816,10 +816,13 @@ details[open] > .fortune-body {
 /* v3.10: 날짜는 위 한 줄(16px 보조색, 가운데), 아래 캐릭터 쌍과 14px */
 .today-date {
   margin: 0;
-  font-size: 16px;
-  line-height: 1.4;
+  /* v3.13: 송명 24px 먹색, 가운데 */
+  font-family: var(--font-serif);
+  font-size: 24px;
+  line-height: 1.3;
   font-weight: 400;
-  color: var(--color-muted);
+  color: var(--color-ink);
+  text-align: center;
 }
 .medal-pair {
   display: flex;
@@ -838,26 +841,26 @@ details[open] > .fortune-body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
-  width: 100px;
+  gap: 4px;
+  width: 108px;
   white-space: nowrap;
 }
 /* v3.10: "나"/"오늘" 13px 보조색, 바로 아래 간지 한자만 송명 22px 먹색(한글 없음) */
 .medal-pair__who {
-  font-size: 13px;
+  font-size: 16px;
   line-height: 1;
   color: var(--color-muted);
 }
 .medal-pair__hanja {
   font-family: var(--font-serif);
-  font-size: 22px;
+  font-size: 30px;
   line-height: 1.1;
   color: var(--color-ink);
 }
 .medal {
   display: block;
-  width: 100px;
-  height: 100px;
+  width: 108px;
+  height: 108px;
   overflow: hidden;
   border: 1px solid var(--color-frame);
   border-radius: 50%;
@@ -877,7 +880,7 @@ details[open] > .fortune-body {
 .medal-pair__x {
   font-family: var(--font-serif);
   font-size: 20px;
-  line-height: 100px;
+  line-height: 108px;
   color: var(--color-muted);
 }
 
@@ -1616,4 +1619,316 @@ input:checked + .tag[data-tone="neg"] {
   font-size: 13px;
   line-height: 1.4;
   color: var(--color-muted);
+}
+
+/* ── v3.13 머리 확대 · 신호 상자 둘 · 이름–값 줄 · 오행 붓 막대 · 달력 (명세 14) ─────────────
+   원칙: 글자 사이 가운뎃점 금지. 나열은 간격·칩, 짝 정보는 .kv 줄맞춤. ::before로 점을 되살리지 않는다 */
+
+/* 신호 상자 둘: 좋은 쪽 = 금빛 면 + 금 1px, 조심 쪽 = 먹빛 면 + 먹 1px. 빨강·파랑 없음 */
+.signal-box--good {
+  background-image:
+    linear-gradient(color-mix(in srgb, var(--color-gold) 10%, transparent), color-mix(in srgb, var(--color-gold) 10%, transparent)),
+    linear-gradient(color-mix(in srgb, var(--color-paper-3) 82%, transparent), color-mix(in srgb, var(--color-paper-3) 82%, transparent)),
+    url("/ui/card-paper.webp");
+  background-size: auto, auto, 256px 256px;
+  background-blend-mode: multiply, normal, normal;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-gold) 75%, transparent);
+}
+.signal-box--care {
+  background-image:
+    linear-gradient(color-mix(in srgb, var(--color-ink) 7%, transparent), color-mix(in srgb, var(--color-ink) 7%, transparent)),
+    linear-gradient(color-mix(in srgb, var(--color-paper-3) 82%, transparent), color-mix(in srgb, var(--color-paper-3) 82%, transparent)),
+    url("/ui/card-paper.webp");
+  background-size: auto, auto, 256px 256px;
+  background-blend-mode: multiply, normal, normal;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-ink) 70%, transparent);
+}
+.signal-box + .signal-box {
+  margin-top: 12px;
+}
+/* 화살표: ↑ 금 / ↓ 먹, 굵게 20px (띠지 높이 30px 안) */
+.signal-box__row[data-signal="↑"] .sig > span[aria-hidden],
+.signal-box__row[data-signal="↓"] .sig > span[aria-hidden] {
+  font-size: 20px;
+  font-weight: 800;
+  line-height: 1;
+}
+.signal-box__row[data-signal="↑"] .sig > span[aria-hidden] {
+  color: var(--color-gold);
+}
+.signal-box__row[data-signal="↓"] .sig > span[aria-hidden] {
+  color: var(--color-ink);
+}
+/* 보통(→) 줄은 좋은 쪽 상자 맨 아래, 옅게 */
+.signal-box__row[data-signal="→"] {
+  color: color-mix(in srgb, var(--color-ink) 70%, transparent);
+}
+
+/* 이름–값 줄: 왼쪽 이름 14px 보조색, 오른쪽 값 송명 15px 숫자, 양끝 정렬. 줄 아래 녹갈 25% 점선 */
+.kv {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  text-align: left;
+}
+.kv__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 22px;
+  padding-bottom: 6px;
+  border-bottom: 0.5px dashed color-mix(in srgb, var(--color-frame) 25%, transparent);
+}
+.kv__row:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+.kv dt {
+  font-size: 14px;
+  line-height: 1.3;
+  color: var(--color-muted);
+}
+.kv dd {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: 15px;
+  line-height: 1.3;
+  color: var(--color-ink);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+/* 작은 진행 막대: 숫자 오른쪽, 72×5 paper-3 트랙 + 금빛 fill */
+.kv__bar {
+  display: inline-block;
+  flex: none;
+  width: 72px;
+  height: 5px;
+  overflow: hidden;
+  border-radius: 3px;
+  background: var(--color-paper-3);
+  box-shadow: inset 0 0 0 0.5px color-mix(in srgb, var(--color-frame) 35%, transparent);
+}
+.kv__bar > span {
+  display: block;
+  height: 100%;
+  min-width: 2px;
+  border-radius: 3px;
+  background: var(--color-gold) url("/ui/gold-wash.webp") center / 512px 512px;
+}
+/* 사실 줄(가장 행복한 날/가장 힘든 날): 간지 → 인주 작은 원(칸 상세 도장 축소판) → 횟수 */
+.kv--facts dd {
+  gap: 8px;
+}
+.kv__num {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  font-size: 13px;
+  line-height: 1;
+  color: var(--color-paper-2);
+  background: url("/ui/stamp-inked-red-clean.png") center / contain no-repeat;
+  transform: rotate(-6deg);
+}
+.kv__n {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  color: var(--color-muted);
+}
+/* 나 머리: 가운데 블록 최대 260px */
+.me-progress {
+  max-width: 260px;
+  margin-inline: auto;
+}
+
+/* 오늘의 기록 소식: 카드 문장 → kv(카드 폭) → 칩 두 개 */
+.entry-news > .kv {
+  align-self: stretch;
+}
+.entry-news__chips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.chip {
+  display: inline-flex;
+  align-items: center;
+  height: 28px;
+  padding: 0 12px;
+  border: 1px solid var(--color-frame);
+  border-radius: 9999px;
+  font-size: 13px;
+  line-height: 1;
+  color: var(--color-ink);
+  white-space: nowrap;
+}
+
+/* 쓰기 쪽지 라벨: 오른쪽에 12px 보조 글자, 모자라면 아래 줄 */
+.note-slip__label {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 8px;
+  row-gap: 2px;
+}
+.note-slip__sub {
+  font-size: 12px;
+  color: var(--color-muted);
+}
+
+/* 오행 분포 = 붓 막대: 글자 17px 오행 색 → 붓 가로획(사주 코어 brush-stroke 마스크) → % 13px */
+.elements__label {
+  width: 22px;
+  font-size: 17px;
+  line-height: 1;
+}
+.elements__track {
+  height: 10px;
+  overflow: visible;
+  border-radius: 0;
+  background: none;
+}
+.elements__fill {
+  -webkit-mask: url("/ui/brush-stroke.webp") no-repeat center / 100% 100%;
+  mask: url("/ui/brush-stroke.webp") no-repeat center / 100% 100%;
+  /* 짧은 막대도 붓 끝이 갈라져 보이게: 마스크를 최소 56px로 두고 오른쪽(붓 끝)에 맞춘다 — 시작은 축에서 곧게 */
+  -webkit-mask-size: max(100%, 56px) 100%;
+  mask-size: max(100%, 56px) 100%;
+  -webkit-mask-position: right center;
+  mask-position: right center;
+  transform-origin: left center;
+  animation: brush-in 0.9s cubic-bezier(0.3, 0.7, 0.3, 1) both;
+}
+.elements__row:nth-child(2) .elements__fill { animation-delay: 70ms; }
+.elements__row:nth-child(3) .elements__fill { animation-delay: 140ms; }
+.elements__row:nth-child(4) .elements__fill { animation-delay: 210ms; }
+.elements__row:nth-child(5) .elements__fill { animation-delay: 280ms; }
+.elements__value {
+  font-size: 13px;
+}
+@keyframes brush-in {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+/* 보기 전환(60갑자 / 달력): 밑줄 탭. 현재 쪽 = 먹색 굵게 + 붓선(divider) 밑줄 */
+.view-switch {
+  display: flex;
+  gap: 20px;
+}
+.view-switch__item {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  font-size: 15px;
+  color: var(--color-muted);
+}
+.view-switch__item[aria-current="page"] {
+  font-weight: 700;
+  color: var(--color-ink);
+}
+.view-switch__item[aria-current="page"]::after {
+  content: "";
+  position: absolute;
+  left: -4px;
+  right: -4px;
+  bottom: 6px;
+  height: 6px;
+  background: url("/ui/divider-clean.png") center / 100% 100% no-repeat;
+}
+
+/* 달력: 7열 정사각 칸(375px에서 ~44px), 모서리 18% — 60갑자 격자 칸과 같은 체계 */
+.cal__title {
+  font-family: var(--font-serif);
+  font-size: 20px;
+  line-height: 1.2;
+}
+.cal__head .tap--box {
+  font-size: 22px;
+  color: var(--color-ink);
+}
+.cal__grid {
+  margin-bottom: 0;
+  padding: 0;
+  list-style: none;
+}
+.cal__cell {
+  position: relative;
+  display: flex;
+  aspect-ratio: 1;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 18%;
+  background: url("/ui/stamp-board-cell-empty-clean.webp") center / 100% 100% no-repeat;
+  isolation: isolate;
+}
+.cal__cell--blank {
+  background: none;
+}
+.cal__day {
+  font-family: var(--font-serif);
+  font-size: 12px;
+  line-height: 1;
+  color: var(--color-muted);
+  font-variant-numeric: tabular-nums;
+}
+/* 기록 있는 날 = 인주 도장이 칸을 꽉 채운다. 농도 = 행복도 --h */
+.cal__cell[data-has]::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: url("/ui/stamp-inked-red-clean.png") center / 150% 150% no-repeat;
+  opacity: calc(0.45 + var(--h, 0) * 0.55);
+}
+.cal__cell[data-has] .cal__day {
+  position: absolute;
+  top: 4px;
+  left: 5px;
+  font-size: 9px;
+  color: color-mix(in srgb, var(--color-paper-2) 70%, transparent);
+}
+.cal__stamp {
+  font-family: var(--font-serif);
+  font-size: 16px;
+  line-height: 1;
+  color: var(--color-paper-2);
+  font-variant-numeric: tabular-nums;
+}
+.cal__cell[data-today] {
+  overflow: visible;
+  outline: 2px solid var(--color-ganji);
+  outline-offset: 1px;
+}
+.cal__cell[data-today][data-has]::before {
+  border-radius: 18%;
+  background-size: 150% 150%;
+}
+.cal__cell[data-future] {
+  opacity: 0.35;
+  cursor: default;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .elements__fill {
+    animation: none;
+    transform: none;
+  }
 }

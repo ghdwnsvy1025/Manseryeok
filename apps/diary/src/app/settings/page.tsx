@@ -62,7 +62,10 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
               </div>
             </>
           ) : (
-            <p className="mt-2 text-[15px] text-muted">연결됨 · {user.email ?? "Google"}</p>
+            <p className="mt-2 text-[15px] text-muted">
+              연결됨
+              <span className="block text-ink">{user.email ?? "Google"}</span>
+            </p>
           )}
         </div>
 
@@ -93,7 +96,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
           <p className="mt-2 font-serif text-[17px] text-ink">
             {profile
               ? `${profile.calendar === "lunar" ? "음력" : "양력"} ${profile.birth_year}.${profile.birth_month}.${profile.birth_day}${
-                  profile.birth_hour !== null ? ` ${String(profile.birth_hour).padStart(2, "0")}:${String(profile.birth_minute).padStart(2, "0")}` : " · 시간 모름"
+                  profile.birth_hour !== null ? ` ${String(profile.birth_hour).padStart(2, "0")}:${String(profile.birth_minute).padStart(2, "0")}` : " 시간 모름"
                 }`
               : "아직 넣지 않았어요."}
           </p>

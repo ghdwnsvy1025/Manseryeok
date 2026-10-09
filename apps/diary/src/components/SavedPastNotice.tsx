@@ -30,7 +30,7 @@ export function SavedPastNotice({ date, label }: { date: string; label: string }
   return (
     <p className="mt-2" role="status">
       <Link href="/me" className="tag h-8 px-1 text-[13px] text-ink">
-        {label} 기록을 남겼어요 · 나에서 보기
+        {label} 기록을 남겼어요 <span className="ml-1.5 underline underline-offset-4">나에서 보기</span>
       </Link>
     </p>
   );

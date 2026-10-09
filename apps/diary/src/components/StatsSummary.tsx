@@ -47,10 +47,11 @@ function Bars({ title, items, element = false }: { title: string; items: Bucket[
 
 /** 맞춤도 + 지표 세 칸 + 30일 그래프 + 사실 한 줄들 + 천간·지지·오행 한 판. 기간 약속·재촉 문구는 쓰지 않는다 */
 export function StatsSummary({ h, fitPercent, stems, branches, elements, points, moods, streak, chart }: Props) {
-  const facts: string[] = [];
-  if (h.bestGanji) facts.push(`가장 행복한 날은 ${h.bestGanji.ko}일(${h.bestGanji.hanja}) · 평균 ${h.bestGanji.mean}, ${h.bestGanji.n}번`);
+  // v3.13: 점 대신 이름–값 줄 (왼쪽 무엇, 오른쪽 간지 + 평균 + 횟수)
+  const facts: { label: string; ganji: string; mean: number | null; n: number }[] = [];
+  if (h.bestGanji) facts.push({ label: "가장 행복한 날", ganji: `${h.bestGanji.ko}일`, mean: h.bestGanji.mean, n: h.bestGanji.n });
   if (h.worstGanji && h.worstGanji.index !== h.bestGanji?.index)
-    facts.push(`가장 힘든 날은 ${h.worstGanji.ko}일(${h.worstGanji.hanja}) · 평균 ${h.worstGanji.mean}, ${h.worstGanji.n}번`);
+    facts.push({ label: "가장 힘든 날", ganji: `${h.worstGanji.ko}일`, mean: h.worstGanji.mean, n: h.worstGanji.n });
 
   return (
     <div className="flex flex-col gap-4">
@@ -66,10 +67,23 @@ export function StatsSummary({ h, fitPercent, stems, branches, elements, points,
         <span className="meter mt-2" aria-hidden>
           <span className="meter__fill" style={{ width: `${fitPercent}%` }} />
         </span>
-        <p className="mt-2 text-sm text-muted">기록이 쌓일수록 올라요 · 지금 {h.total}일</p>
-        <p className="mt-1 text-sm text-muted">
-          {h.overallMean !== null && <>평균 행복도 {h.overallMean} · </>}아직 안 겪은 간지 {h.unseen}개
-        </p>
+        <p className="mt-2 text-sm text-muted">기록이 쌓일수록 올라요.</p>
+        <dl className="kv mt-2">
+          <div className="kv__row">
+            <dt>기록</dt>
+            <dd>{h.total}일</dd>
+          </div>
+          {h.overallMean !== null && (
+            <div className="kv__row">
+              <dt>평균 행복도</dt>
+              <dd>{h.overallMean}</dd>
+            </div>
+          )}
+          <div className="kv__row">
+            <dt>아직 안 겪은 간지</dt>
+            <dd>{h.unseen}개</dd>
+          </div>
+        </dl>
       </div>
 
       {/* 지표 세 칸 (Q4 = A+B+D): 연속 기록 · 오늘의 포인트 · 자주 고른 기분 */}
@@ -86,14 +100,14 @@ export function StatsSummary({ h, fitPercent, stems, branches, elements, points,
           <li className="metric">
             <span className="metric__label">포인트 해봄</span>
             <span className="metric__value">
-              {points.rate === null ? "·" : points.rate}
+              {points.rate === null ? "–" : points.rate}
               {points.rate !== null && <small>%</small>}
             </span>
             <span className="metric__sub">
               {points.answered === 0
                 ? "아직 답한 날 없음"
                 : points.keptMean !== null && points.missedMean !== null
-                  ? `해본 날 ${points.keptMean} · 못 한 날 ${points.missedMean}`
+                  ? <>해본 날 {points.keptMean}<br />못 한 날 {points.missedMean}</>
                   : `${points.kept}/${points.answered}일`}
             </span>
           </li>
@@ -124,22 +138,27 @@ export function StatsSummary({ h, fitPercent, stems, branches, elements, points,
       )}
 
       {facts.length > 0 && (
-        <ul className="flex flex-col gap-2 text-[15px] leading-relaxed">
+        <dl className="kv kv--facts card-frame card-paper px-5 py-4">
           {facts.map((f) => (
-            <li key={f} className="border-l-2 border-gold pl-3">
-              {f}
-            </li>
+            <div key={f.label} className="kv__row">
+              <dt>{f.label}</dt>
+              <dd>
+                <span className="text-ganji">{f.ganji}</span>
+                <span className="kv__num">{f.mean}</span>
+                <span className="kv__n">{f.n}번</span>
+              </dd>
+            </div>
           ))}
-        </ul>
+        </dl>
       )}
 
       {/* 천간·지지·오행 한 판 (Q6 = A). 접기 없음. 기록 3건 전엔 한 줄 안내 */}
       {h.total < 3 ? (
-        <p className="card-frame card-paper px-5 py-4 text-[15px] text-muted">기록이 3일 쌓이면 천간·지지·오행별 행복도가 막대로 보여요.</p>
+        <p className="card-frame card-paper px-5 py-4 text-[15px] text-muted">기록이 3일 쌓이면 천간, 지지, 오행별 행복도가 막대로 보여요.</p>
       ) : (
         <div className="card-frame card-paper flex flex-col gap-5 px-5 py-4">
           <p className="text-[15px] font-bold">
-            글자별 내 행복도 <span className="mt-1 block text-[13px] font-normal text-muted">막대 = 평균 · 아래 숫자 = 횟수</span>
+            글자별 내 행복도 <span className="mt-1 block text-[13px] font-normal text-muted">막대 높이는 평균, 아래 숫자는 횟수예요</span>
           </p>
           <Bars title="천간" items={stems} />
           <Bars title="지지" items={branches} />

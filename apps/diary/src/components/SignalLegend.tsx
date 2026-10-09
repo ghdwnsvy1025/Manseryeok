@@ -33,7 +33,11 @@ export function SignalLegend() {
   return (
     <p className="mt-5 -mb-2 flex items-center justify-between gap-3 text-[14px] text-muted">
       <span>
-        <span className="text-gold">↑</span> 좋아요 · <span>→</span> 보통 · <span className="text-ink">↓</span> 조심
+        <span className="inline-flex gap-4">
+          <span><span className="text-gold">↑</span> 좋아요</span>
+          <span><span>→</span> 보통</span>
+          <span><span className="text-ink">↓</span> 조심</span>
+        </span>
       </span>
       <button type="button" onClick={close} aria-label="범례 닫기" className="tap tap--box -mr-2 text-[18px] leading-none text-muted">
         ×

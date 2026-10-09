@@ -28,7 +28,7 @@ export default async function WelcomePage() {
       {/* 글은 카드 팡 뒤 150ms, 버튼은 그 다음 — 같은 saved-in 전환 한 번씩 */}
       <div className="burst-text px-2">
         <h1 className="font-serif text-[24px] leading-snug break-keep">
-          당신의 카드는 <span className="text-ganji">{me.ganjiKo}</span> · {me.animal}예요
+          당신의 카드는 <span className="text-ganji">{me.ganjiKo}일</span> 카드예요
         </h1>
         <p className="mt-2 text-[16px] leading-[1.6] text-muted break-keep">
           {me.ganjiKo}({profile.pillars.day.stem}

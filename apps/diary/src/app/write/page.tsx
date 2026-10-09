@@ -62,7 +62,7 @@ export default async function WritePage({ searchParams }: { searchParams: Promis
         {/* 새벽 4시 전 "어젯밤" 안내 — 오늘로 바꾸는 길을 바로 옆에 (모양은 디자이너 .night-carry) */}
         {carried && (
           <p className="night-carry text-sm">
-            어젯밤({dateLabel}) 기록으로 남겨요 ·{" "}
+            어젯밤({dateLabel}) 기록으로 남겨요{" "}
             <Link href={`/write?date=${today}`} className="underline underline-offset-4">
               오늘로 바꾸기
             </Link>

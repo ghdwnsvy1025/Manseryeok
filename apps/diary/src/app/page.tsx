@@ -17,6 +17,21 @@ import { cachedFortuneContent, getTodayFortune, type FortuneCacheLookup } from "
 import { withLivePersonal } from "@/lib/fortune/live";
 import type { EntryLike } from "@/lib/fortune/personal";
 import { dayGanji } from "@/lib/ganji";
+import { BRANCH_META, STEM_META, type StemHanja } from "@saju/engine";
+
+/** 간지 한자 두 글자를 각자 오행 색으로 (v3.13, 나 화면 나무패와 같은 규칙). 색은 globals.css text-el-* */
+const EL_TEXT: Record<string, string> = { wood: "text-el-wood", fire: "text-el-fire", earth: "text-el-earth", metal: "text-el-metal", water: "text-el-water" };
+function HanjaByElement({ hanja, label }: { hanja: string; label: string }) {
+  const [s, b] = [...hanja];
+  const se = STEM_META[s as StemHanja]?.element;
+  const be = BRANCH_META[b as keyof typeof BRANCH_META]?.element;
+  return (
+    <span className="medal-pair__hanja" lang="zh-Hant" aria-label={label}>
+      <span className={se ? EL_TEXT[se] : undefined}>{s}</span>
+      <span className={be ? EL_TEXT[be] : undefined}>{b}</span>
+    </span>
+  );
+}
 import { shouldShowLinkPrompt } from "@/lib/linkPrompt";
 import { pointStats, streakOf } from "@/lib/stats/extra";
 import { nightCarryDate } from "@/lib/writeNav";
@@ -193,7 +208,7 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
           그림은 이 한 쌍이 전부. 내 쪽 틀은 금색 선(나), 오늘 쪽은 녹갈 선 — 색으로 길흉을 말하지 않는다 */}
       <header className="flex flex-col items-center text-center">
         {/* v3.10: 날짜는 위 한 줄(작게). 간지는 캐릭터 라벨이 말한다. 순번·기록 일수 줄은 뺐다(기록 일수는 나 화면 머리로) */}
-        <h1 className="today-date text-[16px] text-muted">{formatKoreanDate(today)}</h1>
+        <h1 className="today-date">{formatKoreanDate(today)}</h1>
         {savedPast && <SavedPastNotice date={savedPast} label={savedPastLabel} />}
         <div className="medal-pair" aria-label={`나 ${myCharacter.ganjiKo} × 오늘 ${ganji.ko}`}>
           <span className="medal-pair__item">
@@ -202,7 +217,7 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
             </span>
             <span className="medal-pair__label">
               <span className="medal-pair__who">나</span>
-              <span className="medal-pair__hanja" lang="zh-Hant" aria-label={myCharacter.ganjiKo}>{myHanja}</span>
+              <HanjaByElement hanja={myHanja} label={myCharacter.ganjiKo} />
             </span>
           </span>
           <span aria-hidden className="medal-pair__x">
@@ -214,7 +229,7 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
             </span>
             <span className="medal-pair__label">
               <span className="medal-pair__who">오늘</span>
-              <span className="medal-pair__hanja" lang="zh-Hant" aria-label={ganji.ko}>{ganji.hanja}</span>
+              <HanjaByElement hanja={ganji.hanja} label={ganji.ko} />
             </span>
           </span>
         </div>

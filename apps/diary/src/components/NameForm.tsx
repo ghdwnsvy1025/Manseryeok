@@ -47,7 +47,7 @@ export function NameForm({ current }: Props) {
           {state.error}
         </p>
       ) : (
-        <p className="text-sm text-muted">운세 문장·공유 문구·나 화면에 이 이름이 들어가요.</p>
+        <p className="text-sm text-muted">운세 문장, 공유 문구, 나 화면에 이 이름이 들어가요.</p>
       )}
     </form>
   );

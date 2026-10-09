@@ -247,7 +247,7 @@ export function SaveBurst({ ganjiKo, ganjiHanja, cardSrc, characterSrc, happines
         <span className="block font-serif text-[22px] leading-snug text-ink">{ganjiKo}일 카드에 오늘 도장을 찍었어요</span>
         {happiness !== undefined && (
           <span className="burst-caption block">
-            오늘 행복도 {happiness}점을 {ganjiKo}일 카드에 찍었어요{kept && " · 오늘 포인트도 해냈어요"}
+            오늘 행복도 {happiness}점을 {ganjiKo}일 카드에 찍었어요{kept && ". 오늘 포인트도 해냈어요"}
           </span>
         )}
       </p>

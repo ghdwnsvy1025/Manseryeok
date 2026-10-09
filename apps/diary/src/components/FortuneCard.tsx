@@ -54,10 +54,10 @@ function personalLines(fortune: FortuneContent, ganjiKo: string): { main: string
   let mean: number | null = null;
   if (p.sameGanjiCount > 0 && p.sameGanjiMean !== null) {
     mean = p.sameGanjiMean;
-    main = `${ganjiKo}일에 ${p.sameGanjiCount}번 기록 · 평균 ${mean.toFixed(1)}`;
+    main = `${ganjiKo}일 기록 ${p.sameGanjiCount}번 기준`;
   } else if (p.n > 0 && p.mean !== null) {
     mean = p.mean;
-    main = `${stem}${batchim(stem) ? "이나" : "나"} ${branch}${batchim(branch) ? "이" : "가"} 든 날에 ${p.n}번 · 평균 ${mean.toFixed(1)}`;
+    main = `${stem}${batchim(stem) ? "이나" : "나"} ${branch}${batchim(branch) ? "이" : "가"} 든 날 기록 ${p.n}번 기준`;
   } else {
     return { main: "아직 기록이 없어 사주만으로 계산했어요", compare: null, mean: null };
   }
@@ -181,16 +181,15 @@ export function FortuneCard({ fortune, ganjiKo, canVote, vote, defaultOpen }: Pr
                 기록이 없으면 "아직 기록이 없어 사주만으로" 한 줄. 모양은 디자이너(.compare-*) */}
             <PersonalCompare personal={personal} fortune={fortune} />
 
-            {/* 오늘의 신호 (v3.4 → v3.7 라벨 위·문장 아래): 한 상자에 같은 띠지. 영역 = 먹색 테두리, 하면 좋아요 = 금색 면, 피해요 = 먹색 면.
-                화살표는 글자, 색으로 길흉을 말하지 않는다(↓도 ink) */}
+            {/* 오늘의 신호 (v3.4 → v3.13 둘로 나눔): 좋은 쪽(↑ 줄 + → 줄 + 하면 좋아요) = 금빛 면 상자, 조심 쪽(↓ 줄 + 피해요) = 먹빛 면 상자.
+                빨강 없음. 띠지 안 기간·영역 사이 점은 뺐다(간격으로). 모양은 디자이너(.signal-box--good/--care) */}
             <SignalLegend />
-            <ul className="signal-box mt-5 list-none text-[16px] leading-[1.5]">
-              {areas.map((a) => (
-                <li key={`${a.period}-${a.area}`} className="signal-box__row break-keep text-ink/90">
+            {(() => {
+              const row = (a: (typeof areas)[number]) => (
+                <li key={`${a.period}-${a.area}`} className="signal-box__row break-keep text-ink/90" data-signal={a.signal}>
                   <span className="sig sig--line">
                     <span className="text-muted">{a.period}</span>
-                    <span aria-hidden className="mx-1 text-muted">·</span>
-                    <span>{AREA_WORD[a.area]}</span>
+                    <span className="ml-1.5">{AREA_WORD[a.area]}</span>
                     <span aria-hidden className={`ml-1 ${SIGNAL_COLOR[a.signal]}`}>
                       {a.signal}
                     </span>
@@ -198,16 +197,30 @@ export function FortuneCard({ fortune, ganjiKo, canVote, vote, defaultOpen }: Pr
                   </span>
                   <span className="signal-box__text">{a.line}</span>
                 </li>
-              ))}
-              <li className="signal-box__row break-keep">
-                <span className="sig sig--gold">하면 좋아요</span>
-                <span className="signal-box__text">{fortune.do}</span>
-              </li>
-              <li className="signal-box__row break-keep text-ink/85">
-                <span className="sig sig--ink">피해요</span>
-                <span className="signal-box__text">{fortune.dont}</span>
-              </li>
-            </ul>
+              );
+              const up = areas.filter((a) => a.signal === "↑");
+              const flat = areas.filter((a) => a.signal === "→");
+              const down = areas.filter((a) => a.signal === "↓");
+              return (
+                <>
+                  <ul className="signal-box signal-box--good mt-5 list-none text-[16px] leading-[1.5]" aria-label="좋은 쪽">
+                    {up.map(row)}
+                    <li className="signal-box__row break-keep">
+                      <span className="sig sig--gold">하면 좋아요</span>
+                      <span className="signal-box__text">{fortune.do}</span>
+                    </li>
+                    {flat.map(row)}
+                  </ul>
+                  <ul className="signal-box signal-box--care mt-3 list-none text-[16px] leading-[1.5]" aria-label="조심할 쪽">
+                    {down.map(row)}
+                    <li className="signal-box__row break-keep text-ink/85">
+                      <span className="sig sig--ink">피해요</span>
+                      <span className="signal-box__text">{fortune.dont}</span>
+                    </li>
+                  </ul>
+                </>
+              );
+            })()}
 
             {/* 카드 안 붓선은 이 한 곳뿐 — 띠지와 맨 아래(투표·근거) 사이 */}
             <span aria-hidden className="rule rule--light mt-5" />
@@ -237,7 +250,7 @@ export function FortuneCard({ fortune, ganjiKo, canVote, vote, defaultOpen }: Pr
                   아니에요
                 </button>
                 {/* 투표 뒤 한 줄 — 눌린 상태일 때만 */}
-                {vote !== null && <span className="basis-full break-keep text-[14px] text-muted">고마워요, 내일 운세에 반영해요 · 다시 누르면 취소돼요</span>}
+                {vote !== null && <span className="basis-full break-keep text-[14px] text-muted">고마워요, 내일 운세에 반영해요. 다시 누르면 취소돼요.</span>}
               </form>
             )}
 

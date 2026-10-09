@@ -12,6 +12,8 @@ import { countEntries, getSajuProfile, listEntries, listEntriesForStats, listFor
 import { moodTone } from "@/lib/entry";
 import { growingSeries, happinessSeries, moodTop, pointStats, streakOf } from "@/lib/stats/extra";
 import { HappinessChart } from "@/components/HappinessChart";
+import { MonthCalendar } from "@/components/MonthCalendar";
+import { buildMonth, resolveMonth } from "@/lib/calendar";
 import { addDays } from "@/lib/time";
 import { fitPercent } from "@/lib/fortune/personal";
 import { dayGanji } from "@/lib/ganji";
@@ -94,8 +96,8 @@ function PillarCell({ label, info }: { label: string; info: PillarInfo | null })
     <div className="flex flex-col items-center gap-2">
       <div className="wood-tablet pillar flex min-h-[156px] w-full flex-col items-center justify-center gap-1 font-serif text-[28px] leading-none text-ganji">
         {info && <span className={`pillar-god pillar-god--stem font-sans text-[12px] leading-tight ${self ? "font-bold text-gold-ink" : "text-ink"}`}>{info.tenGod}</span>}
-        <span className={info ? ELEMENT_TEXT[info.stemElement] : undefined}>{info ? info.p.stem : "·"}</span>
-        <span className={info ? ELEMENT_TEXT[info.branchElement] : undefined}>{info ? info.p.branch : "·"}</span>
+        <span className={info ? ELEMENT_TEXT[info.stemElement] : undefined}>{info ? info.p.stem : ""}</span>
+        <span className={info ? ELEMENT_TEXT[info.branchElement] : undefined}>{info ? info.p.branch : ""}</span>
         {info && <span className="pillar-god pillar-god--branch font-sans text-[12px] leading-tight text-ink">{info.branchTenGod}</span>}
       </div>
       <span className="text-[13px] text-muted">{label}</span>
@@ -110,13 +112,13 @@ function ElementDetails({ rows }: { rows: { el: ElementKo; pct: number }[] }) {
   return (
     <details className="mt-3">
       <summary className="tap cursor-pointer list-none text-[15px] text-muted underline underline-offset-4 [&::-webkit-details-marker]:hidden">
-        자세히 · 오행 분포
+        자세히
       </summary>
       <ul className="elements mt-2 flex flex-col gap-1.5" aria-label="오행 분포율">
         {rows.map((r) => (
           <li key={r.el} className={`elements__row flex items-center gap-2 text-[14px] ${ELEMENT_TEXT[ELEMENT_KO_TO_EN[r.el]]}`} data-el={ELEMENT_KO_TO_EN[r.el]}>
-            <span className="elements__label w-5 font-serif text-[16px]">{r.el}</span>
-            <span className="elements__track relative h-2 flex-1 overflow-hidden rounded-sm bg-paper-3">
+            <span className="elements__label font-serif">{r.el}</span>
+            <span className="elements__track relative flex-1">
               <span className="elements__fill absolute inset-y-0 left-0 bg-current" style={{ width: `${Math.max(2, r.pct)}%` }} />
             </span>
             <span className={`elements__value w-10 text-right tabular-nums ${r.pct === top ? "font-bold text-ink" : "text-muted"}`}>{r.pct}%</span>
@@ -127,8 +129,8 @@ function ElementDetails({ rows }: { rows: { el: ElementKo; pct: number }[] }) {
   );
 }
 
-export default async function MePage({ searchParams }: { searchParams: Promise<{ cell?: string }> }) {
-  const { cell } = await searchParams;
+export default async function MePage({ searchParams }: { searchParams: Promise<{ cell?: string; view?: string; m?: string }> }) {
+  const { cell, view, m } = await searchParams;
   const { supabase, user } = await getUser();
   // 세션이 아직 없는 첫 요청: 리디렉트하지 않고 뼈대만 그린다. AnonBoot가 곧 새로 그린다 (docs/ANON_START.md 1절, B2)
   if (!user) return <Booting title="나" cards={3} />;
@@ -148,6 +150,7 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
   const share = card ? shareMessage(card) : null;
   const selected = cell !== undefined && /^\d{1,2}$/.test(cell) && Number(cell) < 60 ? Number(cell) : null;
   const todayIndex = dayGanji(today).index;
+  const isCal = view === "cal";
   // 2026-10-09 Q4·Q7: 행복도 말고 보여 줄 지표 + 최근 30일 그래프(운세 점수 겹침, 빈 날은 비움)
   const points = pointStats(all);
   const moods = moodTop(all, 3);
@@ -175,20 +178,24 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
         {/* 제목 자리 = 내 카드 (v3.3 → v3.8 정사각): 폭 54%, 이 화면의 그림 하나. 카드 자체가 테두리를 가지고 있어 틀을 더 두르지 않는다 */}
         <img src={me.cardSrc} alt={`내 카드 ${me.ganjiKo}`} width={1080} height={1080} className="h-auto w-[54%] max-w-[220px]" />
         <h1 className="mt-3 font-serif text-[20px] leading-snug">
-          {profile.name !== "손님" && <>{profile.name} · </>}<span className="text-ganji">{me.ganjiKo}일</span> · {me.animal}
+          {profile.name !== "손님" && <>{profile.name}의 </>}<span className="text-ganji">{me.ganjiKo}일</span>
         </h1>
-        <p className="me-progress mt-1 text-[14px] text-muted">
-          {total > 0 ? `기록 ${total}일째 · 60칸 중 ${filledCells}칸` : "첫 기록을 기다려요 · 60칸 중 0칸"}
-        </p>
-        {/* 익명일 때만: 기록이 이 기기에 묶여 있다는 작은 줄 (전수조사 C "익명 기기 종속 상시 안내") */}
-        {user.is_anonymous && (
-          <p className="mt-1 text-[13px] text-muted">
-            이 기기에만 저장돼요 ·{" "}
-            <Link href="/settings" className="underline underline-offset-4">
-              설정에서 Google 연결
-            </Link>
-          </p>
-        )}
+        {/* v3.13: 점 대신 이름–값 줄맞춤. "이 기기에만 저장돼요"는 설정에만 (2026-10-10) */}
+        <dl className="kv me-progress mt-3 w-full max-w-[260px]">
+          <div className="kv__row">
+            <dt>기록</dt>
+            <dd>{total}일</dd>
+          </div>
+          <div className="kv__row">
+            <dt>모은 카드</dt>
+            <dd>
+              {filledCells} / 60장
+              <span className="kv__bar" aria-hidden>
+                <span style={{ width: `${(filledCells / 60) * 100}%` }} />
+              </span>
+            </dd>
+          </div>
+        </dl>
       </header>
 
       <section className="card-frame card-paper p-5">
@@ -204,7 +211,7 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
               {profile.calendar === "lunar" ? "음력" : "양력"} {profile.birth_year}.{profile.birth_month}.{profile.birth_day}
               {profile.birth_hour !== null
                 ? ` ${String(profile.birth_hour).padStart(2, "0")}:${String(profile.birth_minute).padStart(2, "0")}`
-                : " · 시간 모름"}
+                : " 시간 모름"}
             </p>
             {/* 사주는 오른쪽에서 왼쪽으로 읽는다: 시 · 일 · 월 · 년 */}
             <div className="mt-4 grid grid-cols-4 gap-2">
@@ -222,16 +229,31 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
 
       <section className="flex flex-col gap-4">
         <div>
-          <h2 className="font-serif text-[22px]">간지별 내 행복도</h2>
-          <p className="mt-1 text-sm text-muted">60가지 날 가운데 나는 어떤 날에 행복했는지. 기록한 날의 동물이 칸에 찍혀요.</p>
+          <h2 className="font-serif text-[22px]">내 행복도</h2>
+          {/* v3.13 Q6 = B: 같은 자리에서 60갑자 / 달력 전환 (링크, JS 없음). 모양은 디자이너(.view-switch) */}
+          <nav className="view-switch mt-2" aria-label="보기">
+            <Link href="/me" scroll={false} aria-current={isCal ? undefined : "page"} className="view-switch__item">
+              60갑자
+            </Link>
+            <Link href="/me?view=cal" scroll={false} aria-current={isCal ? "page" : undefined} className="view-switch__item">
+              달력
+            </Link>
+          </nav>
+          <p className="mt-2 text-sm text-muted">
+            {isCal ? "날마다 남긴 행복도가 도장으로 찍혀요. 날짜를 누르면 그날 기록으로 가요." : "60가지 날 가운데 나는 어떤 날에 행복했는지. 기록한 날의 동물이 칸에 찍혀요."}
+          </p>
         </div>
-        <GanjiGrid
-          cells={cells}
-          selected={selected}
-          todayIndex={todayIndex}
-          basePath="/me"
-          pickedEntries={selected === null ? [] : all.filter((e) => e.day_ganji_index === selected)}
-        />
+        {isCal ? (
+          <MonthCalendar cal={buildMonth(resolveMonth(m, today), all, today)} />
+        ) : (
+          <GanjiGrid
+            cells={cells}
+            selected={selected}
+            todayIndex={todayIndex}
+            basePath="/me"
+            pickedEntries={selected === null ? [] : all.filter((e) => e.day_ganji_index === selected)}
+          />
+        )}
         <StatsSummary h={h} fitPercent={fitPercent(all.length)} stems={byStem(all)} branches={byBranch(all)} elements={byElement(all)} points={points} moods={moods} streak={streak} chart={<HappinessChart series={series} />} />
       </section>
 
@@ -257,7 +279,7 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
                   <span className="w-9 shrink-0 pt-0.5 text-center font-serif text-[24px] leading-none">{e.happiness}</span>
                   <span className="min-w-0 flex-1">
                     <span className="block text-[15px]">
-                      {formatKoreanDate(e.entry_date)} · <span className="text-ganji">{e.day_stem}{e.day_branch}일</span>
+                      {formatKoreanDate(e.entry_date)} <span className="ml-1.5 text-ganji">{e.day_stem}{e.day_branch}일</span>
                     </span>
                     {e.note ? (
                       <span className="mt-0.5 block truncate font-hand text-[20px] leading-snug text-ink">{e.note}</span>
