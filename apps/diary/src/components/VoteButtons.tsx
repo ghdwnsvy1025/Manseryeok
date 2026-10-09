@@ -38,7 +38,7 @@ export function VoteButtons({ date, initial }: { date: string; initial: 1 | -1 |
   };
 
   return (
-    <div className="vote mt-4 flex flex-wrap items-center gap-2 text-sm text-muted" data-voted={vote !== null ? "" : undefined}>
+    <div id="fortune-vote" className="vote mt-4 flex flex-wrap items-center gap-2 text-sm text-muted" data-voted={vote !== null ? "" : undefined}>
       <span className="mr-1">오늘과 맞았어요?</span>
       <button type="button" aria-pressed={vote === 1} onClick={() => press(1)} className="vote__btn">
         맞아요

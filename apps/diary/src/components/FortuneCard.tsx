@@ -1,5 +1,6 @@
 import { BRANCHES, BRANCHES_KO, STEMS, STEMS_KO } from "@saju/engine";
 import { VoteButtons } from "@/components/VoteButtons";
+import { FortuneShareButton } from "@/components/FortuneShareButton";
 import { SignalLegend } from "@/components/SignalLegend";
 import { AREA_WORD } from "@/lib/fortune/core";
 import type { AreaSignal, FortuneContent } from "@/lib/fortune/types";
@@ -167,7 +168,11 @@ export function FortuneCard({ fortune, ganjiKo, canVote, vote, defaultOpen }: Pr
       <div className="fortune-body">
         <div>
           <div className="px-5 pb-5">
-            <h2 className="border-l-2 border-gold pl-3 font-serif text-[24px] leading-snug">{fortune.headline}</h2>
+            {/* v3.16: 헤드라인 줄 오른쪽에 "공유" (오늘의 운세 한 장). summary 밖이라 눌러도 카드가 접히지 않는다 */}
+            <div className="flex items-start justify-between gap-3">
+              <h2 className="border-l-2 border-gold pl-3 font-serif text-[24px] leading-snug">{fortune.headline}</h2>
+              <FortuneShareButton date={fortune.date} ganjiKo={ganjiKo} band={fortune.band} score={fortune.score} headline={fortune.headline} />
+            </div>
             {/* 본문 2~3문단 (v3.7). 문단 사이 12px, 들여쓰기 없음 */}
             <div className="mt-3 flex flex-col gap-3 text-[16px] leading-[1.7] text-ink/90">
               {paragraphs.map((p, i) => (

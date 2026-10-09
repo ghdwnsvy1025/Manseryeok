@@ -281,3 +281,17 @@ export async function setRemindHourAction(form: FormData): Promise<void> {
   }
   revalidatePath("/settings");
 }
+
+/**
+ * 공유 버튼으로 공유를 마친 횟수만 남긴다 (v3.16). 누가 눌렀는지는 저장하지 않는다 (종류, 방법, 시각뿐).
+ * 테이블(0004_share_events.sql)이 아직 없거나 실패해도 사용자에겐 영향이 없게 조용히 넘어간다.
+ */
+export async function recordShareAction(kind: "fortune", method: "image" | "link" | "download"): Promise<void> {
+  if (kind !== "fortune" || !["image", "link", "download"].includes(method)) return;
+  try {
+    const { error } = await adminClient().from("night_share_events").insert({ kind, method });
+    if (error) console.warn("공유 횟수 기록 실패", error.message);
+  } catch (e) {
+    console.warn("공유 횟수 기록 실패", e instanceof Error ? e.message : e);
+  }
+}

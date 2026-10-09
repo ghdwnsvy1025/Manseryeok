@@ -1,29 +1,28 @@
 import Link from "next/link";
 import { characterOfGanji } from "@/lib/character";
 import { moodTone } from "@/lib/entry";
-import { dayGanji } from "@/lib/ganji";
-import { formatKoreanDate } from "@/lib/time";
 
 interface Props {
   date: string;
+  /** 그날 간지 한글 ("병진") — 서버가 계산해 넘긴다(클라이언트에서 엔진을 부르지 않게) */
+  ganjiKo: string;
   entry: { happiness: number; moods: string[]; note: string | null } | null;
 }
 
 /**
- * 달력에서 고른 날의 상세 (v3.14, 2026-10-10 Q7 = A). 그날 간지의 정사각 카드 + 행복도 도장 + 기분 띠지 + 한 줄 메모 + "고치기".
- * 기록이 없으면 흐린 카드 + "이 날 기록하기"(금색 면 버튼 — 이 섹션에서만). 모양은 디자이너(.day-detail*).
+ * 달력에서 고른 날의 상세 (v3.14 → v3.15). 머리는 간지 이름만("병진", 2026-10-10 Q3 = B — 날짜는 고른 칸 테두리가 말한다).
+ * 정사각 카드 + 행복도 도장 + 기분 띠지 + 한 줄 메모 + "고치기". 기록이 없으면 흐린 카드 + "이 날 기록하기".
+ * 서버·클라이언트 어디서든 그릴 수 있는 순수 컴포넌트(CalendarView가 클라이언트에서 쓴다). 모양은 디자이너(.day-detail*).
  */
-export function CalendarDayDetail({ date, entry }: Props) {
-  const g = dayGanji(date);
-  const card = characterOfGanji(g.ko);
-  const label = formatKoreanDate(date);
+export function CalendarDayDetail({ date, ganjiKo, entry }: Props) {
+  // 간지가 없으면(예상 밖 날짜) 그리지 않는다 — 이전 핫 리로드에서 characterOfGanji(undefined)로 터진 적이 있다
+  if (!ganjiKo) return null;
+  const card = characterOfGanji(ganjiKo);
   return (
-    <section className="day-detail mt-4" aria-label={`${label} 기록`}>
-      <p className="day-detail__date">
-        {label} <span className="text-ganji">{g.ko}일</span>
-      </p>
+    <section className="day-detail mt-4" aria-label={`${date} ${ganjiKo}일 기록`}>
+      <p className="day-detail__date text-ganji">{ganjiKo}</p>
       <div className="day-detail__card" data-empty={entry ? undefined : ""}>
-        <img src={card.cardSrc} alt={`${g.ko} 카드`} width={1080} height={1080} className="h-auto w-full" />
+        <img src={card.cardSrc} alt={`${ganjiKo} 카드`} width={1080} height={1080} className="h-auto w-full" />
         {entry && (
           <span className="day-detail__stamp" style={{ "--h": (entry.happiness - 1) / 9 } as React.CSSProperties} aria-label={`행복도 ${entry.happiness}`}>
             {entry.happiness}

@@ -4,16 +4,13 @@ import { BRANCH_META, ELEMENT_ORDER, STEM_META, calculateElementDistribution, ca
 import { getUser } from "@/lib/supabase/server";
 import { GanjiGrid } from "@/components/GanjiGrid";
 import { Booting } from "@/components/Booting";
-import { ShareCard } from "@/components/ShareCard";
-import { shareCardText, shareMessage } from "@/lib/share";
 import { characterOf, characterOfGanji } from "@/lib/character";
 import { StatsSummary } from "@/components/StatsSummary";
-import { countEntries, getEntry, getSajuProfile, listEntries, listEntriesForStats, listFortuneScores } from "@/lib/db";
+import { countEntries, getSajuProfile, listEntriesInMonth, listEntries, listEntriesForStats, listFortuneScores } from "@/lib/db";
 import { moodTone } from "@/lib/entry";
 import { growingSeries, happinessSeries, moodTop, pointStats, streakOf } from "@/lib/stats/extra";
 import { HappinessChart } from "@/components/HappinessChart";
-import { MonthCalendar } from "@/components/MonthCalendar";
-import { CalendarDayDetail } from "@/components/CalendarDayDetail";
+import { MonthCalendar, type DayInfo } from "@/components/MonthCalendar";
 import { buildMonth, resolveMonth } from "@/lib/calendar";
 import { addDays } from "@/lib/time";
 import { fitPercent } from "@/lib/fortune/personal";
@@ -136,26 +133,34 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
   // 세션이 아직 없는 첫 요청: 리디렉트하지 않고 뼈대만 그린다. AnonBoot가 곧 새로 그린다 (docs/ANON_START.md 1절, B2)
   if (!user) return <Booting title="나" cards={3} />;
   const today = todayKST();
-  const [profile, entries, total, all, fortuneScores] = await Promise.all([
+  // 달력: 보여 줄 달(?d가 있으면 그 달). 그 달 기록을 한 번에 받아 날짜 상세를 클라이언트에서 바로 그린다 (v3.15)
+  const dParam = d && /^\d{4}-\d{2}-\d{2}$/.test(d) && d <= today ? d : null;
+  const calYm = resolveMonth(dParam ? dParam.slice(0, 7) : m, today);
+  const [profile, entries, total, all, fortuneScores, monthEntries] = await Promise.all([
     getSajuProfile(supabase, user.id),
     listEntries(supabase, user.id, 30),
     countEntries(supabase, user.id),
     listEntriesForStats(supabase, user.id),
     listFortuneScores(supabase, user.id, addDays(today, -29)),
+    listEntriesInMonth(supabase, user.id, calYm),
   ]);
   // 생년월일이 없으면 먼저 받는다 (로그인 사용자와 같은 규칙)
   if (!profile) redirect("/onboarding?next=/me");
   const me = characterOf(profile.pillars);
   const h = highlights(all);
-  const card = shareCardText(h, profile?.name ?? null);
-  const share = card ? shareMessage(card) : null;
   const selected = cell !== undefined && /^\d{1,2}$/.test(cell) && Number(cell) < 60 ? Number(cell) : null;
   const todayIndex = dayGanji(today).index;
   // v3.14 Q6: 기본은 달력. 60갑자는 ?view=grid (칸 선택 ?cell=이 있으면 60갑자)
   const isCal = view !== "grid" && cell === undefined;
-  // 달력에서 고른 날 (미래·형식 오류는 무시)
-  const pickedDay = isCal && d && /^\d{4}-\d{2}-\d{2}$/.test(d) && d <= today ? d : null;
-  const pickedEntry = pickedDay ? await getEntry(supabase, user.id, pickedDay) : null;
+  const pickedDay = isCal ? dParam : null;
+  const calMonth = buildMonth(calYm, all, today);
+  const calDays: Record<string, DayInfo> = {};
+  const byDate = new Map(monthEntries.map((e) => [e.entry_date, e]));
+  for (const c of calMonth.weeks.flat()) {
+    if (!c.date || c.isFuture) continue;
+    const e = byDate.get(c.date);
+    calDays[c.date] = { ganjiKo: dayGanji(c.date).ko, entry: e ? { happiness: e.happiness, moods: e.moods, note: e.note } : null };
+  }
   // 2026-10-09 Q4·Q7: 행복도 말고 보여 줄 지표 + 최근 30일 그래프(운세 점수 겹침, 빈 날은 비움)
   const points = pointStats(all);
   const moods = moodTop(all, 3);
@@ -203,9 +208,26 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
         </dl>
       </header>
 
-      <section className="card-frame card-paper p-5">
-        <div className="flex items-baseline justify-between">
+      {/* v3.15 Q1 = A: 접힌 상태가 기본. 제목 줄에 여덟 글자(시·일·월·년, 오행 색) 미리보기, 누르면 생년월일·나무패·오행 분포. 모양은 디자이너(.saju-fold*) */}
+      <details className="saju-fold card-frame card-paper p-5">
+        <summary className="saju-fold__summary flex cursor-pointer list-none items-center justify-between gap-3 [&::-webkit-details-marker]:hidden">
           <h2 className="font-serif text-[22px]">내 사주</h2>
+          <span className="saju-fold__preview font-serif text-[17px]" lang="zh-Hant" aria-label="내 사주 여덟 글자">
+            {infos.map((info, k) =>
+              info ? (
+                <span key={k} className="saju-fold__pillar">
+                  <span className={ELEMENT_TEXT[info.stemElement]}>{info.p.stem}</span>
+                  <span className={ELEMENT_TEXT[info.branchElement]}>{info.p.branch}</span>
+                </span>
+              ) : (
+                <span key={k} className="saju-fold__pillar text-muted">
+                  ??
+                </span>
+              ),
+            )}
+          </span>
+        </summary>
+        <div className="mt-3 flex justify-end">
           <Link href="/onboarding?next=/me" className="tap text-sm text-muted underline underline-offset-4">
             {profile ? "고치기" : "넣기"}
           </Link>
@@ -230,7 +252,7 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
         ) : (
           <p className="mt-2 text-[15px] text-muted">생년월일을 넣으면 내 사주와 운세가 보여요.</p>
         )}
-      </section>
+      </details>
 
       <section className="flex flex-col gap-4">
         <div>
@@ -249,10 +271,7 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
           </p>
         </div>
         {isCal ? (
-          <>
-            <MonthCalendar cal={buildMonth(resolveMonth(pickedDay ? pickedDay.slice(0, 7) : m, today), all, today)} selected={pickedDay} />
-            {pickedDay && <CalendarDayDetail date={pickedDay} entry={pickedEntry ? { happiness: pickedEntry.happiness, moods: pickedEntry.moods, note: pickedEntry.note } : null} />}
-          </>
+          <MonthCalendar cal={calMonth} days={calDays} initialSelected={pickedDay} today={today} />
         ) : (
           <GanjiGrid
             cells={cells}
@@ -264,10 +283,7 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
         )}
         <StatsSummary h={h} fitPercent={fitPercent(all.length)} stems={byStem(all)} branches={byBranch(all)} elements={byElement(all)} points={points} moods={moods} streak={streak} chart={<HappinessChart series={series} />} />
       </section>
-
-      <section className="flex flex-col gap-3">
-        <ShareCard card={card} cardSrc={me.cardSrc} title={share?.title ?? ""} text={share?.text ?? ""} />
-      </section>
+      {/* v3.16: "내 카드 공유" 섹션은 없앴다 — 공유는 오늘 화면 운세 카드의 "공유"(오늘의 운세 한 장)로 */}
 
       <section>
         <div className="flex items-baseline justify-between">

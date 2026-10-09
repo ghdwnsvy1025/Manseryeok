@@ -173,7 +173,7 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
       sameGanjiTimes={sameGanjiTimes}
       metCards={metCards}
       streak={streak.current}
-      pointRate={points.rate}
+      points={points.answered ? { kept: points.kept, answered: points.answered } : null}
       justSaved={saved === today}
     />
   ) : (

@@ -147,9 +147,11 @@ export function SaveBurst({ ganjiKo, ganjiHanja, cardSrc, characterSrc, happines
       } catch {
         /* 주소를 못 고쳐도 화면은 닫힌다 */
       }
+      // v3.15 Q6 = A: 하루를 쓴 직후가 "오늘과 맞았어요?"에 답하기 가장 좋은 때 — 운세 카드의 투표로 내려 준다 (없으면 그대로)
+      if (!reveal) document.getElementById("fortune-vote")?.scrollIntoView({ behavior: reduced ? "auto" : "smooth", block: "center" });
     }, reduced ? 0 : 200);
     return () => window.clearTimeout(t);
-  }, [phase]);
+  }, [phase, reveal]);
 
   // save 모드만 숨김 상태가 있다. reveal은 처음부터 실루엣을 그린다(첫 그림이 비면 안 된다)
   if (!reveal && phase === "hidden") return null;

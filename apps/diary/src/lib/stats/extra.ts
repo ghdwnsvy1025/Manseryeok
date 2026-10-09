@@ -26,6 +26,8 @@ export interface PointStats {
   /** 해본 날 평균 행복도 / 못 한 날 평균 행복도 */
   keptMean: number | null;
   missedMean: number | null;
+  /** v3.15: 최근 답 7개(최신 → 오래된). 도장 점 줄 */
+  recent: ("kept" | "missed")[];
 }
 
 /** 오늘의 포인트("하면 좋아요")를 해본 비율과, 해본 날·못 한 날의 행복도 */
@@ -39,6 +41,11 @@ export function pointStats(entries: StatEntry[]): PointStats {
     rate: answered ? Math.round((100 * kept.length) / answered) : null,
     keptMean: mean(kept.map((e) => e.happiness)),
     missedMean: mean(missed.map((e) => e.happiness)),
+    recent: entries
+      .filter((e) => e.promise === "kept" || e.promise === "missed")
+      .sort((a, b) => (a.entry_date < b.entry_date ? 1 : -1))
+      .slice(0, 7)
+      .map((e) => e.promise as "kept" | "missed"),
   };
 }
 

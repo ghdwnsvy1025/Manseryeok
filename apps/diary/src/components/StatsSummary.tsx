@@ -107,23 +107,28 @@ export function StatsSummary({ h, fitPercent, stems, branches, elements, points,
             </span>
             <span className="metric__sub">최고 {streak.best}일</span>
           </li>
-          <li className="metric">
-            {/* v3.14 Q4 = A: "포인트 해봄" → "해 본 비율" + 무엇을 해 봤는지 */}
-            <span className="metric__label">
-              해 본 비율
-              <span className="metric__hint">&ldquo;하면 좋아요&rdquo;</span>
-            </span>
+          <li className="metric metric--points">
+            {/* v3.15 Q4 = A: 제목 "하면 좋아요", 큰 숫자 "3/5일", 최근 7번 답을 도장 점으로(해봤어요 = 찍힌 점, 못 했어요 = 빈 점). 퍼센트 없음 */}
+            <span className="metric__label">하면 좋아요</span>
             <span className="metric__value">
-              {points.rate === null ? "–" : points.rate}
-              {points.rate !== null && <small>%</small>}
+              {points.answered ? (
+                <>
+                  {points.kept}
+                  <small>/{points.answered}일</small>
+                </>
+              ) : (
+                "–"
+              )}
             </span>
-            <span className="metric__sub">
-              {points.answered === 0
-                ? "아직 답한 날 없음"
-                : points.keptMean !== null && points.missedMean !== null
-                  ? <>해본 날 {points.keptMean}<br />못 한 날 {points.missedMean}</>
-                  : `${points.kept}/${points.answered}일`}
-            </span>
+            {points.recent.length > 0 ? (
+              <span className="metric__dots" aria-label={`최근 ${points.recent.length}번 중 ${points.recent.filter((r) => r === "kept").length}번 해봤어요`}>
+                {[...points.recent].reverse().map((r, k) => (
+                  <span key={k} className="metric__dot" data-kept={r === "kept" ? "" : undefined} />
+                ))}
+              </span>
+            ) : (
+              <span className="metric__sub">아직 답한 날 없음</span>
+            )}
           </li>
           <li className="metric metric--moods">
             <span className="metric__label">자주 고른 기분</span>

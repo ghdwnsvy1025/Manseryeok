@@ -10,7 +10,7 @@ const e = (entry_date: string, happiness: number, extra: Partial<{ moods: string
 describe("pointStats", () => {
   it("해당 없음은 빼고 비율을 낸다", () => {
     const s = pointStats([e("2026-10-01", 8, { promise: "kept" }), e("2026-10-02", 4, { promise: "missed" }), e("2026-10-03", 6, { promise: "na" }), e("2026-10-04", 7)]);
-    expect(s).toEqual({ answered: 2, kept: 1, rate: 50, keptMean: 8, missedMean: 4 });
+    expect(s).toEqual({ answered: 2, kept: 1, rate: 50, keptMean: 8, missedMean: 4, recent: ["missed", "kept"] });
   });
   it("답한 날이 없으면 rate null", () => {
     expect(pointStats([e("2026-10-01", 5)]).rate).toBeNull();

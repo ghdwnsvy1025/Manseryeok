@@ -13,8 +13,8 @@ interface Props {
   metCards: number;
   /** 연속 기록 일수 */
   streak: number;
-  /** 포인트 해본 비율(0~100). 답한 날이 없으면 null */
-  pointRate: number | null;
+  /** "하면 좋아요" 해 본 날 / 답한 날 (v3.15). 답한 날이 없으면 null */
+  points: { kept: number; answered: number } | null;
   /** 방금 저장하고 돌아왔는지 — "저장했어요" 줄이 150ms 늦게 나타난다 */
   justSaved: boolean;
 }
@@ -34,7 +34,7 @@ const ORDINAL = ["", "첫", "두", "세", "네", "다섯", "여섯", "일곱", "
  * 메모는 괘선 두 줄 사이에 손글씨로 — 없으면 괘선째 생략. 포인트 줄은 있을 때만.
  * 맨 아래 두 줄 (2026-10-09 Q4 = C, 내일 간지 대신): 카드 획득 / 지표. 모양은 디자이너(.entry-news*).
  */
-export function TodayEntryCard({ entry, today, ganjiKo, sameGanjiTimes, metCards, streak, pointRate, justSaved }: Props) {
+export function TodayEntryCard({ entry, today, ganjiKo, sameGanjiTimes, metCards, streak, points, justSaved }: Props) {
   const promise = entry.promise ? PROMISE_LINE[entry.promise] : null;
   const nth = sameGanjiTimes <= 10 ? `${ORDINAL[sameGanjiTimes]} 번째` : `${sameGanjiTimes}번째`;
   const cardLine = sameGanjiTimes <= 1 ? `${ganjiKo} 카드를 처음 만났어요` : `${ganjiKo} 카드에 ${nth} 도장을 찍었어요`;
@@ -100,7 +100,7 @@ export function TodayEntryCard({ entry, today, ganjiKo, sameGanjiTimes, metCards
         </dl>
         <ul className="entry-news__chips" aria-label="지표">
           <li className="chip">연속 {streak}일</li>
-          {pointRate !== null && <li className="chip">해 본 비율 {pointRate}%</li>}
+          {points && <li className="chip">하면 좋아요 {points.kept}/{points.answered}</li>}
         </ul>
       </div>
     </section>

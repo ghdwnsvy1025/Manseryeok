@@ -2129,3 +2129,203 @@ input:checked + .tag[data-tone="neg"] {
   line-height: 1.35;
   color: var(--color-muted);
 }
+
+/* ── v3.15 달력 단계 색 · 오늘 도장 꽝 · 내 사주 접기 · "하면 좋아요" 점 줄 (명세 16) ─────────────
+   빨강 없음, 틀 안의 틀 없음, 가운뎃점 없음. 새 그림 없음(키트 stamp-inked-red는 모양 mask로만, gold-wash 재사용) */
+
+/* 날짜 칸이 버튼이 되었다: 기본 버튼 모양을 지우고 칸 모양은 .cal__cell 그대로 */
+button.cal__cell {
+  appearance: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-height: 44px;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* 도장 면 = 단계 색. 모양(가장자리 번짐)은 stamp-inked-red의 알파를 mask로 빌린다 — 인주 빨강은 보이지 않는다 */
+.cal__cell[data-has]::before {
+  background: var(--stamp-face, var(--color-gold));
+  opacity: 1;
+  -webkit-mask: url("/ui/stamp-inked-red-clean.png") center / 122% 122% no-repeat;
+  mask: url("/ui/stamp-inked-red-clean.png") center / 122% 122% no-repeat;
+}
+.cal__cell[data-tier="high"] {
+  --stamp-face: var(--color-gold) url("/ui/gold-wash.webp") center / 256px 256px;
+  --stamp-num: var(--color-ink);
+  --stamp-day: color-mix(in srgb, var(--color-ink) 65%, transparent);
+}
+.cal__cell[data-tier="mid"] {
+  --stamp-face: color-mix(in srgb, var(--color-frame) 28%, var(--color-paper-2));
+  --stamp-num: var(--color-ink);
+  --stamp-day: var(--color-muted);
+}
+.cal__cell[data-tier="low"] {
+  --stamp-face: color-mix(in srgb, var(--color-sky) 82%, var(--color-paper-2));
+  --stamp-num: var(--color-paper-2);
+  --stamp-day: color-mix(in srgb, var(--color-paper-2) 70%, transparent);
+}
+.cal__cell[data-tier] .cal__stamp {
+  color: var(--stamp-num);
+}
+.cal__cell[data-tier="high"] .cal__stamp {
+  font-weight: 700;
+}
+.cal__cell[data-tier] .cal__day {
+  color: var(--stamp-day);
+}
+
+/* 오늘 칸 도장 꽝 — 이 세션에서 처음 볼 때 한 번 */
+.cal__cell[data-stamp-in]::before,
+.cal__cell[data-stamp-in] .cal__stamp {
+  animation: cal-stamp-in 420ms cubic-bezier(0.3, 0.7, 0.4, 1) both;
+}
+@keyframes cal-stamp-in {
+  0% {
+    transform: scale(1.25);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(0.95);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cal__cell[data-stamp-in]::before,
+  .cal__cell[data-stamp-in] .cal__stamp {
+    animation: none;
+  }
+}
+
+/* 날짜 상세: 머리는 간지 이름만(송명 24px 남색 가운데), 도장은 금빛 하나(상세엔 단계가 없다) */
+.day-detail__date {
+  margin: 0 0 12px;
+  font-size: 24px;
+  line-height: 1.25;
+  color: var(--color-ganji);
+}
+.day-detail__stamp {
+  color: var(--color-ink);
+  font-weight: 700;
+}
+.day-detail__stamp::before {
+  background: var(--color-gold) url("/ui/gold-wash.webp") center / 256px 256px;
+  opacity: 1;
+  -webkit-mask: url("/ui/stamp-inked-red-clean.png") center / contain no-repeat;
+  mask: url("/ui/stamp-inked-red-clean.png") center / contain no-repeat;
+}
+
+/* 내 사주 접기: 한 줄 summary — 제목 / 여덟 글자 미리보기 / ▾ */
+.saju-fold__summary {
+  min-height: 44px;
+}
+.saju-fold__summary h2 {
+  flex: none;
+  margin: 0;
+  line-height: 1.2;
+}
+.saju-fold__preview {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+.saju-fold__pillar {
+  display: inline-flex;
+}
+.saju-fold__summary::after {
+  content: "";
+  flex: none;
+  width: 14px;
+  height: 14px;
+  background: var(--color-muted);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 14' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 5.5l4 4 4-4'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 14' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 5.5l4 4 4-4'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+.saju-fold[open] > .saju-fold__summary::after {
+  transform: rotate(180deg);
+}
+
+/* "하면 좋아요" 값 단위와 점 줄 — 금빛 찍힌 점 / 녹갈 빈 점 */
+.metric--points .metric__value small {
+  font-size: 13px;
+  color: var(--color-muted);
+}
+.metric__dots {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 3.5px; /* 7개 = 87px가 375px 칸 안쪽(86px)을 1px 넘어서 반 픽셀 줄였다 */
+  margin-top: 6px;
+}
+.metric__dot {
+  flex: none;
+  width: 9px;
+  height: 9px;
+  border-radius: 9999px;
+  box-shadow: inset 0 0 0 1px var(--color-frame);
+}
+.metric__dot[data-kept] {
+  background: var(--color-gold) url("/ui/gold-wash.webp") center / 64px 64px;
+  box-shadow: none;
+}
+
+/* v3.16 운세 카드 "공유" (명세 17): 글자 링크보다 조금 또렷한 녹갈 1px pill. 금색 면 금지(화면당 금 면 하나).
+   보이는 높이 32px, 손가락 자리 44px는 ::after로 위아래 6px씩 늘린다(.tap의 min-height·음수 여백은 여기서 끈다). */
+.share-btn-wrap {
+  position: relative;
+  flex-shrink: 0;
+  display: inline-flex;
+  margin-top: 2px; /* 헤드라인 첫 줄(24px × 1.375)과 가운데를 맞춘다 */
+}
+.share-btn.tap {
+  position: relative;
+  min-height: 32px;
+  height: 32px;
+  margin-inline: 0;
+  padding: 0 12px 0 10px;
+  gap: 5px;
+  border: 1px solid var(--color-frame);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--color-ink);
+  font-size: 13px;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.share-btn::before {
+  content: "";
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  background: currentColor;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 14' fill='none' stroke='%23000' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M7 1.5v7.5M4.2 4.2 7 1.5l2.8 2.7'/%3E%3Cpath d='M4.5 6.5H3v6h8v-6H9.5'/%3E%3C/svg%3E") center / 14px 14px no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 14' fill='none' stroke='%23000' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M7 1.5v7.5M4.2 4.2 7 1.5l2.8 2.7'/%3E%3Cpath d='M4.5 6.5H3v6h8v-6H9.5'/%3E%3C/svg%3E") center / 14px 14px no-repeat;
+}
+.share-btn::after {
+  content: "";
+  position: absolute;
+  inset: -7px 0;
+}
+.share-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.share-btn__note {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  font-size: 12px;
+  line-height: 1.3;
+  color: var(--color-muted);
+  white-space: nowrap;
+  pointer-events: none;
+}
