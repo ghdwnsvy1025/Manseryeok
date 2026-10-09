@@ -1,13 +1,20 @@
 import Link from "next/link";
-import { characterOfGanji } from "@/lib/character";
-import type { Promise_ } from "@/lib/entry";
+import { moodTone, type Promise_ } from "@/lib/entry";
 
 interface Props {
   entry: { happiness: number; moods: string[]; note: string | null; promise?: Promise_ | null };
   /** 오늘 날짜 (고치기 링크) */
   today: string;
-  /** 내일 간지 한글 ("계축") */
-  tomorrowKo: string;
+  /** 오늘 간지 한글 ("을묘") — 카드 획득 줄 */
+  ganjiKo: string;
+  /** 오늘 간지로 기록한 횟수(오늘 포함). 1이면 처음 만난 카드 */
+  sameGanjiTimes: number;
+  /** 지금까지 만난 카드 수(기록이 있는 간지 수, 60장 중) */
+  metCards: number;
+  /** 연속 기록 일수 */
+  streak: number;
+  /** 포인트 해본 비율(0~100). 답한 날이 없으면 null */
+  pointRate: number | null;
   /** 방금 저장하고 돌아왔는지 — "저장했어요" 줄이 150ms 늦게 나타난다 */
   justSaved: boolean;
 }
@@ -19,15 +26,21 @@ const PROMISE_LINE: Record<Promise_, { word: string; dot: string | null }> = {
   na: { word: "해당 없음", dot: null },
 };
 
+const ORDINAL = ["", "첫", "두", "세", "네", "다섯", "여섯", "일곱", "여덟", "아홉", "열"];
+
 /**
- * 오늘의 기록 — 일기장의 오늘 페이지 (톤 v3 → 02 v3.7).
- * 숫자가 주인공: 행복도 Song Myung 56px 가운데, 아래 "행복도" 11px. 기분 띠지도 가운데.
- * 메모는 괘선 두 줄 사이에 손글씨로 — 없으면 괘선째 생략. 약속 줄은 있을 때만. 맨 아래 내일 간지 + 동물.
- * 표시만 한다. 데이터는 page.tsx가 읽은 값을 그대로 받는다.
+ * 오늘의 기록 — 일기장의 오늘 페이지 (톤 v3 → 02 v3.7 → v3.12).
+ * 숫자가 주인공: 행복도 Song Myung 56px 가운데. 기분 띠지는 data-tone(긍정 금빛 · 무덤덤 · 부정 남색).
+ * 메모는 괘선 두 줄 사이에 손글씨로 — 없으면 괘선째 생략. 포인트 줄은 있을 때만.
+ * 맨 아래 두 줄 (2026-10-09 Q4 = C, 내일 간지 대신): 카드 획득 / 지표. 모양은 디자이너(.entry-news*).
  */
-export function TodayEntryCard({ entry, today, tomorrowKo, justSaved }: Props) {
+export function TodayEntryCard({ entry, today, ganjiKo, sameGanjiTimes, metCards, streak, pointRate, justSaved }: Props) {
   const promise = entry.promise ? PROMISE_LINE[entry.promise] : null;
-  const tomorrow = characterOfGanji(tomorrowKo);
+  const cardLine =
+    sameGanjiTimes <= 1
+      ? `${ganjiKo} 카드를 처음 만났어요 · 60장 중 ${metCards}장`
+      : `${ganjiKo} 카드에 ${ORDINAL[sameGanjiTimes] ?? `${sameGanjiTimes}번째`}${sameGanjiTimes <= 10 ? " 번째" : ""} 도장 · 60장 중 ${metCards}장`;
+  const metricLine = [`연속 ${streak}일째`, pointRate !== null ? `포인트 해본 비율 ${pointRate}%` : null].filter(Boolean).join(" · ");
   return (
     <section className="card-frame card-paper p-5">
       {justSaved && <p className="saved-line mb-2 text-sm font-bold text-gold">저장했어요</p>}
@@ -47,7 +60,7 @@ export function TodayEntryCard({ entry, today, tomorrowKo, justSaved }: Props) {
       {entry.moods.length > 0 && (
         <ul className="mt-3 flex flex-wrap justify-center gap-2" aria-label="기분">
           {entry.moods.map((m) => (
-            <li key={m} className="tag tag--on h-8 px-1 text-[14px] text-paper-2">
+            <li key={m} data-tone={moodTone(m)} className="tag tag--on h-8 px-1 text-[14px] text-paper-2">
               {m}
             </li>
           ))}
@@ -70,10 +83,12 @@ export function TodayEntryCard({ entry, today, tomorrowKo, justSaved }: Props) {
         </p>
       )}
 
-      <p className={`${promise ? "mt-2" : "mt-4"} text-[17px]`}>
-        내일은 <b className="font-serif font-normal text-ganji">{tomorrowKo}일</b>
-        {tomorrow.animal && <> · {tomorrow.animal}의 날</>}이에요
-      </p>
+      <div className={`entry-news ${promise ? "mt-3" : "mt-4"}`}>
+        <p className="entry-news__card" data-first={sameGanjiTimes <= 1 ? "" : undefined}>
+          {cardLine}
+        </p>
+        <p className="entry-news__metric">{metricLine}</p>
+      </div>
     </section>
   );
 }

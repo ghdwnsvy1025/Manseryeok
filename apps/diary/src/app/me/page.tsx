@@ -9,7 +9,8 @@ import { shareCardText, shareMessage } from "@/lib/share";
 import { characterOf, characterOfGanji } from "@/lib/character";
 import { StatsSummary } from "@/components/StatsSummary";
 import { countEntries, getSajuProfile, listEntries, listEntriesForStats, listFortuneScores } from "@/lib/db";
-import { happinessSeries, moodTop, pointStats, streakOf } from "@/lib/stats/extra";
+import { moodTone } from "@/lib/entry";
+import { growingSeries, happinessSeries, moodTop, pointStats, streakOf } from "@/lib/stats/extra";
 import { HappinessChart } from "@/components/HappinessChart";
 import { addDays } from "@/lib/time";
 import { fitPercent } from "@/lib/fortune/personal";
@@ -151,9 +152,8 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
   const points = pointStats(all);
   const moods = moodTop(all, 3);
   const streak = streakOf(all, today);
-  const series = happinessSeries(all, fortuneScores, today, 30);
+  const series = growingSeries(happinessSeries(all, fortuneScores, today, 30));
   const cells = ganjiGrid(all);
-  const pickedAnimal = selected === null ? "" : characterOfGanji(cells[selected].ko).animal;
   const bt = branchTenGods(profile.pillars);
   const infos = [
     pillarInfo(profile.pillars.hour, profile.pillars.day.stem, false, bt.hour),
@@ -231,7 +231,6 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
           todayIndex={todayIndex}
           basePath="/me"
           pickedEntries={selected === null ? [] : all.filter((e) => e.day_ganji_index === selected)}
-          pickedAnimal={pickedAnimal}
         />
         <StatsSummary h={h} fitPercent={fitPercent(all.length)} stems={byStem(all)} branches={byBranch(all)} elements={byElement(all)} points={points} moods={moods} streak={streak} chart={<HappinessChart series={series} />} />
       </section>
@@ -268,7 +267,7 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
                     {e.moods.length > 0 && (
                       <span className="mt-1.5 flex flex-wrap gap-1.5">
                         {e.moods.map((m) => (
-                          <span key={m} className="tag tag--on h-6 px-0.5 text-[12px] text-paper-2">
+                          <span key={m} data-tone={moodTone(m)} className="tag tag--on h-6 px-0.5 text-[12px] text-paper-2">
                             {m}
                           </span>
                         ))}

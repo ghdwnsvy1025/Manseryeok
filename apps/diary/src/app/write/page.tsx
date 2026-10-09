@@ -6,8 +6,8 @@ import { characterOfGanji } from "@/lib/character";
 import { getUser } from "@/lib/supabase/server";
 import { getEntry, getSajuProfile, readCachedFortune } from "@/lib/db";
 import { dayGanji } from "@/lib/ganji";
-import { formatKoreanDate, todayKST } from "@/lib/time";
-import { resolveWriteDate, writeDateLinks } from "@/lib/writeNav";
+import { addDays, formatKoreanDate, hourKST, todayKST } from "@/lib/time";
+import { NIGHT_CUTOFF_HOUR, nightCarryDate, resolveWriteDate, writeDateLinks } from "@/lib/writeNav";
 import { WritePreload } from "@/components/WritePreload";
 import { EntryForm } from "./EntryForm";
 
@@ -17,17 +17,31 @@ export default async function WritePage({ searchParams }: { searchParams: Promis
   const { date: requested } = await searchParams;
   const today = todayKST();
   // 잘못됐거나 미래·2020년 이전 날짜면 오늘로 열고 한 줄 알려 준다
-  const { date, adjusted } = resolveWriteDate(requested, today);
+  const resolved = resolveWriteDate(requested, today);
+  const adjusted = resolved.adjusted;
+
+  const { supabase, user } = await getUser();
+  // 세션이 아직 없는 첫 요청: 리디렉트하지 않고 뼈대만 그린다. AnonBoot가 곧 새로 그린다 (docs/ANON_START.md 1절, B2)
+  if (!user) return <Booting title="오늘 하루" cards={1} />;
+
+  // 새벽 4시 전, 날짜 없이 열었으면 "어젯밤" (어제 기록이 아직 없을 때만). 이 시간대에만 쿼리 하나 더
+  let date = resolved.date;
+  let carried = false;
+  if (!requested && hourKST() < NIGHT_CUTOFF_HOUR) {
+    const yesterday = addDays(today, -1);
+    const y = await getEntry(supabase, user.id, yesterday);
+    const carry = nightCarryDate(today, hourKST(), Boolean(y));
+    if (carry) {
+      date = carry;
+      carried = true;
+    }
+  }
   const ganji = dayGanji(date);
   // "10월 5일" — 요일은 뺀다
   const dateLabel = formatKoreanDate(date).replace(/\s*\S+요일$/, "");
   const isToday = date === today;
   // 날짜 앞뒤 이동 (B7): 어제로는 2020-01-01까지, 내일로는 오늘까지
   const nav = writeDateLinks(date, today);
-
-  const { supabase, user } = await getUser();
-  // 세션이 아직 없는 첫 요청: 리디렉트하지 않고 뼈대만 그린다. AnonBoot가 곧 새로 그린다 (docs/ANON_START.md 1절, B2)
-  if (!user) return <Booting title={`${dateLabel} ${ganji.ko}일, ${date === today ? "오늘" : "그날"} 하루`} cards={1} />;
 
   // 운세 do 문장은 캐시에서만 읽는다 — 쓰기 화면이 운세 계산·모델 호출을 유발하면 안 된다. 캐시가 없으면 약속 블록 생략
   const [existing, profile, cachedFortune] = await Promise.all([
@@ -45,8 +59,17 @@ export default async function WritePage({ searchParams }: { searchParams: Promis
       <header className="mb-5">
         {existing && <p className="text-sm text-muted">기록 고치기</p>}
         {adjusted && <p className="text-sm text-muted">그 날짜는 쓸 수 없어 오늘 날짜로 열었어요</p>}
+        {/* 새벽 4시 전 "어젯밤" 안내 — 오늘로 바꾸는 길을 바로 옆에 (모양은 디자이너 .night-carry) */}
+        {carried && (
+          <p className="night-carry text-sm">
+            어젯밤({dateLabel}) 기록으로 남겨요 ·{" "}
+            <Link href={`/write?date=${today}`} className="underline underline-offset-4">
+              오늘로 바꾸기
+            </Link>
+          </p>
+        )}
         <h1 className="mt-1 font-serif text-[26px] leading-snug">
-          {dateLabel} <span className="text-ganji">{ganji.ko}일</span>, {isToday ? "오늘" : "그날"} 하루
+          {dateLabel} <span className="text-ganji">{ganji.ko}일</span>, {isToday ? "오늘" : carried ? "어젯밤" : "그날"} 하루
         </h1>
         {/* 날짜 앞뒤 이동 (B7). 없는 쪽은 자리만 비운다 */}
         <nav aria-label="다른 날" className="mt-2 flex items-center justify-between text-sm text-muted">
@@ -71,7 +94,7 @@ export default async function WritePage({ searchParams }: { searchParams: Promis
       <WritePreload />
       <EntryForm
         date={date}
-        notePlaceholder={isToday ? "오늘 기억하고 싶은 일 하나" : "그날 기억하고 싶은 일 하나"}
+        notePlaceholder={isToday ? "오늘 기억하고 싶은 일 하나" : carried ? "어젯밤까지의 하루, 기억하고 싶은 일 하나" : "그날 기억하고 싶은 일 하나"}
         promiseText={promiseText}
         initial={
           existing

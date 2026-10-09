@@ -19,6 +19,15 @@ export const MOODS = [
 ] as const;
 export type Mood = (typeof MOODS)[number];
 
+/** 기분 색 구분 (2026-10-09 Q3): 긍정 = 금빛, 무덤덤 = 색 없음, 부정 = 차분한 남색. 빨강 없음. 화면은 data-tone으로 칠한다 */
+export type MoodTone = "pos" | "neutral" | "neg";
+const POSITIVE_MOODS: readonly string[] = ["기쁨", "뿌듯함", "설렘", "평온"];
+export function moodTone(m: string): MoodTone {
+  if (POSITIVE_MOODS.includes(m)) return "pos";
+  if (m === "무덤덤") return "neutral";
+  return "neg";
+}
+
 export const MAX_MOODS = 3;
 export const MAX_NOTE = 500;
 /** 기록할 수 있는 가장 이른 날짜 (레거시 이관분 포함) */

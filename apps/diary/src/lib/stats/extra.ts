@@ -96,6 +96,15 @@ export interface SeriesPoint {
   fortune: number | null;
 }
 
+/**
+ * 그래프가 기록과 함께 자라게 (2026-10-09 사용자 결정): 첫 기록 날부터 오늘까지만 남긴다(최대 days일).
+ * 이틀 기록하면 이틀이 가로 전체, 30일을 넘으면 최근 30일. 첫 기록 앞의 빈 날은 버리고, 그 뒤 빈 날은 null 그대로 비운다.
+ */
+export function growingSeries(series: SeriesPoint[]): SeriesPoint[] {
+  const first = series.findIndex((p) => p.happiness !== null);
+  return first < 0 ? [] : series.slice(first);
+}
+
 /** 오늘 포함 최근 days일. 오래된 날 → 오늘 순 */
 export function happinessSeries(entries: StatEntry[], fortunes: { fortune_date: string; score: number }[], today: string, days = 30): SeriesPoint[] {
   const byDate = new Map(entries.map((e) => [e.entry_date, e.happiness]));

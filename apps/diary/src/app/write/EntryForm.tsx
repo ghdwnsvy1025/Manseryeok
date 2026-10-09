@@ -3,7 +3,7 @@
 import { startTransition, useActionState, useEffect, useRef, useState, type FormEvent } from "react";
 import { saveEntryAction, type FormState } from "@/app/actions";
 import { DeleteEntryButton } from "@/components/DeleteEntryButton";
-import { MAX_MOODS, MAX_NOTE, MOODS, type Promise_ } from "@/lib/entry";
+import { MAX_MOODS, MAX_NOTE, MOODS, moodTone, type Promise_ } from "@/lib/entry";
 
 interface Props {
   date: string;
@@ -185,6 +185,7 @@ export function EntryForm({ date, promiseText, notePlaceholder, initial }: Props
                     className="peer sr-only"
                   />
                   <span
+                    data-tone={moodTone(m)}
                     className={`tag h-10 cursor-pointer px-2 text-[15px] peer-focus-visible:outline-2 peer-focus-visible:outline-gold ${
                       on ? "tag--on font-bold text-paper-2" : "text-ink"
                     } ${full ? "cursor-not-allowed opacity-45" : ""}`}

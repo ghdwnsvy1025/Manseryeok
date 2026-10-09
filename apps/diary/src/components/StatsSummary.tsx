@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import type { Bucket, Highlights } from "@/lib/stats/ganji";
 import type { MoodCount, PointStats, Streak } from "@/lib/stats/extra";
+import { moodTone } from "@/lib/entry";
 
 interface Props {
   h: Highlights;
@@ -101,7 +102,7 @@ export function StatsSummary({ h, fitPercent, stems, branches, elements, points,
             {moods.length ? (
               <span className="metric__chips">
                 {moods.map((m) => (
-                  <span key={m.mood} className="metric__chip">
+                  <span key={m.mood} className="metric__chip" data-tone={moodTone(m.mood)}>
                     {m.mood}
                     <small>{m.n}</small>
                   </span>
@@ -117,7 +118,7 @@ export function StatsSummary({ h, fitPercent, stems, branches, elements, points,
       {/* 행복도 그래프 (Q7) */}
       {h.total > 0 && (
         <div className="card-frame card-paper px-5 py-4">
-          <p className="text-[15px] font-bold">최근 30일 행복도</p>
+          <p className="text-[15px] font-bold">내 행복도</p>
           <div className="mt-3">{chart}</div>
         </div>
       )}

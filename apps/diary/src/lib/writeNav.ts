@@ -19,6 +19,18 @@ export function writeDateLinks(date: string, today: string): WriteDateLinks {
   };
 }
 
+/** 이 시각(한국) 전까지는 날짜 없이 쓰기를 열 때 "어젯밤" 기록으로 연다 (2026-10-09 사용자 결정: 밤 일기가 자정을 넘기는 일이 많다) */
+export const NIGHT_CUTOFF_HOUR = 4;
+
+/**
+ * 0~4시에 날짜 없이 쓰기를 열었고 어제 기록이 아직 없으면 어제 날짜. 아니면 null(오늘 그대로).
+ * 어제 기록이 이미 있으면 오늘로 — 두 번 쓰지 않게.
+ */
+export function nightCarryDate(today: string, hour: number, hasYesterdayEntry: boolean): string | null {
+  if (hour >= NIGHT_CUTOFF_HOUR || hasYesterdayEntry) return null;
+  return addDays(today, -1);
+}
+
 export interface ResolvedWriteDate {
   date: string;
   /** 요청한 날짜가 없거나 잘못됐거나 미래(또는 2020-01-01 이전)라 오늘로 바꿨으면 true → "오늘 날짜로 열었어요" */

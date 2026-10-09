@@ -13,8 +13,6 @@ interface Props {
   basePath: string;
   /** 선택 칸의 그 날들 (최신순). 상세 아래 기록 목록. 없으면 생략 */
   pickedEntries?: { entry_date: string; happiness: number; promise?: "kept" | "missed" | "na" | null }[];
-  /** 선택 칸의 동물 이름 ("토끼") — 상세에 "을묘 · 토끼"로 */
-  pickedAnimal?: string;
 }
 
 /**
@@ -23,7 +21,7 @@ interface Props {
  * 약속 지킨 날이 있는 칸은 두 겹(금 2px + 안쪽 한지 1px + 금 1px). 카드 틀·썸네일·인장 없음.
  * 안 모은 칸 = 빈 도장 자리 + 지지 한 글자. 숫자·이모지는 넣지 않는다. 전환 효과 없음.
  */
-export function GanjiGrid({ cells, selected, todayIndex, basePath, pickedEntries = [], pickedAnimal = "" }: Props) {
+export function GanjiGrid({ cells, selected, todayIndex, basePath, pickedEntries = [] }: Props) {
   const picked = selected !== null ? cells[selected] : null;
   return (
     // 좌우 여백을 화면 가장자리까지 줄여 칸이 36px 이상 (375px 기준 36.6px). 칸 사이 1px
@@ -71,21 +69,18 @@ export function GanjiGrid({ cells, selected, todayIndex, basePath, pickedEntries
             <div className="flex flex-col items-center gap-2">
               {/* 2026-10-09 Q5: 캐릭터 대신 그 간지의 정사각 카드 */}
               <img src={characterOfGanji(picked.ko).cardSrc} alt={`${picked.ko} 카드`} width={1080} height={1080} className="grid-card block h-auto w-[56%] max-w-[220px]" />
-              <p className="font-serif text-[20px] leading-none">
-                <span className="text-ganji">{picked.ko}</span>
-                {pickedAnimal && <span className="text-ink"> · {pickedAnimal}</span>}
-              </p>
-              <p className="text-center">
-                <b className="text-ganji">{picked.ko}일</b> {picked.n}번 · 평균 <b className="font-serif">{picked.mean}</b>
-                {picked.keptCount > 0 && <> · 오늘 포인트 {picked.keptCount}번</>}
-                {picked.signal === "약함" ? (
-                  <span className="text-muted"> (기록 3번부터 믿을 만해요)</span>
-                ) : (
-                  <span className="text-muted"> · 신호 {picked.signal}</span>
-                )}
+              <p className="font-serif text-[20px] leading-none text-ganji">{picked.ko}</p>
+              {/* 2026-10-09 Q2 = A: 인주 도장 안에 평균 + 옆에 횟수만. 도장 농도 = 평균(--h 0~1). 모양은 디자이너(.cell-stamp) */}
+              <p className="cell-stat flex items-center gap-3">
+                <span className="cell-stamp" style={{ "--h": picked.mean === null ? 0 : (picked.mean - 1) / 9 } as React.CSSProperties} aria-label={`평균 행복도 ${picked.mean}`}>
+                  {picked.mean}
+                </span>
+                <span className="text-[15px] text-muted">{picked.n}번 기록</span>
               </p>
               {pickedEntries.length > 0 && (
-                <ul className="flex w-full flex-col gap-1.5 text-[15px]">
+                <details className="w-full">
+                  <summary className="tap cursor-pointer list-none text-center text-[14px] text-muted underline underline-offset-4 [&::-webkit-details-marker]:hidden">날짜 보기</summary>
+                <ul className="mt-2 flex w-full flex-col gap-1.5 text-[15px]">
                   {pickedEntries.map((e) => (
                     <li key={e.entry_date}>
                       <Link href={`/write?date=${e.entry_date}`} className="flex items-baseline justify-between gap-3 px-1 underline-offset-4 hover:underline">
@@ -98,6 +93,7 @@ export function GanjiGrid({ cells, selected, todayIndex, basePath, pickedEntries
                     </li>
                   ))}
                 </ul>
+                </details>
               )}
             </div>
           ) : (

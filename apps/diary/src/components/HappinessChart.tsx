@@ -36,7 +36,7 @@ function brokenPath(values: (number | null)[]): string {
 export function HappinessChart({ series }: { series: SeriesPoint[] }) {
   const recorded = series.filter((p) => p.happiness10 !== null).length;
   if (recorded < 2) {
-    return <p className="hchart__empty text-[15px] text-muted">최근 30일 중 기록이 2일 넘으면 그래프가 그려져요.</p>;
+    return <p className="hchart__empty text-[15px] text-muted">기록이 2일 쌓이면 그래프가 그려져요. 하루씩 늘어나 30일까지 자라요.</p>;
   }
   const n = series.length;
   const avgPath = brokenPath(series.map((p) => p.avg7));
@@ -45,7 +45,7 @@ export function HappinessChart({ series }: { series: SeriesPoint[] }) {
   const last = series[n - 1]!.date.slice(5).replace("-", ".");
   return (
     <figure className="hchart">
-      <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`최근 30일 행복도 그래프. 기록 ${recorded}일`} className="hchart__svg block h-auto w-full">
+      <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`${n}일 행복도 그래프. 기록 ${recorded}일`} className="hchart__svg block h-auto w-full">
         {/* 눈금: 0 · 5 · 10 */}
         {[0, 5, 10].map((v) => (
           <g key={v}>

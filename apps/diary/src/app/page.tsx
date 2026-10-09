@@ -18,6 +18,8 @@ import { withLivePersonal } from "@/lib/fortune/live";
 import type { EntryLike } from "@/lib/fortune/personal";
 import { dayGanji } from "@/lib/ganji";
 import { shouldShowLinkPrompt } from "@/lib/linkPrompt";
+import { pointStats, streakOf } from "@/lib/stats/extra";
+import { nightCarryDate } from "@/lib/writeNav";
 import { addDays, formatKoreanDate, hourKST, parseYmd, todayKST } from "@/lib/time";
 
 export const dynamic = "force-dynamic";
@@ -80,7 +82,6 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
   const { saved } = await searchParams;
   const today = todayKST();
   const ganji = dayGanji(today);
-  const tomorrow = dayGanji(addDays(today, 1));
   const hour = hourKST();
   // 밤에는 운세를 접어 두고 기록을 먼저 보이게 한다 (화면 색은 시간과 무관 — v3.1). 기록이 하나도 없는 사람은 늘 펼친다
   const night = hour >= 18 || hour < 5;
@@ -142,15 +143,33 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
   const savedPast = saved && saved !== today && parseYmd(saved) ? saved : null;
   const savedPastLabel = savedPast ? formatKoreanDate(savedPast).replace(/\s*\S+요일$/, "") : "";
 
+  // 새벽 4시 전이고 어제 기록이 없으면 "어젯밤" — 쓰기 화면도 같은 규칙으로 어제를 연다 (writeNav.nightCarryDate)
+  const carry = nightCarryDate(today, hour, entries.some((e) => e.entry_date === addDays(today, -1)));
+  // 오늘의 기록 카드 아래 두 줄 (2026-10-09 Q4 = C): 카드 획득 + 지표
+  const sameGanjiTimes = entries.filter((e) => e.day_ganji_index === ganji.index).length;
+  const metCards = new Set(entries.map((e) => e.day_ganji_index)).size;
+  const streak = streakOf(entries, today);
+  const points = pointStats(entries);
   const writeCard = entry ? (
-    <TodayEntryCard entry={entry} today={today} tomorrowKo={tomorrow.ko} justSaved={saved === today} />
+    <TodayEntryCard
+      entry={entry}
+      today={today}
+      ganjiKo={ganji.ko}
+      sameGanjiTimes={sameGanjiTimes}
+      metCards={metCards}
+      streak={streak.current}
+      pointRate={points.rate}
+      justSaved={saved === today}
+    />
   ) : (
     <section className={card}>
-      <h2 className="font-serif text-[24px] leading-snug">오늘 하루, 어땠어요?</h2>
-      <p className="mt-2 text-[15px] text-muted">행복도 하나만 골라도 돼요. 30초면 끝나요.</p>
+      <h2 className="font-serif text-[24px] leading-snug">{carry ? "어젯밤 하루, 어땠어요?" : "오늘 하루, 어땠어요?"}</h2>
+      <p className="mt-2 text-[15px] text-muted">
+        {carry ? "자정이 지났지만 아직 어젯밤이에요. 어제 날짜로 남겨요." : "행복도 하나만 골라도 돼요. 30초면 끝나요."}
+      </p>
       {/* 금색 면 버튼은 화면에 하나 — 이것 */}
       <Link href="/write" className={goldButton}>
-        오늘 기록하기
+        {carry ? "어젯밤 기록하기" : "오늘 기록하기"}
       </Link>
     </section>
   );
