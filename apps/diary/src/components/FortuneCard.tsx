@@ -1,5 +1,5 @@
 import { BRANCHES, BRANCHES_KO, STEMS, STEMS_KO } from "@saju/engine";
-import { fortuneVoteAction } from "@/app/actions";
+import { VoteButtons } from "@/components/VoteButtons";
 import { SignalLegend } from "@/components/SignalLegend";
 import { AREA_WORD } from "@/lib/fortune/core";
 import type { AreaSignal, FortuneContent } from "@/lib/fortune/types";
@@ -181,78 +181,48 @@ export function FortuneCard({ fortune, ganjiKo, canVote, vote, defaultOpen }: Pr
                 기록이 없으면 "아직 기록이 없어 사주만으로" 한 줄. 모양은 디자이너(.compare-*) */}
             <PersonalCompare personal={personal} fortune={fortune} />
 
-            {/* 오늘의 신호 (v3.4 → v3.13 둘로 나눔): 좋은 쪽(↑ 줄 + → 줄 + 하면 좋아요) = 금빛 면 상자, 조심 쪽(↓ 줄 + 피해요) = 먹빛 면 상자.
-                빨강 없음. 띠지 안 기간·영역 사이 점은 뺐다(간격으로). 모양은 디자이너(.signal-box--good/--care) */}
-            <SignalLegend />
-            {(() => {
-              const row = (a: (typeof areas)[number]) => (
-                <li key={`${a.period}-${a.area}`} className="signal-box__row break-keep text-ink/90" data-signal={a.signal}>
-                  <span className="sig sig--line">
-                    <span className="text-muted">{a.period}</span>
-                    <span className="ml-1.5">{AREA_WORD[a.area]}</span>
-                    <span aria-hidden className={`ml-1 ${SIGNAL_COLOR[a.signal]}`}>
-                      {a.signal}
-                    </span>
-                    <span className="sr-only">{SIGNAL_WORD[a.signal]}</span>
-                  </span>
-                  <span className="signal-box__text">{a.line}</span>
-                </li>
-              );
-              const up = areas.filter((a) => a.signal === "↑");
-              const flat = areas.filter((a) => a.signal === "→");
-              const down = areas.filter((a) => a.signal === "↓");
-              return (
-                <>
-                  <ul className="signal-box signal-box--good mt-5 list-none text-[16px] leading-[1.5]" aria-label="좋은 쪽">
-                    {up.map(row)}
-                    <li className="signal-box__row break-keep">
-                      <span className="sig sig--gold">하면 좋아요</span>
-                      <span className="signal-box__text">{fortune.do}</span>
+            {/* v3.14 (2026-10-10): 섹션 둘로 — "오늘의 특징"(영역 줄, ↑ → ↓ 순) / 붓선 / "오늘 해 볼 것"(하면 좋아요 · 피해요).
+                예전엔 좋은 쪽·조심 쪽 상자에 영역 줄과 행동이 섞여 뒤죽박죽이었다. 모양은 디자이너(.traits* / .actions*) */}
+            {areas.length > 0 && (
+              <section className="traits mt-6" aria-labelledby="traits-title">
+                <h3 id="traits-title" className="traits__title">오늘의 특징</h3>
+                {/* 화살표 범례: 처음 한 번만 (닫으면 다시 안 뜸) */}
+                <SignalLegend />
+                <ul className="traits__list">
+                  {[...areas.filter((a) => a.signal === "↑"), ...areas.filter((a) => a.signal === "→"), ...areas.filter((a) => a.signal === "↓")].map((a) => (
+                    <li key={`${a.period}-${a.area}`} className="trait break-keep" data-signal={a.signal}>
+                      <span className="trait__tag sig sig--line">
+                        <span className="trait__period">{a.period}</span>
+                        <span className="trait__area">{AREA_WORD[a.area]}</span>
+                        <span aria-hidden className={`trait__arrow ${SIGNAL_COLOR[a.signal]}`}>
+                          {a.signal}
+                        </span>
+                        <span className="sr-only">{SIGNAL_WORD[a.signal]}</span>
+                      </span>
+                      <span className="trait__text">{a.line}</span>
                     </li>
-                    {flat.map(row)}
-                  </ul>
-                  <ul className="signal-box signal-box--care mt-3 list-none text-[16px] leading-[1.5]" aria-label="조심할 쪽">
-                    {down.map(row)}
-                    <li className="signal-box__row break-keep text-ink/85">
-                      <span className="sig sig--ink">피해요</span>
-                      <span className="signal-box__text">{fortune.dont}</span>
-                    </li>
-                  </ul>
-                </>
-              );
-            })()}
+                  ))}
+                </ul>
+              </section>
+            )}
+            <span aria-hidden className="rule rule--light mt-5" />
+            <section className="actions mt-4" aria-labelledby="actions-title">
+              <h3 id="actions-title" className="actions__title">오늘 해 볼 것</h3>
+              <div className="action action--do break-keep">
+                <span className="sig sig--gold">하면 좋아요</span>
+                <p className="action__text">{fortune.do}</p>
+              </div>
+              <div className="action action--dont break-keep">
+                <span className="sig sig--ink">피해요</span>
+                <p className="action__text">{fortune.dont}</p>
+              </div>
+            </section>
 
-            {/* 카드 안 붓선은 이 한 곳뿐 — 띠지와 맨 아래(투표·근거) 사이 */}
+            {/* 붓선 — 행동 섹션과 투표 사이 */}
             <span aria-hidden className="rule rule--light mt-5" />
 
-            {canVote && (
-              <form action={fortuneVoteAction} className="vote mt-4 flex flex-wrap items-center gap-2 text-sm text-muted" data-voted={vote !== null ? "" : undefined}>
-                <input type="hidden" name="date" value={fortune.date} />
-                <span className="mr-1">오늘과 맞았어요?</span>
-                {/* 눌린 쪽을 다시 누르면 value "0" → 투표 취소 (actions.ts fortuneVoteAction).
-                    모양(v3.9): 안 눌림 = 녹갈 테두리 pill 44px, 눌림(aria-pressed) = 금색 면 + 먹색 굵게 + 1.04, 반대쪽 흐림 — globals.css .vote */}
-                <button
-                  type="submit"
-                  name="vote"
-                  value={vote === 1 ? "0" : "1"}
-                  aria-pressed={vote === 1}
-                  className="vote__btn"
-                >
-                  맞아요
-                </button>
-                <button
-                  type="submit"
-                  name="vote"
-                  value={vote === -1 ? "0" : "-1"}
-                  aria-pressed={vote === -1}
-                  className="vote__btn"
-                >
-                  아니에요
-                </button>
-                {/* 투표 뒤 한 줄 — 눌린 상태일 때만 */}
-                {vote !== null && <span className="basis-full break-keep text-[14px] text-muted">고마워요, 내일 운세에 반영해요. 다시 누르면 취소돼요.</span>}
-              </form>
-            )}
+            {/* v3.14: 누르는 즉시 바뀌고 카드가 접히지 않는다 (클라이언트 컴포넌트) */}
+            {canVote && <VoteButtons date={fortune.date} initial={vote} />}
 
           </div>
         </div>

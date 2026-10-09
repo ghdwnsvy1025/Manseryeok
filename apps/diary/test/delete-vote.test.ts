@@ -74,7 +74,8 @@ describe("fortuneVoteAction", () => {
   test("\"0\"이면 그 날짜의 피드백 행을 지운다", async () => {
     await fortuneVoteAction(form({ date: "2026-10-08", vote: "0" }));
     expect(calls).toEqual([{ op: "delete", table: "night_fortune_feedback", filters: { user_id: "u-1", fortune_date: "2026-10-08" } }]);
-    expect(revalidated).toContain("/");
+    // v3.14: 투표는 화면을 다시 그리지 않는다(낙관적 버튼, 카드가 접히던 문제)
+    expect(revalidated).toEqual([]);
   });
 
   test("다른 값·잘못된 날짜는 아무것도 하지 않는다", async () => {

@@ -100,7 +100,7 @@ export function TodayEntryCard({ entry, today, ganjiKo, sameGanjiTimes, metCards
         </dl>
         <ul className="entry-news__chips" aria-label="지표">
           <li className="chip">연속 {streak}일</li>
-          {pointRate !== null && <li className="chip">포인트 {pointRate}%</li>}
+          {pointRate !== null && <li className="chip">해 본 비율 {pointRate}%</li>}
         </ul>
       </div>
     </section>

@@ -6,9 +6,9 @@ const DOW = ["일", "월", "화", "수", "목", "금", "토"];
 /**
  * 나 화면 달력 보기 (2026-10-10 Q6 = B). 자바스크립트 없이 링크로 달을 옮긴다(?view=cal&m=YYYY-MM).
  * 기록한 날 = 인주 도장(농도 --h = 행복도), 안에 행복도 숫자. 기록 없는 날 = 날짜만. 미래 = 흐림, 누를 수 없음.
- * 날짜를 누르면 그날 쓰기/고치기. 모양은 디자이너(.cal*).
+ * v3.14: 날짜를 누르면 달력 아래에 그날 상세(?d=YYYY-MM-DD, CalendarDayDetail). 다시 누르면 닫힘. 고른 날 = data-selected. 모양은 디자이너(.cal*).
  */
-export function MonthCalendar({ cal }: { cal: CalendarMonth }) {
+export function MonthCalendar({ cal, selected = null }: { cal: CalendarMonth; selected?: string | null }) {
   return (
     <div className="cal">
       <div className="cal__head flex items-center justify-between">
@@ -58,8 +58,11 @@ export function MonthCalendar({ cal }: { cal: CalendarMonth }) {
           ) : (
             <li key={c.date}>
               <Link
-                href={`/write?date=${c.date}`}
+                href={selected === c.date ? `/me?view=cal&m=${cal.ym}` : `/me?view=cal&m=${cal.ym}&d=${c.date}`}
+                scroll={false}
                 className="cal__cell"
+                data-selected={selected === c.date ? "" : undefined}
+                aria-current={selected === c.date ? "date" : undefined}
                 data-today={c.isToday ? "" : undefined}
                 data-has={c.happiness !== null ? "" : undefined}
                 style={c.happiness !== null ? ({ "--h": (c.happiness - 1) / 9 } as React.CSSProperties) : undefined}

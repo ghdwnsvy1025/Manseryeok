@@ -57,7 +57,13 @@ export function StatsSummary({ h, fitPercent, stems, branches, elements, points,
     <div className="flex flex-col gap-4">
       <div className="card-frame card-paper px-5 py-4">
         <div className="flex items-baseline justify-between">
-          <span className="text-[15px] font-bold">맞춤도</span>
+          {/* v3.14: 맞춤도 뜻은 "?"를 누르면 한 줄 (details, JS 없음) */}
+          <details className="fit-help">
+            <summary className="text-[15px] font-bold [&::-webkit-details-marker]:hidden">
+              맞춤도 <span className="fit-help__q" aria-label="맞춤도가 뭔가요">?</span>
+            </summary>
+            <p className="fit-help__text">내 기록이 운세 점수에 반영된 정도예요. 기록이 쌓일수록 올라요.</p>
+          </details>
           <span className="font-serif text-[32px] leading-none">
             {fitPercent}
             <span className="text-[17px] text-muted">%</span>
@@ -67,23 +73,27 @@ export function StatsSummary({ h, fitPercent, stems, branches, elements, points,
         <span className="meter mt-2" aria-hidden>
           <span className="meter__fill" style={{ width: `${fitPercent}%` }} />
         </span>
-        <p className="mt-2 text-sm text-muted">기록이 쌓일수록 올라요.</p>
-        <dl className="kv mt-2">
-          <div className="kv__row">
-            <dt>기록</dt>
-            <dd>{h.total}일</dd>
-          </div>
-          {h.overallMean !== null && (
-            <div className="kv__row">
-              <dt>평균 행복도</dt>
-              <dd>{h.overallMean}</dd>
-            </div>
-          )}
-          <div className="kv__row">
-            <dt>아직 안 겪은 간지</dt>
-            <dd>{h.unseen}개</dd>
-          </div>
-        </dl>
+        {/* v3.14 Q3 = A: 설명 문장 대신 숫자 세 칸 (숫자 크게, 이름 아래 작게). 모양은 디자이너(.stat3*) */}
+        <ul className="stat3 mt-3" aria-label="기록 요약">
+          <li className="stat3__item">
+            <span className="stat3__value">
+              {h.total}
+              <small>일</small>
+            </span>
+            <span className="stat3__label">기록</span>
+          </li>
+          <li className="stat3__item">
+            <span className="stat3__value">{h.overallMean ?? "–"}</span>
+            <span className="stat3__label">평균 행복도</span>
+          </li>
+          <li className="stat3__item">
+            <span className="stat3__value">
+              {h.unseen}
+              <small>개</small>
+            </span>
+            <span className="stat3__label">안 겪은 간지</span>
+          </li>
+        </ul>
       </div>
 
       {/* 지표 세 칸 (Q4 = A+B+D): 연속 기록 · 오늘의 포인트 · 자주 고른 기분 */}
@@ -98,7 +108,11 @@ export function StatsSummary({ h, fitPercent, stems, branches, elements, points,
             <span className="metric__sub">최고 {streak.best}일</span>
           </li>
           <li className="metric">
-            <span className="metric__label">포인트 해봄</span>
+            {/* v3.14 Q4 = A: "포인트 해봄" → "해 본 비율" + 무엇을 해 봤는지 */}
+            <span className="metric__label">
+              해 본 비율
+              <span className="metric__hint">&ldquo;하면 좋아요&rdquo;</span>
+            </span>
             <span className="metric__value">
               {points.rate === null ? "–" : points.rate}
               {points.rate !== null && <small>%</small>}
@@ -152,10 +166,8 @@ export function StatsSummary({ h, fitPercent, stems, branches, elements, points,
         </dl>
       )}
 
-      {/* 천간·지지·오행 한 판 (Q6 = A). 접기 없음. 기록 3건 전엔 한 줄 안내 */}
-      {h.total < 3 ? (
-        <p className="card-frame card-paper px-5 py-4 text-[15px] text-muted">기록이 3일 쌓이면 천간, 지지, 오행별 행복도가 막대로 보여요.</p>
-      ) : (
+      {/* 천간·지지·오행 한 판 (Q6 = A). 접기 없음. v3.14: 기록 3건 전엔 아무것도 그리지 않는다(안내 카드 없음) */}
+      {h.total < 3 ? null : (
         <div className="card-frame card-paper flex flex-col gap-5 px-5 py-4">
           <p className="text-[15px] font-bold">
             글자별 내 행복도 <span className="mt-1 block text-[13px] font-normal text-muted">막대 높이는 평균, 아래 숫자는 횟수예요</span>

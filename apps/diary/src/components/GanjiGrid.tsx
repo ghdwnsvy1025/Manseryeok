@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { STEMS } from "@saju/engine";
+import { STEMS, STEM_META, type StemHanja } from "@saju/engine";
 import type { GanjiCell } from "@/lib/stats/ganji";
 import { characterOfGanji } from "@/lib/character";
 
@@ -38,15 +38,19 @@ export function GanjiGrid({ cells, selected, todayIndex, basePath, pickedEntries
           const isToday = c.index === todayIndex;
           // 1~10 → 0.35~1.0. 기록이 없으면 금 테두리 없음
           const ink = c.mean === null ? 0 : 0.35 + ((c.mean - 1) / 9) * 0.65;
-          const ring = isSel ? "outline-2 outline-offset-1 outline-ink" : isToday ? "outline-2 outline-offset-1 outline-ganji" : "";
+          // v3.14: 테두리는 선택한 칸 하나만. 오늘 칸은 테두리 대신 data-today(작은 점, CSS). 배경은 그 간지 천간의 오행 색 옅게(data-el, CSS)
+          const ring = isSel ? "outline-2 outline-offset-1 outline-ink" : "";
+          const el = STEM_META[c.hanja[0] as StemHanja]?.element;
           return (
             <li key={c.index}>
               <Link
-                href={isSel ? basePath : `${basePath}?cell=${c.index}`}
+                href={isSel ? basePath : `${basePath}${basePath.includes("?") ? "&" : "?"}cell=${c.index}`}
                 scroll={false}
                 aria-label={`${c.ko}일 ${c.n ? `${c.n}번, 평균 ${c.mean}${c.keptCount ? `, 지킨 약속 ${c.keptCount}` : ""}` : "기록 없음"}`}
                 aria-current={isSel ? "true" : undefined}
                 data-kept={c.keptCount > 0 ? "" : undefined}
+                data-today={isToday ? "" : undefined}
+                data-el={el}
                 className={`flex aspect-square items-center justify-center rounded-[18%] ${c.n ? "album-cell" : "board-cell"} ${ring}`}
                 style={{ "--ink": ink } as React.CSSProperties}
               >
@@ -106,7 +110,7 @@ export function GanjiGrid({ cells, selected, todayIndex, basePath, pickedEntries
             </div>
           )
         ) : (
-          <p className="text-muted">칸을 누르면 그 간지의 카드가 보여요. 남색 테두리가 오늘이에요.</p>
+          <p className="text-muted">칸을 누르면 그 간지의 카드가 보여요. 작은 점이 있는 칸이 오늘이에요.</p>
         )}
       </div>
     </div>

@@ -8,11 +8,12 @@ import { ShareCard } from "@/components/ShareCard";
 import { shareCardText, shareMessage } from "@/lib/share";
 import { characterOf, characterOfGanji } from "@/lib/character";
 import { StatsSummary } from "@/components/StatsSummary";
-import { countEntries, getSajuProfile, listEntries, listEntriesForStats, listFortuneScores } from "@/lib/db";
+import { countEntries, getEntry, getSajuProfile, listEntries, listEntriesForStats, listFortuneScores } from "@/lib/db";
 import { moodTone } from "@/lib/entry";
 import { growingSeries, happinessSeries, moodTop, pointStats, streakOf } from "@/lib/stats/extra";
 import { HappinessChart } from "@/components/HappinessChart";
 import { MonthCalendar } from "@/components/MonthCalendar";
+import { CalendarDayDetail } from "@/components/CalendarDayDetail";
 import { buildMonth, resolveMonth } from "@/lib/calendar";
 import { addDays } from "@/lib/time";
 import { fitPercent } from "@/lib/fortune/personal";
@@ -129,8 +130,8 @@ function ElementDetails({ rows }: { rows: { el: ElementKo; pct: number }[] }) {
   );
 }
 
-export default async function MePage({ searchParams }: { searchParams: Promise<{ cell?: string; view?: string; m?: string }> }) {
-  const { cell, view, m } = await searchParams;
+export default async function MePage({ searchParams }: { searchParams: Promise<{ cell?: string; view?: string; m?: string; d?: string }> }) {
+  const { cell, view, m, d } = await searchParams;
   const { supabase, user } = await getUser();
   // 세션이 아직 없는 첫 요청: 리디렉트하지 않고 뼈대만 그린다. AnonBoot가 곧 새로 그린다 (docs/ANON_START.md 1절, B2)
   if (!user) return <Booting title="나" cards={3} />;
@@ -150,7 +151,11 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
   const share = card ? shareMessage(card) : null;
   const selected = cell !== undefined && /^\d{1,2}$/.test(cell) && Number(cell) < 60 ? Number(cell) : null;
   const todayIndex = dayGanji(today).index;
-  const isCal = view === "cal";
+  // v3.14 Q6: 기본은 달력. 60갑자는 ?view=grid (칸 선택 ?cell=이 있으면 60갑자)
+  const isCal = view !== "grid" && cell === undefined;
+  // 달력에서 고른 날 (미래·형식 오류는 무시)
+  const pickedDay = isCal && d && /^\d{4}-\d{2}-\d{2}$/.test(d) && d <= today ? d : null;
+  const pickedEntry = pickedDay ? await getEntry(supabase, user.id, pickedDay) : null;
   // 2026-10-09 Q4·Q7: 행복도 말고 보여 줄 지표 + 최근 30일 그래프(운세 점수 겹침, 빈 날은 비움)
   const points = pointStats(all);
   const moods = moodTop(all, 3);
@@ -232,25 +237,28 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
           <h2 className="font-serif text-[22px]">내 행복도</h2>
           {/* v3.13 Q6 = B: 같은 자리에서 60갑자 / 달력 전환 (링크, JS 없음). 모양은 디자이너(.view-switch) */}
           <nav className="view-switch mt-2" aria-label="보기">
-            <Link href="/me" scroll={false} aria-current={isCal ? undefined : "page"} className="view-switch__item">
-              60갑자
-            </Link>
-            <Link href="/me?view=cal" scroll={false} aria-current={isCal ? "page" : undefined} className="view-switch__item">
+            <Link href="/me" scroll={false} aria-current={isCal ? "page" : undefined} className="view-switch__item" data-icon="calendar">
               달력
+            </Link>
+            <Link href="/me?view=grid" scroll={false} aria-current={isCal ? undefined : "page"} className="view-switch__item" data-icon="grid">
+              60갑자
             </Link>
           </nav>
           <p className="mt-2 text-sm text-muted">
-            {isCal ? "날마다 남긴 행복도가 도장으로 찍혀요. 날짜를 누르면 그날 기록으로 가요." : "60가지 날 가운데 나는 어떤 날에 행복했는지. 기록한 날의 동물이 칸에 찍혀요."}
+            {isCal ? "날마다 남긴 행복도가 도장으로 찍혀요. 날짜를 누르면 그날 카드와 기록이 아래에 나와요." : "60가지 날 가운데 나는 어떤 날에 행복했는지. 기록한 날의 동물이 칸에 찍혀요."}
           </p>
         </div>
         {isCal ? (
-          <MonthCalendar cal={buildMonth(resolveMonth(m, today), all, today)} />
+          <>
+            <MonthCalendar cal={buildMonth(resolveMonth(pickedDay ? pickedDay.slice(0, 7) : m, today), all, today)} selected={pickedDay} />
+            {pickedDay && <CalendarDayDetail date={pickedDay} entry={pickedEntry ? { happiness: pickedEntry.happiness, moods: pickedEntry.moods, note: pickedEntry.note } : null} />}
+          </>
         ) : (
           <GanjiGrid
             cells={cells}
             selected={selected}
             todayIndex={todayIndex}
-            basePath="/me"
+            basePath="/me?view=grid"
             pickedEntries={selected === null ? [] : all.filter((e) => e.day_ganji_index === selected)}
           />
         )}

@@ -39,7 +39,8 @@ export function HappinessChart({ series }: { series: SeriesPoint[] }) {
     return <p className="hchart__empty text-[15px] text-muted">기록이 2일 쌓이면 그래프가 그려져요. 하루씩 늘어나 30일까지 자라요.</p>;
   }
   const n = series.length;
-  const avgPath = brokenPath(series.map((p) => p.avg7));
+  // v3.14 Q5 = A: 내 행복도는 선 + 점(빈 날 끊김), 운세 점수는 옅은 점선. 7일 평균은 뺐다
+  const linePath = brokenPath(series.map((p) => p.happiness10));
   const fortunePath = brokenPath(series.map((p) => p.fortune));
   const first = series[0]!.date.slice(5).replace("-", ".");
   const last = series[n - 1]!.date.slice(5).replace("-", ".");
@@ -56,7 +57,7 @@ export function HappinessChart({ series }: { series: SeriesPoint[] }) {
           </g>
         ))}
         {fortunePath && <path d={fortunePath} className="hchart__fortune" fill="none" />}
-        {avgPath && <path d={avgPath} className="hchart__avg" fill="none" />}
+        {linePath && <path d={linePath} className="hchart__line" fill="none" />}
         {series.map((p, i) =>
           p.happiness10 === null ? null : <circle key={p.date} cx={x(i, n)} cy={y(p.happiness10)} r={3} className="hchart__dot" />,
         )}
@@ -69,7 +70,6 @@ export function HappinessChart({ series }: { series: SeriesPoint[] }) {
       </svg>
       <figcaption className="hchart__legend mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[13px] text-muted">
         <span className="hchart__key hchart__key--dot">내 행복도</span>
-        <span className="hchart__key hchart__key--avg">7일 평균</span>
         <span className="hchart__key hchart__key--fortune">운세 점수</span>
       </figcaption>
     </figure>

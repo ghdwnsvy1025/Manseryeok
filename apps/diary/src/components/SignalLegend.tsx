@@ -31,7 +31,7 @@ export function SignalLegend() {
 
   if (!show) return null;
   return (
-    <p className="mt-5 -mb-2 flex items-center justify-between gap-3 text-[14px] text-muted">
+    <p className="-mt-1 mb-1 flex items-center justify-between gap-3 text-[14px] text-muted">
       <span>
         <span className="inline-flex gap-4">
           <span><span className="text-gold">↑</span> 좋아요</span>

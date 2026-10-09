@@ -227,7 +227,7 @@ export async function fortuneVoteAction(form: FormData): Promise<void> {
   } catch (e) {
     console.error(e);
   }
-  revalidatePath("/");
+  // v3.14: revalidate하지 않는다 — 버튼이 낙관적으로 바뀌고, 화면 전체를 다시 그리면 운세 카드가 접혔다(VoteButtons)
 }
 
 /** 브라우저가 만든 푸시 구독을 저장하고 알림을 켠다 */
