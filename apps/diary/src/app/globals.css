@@ -1498,9 +1498,36 @@ input:focus-visible + .promise-stamp > .promise-stamp__mark {
 }
 
 /* 기분 색 [data-tone]: 무덤덤 = 지금 띠지 그대로. 긍정만 금빛으로, 부정은 남색. 빨강·초록 없음 */
+/* 안 고른 띠지 (v3.12 보충): 1px 선 + 아주 옅은 면을 종이 띠지 위에 곱한다(multiply — 한지 결이 비친다).
+   긍정 = gold 1px + gold 12%, 부정 = sky 45% 1px + sky 5%. 글자는 먹색(긍정)·ganji(부정) 그대로 — 밝은 금 글자 없음 */
+.tag[data-tone="pos"],
+.tag[data-tone="neg"] {
+  position: relative;
+  isolation: isolate;
+}
 .tag[data-tone="pos"] {
-  color: var(--color-gold-ink);
-  box-shadow: inset 0 0 0 0.5px var(--color-gold);
+  color: var(--color-ink);
+}
+.tag[data-tone="pos"]::after,
+.tag[data-tone="neg"]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 1px;
+  pointer-events: none;
+  mix-blend-mode: multiply;
+}
+.tag[data-tone="pos"]::after {
+  background-color: color-mix(in srgb, var(--color-gold) 12%, transparent);
+  box-shadow: inset 0 0 0 1px var(--color-gold);
+}
+.tag[data-tone="neg"]::after {
+  background-color: color-mix(in srgb, var(--color-sky) 5%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-sky) 45%, transparent);
+}
+.tag[data-tone].tag--on::after,
+input:checked + .tag[data-tone]::after {
+  content: none;
 }
 /* 고른 긍정 = 금빛 면(키트 gold-wash)을 종이 띠지(tag-strip-paper)의 찢긴 모양으로 오려 낸다. 글자는 위에.
    마스크 9분할을 못 쓰는 브라우저는 운세 카드 .tag--gold처럼 gold-wash 띠 그대로 */
@@ -1544,6 +1571,7 @@ input:checked + .tag[data-tone="neg"] {
 }
 .metric__chip[data-tone="neg"] {
   border-color: color-mix(in srgb, var(--color-sky) 55%, transparent);
+  background-color: color-mix(in srgb, var(--color-sky) 8%, transparent);
   color: var(--color-ganji);
 }
 
