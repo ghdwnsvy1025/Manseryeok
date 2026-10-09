@@ -78,16 +78,17 @@ describe("v4 점수·밴드·영역 스냅샷 (사주 2 × 날짜 5)", () => {
   // 값은 2026-10-05 구현 시점의 실행 결과로 고정. 계수(core.ts COEF)나 코어 규칙이 바뀌면 함께 갱신한다.
   // 2026-10-07 v4.1 갱신: ③ ctx에 대운·세운 판정(×0.2, ×0.15)이 더해져 점수가 움직였고(B는 대운 戊辰/己巳이 유리라 +1), ① 한·한 일진(A 壬子 = 편관·정관, B 庚申 = 편관·편관)은 판정 "보통",
   // ② 한신 영역이 "→"로 올라왔다(A 壬子 직업→, B 庚申 직업→·연애→, B 己酉 직업→).
+  // 2026-10-10 v4.5: 0.5 아래는 tanh 곡선(lowAmp 0.38) — 낮은 점수만 조금 올라간다(A 甲午 3.5→3.6, B 壬子 2.6→2.9). 위쪽은 그대로.
   // 2026-10-07 v4.2 갱신(코어 240c91d): Y-12 — A(己巳 丙子 丙寅 甲午, 비겁 중심 신강)의 관성(수) 운이 한신 0.5 → 희신급 1. A 壬子 한·한이 "유리"·직업↑, A 대운 癸酉 2.75 → 3.5, 세운 乙巳 등 수 글자 점수 ↑. B(중화)는 변화 없음.
   // 2026-10-07 v4.2 합 점수 삭제: rel에는 충만 남고 합(육합·삼합·반합)·운 지지 합(union)은 0 → A 甲午 3.3→3.5(반합 寅午 제거), A 己酉 8.1→7.9(반합 巳酉 +0.25 제거), B 壬子 3.1→2.6(육합 子丑 +0.5·월운 합 제거), B 甲午 4.1→3.9, B 己酉 9.2→9.1, B 庚申 8.5→8.3.
   //   영역은 오늘(일운 ≤2) → 이달(월운 1) → 올해(세운 1)로 최대 4개, period가 붙는다.
   const CASES: { prof: BirthProfile; date: string; ganji: string; score: number; band: string; total: string; areas: string[] }[] = [
     { prof: PROFILE_A, date: "2026-10-05", ganji: "壬子", score: 7.5, band: "좋음", total: "유리", areas: ["오늘:직업↑", "이달:연애↑", "올해:대인↓"] },
-    { prof: PROFILE_A, date: "2026-01-20", ganji: "甲午", score: 3.5, band: "주의", total: "어려움", areas: ["오늘:대인↓", "오늘:재물↓", "이달:직업↑", "올해:대인↓"] },
+    { prof: PROFILE_A, date: "2026-01-20", ganji: "甲午", score: 3.6, band: "주의", total: "어려움", areas: ["오늘:대인↓", "오늘:재물↓", "이달:직업↑", "올해:대인↓"] },
     { prof: PROFILE_A, date: "2026-02-04", ganji: "己酉", score: 7.9, band: "좋음", total: "매우 유리", areas: ["오늘:재물↑", "오늘:연애↑", "이달:재물↑", "올해:대인↓"] },
     { prof: PROFILE_A, date: "2026-06-15", ganji: "庚申", score: 9.2, band: "좋음", total: "매우 유리", areas: ["오늘:재물↑", "오늘:연애↑", "이달:대인↓", "올해:대인↓"] },
     { prof: PROFILE_A, date: "2027-03-01", ganji: "己卯", score: 4.8, band: "무난", total: "유리", areas: ["오늘:직업↑", "오늘:가족↓", "이달:직업↑", "올해:대인↓"] },
-    { prof: PROFILE_B, date: "2026-10-05", ganji: "壬子", score: 2.6, band: "주의", total: "주의", areas: ["오늘:학업↓", "오늘:가족↓", "이달:직업↑", "올해:직업↑"] },
+    { prof: PROFILE_B, date: "2026-10-05", ganji: "壬子", score: 2.9, band: "주의", total: "주의", areas: ["오늘:학업↓", "오늘:가족↓", "이달:직업↑", "올해:직업↑"] },
     { prof: PROFILE_B, date: "2026-01-20", ganji: "甲午", score: 3.9, band: "주의", total: "주의", areas: ["오늘:대인↓", "오늘:재물↓", "이달:재물↑", "올해:대인↓"] },
     { prof: PROFILE_B, date: "2026-02-04", ganji: "己酉", score: 9.1, band: "좋음", total: "매우 유리", areas: ["오늘:재물↑", "오늘:대인↑", "이달:대인↓", "올해:직업↑"] },
     { prof: PROFILE_B, date: "2026-06-15", ganji: "庚申", score: 8.3, band: "좋음", total: "보통", areas: ["오늘:직업→", "오늘:연애→", "이달:대인↓", "올해:직업↑"] },
@@ -129,7 +130,7 @@ describe("v4 점수·밴드·영역 스냅샷 (사주 2 × 날짜 5)", () => {
     expect(r.context.daeun?.플래그).toEqual(expect.arrayContaining([expect.stringContaining("(Y-12)")]));
     expect(r.context.seun.합계).toBe(-2);
     expect(r.parts.ctx).toBe(-0.8);
-    expect(r.facts.some((f) => f.includes("10년 단위 운") && f.includes("부딪혀"))).toBe(true);
+    expect(r.facts.some((f) => f.includes("10년 단위 운") && f.includes("어긋나"))).toBe(true);
   });
 
   test("세운 충: 丙午년 × 壬子일 → 세운 clash, ctx −0.5 (+ v4.1 판정 몫: 대운 3.5×0.2, 세운 −5×0.15)", () => {
@@ -167,7 +168,7 @@ describe("v4.1 보강 (乙亥 丙戌 己丑 辛未 × 2026-10-07 甲寅: 천간�
     expect(r.facts[0]).toBe("오늘은 '약속과 역할'(정관)의 성격이 아주 강해요.");
     expect(r.facts.some((f) => f.includes("겹"))).toBe(false);
     expect(r.facts.some((f) => f.includes("위아래"))).toBe(false);
-    expect(r.facts.filter((f) => f.includes("모자란 쪽에 힘을 보태요"))).toHaveLength(1);
+    expect(r.facts.filter((f) => f.includes("모자란 부분에 힘을 보태 줘요"))).toHaveLength(1);
     expect(r.facts.some((f) => f.includes("기울지 않고"))).toBe(false);
     expect(r.facts.some((f) => f.includes("크게 영향을 주지 않아요"))).toBe(false);
     // 코어가 올리지 않은 한·한(B 중화 사주, 2026-06-15 庚申 편관·편관)은 v4.1 ① 그대로 "보통"
@@ -175,7 +176,8 @@ describe("v4.1 보강 (乙亥 丙戌 己丑 辛未 × 2026-10-07 甲寅: 천간�
     expect([pure.dayLuck.stem.label, pure.dayLuck.branch.label]).toEqual(["한", "한"]);
     expect(pure.dayLuck.raw).toBe(1.25);
     expect(pure.dayLuck.total).toBe("보통");
-    expect(pure.facts.filter((f) => f.includes("기울지 않고 그 성격대로 가요"))).toHaveLength(1);
+    // v4.5: 한신("기울지 않고 그 성격대로") 문장은 글 재료에서 뺐다
+    expect(pure.facts.some((f) => f.includes("기울지 않고"))).toBe(false);
     // 한쪽만 한신이면 판정은 코어 그대로 (B 2026-02-04 己酉: 정재 용 + 정관 한 → 매우 유리)
     const half = v4(PROFILE_B, "2026-02-04");
     expect([half.dayLuck.stem.label, half.dayLuck.branch.label].filter((l) => l === "한")).toHaveLength(1);
@@ -183,7 +185,7 @@ describe("v4.1 보강 (乙亥 丙戌 己丑 辛未 × 2026-10-07 甲寅: 천간�
   });
 
   test("② 한신도 영역에 오르고 신호는 → (직업) — 코어가 올린(Y-12) 한신은 점수 그대로라 ↑. v4.2: 오늘 줄 뒤에 이달·올해 줄", () => {
-    expect(r.areas[0]).toEqual({ period: "오늘", area: "직업", signal: "↑", why: "'약속과 역할'(정관) 글자가 힘을 보태요" });
+    expect(r.areas[0]).toEqual({ period: "오늘", area: "직업", signal: "↑", why: "'약속과 역할'(정관) 쪽이 힘을 보태요" });
     expect(r.areas.map((a) => `${a.period}:${a.area}${a.signal}`)).toEqual(["오늘:직업↑", "이달:가족↓", "올해:학업↓"]);
     const todayOf = (c: CoreFortune) => c.areas.filter((a) => a.period === "오늘").map((a) => a.area + a.signal);
     expect(todayOf(v4(PROFILE_B, "2026-06-15"))).toEqual(["직업→", "연애→"]);
@@ -285,9 +287,9 @@ describe("v4.2 합은 점수 없이 플래그만 · 위아래 문장 없음 · �
 
   test("영역 period: 오늘(일운 ≤2) → 이달(월운 1) → 올해(세운 1), 모두 코어 luckAreas. 용신 없으면 비어 있다", () => {
     expect(c.areas).toEqual([
-      { period: "오늘", area: "직업", signal: "↑", why: "'약속과 역할'(정관) 글자가 힘을 보태요" },
-      { period: "이달", area: "가족", signal: "↓", why: "'혼자 생각'(편인) 글자가 조금 거슬려요" },
-      { period: "올해", area: "학업", signal: "↓", why: "'배움과 쉼'(정인) 글자가 조금 거슬려요" },
+      { period: "오늘", area: "직업", signal: "↑", why: "'약속과 역할'(정관) 쪽이 힘을 보태요" },
+      { period: "이달", area: "가족", signal: "↓", why: "'혼자 생각'(편인) 쪽이 조금 어긋나요" },
+      { period: "올해", area: "학업", signal: "↓", why: "'배움과 쉼'(정인) 쪽이 조금 어긋나요" },
     ]);
     expect(c.context.wolun?.간지).toBe("丁酉"); // 丁 = 편인(가족·건강 ↓), 酉 = 식신
     expect(c.context.seun.간지).toBe("丙午"); // 丙 = 정인(학업 ↓), 午 = 편인
@@ -517,7 +519,7 @@ describe("3단계 brief", () => {
     expect(b.rules.numbers).toContain("점수는 화면에 있으니");
     expect(b.rules.areas).toContain("이달엔");
     // v4.4: 요일·절기가 오늘 재료로
-    expect(b.today).toEqual({ date: "2026-06-15", weekday: "월요일", ganji: "경신일", solarTerm: "망종 열흘째" });
+    expect(b.today).toEqual({ date: "2026-06-15", weekday: "월요일", ganji: "경신일", solarTerm: "망종 열흘째", useSolarTerm: false, solarTermName: "망종" });
   });
 
   test("기록이 없으면 mine이 null이고 기록 이야기를 금지한다", () => {
@@ -718,12 +720,12 @@ describe("3단계 파이프라인 (모델은 가짜)", () => {
     expect(second.messages[0]!.content).toContain('금지어 "기운"');
   });
 
-  test("두 번 탈락 → 템플릿, attempts 2, model null", async () => {
+  test("v4.5: 세 번 탈락 → 템플릿, attempts 3, model null", async () => {
     const bad = { ...good, headline: "기운이 좋은 날" };
-    const { client } = fakeClient([bad, bad]);
+    const { client } = fakeClient([bad, bad, bad]);
     const r = await generateFortuneText(input, fallback, { client });
     expect(r.source).toBe("template");
-    expect(r.attempts).toBe(2);
+    expect(r.attempts).toBe(3);
     expect(r.model).toBeNull();
     expect(r.text).toEqual(fallback);
   });

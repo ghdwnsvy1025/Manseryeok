@@ -2,7 +2,8 @@
 // 검사 항목: 금지어 · 전문용어 · 한자 · 이모지 · 숫자 날조 · 어미(~어요) · 명령조 · 기간 약속 · 문장 수 · 영역 일치 · 길이 상한 · 내 숫자 문장 · 구조 서술(v4.1) · 맥락 없는 운 언급(v4.4)
 //           · 점수 숫자(v4.2: "6.3점", "N점 만점") · 영역 period 일치 · 영역 줄이 본문 첫 문장과 60% 이상 겹침(v4.2). "이달엔/올해는" 접두는 모델 지시일 뿐 검사하지 않는다(템플릿 줄에는 접두가 없다).
 import type { FortuneBrief } from "./brief";
-import { hasContextFact, NUMBER_RE } from "./brief";
+import { ABSTRACT_LABELS, hasContextFact, NUMBER_RE } from "./brief";
+import { FORTUNE_EXAMPLES } from "./examples";
 import type { AreaName, AreaPeriod } from "./types";
 
 /** 모델이 돌려주는 JSON */
@@ -47,6 +48,14 @@ export function tokenOverlap(a: string, b: string): number {
   return ta.filter((t) => tb.has(t)).length / ta.length;
 }
 
+/** v4.5: 직장인을 가정한 장면. 학생·주부·쉬는 사람은 공감하지 못한다 — 본문·하면·피해요에서 본다 (영역 "일" 줄은 제외) */
+export const WORKPLACE_WORDS = ["거래처", "제안서", "보고서", "회의", "출근", "퇴근", "상사", "팀장", "동료", "업무"] as const;
+/** v4.5: 주의인 날 본문에 나오면 앞뒤가 어긋나는 반전 말 */
+/** "긴장이 풀려요"·"피로가 풀려요"는 위로라 괜찮다 — 일이 풀린다는 반전만 본다 */
+export const CARE_DAY_REVERSAL_RE = /수월|순조|술술|(일이|막혀 있던 일이|막힌 일이|잘)\s?풀리/;
+/** v4.5: 시간대를 차례로 늘어놓는 틀 (아침→점심→저녁→밤 중 3개 이상) */
+export const TIME_WORDS = ["아침", "점심", "저녁", "밤"] as const;
+
 export function splitSentences(text: string): string[] {
   return text
     .split(/(?<=[.!?])\s+/)
@@ -61,6 +70,10 @@ function stripCommon(t: string): string {
   return t
     .replace(/상관\s?(없|하지|할 바|말고|이 없|안)/g, "")
     .replace(/편인(데|지)/g, "")
+    // v4.5: "메시지"의 "시지", "연지곤지"류 일상어가 전문용어로 걸리던 것
+    .replace(/메시지/g, "")
+    // "지지해 주다·지지를 받다"(응원) 같은 일상어
+    .replace(/지지(해|하|받|를\s?받|를\s?보내)/g, "")
     // "넘기지지 않-", "느껴지지 않-"처럼 '-지지 않/말/도/는' 꼴은 일상어
     .replace(/지지\s?(않|말|도\s?않|는\s?않|요)/g, "")
     .replace(/(\S+) 편인/g, (m, w: string) => (hasNieun(w.at(-1)!) ? "" : m));
@@ -99,6 +112,23 @@ export function validateFortuneText(t: ModelText | null | undefined, b: FortuneB
   if (bad.length) add(`사실에 없는 숫자 ${bad.join(", ")}`);
   if (scoreValue !== undefined && !allowed.has(scoreValue) && nums.includes(scoreValue)) add(`점수 숫자 ${scoreValue} (점수는 화면에 있으니 글에 쓰지 않기)`);
   if (SCORE_PHRASE_RE.test(everything)) add('점수 숫자 ("N점 만점" 꼴 — 점수는 화면에 있으니 글에 쓰지 않기)');
+
+  // v4.5: 직장 가정 · 주의인 날 반전 · 시간대 나열 · 추상 이름 그대로 · 절기 첫날 아닌데 절기 이름
+  const own = [t.body, t.do, t.dont].join(" ");
+  for (const w of WORKPLACE_WORDS) if (own.includes(w)) add(`직장 장면 "${w}" (직업과 무관한 장면으로)`);
+  if (b.score?.band === "주의" && CARE_DAY_REVERSAL_RE.test(t.body)) add(`주의인 날 본문에 반전 말 "${t.body.match(CARE_DAY_REVERSAL_RE)![0]}"`);
+  const times = TIME_WORDS.filter((w) => t.body.includes(w));
+  if (times.length >= 3) add(`시간대 나열 (${times.join("·")}) — 장면 1~2개만`);
+  for (const l of ABSTRACT_LABELS) if (t.body.includes(l)) add(`추상 이름 "${l}"을 그대로 씀 (생활 속 마음·행동으로)`);
+  if (b.today && b.today.useSolarTerm === false && b.today.solarTermName && everything.includes(b.today.solarTermName)) add(`절기 이름 "${b.today.solarTermName}" (절기 첫날에만)`);
+
+  // v4.5: 예시 베낌 — 예시 headline·do·dont와 같거나, 본문 문장이 예시 문장과 80% 이상 겹치면
+  const exSentences = FORTUNE_EXAMPLES.flatMap((e) => splitSentences(e.text.body));
+  for (const e of FORTUNE_EXAMPLES) {
+    if (t.headline.trim() === e.text.headline) add(`예시 headline을 그대로 씀 "${e.text.headline}"`);
+    if (t.do.trim() === e.text.do || t.dont.trim() === e.text.dont) add("예시 do·dont를 그대로 씀");
+  }
+  for (const sent of splitSentences(t.body)) if (exSentences.some((x) => tokenOverlap(sent, x) >= 0.8)) add(`예시 문장을 베낌 "${sent.slice(0, 20)}…"`);
 
   // 단정 · 기간 약속 · 명령조
   if (PROMISE_RE.test(everything)) add("기간 약속 (\"N일 더 쓰면\" 꼴)");

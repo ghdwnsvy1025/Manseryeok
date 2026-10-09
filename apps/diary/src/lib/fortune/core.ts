@@ -3,7 +3,7 @@
 //   원국(일기 앱 pillars 스냅샷) → balance → yongsin(현묘표) → relations
 //   맥락: fromBirth(BirthInput) → currentLuckContext = 현재 대운 · 세운(입춘 전이면 전년) · 월운
 //   일진: luck + luckRelations + luckAreas("일운") · 중첩: luckClash(대운·세운·월운, 일진)
-//   점수: score01 = clamp(0.5 + (raw + rel + ctx) / 12, 0.12, 0.92)
+//   점수: score01 = toScore01(raw + rel + ctx) — 0.5 위는 0.5+합/12(상한 0.92), 아래는 0.5+0.38·tanh(합/12/0.38) (v4.5)
 //   v4.1: 한·한 일진은 판정 "보통", 한신도 영역 "→", ctx에 대운·세운 판정 소폭(×0.2, ×0.15), 월운·대운 플래그 문장 항상
 //   v4.2 (코어 240c91d, 2026-10-07 동기화): 전왕표(Y-08) 없음. Y-12 — 비겁 중심 신강의 관성 운은 라벨 "한"이지만 코어가 희신급 점수로 올린다(플래그 "Y-12").
 //        코어 규칙이 우선이므로 그 글자는 v4.1 ①②(한·한 → 보통, 한신 영역 →)에서 빼고 문장도 희신 말로 쓴다.
@@ -74,7 +74,17 @@ export const COEF = {
   seunVerdict: 0.15,
   min: 0.12,
   max: 0.92,
+  /** v4.5: 0.5 아래쪽은 직선 자르기 대신 tanh 곡선. 기울기는 0 근처에서 그대로, 바닥은 0.5−lowAmp(=1.2)에 다가가기만 한다.
+      6사주×365일 측정: 직선일 때 1점대 7.9%·바닥(1.2) 붙음 3% → 곡선이면 1점대 1% 아래, 힘든 날은 2~4점대에서 서로 구분된다 */
+  lowAmp: 0.38,
 } as const;
+
+/** (raw + rel + ctx) → 0~1 점수 (v4.5). 0.5 위는 예전 직선(상한 max), 아래는 lowAmp tanh — 순서는 그대로 */
+export function toScore01(sum: number): number {
+  const lin = sum / COEF.scale;
+  if (lin >= 0) return Math.min(0.5 + lin, COEF.max);
+  return 0.5 + COEF.lowAmp * Math.tanh(lin / COEF.lowAmp);
+}
 
 /** 시간 모름(Y-10): 12개 시주 중 이 개수 이상에서 용신 오행이 같아야 그 용신을 쓴다 */
 export const UNKNOWN_HOUR_MIN = 10;
@@ -92,15 +102,17 @@ const POS: CoreRelationHit["pos"][] = ["연", "월", "일", "시"];
 const hourPillar = (dayStem: string, i: number): string => STEMS[([0, 2, 4, 6, 8][STEMS.indexOf(dayStem) % 5]! + i) % 10]! + BRANCHES[i]!;
 
 // ---------- 사용자용 낱말 (text.ts BANNED를 지킨다: 기운·흐름·용신·기신·십신·일간·일지 금지) ----------
-const POS_WORD: Record<CoreRelationHit["pos"], string> = { 연: "태어난 해 글자", 월: "태어난 달 글자", 일: "태어난 날 글자", 시: "태어난 시 글자" };
-const LABEL_WORD: Record<Exclude<RoleLabel, null>, string> = {
-  용: "내 사주에 모자란 쪽을 채워 줘요",
-  희: "모자란 쪽에 힘을 보태요",
-  한: "기울지 않고 그 성격대로 가요",
-  구: "조금 거슬리는 쪽이에요",
-  기: "내 사주에 이미 많은 쪽을 더 보태요",
+/** v4.5: 생활어. "한"(치우치지 않음)은 글에 쓸 내용이 없어 문장을 만들지 않는다 */
+const LABEL_WORD: Record<Exclude<RoleLabel, null>, string | null> = {
+  용: "나에게 모자란 부분을 채워 줘서 도움이 돼요",
+  희: "모자란 부분에 힘을 보태 줘요",
+  한: null,
+  구: "나와 조금 어긋나서 신경이 쓰일 수 있어요",
+  기: "원래 나에게 넘치는 쪽이라 오늘은 과해지기 쉬워요",
 };
-const LABEL_SHORT: Record<Exclude<RoleLabel, null>, string> = { 용: "모자란 쪽을 채워요", 희: "힘을 보태요", 한: "기울지 않아요", 구: "조금 거슬려요", 기: "이미 많은 쪽을 더해요" };
+/** v4.5: 충·복음이 걸린 내 자리 → 생활 영역 (태어난 해=오래된 인연, 달=집안·일터, 날=나와 가까운 사람, 시=앞으로의 계획) */
+const POS_LIFE: Record<"연" | "월" | "일" | "시", string> = { 연: "오래된 인연", 월: "집안이나 일터", 일: "나와 가까운 사람", 시: "앞으로의 계획" };
+const LABEL_SHORT: Record<Exclude<RoleLabel, null>, string> = { 용: "모자란 부분을 채워요", 희: "힘을 보태요", 한: "그 성격대로 가요", 구: "조금 어긋나요", 기: "넘치는 쪽을 더해요" };
 const VERDICT_WORD: Record<Verdict5, string> = { "매우 유리": "꽤 수월한 편", 유리: "수월한 편", 보통: "보통", 주의: "조심할 편", 어려움: "힘이 드는 편" };
 const AREA_WORD: Record<AreaName, string> = { 대인: "사람", 재물: "돈", 직업: "일", 학업: "배움", 연애: "연애", 가족: "가족", 건강: "몸" };
 
@@ -284,7 +296,7 @@ export function computeCoreFortune(input: CoreInput): CoreFortune {
   ctxScore += (daeun?.합계 ?? 0) * COEF.daeunVerdict + (seunItem.합계 ?? 0) * COEF.seunVerdict;
 
   // ---- 점수 ----
-  const score01 = clamp(0.5 + (raw + relScore + ctxScore) / COEF.scale, COEF.min, COEF.max);
+  const score01 = toScore01(raw + relScore + ctxScore);
 
   // ---- 영역 (숫자 없음, 신호만) — v4.2: 오늘(일운 ≤2) → 이달(월운 1) → 올해(세운 1), 전부 코어 luckAreas ----
   const gender = input.profile?.gender;
@@ -298,7 +310,7 @@ export function computeCoreFortune(input: CoreInput): CoreFortune {
       const boostedHere = assistedHere && part.라벨 === "한" && part.그룹 === "관성";
       const eff = part.라벨 === "한" && !boostedHere ? 0 : part.점수;
       const theme = TEN_GOD_THEME[row.십신 as TenGod];
-      const why = `'${theme}'(${row.십신}) 글자가 ${LABEL_SHORT[boostedHere ? "희" : part.라벨]}`;
+      const why = `'${theme}'(${row.십신}) 쪽이 ${LABEL_SHORT[boostedHere ? "희" : part.라벨]}`;
       for (const name of row.영역) {
         let area: AreaName | null = null;
         if (name === "연애(남·전통)") area = gender === "male" ? "연애" : null;
@@ -315,7 +327,7 @@ export function computeCoreFortune(input: CoreInput): CoreFortune {
     const out: CoreFortune["areas"] = [];
     for (const [area, v] of [...acc.entries()].sort((a, c) => Math.abs(c[1].sum) - Math.abs(a[1].sum))) {
       const signal: AreaSignal = v.sum >= 1 ? "↑" : v.sum <= -1 ? "↓" : "→";
-      out.push({ period, area, signal, why: v.mixed && signal === "→" ? "두 글자가 서로 다른 쪽으로 당겨 비슷해요" : v.whys[0]! });
+      out.push({ period, area, signal, why: v.mixed && signal === "→" ? "두 성격이 서로 다른 쪽으로 당겨 비슷해요" : v.whys[0]! });
       if (out.length === max) break;
     }
     return out;
@@ -350,36 +362,43 @@ export function computeCoreFortune(input: CoreInput): CoreFortune {
   else facts.push(`오늘은 '${st}'(${stem.tenGod})${batchim(st) ? "과" : "와"} '${bt}'(${branch.tenGod})${batchim(bt) ? "이" : "가"} 함께 와요.`);
   // 라벨 문장은 같은 것이면 한 번만
   const labelFacts = new Set<string>();
-  for (const part of [stem, branch]) { const wl = wordLabel(part); if (wl) labelFacts.add(`'${TEN_GOD_THEME[part.tenGod]}' 글자는 ${LABEL_WORD[wl]}.`); }
+  for (const part of [stem, branch]) { const wl = wordLabel(part); const w = wl ? LABEL_WORD[wl] : null; if (w) labelFacts.add(`'${TEN_GOD_THEME[part.tenGod]}' 쪽은 ${w}.`); }
   facts.push(...labelFacts);
   if (l) facts.push(`둘을 합치면 오늘은 ${VERDICT_WORD[total]}이에요.`);
-  else facts.push("태어난 시간을 몰라 오늘이 수월한지 힘든지는 단정하지 않고, 글자의 성격과 부딪힘만 봐요.");
+  else facts.push("태어난 시간을 몰라 오늘이 수월한지 힘든지는 단정하지 않아요.");
   for (const h of hits) {
     // 전문용어(충·반합 등)는 relations.hits에 있으므로 문장에는 넣지 않는다. v4.2: 합 문장("짝이 돼요/한편이 돼요")은 없다 — 합은 아래 플래그 문장 두 종류만
     if (h.kind === "충") {
-      const dir = h.direction === "불리" ? " 흔들리는 쪽이라 예정이 틀어지기 쉬워요." : h.direction === "유리" ? " 묵은 것이 풀리는 쪽이에요." : "";
-      facts.push(`오늘 아랫글자 ${g[1]}는 내 ${POS_WORD[h.pos]} ${h.chars}와 부딪혀요.${dir}`);
+      // v4.5: 구조("아랫글자 … 부딪혀요") 대신 그 결과를 생활 영역으로
+      const life = POS_LIFE[h.pos];
+      facts.push(
+        h.direction === "불리"
+          ? `오늘은 ${life} 쪽 일이 흔들려 예정이 틀어지기 쉬워요.`
+          : h.direction === "유리"
+            ? `오늘은 ${life} 쪽에서 오래 묵혀 둔 일이 움직이기 쉬워요.`
+            : `오늘은 ${life} 쪽에 작은 변화가 생기기 쉬워요.`,
+      );
     } else if (h.kind === "복음") {
-      facts.push(`오늘 아랫글자 ${g[1]}는 내 ${POS_WORD[h.pos]}와 같은 글자예요.`);
+      facts.push(`오늘은 ${POS_LIFE[h.pos]} 쪽에서 비슷한 일이 되풀이되기 쉬워요.`);
     }
   }
   // 오늘 플래그 문장 (같은 문장은 한 번만). 맥락 문장보다 앞 — 10문장 상한에서 오늘 것이 먼저 남는다.
   // v4.3: 합 관련 플래그("… 합으로 묶음", "긴장이 풀리는 시기")는 문장을 만들지 않는다 — 큰 특징만 나열
   const flagFacts = new Set<string>();
   for (const f of flags) {
-    if (f.startsWith("용신 손상") && !f.includes("묶음")) flagFacts.add("오늘 글자가 내 사주에 모자란 쪽 글자를 누르는 날이라 평소보다 힘이 들 수 있어요.");
+    if (f.startsWith("용신 손상") && !f.includes("묶음")) flagFacts.add("오늘은 나에게 모자란 부분이 더 눌리는 날이라 평소보다 힘이 들 수 있어요.");
     else if (f.startsWith("운 내부 상충")) flagFacts.add("오늘은 겉과 속이 달라 힘이 한곳에 모이지 않아요.");
-    else if (f.startsWith("중화 사주")) flagFacts.add("내 사주는 치우침이 적어 운의 좋고 나쁨보다 하는 일의 성격이 더 크게 작용해요.");
+    // v4.5: "중화 사주" 문장은 글 재료에서 뺀다 — 모델이 매일 그대로 옮겨 적어 읽는 사람에게 뜻이 없었다(플래그는 relations에 남는다)
   }
   facts.push(...flagFacts);
 
   // ---- 맥락 문장 (v4.4): 근거 표시용 contextFacts에는 항상, 글 재료 facts에는 바뀌는 날·충인 날에만 ----
   const contextFacts: string[] = [];
   const daeunFact = daeun
-    ? `지금 10년 단위 운 ${ko(daeun.간지)}은 ${daeun.판정 ? VERDICT_WORD[daeun.판정] : "판정 보류"}${daeun.clash ? "이고, 오늘 글자와 부딪혀 변동이 겹치는 날이에요" : "이에요"}.`
+    ? `지금 10년 단위 운 ${ko(daeun.간지)}은 ${daeun.판정 ? VERDICT_WORD[daeun.판정] : "판정 보류"}${daeun.clash ? "이고, 오늘과 어긋나 변동이 커지기 쉬운 날이에요" : "이에요"}.`
     : null;
-  const seunFact = `올해 운 ${ko(seunItem.간지)}은 ${seunItem.판정 ? VERDICT_WORD[seunItem.판정] : "판정 보류"}${seunItem.clash ? "이고, 오늘 글자와 부딪혀요" : "이에요"}.`;
-  const wolunFact = wolun ? `이달 운 ${ko(wolun.간지)}은 ${wolun.판정 ? VERDICT_WORD[wolun.판정] : "판정 보류"}${wolun.clash ? "이고, 오늘 글자와 부딪혀요" : "이에요"}.` : null;
+  const seunFact = `올해 운 ${ko(seunItem.간지)}은 ${seunItem.판정 ? VERDICT_WORD[seunItem.판정] : "판정 보류"}${seunItem.clash ? "이고, 오늘과 어긋나 변동이 생기기 쉬워요" : "이에요"}.`;
+  const wolunFact = wolun ? `이달 운 ${ko(wolun.간지)}은 ${wolun.판정 ? VERDICT_WORD[wolun.판정] : "판정 보류"}${wolun.clash ? "이고, 오늘과 어긋나 변동이 생기기 쉬워요" : "이에요"}.` : null;
   if (daeunFact) {
     contextFacts.push(daeunFact);
     // 대운 플래그(용신 손상 · 운 내부 상충) 문장은 근거에만 (v4.1 ③ → v4.4)
@@ -399,8 +418,8 @@ export function computeCoreFortune(input: CoreInput): CoreFortune {
   if (wolunFact && (wolunStartsToday || wolun?.clash)) facts.push(wolunFact);
 
   // v4.4: 맥락 문장이 빠져 채움 문장이 자주 쓰이므로 다른 facts처럼 "~요"로 끝낸다
-  if (facts.length < 6 && keywords.positive.length) facts.push(`오늘 글자에는 '${keywords.positive.slice(0, 3).join(", ")}' 같은 말이 잘 붙어요.`);
-  if (facts.length < 6 && keywords.negative.length) facts.push(`오늘 글자에서는 '${keywords.negative.slice(0, 3).join(", ")}' 같은 말을 조심해요.`);
+  if (facts.length < 6 && keywords.positive.length) facts.push(`오늘 어울리는 말은 '${keywords.positive.slice(0, 3).join(", ")}' 같은 것들이에요.`);
+  if (facts.length < 6 && keywords.negative.length) facts.push(`오늘 조심할 말은 '${keywords.negative.slice(0, 3).join(", ")}' 같은 것들이에요.`);
   if (facts.length < 6) facts.push(`오늘은 ${AREA_WORD[todayAreas[0]?.area ?? "대인"]} 쪽에 신호가 ${todayAreas.length ? "있어요" : "뚜렷하지 않아요"}.`);
   facts.splice(10);
 

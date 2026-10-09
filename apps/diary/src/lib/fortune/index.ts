@@ -2,6 +2,7 @@
 // 1) 사용자(또는 게스트 지문) × 날짜 캐시가 있으면 그대로 준다.
 // 2) 없으면 코어 판정(v4: core.ts) → 10점 환산 → 내 기록 보정 → 글(3단계 llm.ts: 모델 → 검사 → 재작성 1회 → 템플릿) → 캐시에 쓴다.
 // v3의 computeBaseFortune(base.ts)은 더 쓰지 않는다 (백테스트·테스트가 참조하므로 파일은 둔다).
+import { visibleAreas } from "./visible";
 import "server-only";
 import { createHash } from "node:crypto";
 import { ENGINE_VERSION } from "@saju/engine";
@@ -17,7 +18,7 @@ import { templateInputFromCore, templateText } from "./text";
 import type { FortuneContent } from "./types";
 
 /** 캐시 지문에 들어간다. 올리면 기존 캐시가 전부 무효 */
-export const FORTUNE_VERSION = "v4.4";
+export const FORTUNE_VERSION = "v4.5";
 
 export type FortuneOwner = { userId: string; guestKey?: undefined } | { guestKey: string; userId?: undefined };
 
@@ -154,7 +155,7 @@ export async function computeFortune(req: Omit<FortuneRequest, "owner">, opts: {
     body: text.body,
     do: text.do,
     dont: text.dont,
-    ...(text.areas ? { areas: text.areas } : {}),
+    ...(text.areas ? { areas: visibleAreas(text.areas, core.facts) } : {}),
     source,
     attempts,
     ...(model ? { model } : {}),

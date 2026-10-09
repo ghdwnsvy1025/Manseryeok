@@ -1,6 +1,7 @@
 // 3단계 — 글의 재료(brief). 모델에게 가는 유일한 입력이고, 검사기(validate.ts)는 "brief에 없는 것이 글에 나왔는가"를 이 묶음으로 판단한다.
 // 사주 코어 content/src/brief.ts의 축소판: 사실 + 낱말 + 금지 사항 + 분량 규칙. 설계: docs/FORTUNE_V4.md "3단계 — 글".
 import type { TenGod } from "@saju/engine";
+import { TEN_GOD_THEME } from "./base";
 import { AREA_WORD } from "./core";
 import { solarTermOf } from "./solarTerms";
 import { BANNED, batchim } from "./text";
@@ -51,9 +52,12 @@ export interface BriefInput {
 export const CONTEXT_FACT_RE = /^(올해 운|이달 운|지금 10년 단위 운)/;
 export const hasContextFact = (facts: readonly string[]): boolean => facts.some((f) => CONTEXT_FACT_RE.test(f));
 
+/** v4.5: 본문에 그대로 쓰면 추상적으로 읽히는 성격 이름("경쟁과 추진" 같은 'A과 B' 꼴). 생활 속 마음·행동으로 풀어 써야 한다 — 검사기가 본다 */
+export const ABSTRACT_LABELS: readonly string[] = Object.values(TEN_GOD_THEME).filter((t) => /[과와] /.test(t));
+
 export interface FortuneBrief {
-  /** v4.4: solarTerm = 그날이 속한 24절기와 며칠째 ("한로 사흘째"). 요일과 함께 장면 재료 — 기록 없는 사람도 날마다 다르게 */
-  today: { date: string; weekday: string; ganji: string; solarTerm: string };
+  /** v4.4: solarTerm = 그날이 속한 24절기와 며칠째 ("한로 사흘째"). v4.5: 글에 쓸 수 있는 건 절기 첫날(useSolarTerm)뿐 — 매일 "한로 사흘째…"로 시작하던 것 */
+  today: { date: string; weekday: string; ganji: string; solarTerm: string; useSolarTerm: boolean; solarTermName: string };
   score: { value: number; band: string; word: string };
   /** 사용자용 낱말로 바뀐 사실 문장 (한자·십신 없음) */
   facts: string[];
@@ -110,7 +114,8 @@ export function buildBrief(input: BriefInput): FortuneBrief {
   }
 
   const [y, m, d] = input.date.split("-").map(Number) as [number, number, number];
-  const solarTerm = solarTermOf(input.date).label;
+  const term = solarTermOf(input.date);
+  const solarTerm = term.label;
   const allowedNumbers = extractNumbers([
     ...facts,
     ...caveats,
@@ -122,7 +127,7 @@ export function buildBrief(input: BriefInput): FortuneBrief {
   const withContext = hasContextFact(facts);
 
   return {
-    today: { date: input.date, weekday: input.weekday, ganji: `${today.ko}일`, solarTerm },
+    today: { date: input.date, weekday: input.weekday, ganji: `${today.ko}일`, solarTerm, useSolarTerm: term.isTermDay, solarTermName: term.name },
     score: { value: input.score10, band: input.band, word: BAND_WORD[input.band] },
     facts,
     areas,
@@ -144,7 +149,9 @@ export function buildBrief(input: BriefInput): FortuneBrief {
       mine: mine
         ? `본문 어딘가에 내 숫자 한 문장을 꼭 넣기 (재료: "${mine}"). 숫자는 그대로 쓰기`
         : "기록이 없으니 내 기록 이야기를 하지 않기 (기록했다는 말, 평균, 횟수 모두 금지)",
-      scene: `오늘은 ${input.weekday}, ${solarTerm}. 요일과 절기는 장면에 자연스럽게 한 번씩만 쓸 수 있고 되풀이하지 않기. "특별한·남다른·다른 날과 달리·차별" 같은 말은 금지`,
+      scene: term.isTermDay
+        ? `오늘은 ${input.weekday}, ${term.name}${batchim(term.name) ? "이" : "가"} 시작하는 날. 절기 이름은 한 번만 써도 되고, 요일도 한 번만. 직장·회사 장면(거래처·제안서·회의·출근·상사)은 쓰지 않기. "특별한·남다른·다른 날과 달리·차별" 금지`
+        : `오늘은 ${input.weekday}. 절기 이름(${term.name})은 쓰지 않기. 요일은 꼭 필요할 때만 한 번. 직장·회사 장면(거래처·제안서·회의·출근·상사)은 쓰지 않기. "특별한·남다른·다른 날과 달리·차별" 금지`,
       context: withContext
         ? "facts에 올해·이달·10년 단위 운 문장이 있는 날이니 그 문장만 한 번 생활어로 풀어 넣기 (없는 운은 말하지 않기)"
         : "facts에 올해·이달·10년 단위 운 문장이 없으니 올해 운·이달 운·10년 단위 운을 말하지 않기 (areas의 이달·올해 줄은 예외)",
