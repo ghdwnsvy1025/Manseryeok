@@ -163,6 +163,23 @@ export function FortuneCard({ fortune, ganjiKo, canVote, vote, defaultOpen }: Pr
           <span className="font-serif text-[34px] tabular-nums text-gold-ink">{scoreText}</span>
           <span className="text-[14px] text-muted">/10</span>
         </span>
+        {/* v3.18 (2026-10-11 Q2 = A): 점수 아래 오늘 영역 한 줄 — "사람 ↑ · 돈 ↓"를 작은 띠지로. 카드를 펼치기 전에도 보인다.
+            엔진은 영역마다 점수가 아니라 방향(↑ → ↓)만 내므로 숫자·막대는 만들지 않는다. 보기만(누르면 카드가 펼쳐질 뿐). 모양은 디자이너(.area-chips*) */}
+        {areas.some((a) => a.period === "오늘") && (
+          <span className="area-chips" aria-label="오늘 영역">
+            {areas
+              .filter((a) => a.period === "오늘")
+              .map((a) => (
+                <span key={a.area} className="area-chip" data-signal={a.signal}>
+                  {AREA_WORD[a.area]}
+                  <span aria-hidden className={`area-chip__arrow ${SIGNAL_COLOR[a.signal]}`}>
+                    {a.signal}
+                  </span>
+                  <span className="sr-only">{SIGNAL_WORD[a.signal]}</span>
+                </span>
+              ))}
+          </span>
+        )}
       </summary>
 
       <div className="fortune-body">

@@ -51,7 +51,7 @@
 
   --font-sans: "Pretendard Variable", "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
   --font-serif: var(--font-song), var(--font-gowun), "AppleMyungjo", "Batang", serif;
-  --font-hand: var(--font-pen), var(--font-gowun), cursive;
+  --font-hand: var(--font-gowun), "AppleMyungjo", "Batang", serif; /* v3.18 메모 = 고운바탕 (나눔펜 폐기) */
 }
 
 /* 오행 글자색의 다크값 (톤 v3.6 "다크에선 각각 밝게"). 앱은 라이트 고정이라 data-theme="dark"가 붙을 때만 */
@@ -145,15 +145,23 @@ body {
   justify-content: center;
 }
 
-/* 편지지 괘선: 키트 ruled-paper (손으로 그은 녹갈 먹선 2줄 타일, 주기 = 타일 높이의 절반).
-   --lh 줄 높이마다 한 줄. 선은 글자 기준선 조금 아래(0.9lh)에 놓인다. */
+/* 편지지 괘선: 키트 ruled-paper (손으로 그은 녹갈 먹선 2줄 타일, 주기 = 타일 높이의 절반, 선은 타일의 1/4·3/4 지점).
+   --lh 줄 높이마다 한 줄. 선은 0.95lh(= 28.5px)에 놓인다 — v3.18 고운바탕 17px의 기준선(약 21px)·받침 아래끝(약 25px) 바로 아래라 글자를 가로지르지 않는다 */
 .ruled {
-  --lh: 36px;
+  --lh: 30px;
   line-height: var(--lh);
   background-image: url("/ui/ruled-paper-clean.webp");
   background-repeat: repeat-y;
   background-size: 100% calc(var(--lh) * 2);
-  background-position: 0 calc(var(--lh) * 0.4);
+  background-position: 0 calc(var(--lh) * 0.45);
+}
+/* 입력칸 (v3.18): 글에 맞춰 2줄~6줄로 자란다(field-sizing 지원 브라우저). 못 자라는 브라우저나 6줄을 넘겨 스크롤할 때도
+   괘선이 글과 함께 움직인다(background-attachment: local) */
+textarea.ruled {
+  background-attachment: local;
+  field-sizing: content;
+  min-height: calc(var(--lh) * 2);
+  max-height: calc(var(--lh) * 6);
 }
 
 /* 종이 띠지: 키트 tag-strip (양 끝이 손으로 찢긴 짧은 한지 띠). 양 끝 44px은 그대로, 가운데만 늘인다 */
@@ -2354,4 +2362,52 @@ button.cal__cell {
   color: var(--color-muted);
   white-space: nowrap;
   pointer-events: none;
+}
+
+/* ── v3.18 운세 카드 점수 아래 영역 띠지 (명세 19) ─────────────────────── */
+/* 점수 아래 8px, 가운데 한 줄, 칩 사이 8px. 칩 = .sig--line 재질 축소판(찢긴 한지 띠 mask + 먹 1px 가장자리).
+   26px · 13px 먹색 · 화살표 15px 굵게(색은 TSX: ↑ 금 / → muted / ↓ 먹). 접힌 카드에서도 보이니 글자는 보통 굵기 */
+.area-chips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+.area-chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 26px;
+  padding: 0 12px;
+  font-size: 13px;
+  line-height: 1;
+  white-space: nowrap;
+  color: var(--color-ink);
+  background: var(--color-paper-2) url("/ui/tag-strip-paper-clean.webp") center / 100% 100% no-repeat;
+  -webkit-mask: url("/ui/tag-strip-paper-clean.webp") center / 100% 100% no-repeat;
+  mask: url("/ui/tag-strip-paper-clean.webp") center / 100% 100% no-repeat;
+}
+.area-chip::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-color: var(--color-ink);
+  opacity: 0.7;
+  -webkit-mask-image: url("/ui/tag-strip-paper-clean.webp"), url("/ui/tag-strip-paper-clean.webp");
+  -webkit-mask-size: 100% 100%, calc(100% - 2px) calc(100% - 2px);
+  -webkit-mask-position: center, center;
+  -webkit-mask-repeat: no-repeat, no-repeat;
+  -webkit-mask-composite: source-out;
+  mask-image: url("/ui/tag-strip-paper-clean.webp"), url("/ui/tag-strip-paper-clean.webp");
+  mask-size: 100% 100%, calc(100% - 2px) calc(100% - 2px);
+  mask-position: center, center;
+  mask-repeat: no-repeat, no-repeat;
+  mask-composite: subtract;
+}
+.area-chip__arrow {
+  font-size: 15px;
+  font-weight: 700;
 }

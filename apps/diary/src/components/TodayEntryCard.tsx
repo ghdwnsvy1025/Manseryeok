@@ -66,7 +66,7 @@ export function TodayEntryCard({ entry, today, ganjiKo, sameGanjiTimes, metCards
 
       {/* 메모가 없으면 괘선까지 통째로 생략한다 — 빈 자리는 비운다 (v3.7) */}
       {/* v3.16 버그 수정: 메모 위·아래 붓선을 뺐다. 편지지 괘선 + 아래 소식 줄의 붓선이 겹쳐 선이 4~5개로 보였다(메모 아래 붓선과 소식 붓선이 붙어 두 줄) */}
-      {entry.note && <p className="ruled mt-4 line-clamp-3 font-hand text-[22px] text-ink">{entry.note}</p>}
+      {entry.note && <p className="ruled mt-4 line-clamp-3 font-hand text-[17px] break-keep text-ink">{entry.note}</p>}
 
       {/* v3.13: 점 대신 줄맞춤 — 첫 줄 카드 소식, 그 아래 이름–값 줄(오늘 포인트 · 모은 카드 + 막대), 맨 아래 지표 칩 */}
       <div className="entry-news mt-4">

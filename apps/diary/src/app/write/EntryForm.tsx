@@ -214,7 +214,7 @@ export function EntryForm({ date, promiseText, notePlaceholder, initial }: Props
             value={note}
             onChange={(e) => setNote(e.target.value)}
             placeholder={notePlaceholder ?? "오늘 기억하고 싶은 일 하나"}
-            className="ruled mt-2 w-full resize-none bg-transparent px-1 font-hand text-[22px] text-ink placeholder:font-sans placeholder:text-[16px] placeholder:text-faint focus:outline-none focus-visible:outline-2 focus-visible:outline-gold"
+            className="ruled mt-2 w-full resize-none bg-transparent px-1 font-hand text-[17px] break-keep text-ink placeholder:font-sans placeholder:text-[16px] placeholder:text-faint focus:outline-none focus-visible:outline-2 focus-visible:outline-gold"
           />
         </div>
       </div>

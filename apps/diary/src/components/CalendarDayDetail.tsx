@@ -40,7 +40,7 @@ export function CalendarDayDetail({ date, ganjiKo, entry }: Props) {
               ))}
             </ul>
           )}
-          {entry.note && <p className="day-detail__note ruled mt-3 font-hand text-[22px] text-ink">{entry.note}</p>}
+          {entry.note && <p className="day-detail__note ruled mt-3 font-hand text-[17px] break-keep text-ink">{entry.note}</p>}
           <p className="mt-3 text-center">
             <Link href={`/write?date=${date}`} className="tap text-sm text-muted underline underline-offset-4">
               고치기

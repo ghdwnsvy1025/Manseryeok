@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Gowun_Batang, Nanum_Pen_Script, Song_Myung } from "next/font/google";
+import { Gowun_Batang, Song_Myung } from "next/font/google";
 import { AnonBoot } from "@/components/AnonBoot";
 import { BottomNav } from "@/components/BottomNav";
 import { PwaRegister } from "@/components/PwaRegister";
@@ -11,7 +11,6 @@ import "./globals.css";
 // 송명은 타입 정의에 preload가 빠져 있지만 런타임은 서브셋 없이 미리 불러오기를 거부한다 (next/font는 리터럴만 받아 spread 불가)
 // @ts-expect-error -- preload는 런타임에서 유효
 const song = Song_Myung({ weight: "400", preload: false, variable: "--font-song", display: "swap" });
-const pen = Nanum_Pen_Script({ weight: "400", preload: false, variable: "--font-pen", display: "swap" });
 const gowun = Gowun_Batang({ weight: ["400", "700"], preload: false, variable: "--font-gowun", display: "swap" });
 const PRETENDARD_CSS = "https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css";
 
@@ -32,7 +31,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="ko" className={`${song.variable} ${pen.variable} ${gowun.variable}`}>
+    <html lang="ko" className={`${song.variable} ${gowun.variable}`}>
       <head>
         <link rel="preconnect" href="https://cdn.jsdelivr.net" crossOrigin="anonymous" />
         <link rel="stylesheet" href={PRETENDARD_CSS} />
