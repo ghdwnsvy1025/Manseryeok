@@ -10,7 +10,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { test } from "vitest";
-import { buildBrief, renderBrief } from "@/lib/fortune/brief";
+import { angleOf, buildBrief, renderBrief } from "@/lib/fortune/brief";
 import { computeCoreFortune } from "@/lib/fortune/core";
 import { generateFortuneText } from "@/lib/fortune/llm";
 import { adjustWithEntries, bandOf, toTenPoint, type EntryLike } from "@/lib/fortune/personal";
@@ -72,7 +72,8 @@ test("fortune review: 사주 4 × 날짜 2 — 모델 호출 8회, 저장 없음
       const fallback = templateText(templateInputFromCore(core), personal, todayInfo);
       const r = await generateFortuneText(input, fallback);
       const t = r.source === "template" ? null : r.lastModelText;
-      lines.push("", `===== ${label} · ${date} ${weekday} ${today.ko}일 · ${score10} ${band} · source=${r.source} attempts=${r.attempts}`);
+      const ang = angleOf(core);
+      lines.push("", `===== [${ang.angle}${ang.focus ? ":" + ang.focus : ""}] ${label} · ${date} ${weekday} ${today.ko}일 · ${score10} ${band} · source=${r.source} attempts=${r.attempts}`);
       lines.push(`facts: ${core.facts.slice(0, 6).join(" / ")}`);
       lines.push(`검사: ${r.issues.map((xs) => (xs.length ? xs.join(" / ") : "통과")).join(" | ")}`);
       if (t) {

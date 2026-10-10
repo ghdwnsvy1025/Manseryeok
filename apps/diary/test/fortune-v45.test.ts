@@ -95,3 +95,19 @@ describe("v4.5 이달·올해 줄은 그 운 문장이 있는 날만", () => {
     expect(visibleAreas(areas, ["올해 운 丙午은 보통이에요."]).map((a) => a.period)).toEqual(["오늘", "올해"]);
   });
 });
+
+describe("v4.6 오늘의 짜임", () => {
+  it("충이나 운 문장이 있으면 change, 오늘 영역 신호가 뚜렷하면 focus, 아니면 calm", async () => {
+    const { angleOf } = await import("@/lib/fortune/brief");
+    const base = { relations: { hits: [], flags: [] }, areas: [], facts: [] } as never;
+    expect(angleOf(base)).toEqual({ angle: "calm", focus: null });
+    expect(angleOf({ relations: { hits: [], flags: [] }, areas: [{ period: "오늘", area: "재물", signal: "↑", why: "" }], facts: [] } as never)).toEqual({ angle: "focus", focus: "재물" });
+    expect(angleOf({ relations: { hits: [], flags: [] }, areas: [{ period: "오늘", area: "재물", signal: "↑", why: "" }], facts: ["이달 운 戊戌은 힘이 드는 편이에요."] } as never).angle).toBe("change");
+    expect(angleOf({ relations: { hits: [{ kind: "충" }], flags: [] }, areas: [], facts: [] } as never).angle).toBe("change");
+  });
+  it("brief에 angle·focusArea·chain이 들어간다", () => {
+    const b = briefFor("2026-10-13");
+    expect(["change", "focus", "calm"]).toContain(b.angle);
+    expect(b.chain.length).toBeGreaterThan(0);
+  });
+});

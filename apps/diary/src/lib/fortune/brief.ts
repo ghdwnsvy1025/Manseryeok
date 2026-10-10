@@ -55,10 +55,27 @@ export const hasContextFact = (facts: readonly string[]): boolean => facts.some(
 /** v4.5: 본문에 그대로 쓰면 추상적으로 읽히는 성격 이름("경쟁과 추진" 같은 'A과 B' 꼴). 생활 속 마음·행동으로 풀어 써야 한다 — 검사기가 본다 */
 export const ABSTRACT_LABELS: readonly string[] = Object.values(TEN_GOD_THEME).filter((t) => /[과와] /.test(t));
 
+/** v4.6: 오늘의 짜임. change = 운이 바뀌거나 내 사주와 부딪히는 날(변동 대비) · focus = 한 생활 영역에 신호가 뚜렷한 날 · calm = 큰 신호 없는 날(담백하게) */
+export type FortuneAngle = "change" | "focus" | "calm";
+
+/** 엔진 결과로 오늘의 짜임을 고른다. 같은 입력이면 늘 같은 짜임 */
+export function angleOf(core: Pick<CoreFortune, "relations" | "areas" | "facts">): { angle: FortuneAngle; focus: AreaName | null } {
+  const changing = core.relations.hits.some((h) => h.kind === "충") || hasContextFact(core.facts);
+  if (changing) return { angle: "change", focus: null };
+  const strong = core.areas.find((a) => a.period === "오늘" && a.signal !== "→");
+  if (strong) return { angle: "focus", focus: strong.area };
+  return { angle: "calm", focus: null };
+}
+
 export interface FortuneBrief {
   /** v4.4: solarTerm = 그날이 속한 24절기와 며칠째 ("한로 사흘째"). v4.5: 글에 쓸 수 있는 건 절기 첫날(useSolarTerm)뿐 — 매일 "한로 사흘째…"로 시작하던 것 */
   today: { date: string; weekday: string; ganji: string; solarTerm: string; useSolarTerm: boolean; solarTermName: string };
   score: { value: number; band: string; word: string };
+  /** v4.6: 오늘의 짜임과 중심 영역(focus일 때만, 생활어 "돈"·"사람"…) */
+  angle: FortuneAngle;
+  focusArea: string | null;
+  /** v4.6: 원인 → 나와의 관계 → 합친 결과. 본문 둘째 단계가 이 순서로 "~라서 ~해요"를 잇는다 */
+  chain: string[];
   /** 사용자용 낱말로 바뀐 사실 문장 (한자·십신 없음) */
   facts: string[];
   /** 신호 있는 영역. 이 순서·개수·period·area대로 areas 줄을 쓴다. v4.2: 오늘(≤2) → 이달(1) → 올해(1) */
@@ -125,10 +142,14 @@ export function buildBrief(input: BriefInput): FortuneBrief {
     String(y), String(m), String(d),
   ]);
   const withContext = hasContextFact(facts);
+  const ang = angleOf(core);
 
   return {
     today: { date: input.date, weekday: input.weekday, ganji: `${today.ko}일`, solarTerm, useSolarTerm: term.isTermDay, solarTermName: term.name },
     score: { value: input.score10, band: input.band, word: BAND_WORD[input.band] },
+    angle: ang.angle,
+    focusArea: ang.focus ? AREA_WORD[ang.focus] : null,
+    chain: facts.slice(0, 3),
     facts,
     areas,
     keywords: core.keywords,
@@ -140,7 +161,7 @@ export function buildBrief(input: BriefInput): FortuneBrief {
     jargon: JARGON,
     rules: {
       headline: "12자 안팎, 한 구절. 오늘 하루의 느낌을 사실 하나와 묶어서",
-      body: "4~6문장. 사실들을 나열하지 말고 하나의 하루 흐름으로 잇기. 오늘의 성격·장면·내 기록으로만 쓰기. 아침·점심·저녁 중 한 장면을 구체적으로 하나 넣기. 같은 문형 반복 금지. 같은 성격이 두 번 온 날은 \"겹친다\" 대신 \"아주 강하다/세다\"로",
+      body: "4~6문장, 두 문단(빈 줄로 나눔). 사실들을 나열하지 말고 오늘의 성격·장면·내 기록으로만 쓰기. 첫 문단은 공감 한 문장 + chain 순서대로 원인→결과, 둘째 문단은 생활 장면 1~2개 + 마무리. 시간대를 차례로 늘어놓지 않기. 같은 문형 반복 금지. 같은 성격이 두 번 온 날은 \"겹친다\" 대신 \"아주 강하다/세다\"로",
       areas: areas.length
         ? `areas 배열은 ${areas.length}개, 순서·period·area 이름은 입력과 똑같이. 각 line은 1문장. period가 "이달"이면 "이달엔", "올해"면 "올해는"으로 시작하는 1문장. line은 본문 첫 문장을 되풀이하지 않기`
         : "areas는 빈 배열 []",
