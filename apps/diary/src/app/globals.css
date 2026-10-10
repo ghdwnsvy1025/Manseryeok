@@ -2241,7 +2241,8 @@ button.cal__cell {
 .saju-fold__pillar {
   display: inline-flex;
 }
-.saju-fold__summary::after {
+.saju-fold__summary::after,
+.more-stats__summary::after {
   content: "";
   flex: none;
   width: 14px;
@@ -2250,8 +2251,33 @@ button.cal__cell {
   -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 14' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 5.5l4 4 4-4'/%3E%3C/svg%3E") center / contain no-repeat;
   mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 14' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 5.5l4 4 4-4'/%3E%3C/svg%3E") center / contain no-repeat;
 }
-.saju-fold[open] > .saju-fold__summary::after {
+.saju-fold[open] > .saju-fold__summary::after,
+.more-stats[open] > .more-stats__summary::after {
   transform: rotate(180deg);
+}
+
+/* v3.17 자세한 통계 접기: 틀 없는 한 줄 — 위아래 녹갈 0.5px 괘선, 왼쪽 제목 / 오른쪽 꺾쇠(내 사주 접기와 같은 모양) */
+.more-stats {
+  border-block: 0.5px solid color-mix(in srgb, var(--color-frame) 70%, transparent);
+}
+.more-stats[open] {
+  padding-bottom: 16px;
+}
+.more-stats__summary.tap {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  min-height: 44px;
+  margin-inline: 0;
+  padding-inline: 2px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--color-ink);
+}
+.more-stats__summary:focus-visible {
+  outline: 2px solid var(--color-ink);
+  outline-offset: 2px;
 }
 
 /* "하면 좋아요" 값 단위와 점 줄 — 금빛 찍힌 점 / 녹갈 빈 점 */

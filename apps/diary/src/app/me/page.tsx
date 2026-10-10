@@ -6,8 +6,7 @@ import { GanjiGrid } from "@/components/GanjiGrid";
 import { Booting } from "@/components/Booting";
 import { characterOf, characterOfGanji } from "@/lib/character";
 import { StatsSummary } from "@/components/StatsSummary";
-import { countEntries, getSajuProfile, listEntriesInMonth, listEntries, listEntriesForStats, listFortuneScores } from "@/lib/db";
-import { moodTone } from "@/lib/entry";
+import { countEntries, getSajuProfile, listEntriesInMonth, listEntriesForStats, listFortuneScores } from "@/lib/db";
 import { growingSeries, happinessSeries, moodTop, pointStats, streakOf } from "@/lib/stats/extra";
 import { HappinessChart } from "@/components/HappinessChart";
 import { MonthCalendar, type DayInfo } from "@/components/MonthCalendar";
@@ -16,7 +15,7 @@ import { addDays } from "@/lib/time";
 import { fitPercent } from "@/lib/fortune/personal";
 import { dayGanji } from "@/lib/ganji";
 import { byBranch, byElement, byStem, ganjiGrid, highlights } from "@/lib/stats/ganji";
-import { formatKoreanDate, todayKST } from "@/lib/time";
+import { todayKST } from "@/lib/time";
 import type { PillarSnapshot } from "@/lib/profile";
 
 export const dynamic = "force-dynamic";
@@ -136,9 +135,8 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
   // 달력: 보여 줄 달(?d가 있으면 그 달). 그 달 기록을 한 번에 받아 날짜 상세를 클라이언트에서 바로 그린다 (v3.15)
   const dParam = d && /^\d{4}-\d{2}-\d{2}$/.test(d) && d <= today ? d : null;
   const calYm = resolveMonth(dParam ? dParam.slice(0, 7) : m, today);
-  const [profile, entries, total, all, fortuneScores, monthEntries] = await Promise.all([
+  const [profile, total, all, fortuneScores, monthEntries] = await Promise.all([
     getSajuProfile(supabase, user.id),
-    listEntries(supabase, user.id, 30),
     countEntries(supabase, user.id),
     listEntriesForStats(supabase, user.id),
     listFortuneScores(supabase, user.id, addDays(today, -29)),
@@ -208,6 +206,36 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
         </dl>
       </header>
 
+
+      <section className="flex flex-col gap-4">
+        <div>
+          <h2 className="font-serif text-[22px]">내 행복도</h2>
+          {/* v3.13 Q6 = B: 같은 자리에서 60갑자 / 달력 전환 (링크, JS 없음). 모양은 디자이너(.view-switch) */}
+          <nav className="view-switch mt-2" aria-label="보기">
+            <Link href="/me" scroll={false} aria-current={isCal ? "page" : undefined} className="view-switch__item" data-icon="calendar">
+              달력
+            </Link>
+            <Link href="/me?view=grid" scroll={false} aria-current={isCal ? undefined : "page"} className="view-switch__item" data-icon="grid">
+              60갑자
+            </Link>
+          </nav>
+          <p className="mt-2 text-sm text-muted">
+            {isCal ? "날마다 남긴 행복도가 도장으로 찍혀요. 날짜를 누르면 그날 카드와 기록이 아래에 나와요." : "60가지 날 가운데 나는 어떤 날에 행복했는지. 기록한 날의 동물이 칸에 찍혀요."}
+          </p>
+        </div>
+        {isCal ? (
+          <MonthCalendar cal={calMonth} days={calDays} initialSelected={pickedDay} today={today} />
+        ) : (
+          <GanjiGrid
+            cells={cells}
+            selected={selected}
+            todayIndex={todayIndex}
+            basePath="/me?view=grid"
+            pickedEntries={selected === null ? [] : all.filter((e) => e.day_ganji_index === selected)}
+          />
+        )}
+        <StatsSummary h={h} fitPercent={fitPercent(all.length)} stems={byStem(all)} branches={byBranch(all)} elements={byElement(all)} points={points} moods={moods} streak={streak} chart={<HappinessChart series={series} />} />
+      </section>
       {/* v3.15 Q1 = A: 접힌 상태가 기본. 제목 줄에 여덟 글자(시·일·월·년, 오행 색) 미리보기, 누르면 생년월일·나무패·오행 분포. 모양은 디자이너(.saju-fold*) */}
       <details className="saju-fold card-frame card-paper p-5">
         <summary className="saju-fold__summary flex cursor-pointer list-none items-center justify-between gap-3 [&::-webkit-details-marker]:hidden">
@@ -254,78 +282,9 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
         )}
       </details>
 
-      <section className="flex flex-col gap-4">
-        <div>
-          <h2 className="font-serif text-[22px]">내 행복도</h2>
-          {/* v3.13 Q6 = B: 같은 자리에서 60갑자 / 달력 전환 (링크, JS 없음). 모양은 디자이너(.view-switch) */}
-          <nav className="view-switch mt-2" aria-label="보기">
-            <Link href="/me" scroll={false} aria-current={isCal ? "page" : undefined} className="view-switch__item" data-icon="calendar">
-              달력
-            </Link>
-            <Link href="/me?view=grid" scroll={false} aria-current={isCal ? undefined : "page"} className="view-switch__item" data-icon="grid">
-              60갑자
-            </Link>
-          </nav>
-          <p className="mt-2 text-sm text-muted">
-            {isCal ? "날마다 남긴 행복도가 도장으로 찍혀요. 날짜를 누르면 그날 카드와 기록이 아래에 나와요." : "60가지 날 가운데 나는 어떤 날에 행복했는지. 기록한 날의 동물이 칸에 찍혀요."}
-          </p>
-        </div>
-        {isCal ? (
-          <MonthCalendar cal={calMonth} days={calDays} initialSelected={pickedDay} today={today} />
-        ) : (
-          <GanjiGrid
-            cells={cells}
-            selected={selected}
-            todayIndex={todayIndex}
-            basePath="/me?view=grid"
-            pickedEntries={selected === null ? [] : all.filter((e) => e.day_ganji_index === selected)}
-          />
-        )}
-        <StatsSummary h={h} fitPercent={fitPercent(all.length)} stems={byStem(all)} branches={byBranch(all)} elements={byElement(all)} points={points} moods={moods} streak={streak} chart={<HappinessChart series={series} />} />
-      </section>
       {/* v3.16: "내 카드 공유" 섹션은 없앴다 — 공유는 오늘 화면 운세 카드의 "공유"(오늘의 운세 한 장)로 */}
 
-      <section>
-        <div className="flex items-baseline justify-between">
-          <h2 className="font-serif text-[22px]">내 기록</h2>
-          <span className="text-sm text-muted">모두 {total}일</span>
-        </div>
-        {entries.length === 0 ? (
-          <p className="card-frame card-paper mt-3 p-5 text-[15px] text-muted">
-            아직 기록이 없어요. 오늘 밤 첫 줄을 남겨 보세요.
-          </p>
-        ) : (
-          <ul className="mt-3 flex flex-col gap-3">
-            {entries.map((e) => (
-              <li key={e.id}>
-                <Link href={`/write?date=${e.entry_date}`} className="card-frame card-paper flex items-start gap-4 px-4 py-3">
-                  {/* 왼쪽 숫자 칸은 행복도 */}
-                  <span className="w-9 shrink-0 pt-0.5 text-center font-serif text-[24px] leading-none">{e.happiness}</span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-[15px]">
-                      {formatKoreanDate(e.entry_date)} <span className="ml-1.5 text-ganji">{e.day_stem}{e.day_branch}일</span>
-                    </span>
-                    {e.note ? (
-                      <span className="mt-0.5 block truncate font-hand text-[20px] leading-snug text-ink">{e.note}</span>
-                    ) : (
-                      e.moods.length === 0 && <span className="block text-sm text-muted">행복도만 남김</span>
-                    )}
-                    {e.moods.length > 0 && (
-                      <span className="mt-1.5 flex flex-wrap gap-1.5">
-                        {e.moods.map((m) => (
-                          <span key={m} data-tone={moodTone(m)} className="tag tag--on h-6 px-0.5 text-[12px] text-paper-2">
-                            {m}
-                          </span>
-                        ))}
-                      </span>
-                    )}
-                  </span>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+      {/* v3.17 정리: "내 기록" 목록은 뺐다 — 달력에서 날짜를 누르면 같은 내용(카드·행복도·기분·메모·고치기)이 나온다 */}
     </main>
   );
 }

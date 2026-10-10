@@ -55,47 +55,6 @@ export function StatsSummary({ h, fitPercent, stems, branches, elements, points,
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="card-frame card-paper px-5 py-4">
-        <div className="flex items-baseline justify-between">
-          {/* v3.14: 맞춤도 뜻은 "?"를 누르면 한 줄 (details, JS 없음) */}
-          <details className="fit-help">
-            <summary className="text-[15px] font-bold [&::-webkit-details-marker]:hidden">
-              맞춤도 <span className="fit-help__q" aria-label="맞춤도가 뭔가요">?</span>
-            </summary>
-            <p className="fit-help__text">내 기록이 운세 점수에 반영된 정도예요. 기록이 쌓일수록 올라요.</p>
-          </details>
-          <span className="font-serif text-[32px] leading-none">
-            {fitPercent}
-            <span className="text-[17px] text-muted">%</span>
-          </span>
-        </div>
-        {/* 맞춤도 게이지 — 0~100 */}
-        <span className="meter mt-2" aria-hidden>
-          <span className="meter__fill" style={{ width: `${fitPercent}%` }} />
-        </span>
-        {/* v3.14 Q3 = A: 설명 문장 대신 숫자 세 칸 (숫자 크게, 이름 아래 작게). 모양은 디자이너(.stat3*) */}
-        <ul className="stat3 mt-3" aria-label="기록 요약">
-          <li className="stat3__item">
-            <span className="stat3__value">
-              {h.total}
-              <small>일</small>
-            </span>
-            <span className="stat3__label">기록</span>
-          </li>
-          <li className="stat3__item">
-            <span className="stat3__value">{h.overallMean ?? "–"}</span>
-            <span className="stat3__label">평균 행복도</span>
-          </li>
-          <li className="stat3__item">
-            <span className="stat3__value">
-              {h.unseen}
-              <small>개</small>
-            </span>
-            <span className="stat3__label">안 겪은 간지</span>
-          </li>
-        </ul>
-      </div>
-
       {/* 지표 세 칸 (Q4 = A+B+D): 연속 기록 · 오늘의 포인트 · 자주 고른 기분 */}
       {h.total > 0 && (
         <ul className="metrics" aria-label="내 지표">
@@ -156,31 +115,80 @@ export function StatsSummary({ h, fitPercent, stems, branches, elements, points,
         </div>
       )}
 
-      {facts.length > 0 && (
-        <dl className="kv kv--facts card-frame card-paper px-5 py-4">
-          {facts.map((f) => (
-            <div key={f.label} className="kv__row">
-              <dt>{f.label}</dt>
-              <dd>
-                <span className="text-ganji">{f.ganji}</span>
-                <span className="kv__num">{f.mean}</span>
-                <span className="kv__n">{f.n}번</span>
-              </dd>
+      {/* v3.17 정리: 자주 보지 않는 통계는 접는다 — 맞춤도 · 가장 행복한 날 · 글자별 막대. 모양은 디자이너(.more-stats*) */}
+      {h.total > 0 && (
+        <details className="more-stats">
+          <summary className="more-stats__summary tap cursor-pointer list-none [&::-webkit-details-marker]:hidden">자세한 통계</summary>
+          <div className="mt-3 flex flex-col gap-4">
+            <div className="card-frame card-paper px-5 py-4">
+              <div className="flex items-baseline justify-between">
+                {/* v3.14: 맞춤도 뜻은 "?"를 누르면 한 줄 (details, JS 없음) */}
+                <details className="fit-help">
+                  <summary className="text-[15px] font-bold [&::-webkit-details-marker]:hidden">
+                    맞춤도 <span className="fit-help__q" aria-label="맞춤도가 뭔가요">?</span>
+                  </summary>
+                  <p className="fit-help__text">내 기록이 운세 점수에 반영된 정도예요. 기록이 쌓일수록 올라요.</p>
+                </details>
+                <span className="font-serif text-[32px] leading-none">
+                  {fitPercent}
+                  <span className="text-[17px] text-muted">%</span>
+                </span>
+              </div>
+              {/* 맞춤도 게이지 — 0~100 */}
+              <span className="meter mt-2" aria-hidden>
+                <span className="meter__fill" style={{ width: `${fitPercent}%` }} />
+              </span>
+              {/* v3.14 Q3 = A: 설명 문장 대신 숫자 세 칸 (숫자 크게, 이름 아래 작게). 모양은 디자이너(.stat3*) */}
+              <ul className="stat3 mt-3" aria-label="기록 요약">
+                <li className="stat3__item">
+                  <span className="stat3__value">
+                    {h.total}
+                    <small>일</small>
+                  </span>
+                  <span className="stat3__label">기록</span>
+                </li>
+                <li className="stat3__item">
+                  <span className="stat3__value">{h.overallMean ?? "–"}</span>
+                  <span className="stat3__label">평균 행복도</span>
+                </li>
+                <li className="stat3__item">
+                  <span className="stat3__value">
+                    {h.unseen}
+                    <small>개</small>
+                  </span>
+                  <span className="stat3__label">안 겪은 간지</span>
+                </li>
+              </ul>
             </div>
-          ))}
-        </dl>
-      )}
 
-      {/* 천간·지지·오행 한 판 (Q6 = A). 접기 없음. v3.14: 기록 3건 전엔 아무것도 그리지 않는다(안내 카드 없음) */}
-      {h.total < 3 ? null : (
-        <div className="card-frame card-paper flex flex-col gap-5 px-5 py-4">
-          <p className="text-[15px] font-bold">
-            글자별 내 행복도 <span className="mt-1 block text-[13px] font-normal text-muted">막대 높이는 평균, 아래 숫자는 횟수예요</span>
-          </p>
-          <Bars title="천간" items={stems} />
-          <Bars title="지지" items={branches} />
-          <Bars title="오행" items={elements} element />
-        </div>
+            {facts.length > 0 && (
+              <dl className="kv kv--facts card-frame card-paper px-5 py-4">
+                {facts.map((f) => (
+                  <div key={f.label} className="kv__row">
+                    <dt>{f.label}</dt>
+                    <dd>
+                      <span className="text-ganji">{f.ganji}</span>
+                      <span className="kv__num">{f.mean}</span>
+                      <span className="kv__n">{f.n}번</span>
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            )}
+
+            {/* 천간·지지·오행 한 판 (Q6 = A). 접기 없음. v3.14: 기록 3건 전엔 아무것도 그리지 않는다(안내 카드 없음) */}
+            {h.total < 3 ? null : (
+              <div className="card-frame card-paper flex flex-col gap-5 px-5 py-4">
+                <p className="text-[15px] font-bold">
+                  글자별 내 행복도 <span className="mt-1 block text-[13px] font-normal text-muted">막대 높이는 평균, 아래 숫자는 횟수예요</span>
+                </p>
+                <Bars title="천간" items={stems} />
+                <Bars title="지지" items={branches} />
+                <Bars title="오행" items={elements} element />
+              </div>
+            )}
+          </div>
+        </details>
       )}
     </div>
   );
