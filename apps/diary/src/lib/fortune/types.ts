@@ -91,6 +91,8 @@ export interface CoreFortune {
     raw: number;
   };
   relations: { hits: CoreRelationHit[]; flags: string[] };
+  /** v4.7: 내 용신·희신 오행(개운 칸용). 시간 모름으로 용신이 확정되지 않으면 null. 옛 캐시엔 없다 */
+  luckEls?: { 용: "목" | "화" | "토" | "금" | "수"; 희: "목" | "화" | "토" | "금" | "수" | null } | null;
   context: {
     daeun?: CoreLuckContextItem & { 순서: number };
     seun: CoreLuckContextItem & { 해: number };

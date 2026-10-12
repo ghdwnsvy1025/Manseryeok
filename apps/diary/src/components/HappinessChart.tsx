@@ -33,10 +33,16 @@ function brokenPath(values: (number | null)[]): string {
   return d.trim();
 }
 
-export function HappinessChart({ series }: { series: SeriesPoint[] }) {
+export function HappinessChart({ series, emptyArt }: { series: SeriesPoint[]; emptyArt?: string }) {
   const recorded = series.filter((p) => p.happiness10 !== null).length;
   if (recorded < 2) {
-    return <p className="hchart__empty text-[15px] text-muted">기록이 2일 쌓이면 그래프가 그려져요. 하루씩 늘어나 30일까지 자라요.</p>;
+    // v3.20 Q3 = C: 빈 화면도 비어 보이지 않게 — 흐린 내 캐릭터 + 한 줄. 모양은 디자이너(.empty-art)
+    return (
+      <div className="empty-art">
+        {emptyArt && <img src={emptyArt} alt="" width={96} height={96} className="empty-art__img" />}
+        <p className="hchart__empty text-[15px] text-muted">기록이 2일 쌓이면 그래프가 그려져요. 하루씩 늘어나 30일까지 자라요.</p>
+      </div>
+    );
   }
   const n = series.length;
   // v3.14 Q5 = A: 내 행복도는 선 + 점(빈 날 끊김), 운세 점수는 옅은 점선. 7일 평균은 뺐다

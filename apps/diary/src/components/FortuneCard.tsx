@@ -1,6 +1,8 @@
 import { BRANCHES, BRANCHES_KO, STEMS, STEMS_KO } from "@saju/engine";
 import { VoteButtons } from "@/components/VoteButtons";
 import { FortuneShareButton } from "@/components/FortuneShareButton";
+import Link from "next/link";
+import { gaewoonOf } from "@/lib/fortune/gaewoon";
 import { SignalLegend } from "@/components/SignalLegend";
 import { AREA_WORD } from "@/lib/fortune/core";
 import type { AreaSignal, FortuneContent } from "@/lib/fortune/types";
@@ -146,6 +148,7 @@ export function FortuneCard({ fortune, ganjiKo, canVote, vote, defaultOpen }: Pr
   /** 영역 줄 최대 4 (오늘 ≤2 · 이달 1 · 올해 1). period는 기능 쪽이 곧 넣는다 — 없으면 "오늘" */
   const areas = (fortune.areas ?? []).slice(0, 4).map((a) => ({ ...a, period: (a as { period?: Period }).period ?? "오늘" }));
   const personal = personalLines(fortune, ganjiKo);
+  const gaewoon = fortune.core?.luckEls ? gaewoonOf(fortune.core, fortune.date) : null;
   return (
     <details open={defaultOpen} className="group card-gold card-paper text-ink">
       <summary className="cursor-pointer list-none p-5 [&::-webkit-details-marker]:hidden">
@@ -238,6 +241,44 @@ export function FortuneCard({ fortune, ganjiKo, canVote, vote, defaultOpen }: Pr
                 <span className="sig sig--ink">피해요</span>
                 <p className="action__text">{fortune.dont}</p>
               </div>
+              {/* v4.7 (2026-10-12): 오늘의 개운 네 칸(색·음식·시간·활동). 전통 오행 대응표로 앱이 고른다(모델 아님). 모양은 디자이너(.gaewoon*) */}
+              {gaewoon ? (
+                <div className="gaewoon" aria-label="오늘의 개운">
+                  <p className="gaewoon__title">오늘의 개운</p>
+                  <p className="gaewoon__reason break-keep">{gaewoon.reason}</p>
+                  <ul className="gaewoon__grid">
+                    <li className="gaewoon__item" data-kind="color">
+                      <span className="gaewoon__label">색</span>
+                      <span className="gaewoon__value">
+                        <span aria-hidden className="gaewoon__swatch" style={{ backgroundColor: gaewoon.color.hex }} />
+                        {gaewoon.color.name}
+                      </span>
+                    </li>
+                    <li className="gaewoon__item" data-kind="food">
+                      <span className="gaewoon__label">음식</span>
+                      <span className="gaewoon__value break-keep">{gaewoon.food}</span>
+                    </li>
+                    <li className="gaewoon__item" data-kind="time">
+                      <span className="gaewoon__label">시간</span>
+                      <span className="gaewoon__value break-keep">{gaewoon.time}</span>
+                    </li>
+                    <li className="gaewoon__item" data-kind="activity">
+                      <span className="gaewoon__label">활동</span>
+                      <span className="gaewoon__value break-keep">{gaewoon.activity}</span>
+                    </li>
+                  </ul>
+                  <p className="gaewoon__note">전통 오행 대응표를 참고한 가벼운 제안이에요.</p>
+                </div>
+              ) : (
+                fortune.core?.dayLuck.method === "용신 없음" && (
+                  <p className="gaewoon__empty">
+                    태어난 시간을 넣으면 오늘의 개운이 보여요.{" "}
+                    <Link href="/onboarding?next=/" className="underline underline-offset-4">
+                      시간 넣기
+                    </Link>
+                  </p>
+                )
+              )}
             </section>
 
             {/* 붓선 — 행동 섹션과 투표 사이 */}

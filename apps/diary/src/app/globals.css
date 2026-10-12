@@ -2411,3 +2411,265 @@ button.cal__cell {
   font-size: 15px;
   font-weight: 700;
 }
+
+/* ── v3.19 오늘의 개운 (명세 20) ─────────────────────────────────────────────
+   "오늘 해 볼 것" 섹션 안, 피해요 아래. 2×2 같은 크기 칸, 칸 = paper-3 옅은 면(틀 없음), 모서리 4px.
+   아이콘 14px은 인라인 SVG mask(그림 생성 없음). 길흉 색 없음, 가운뎃점 없음. 새 모션 없음 */
+.gaewoon {
+  margin-top: 16px;
+}
+.gaewoon__title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.4;
+  color: var(--color-ink);
+}
+.gaewoon__reason {
+  margin: 4px 0 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--color-ink);
+}
+.gaewoon__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-auto-rows: 1fr;
+  gap: 8px;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.gaewoon__item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  padding: 10px 12px 11px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--color-paper-3) 70%, var(--color-paper-2));
+}
+.gaewoon__label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  line-height: 1.3;
+  color: var(--color-muted);
+}
+.gaewoon__label::before {
+  content: "";
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  background: currentColor;
+  -webkit-mask: var(--gw-icon) center / 14px 14px no-repeat;
+  mask: var(--gw-icon) center / 14px 14px no-repeat;
+}
+/* 색 = 동그라미 */
+.gaewoon__item[data-kind="color"] {
+  --gw-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 14' fill='none' stroke='%23000' stroke-width='1.4'%3E%3Ccircle cx='7' cy='7' r='5'/%3E%3C/svg%3E");
+}
+/* 음식 = 그릇 */
+.gaewoon__item[data-kind="food"] {
+  --gw-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 14' fill='none' stroke='%23000' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M1.8 6.2h10.4c0 2.8-2.3 4.8-5.2 4.8S1.8 9 1.8 6.2Z'/%3E%3Cpath d='M5 12.6h4M5.6 2.2c-.5.7.5 1.3 0 2M8.4 2.2c-.5.7.5 1.3 0 2'/%3E%3C/svg%3E");
+}
+/* 시간 = 시계 */
+.gaewoon__item[data-kind="time"] {
+  --gw-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 14' fill='none' stroke='%23000' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='7' cy='7' r='5.4'/%3E%3Cpath d='M7 4v3.2l2.2 1.4'/%3E%3C/svg%3E");
+}
+/* 활동 = 발자국 둘 */
+.gaewoon__item[data-kind="activity"] {
+  --gw-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 14' fill='%23000'%3E%3Cellipse cx='4.3' cy='4.2' rx='1.8' ry='2.6'/%3E%3Cellipse cx='4.3' cy='8.5' rx='1.2' ry='1'/%3E%3Cellipse cx='9.7' cy='6.7' rx='1.8' ry='2.6'/%3E%3Cellipse cx='9.7' cy='11' rx='1.2' ry='1'/%3E%3C/svg%3E");
+}
+.gaewoon__value {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  font-size: 15px;
+  line-height: 1.45;
+  color: var(--color-ink);
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+.gaewoon__item[data-kind="color"] .gaewoon__value {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.gaewoon__swatch {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  box-sizing: border-box;
+  border: 0.5px solid color-mix(in srgb, var(--color-ink) 20%, transparent);
+}
+.gaewoon__note {
+  margin: 8px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--color-muted);
+}
+.gaewoon__empty {
+  margin: 16px 0 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--color-muted);
+}
+
+/* ── v3.20 손맛 효과 · 탭 아이콘 · 카드 무게 · 빈 화면 (명세 21) ───────────── */
+
+/* 1. 인주 도장 "꾹": 누르는 동안 살짝 들어가고, 놓으면 120ms에 돌아온다.
+   :where()로 묶어 각 부품이 이미 가진 transform(기울인 도장 등)보다 약하게 둔다 */
+:where(button, a.tap, .tag, .cal__cell, .album-cell, .vote__btn, .gold-plate, .share-btn) {
+  transition: transform 120ms ease-out;
+}
+:where(button, a.tap, .tag, .cal__cell, .album-cell, .vote__btn, .share-btn):active {
+  transform: scale(0.96);
+}
+.gold-plate:active {
+  transform: scale(0.97);
+}
+.vote__btn[aria-pressed="true"]:active {
+  transform: scale(1); /* 1.04 × .96 */
+}
+
+/* 화면 맨 위 효과 레이어 (팡 오버레이 z-50보다 위) */
+.fx-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+/* 누른 자리 옅은 먹 번짐: 56px 원, 가장자리 흐림, 450ms 한 번. 먹 24%에 opacity .5라 실제 농도는 12% 남짓 */
+.ink-bloom {
+  position: fixed;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  pointer-events: none;
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--color-ink) 24%, transparent) 0%,
+    color-mix(in srgb, var(--color-ink) 15%, transparent) 40%,
+    transparent 70%
+  );
+  transform: translate(-50%, -50%) scale(0);
+  opacity: 0.5;
+  animation: ink-bloom 450ms ease-out forwards;
+}
+@keyframes ink-bloom {
+  to {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 0;
+  }
+}
+
+/* 2. 보상 순간 금빛 가루: 가운데에서 --dx·--dy로 튀며 줄고 사라진다, 700ms */
+.gold-dust {
+  position: fixed;
+  width: var(--s, 6px);
+  height: var(--s, 6px);
+  border-radius: 50%;
+  pointer-events: none;
+  background: radial-gradient(
+    circle at 40% 38%,
+    var(--color-paper-2) 0%,
+    var(--color-gold) 45%,
+    color-mix(in srgb, var(--color-gold) 80%, var(--color-gold-ink)) 100%
+  );
+  box-shadow:
+    0 0 0 0.5px color-mix(in srgb, var(--color-gold-ink) 30%, transparent),
+    0 0 5px color-mix(in srgb, var(--color-gold) 70%, transparent);
+  transform: translate(-50%, -50%) scale(1);
+  animation: gold-dust 700ms cubic-bezier(0.2, 0.7, 0.3, 1) forwards;
+}
+@keyframes gold-dust {
+  from {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 1;
+  }
+  45% {
+    opacity: 1; /* 튀어 나가는 동안은 또렷하게, 뒤에서 사라진다 */
+  }
+  to {
+    transform: translate(calc(-50% + var(--dx, 0px)), calc(-50% + var(--dy, 0px))) scale(0.4);
+    opacity: 0;
+  }
+}
+
+/* 연속 7·30·100일 칩: 금빛 테두리 + 굵게 */
+.chip[data-milestone] {
+  border-color: var(--color-gold);
+  font-weight: 700;
+}
+
+/* 3. 하단 탭 아이콘 22px — 선 2~3획 SVG mask, 색은 글자색(고른 탭 금빛, 나머지 muted) */
+.nav-icon {
+  display: block;
+  width: 22px;
+  height: 22px;
+  background-color: currentColor;
+  -webkit-mask: var(--icon) center / contain no-repeat;
+  mask: var(--icon) center / contain no-repeat;
+}
+.nav-icon[data-icon="sun"] {
+  --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.7' stroke-linecap='round'%3E%3Ccircle cx='12' cy='12' r='4.2'/%3E%3Cpath d='M12 2.5v2.6M12 18.9v2.6M2.5 12h2.6M18.9 12h2.6M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M5.3 18.7l1.8-1.8M16.9 7.1l1.8-1.8'/%3E%3C/svg%3E");
+}
+.nav-icon[data-icon="brush"] {
+  --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20.5 3.5l-8.2 9'/%3E%3Cpath d='M12.3 12.5c-2.6-.6-4.7 1-5.2 3.6-.3 1.6-1.2 3.2-3.6 4.4 3.6.6 6.9-.4 8.4-2.6 1-1.5 1.1-3.6.4-5.4z'/%3E%3C/svg%3E");
+}
+.nav-icon[data-icon="seal"] {
+  --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='6' r='3.3'/%3E%3Cpath d='M10.3 8.9l-.6 4.1h4.6l-.6-4.1'/%3E%3Crect x='5' y='13' width='14' height='7.5' rx='1'/%3E%3C/svg%3E");
+}
+
+/* 4. 카드 무게: 보조 카드는 이중선 + 귀퉁이 장식 대신 녹갈 한 줄. 한지 결은 그대로, 주인공 운세 카드(card-gold)만 무겁다 */
+.card-light {
+  border: 1px solid color-mix(in srgb, var(--color-frame) 55%, transparent);
+  border-image: none;
+  border-radius: 2px;
+}
+
+/* 5. 빈 화면: 흐린 내 캐릭터 + 한 줄 */
+.empty-art {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 0;
+  text-align: center;
+}
+.empty-art__img {
+  width: 96px;
+  height: 96px;
+  object-fit: contain;
+  opacity: 0.35;
+  filter: grayscale(0.3);
+}
+.empty-art .hchart__empty {
+  margin: 0;
+  font-size: 15px;
+  color: var(--color-muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :where(button, a.tap, .tag, .cal__cell, .album-cell, .vote__btn, .gold-plate, .share-btn) {
+    transition: none;
+  }
+  :where(button, a.tap, .tag, .cal__cell, .album-cell, .vote__btn, .share-btn):active,
+  .gold-plate:active {
+    transform: none;
+  }
+  .vote__btn[aria-pressed="true"]:active {
+    transform: scale(1.04);
+  }
+  .ink-bloom,
+  .gold-dust {
+    display: none;
+  }
+}

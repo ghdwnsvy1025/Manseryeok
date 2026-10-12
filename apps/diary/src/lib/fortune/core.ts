@@ -426,6 +426,7 @@ export function computeCoreFortune(input: CoreInput): CoreFortune {
   return {
     dayLuck: { stem, branch, total, method, raw },
     relations: { hits, flags },
+    luckEls: y ? { 용: y.용신오행, 희: (Object.entries(y.오행역할).find(([, r]) => r === "희")?.[0] as "목" | "화" | "토" | "금" | "수" | undefined) ?? null } : null,
     context: { ...(daeun ? { daeun } : {}), seun: seunItem, ...(wolun ? { wolun } : {}), 입춘전: seun.입춘전 },
     areas,
     facts,

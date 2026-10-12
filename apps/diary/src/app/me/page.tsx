@@ -234,10 +234,10 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
             pickedEntries={selected === null ? [] : all.filter((e) => e.day_ganji_index === selected)}
           />
         )}
-        <StatsSummary h={h} fitPercent={fitPercent(all.length)} stems={byStem(all)} branches={byBranch(all)} elements={byElement(all)} points={points} moods={moods} streak={streak} chart={<HappinessChart series={series} />} />
+        <StatsSummary h={h} fitPercent={fitPercent(all.length)} stems={byStem(all)} branches={byBranch(all)} elements={byElement(all)} points={points} moods={moods} streak={streak} chart={<HappinessChart series={series} emptyArt={me.characterSrc} />} />
       </section>
       {/* v3.15 Q1 = A: 접힌 상태가 기본. 제목 줄에 여덟 글자(시·일·월·년, 오행 색) 미리보기, 누르면 생년월일·나무패·오행 분포. 모양은 디자이너(.saju-fold*) */}
-      <details className="saju-fold card-frame card-paper p-5">
+      <details className="saju-fold card-frame card-light card-paper p-5">
         <summary className="saju-fold__summary flex cursor-pointer list-none items-center justify-between gap-3 [&::-webkit-details-marker]:hidden">
           <h2 className="font-serif text-[22px]">내 사주</h2>
           <span className="saju-fold__preview font-serif text-[17px]" lang="zh-Hant" aria-label="내 사주 여덟 글자">

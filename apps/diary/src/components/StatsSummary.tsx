@@ -109,7 +109,7 @@ export function StatsSummary({ h, fitPercent, stems, branches, elements, points,
 
       {/* 행복도 그래프 (Q7) */}
       {h.total > 0 && (
-        <div className="card-frame card-paper px-5 py-4">
+        <div className="card-frame card-light card-paper px-5 py-4">
           <p className="text-[15px] font-bold">내 행복도</p>
           <div className="mt-3">{chart}</div>
         </div>
@@ -120,7 +120,7 @@ export function StatsSummary({ h, fitPercent, stems, branches, elements, points,
         <details className="more-stats">
           <summary className="more-stats__summary tap cursor-pointer list-none [&::-webkit-details-marker]:hidden">자세한 통계</summary>
           <div className="mt-3 flex flex-col gap-4">
-            <div className="card-frame card-paper px-5 py-4">
+            <div className="card-frame card-light card-paper px-5 py-4">
               <div className="flex items-baseline justify-between">
                 {/* v3.14: 맞춤도 뜻은 "?"를 누르면 한 줄 (details, JS 없음) */}
                 <details className="fit-help">
@@ -162,7 +162,7 @@ export function StatsSummary({ h, fitPercent, stems, branches, elements, points,
             </div>
 
             {facts.length > 0 && (
-              <dl className="kv kv--facts card-frame card-paper px-5 py-4">
+              <dl className="kv kv--facts card-frame card-light card-paper px-5 py-4">
                 {facts.map((f) => (
                   <div key={f.label} className="kv__row">
                     <dt>{f.label}</dt>
@@ -178,7 +178,7 @@ export function StatsSummary({ h, fitPercent, stems, branches, elements, points,
 
             {/* 천간·지지·오행 한 판 (Q6 = A). 접기 없음. v3.14: 기록 3건 전엔 아무것도 그리지 않는다(안내 카드 없음) */}
             {h.total < 3 ? null : (
-              <div className="card-frame card-paper flex flex-col gap-5 px-5 py-4">
+              <div className="card-frame card-light card-paper flex flex-col gap-5 px-5 py-4">
                 <p className="text-[15px] font-bold">
                   글자별 내 행복도 <span className="mt-1 block text-[13px] font-normal text-muted">막대 높이는 평균, 아래 숫자는 횟수예요</span>
                 </p>

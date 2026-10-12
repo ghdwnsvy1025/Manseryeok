@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { fortuneVoteAction } from "@/app/actions";
+import { celebrate } from "@/lib/fx";
 
 /**
  * "오늘과 맞았어요?" (v3.14). 누르는 즉시 모양이 바뀐다(낙관적 갱신) — 저장은 뒤에서.
@@ -23,8 +24,10 @@ export function VoteButtons({ date, initial }: { date: string; initial: 1 | -1 |
     }
   }, [key]);
 
-  const press = (v: 1 | -1) => {
+  const press = (v: 1 | -1, el?: Element) => {
     const next = vote === v ? null : v;
+    // v3.20 보상 순간: "맞아요"를 새로 눌렀을 때만 금빛 가루
+    if (next === 1 && el) celebrate(el);
     setVote(next);
     try {
       sessionStorage.setItem(key, String(next ?? 0));
@@ -40,7 +43,7 @@ export function VoteButtons({ date, initial }: { date: string; initial: 1 | -1 |
   return (
     <div id="fortune-vote" className="vote mt-4 flex flex-wrap items-center gap-2 text-sm text-muted" data-voted={vote !== null ? "" : undefined}>
       <span className="mr-1">오늘과 맞았어요?</span>
-      <button type="button" aria-pressed={vote === 1} onClick={() => press(1)} className="vote__btn">
+      <button type="button" aria-pressed={vote === 1} onClick={(e) => press(1, e.currentTarget)} className="vote__btn">
         맞아요
       </button>
       <button type="button" aria-pressed={vote === -1} onClick={() => press(-1)} className="vote__btn">

@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Gowun_Batang, Song_Myung } from "next/font/google";
 import { AnonBoot } from "@/components/AnonBoot";
 import { BottomNav } from "@/components/BottomNav";
+import { TouchFx } from "@/components/TouchFx";
 import { PwaRegister } from "@/components/PwaRegister";
 import "./globals.css";
 
@@ -42,6 +43,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <PwaRegister />
         {/* 첫 방문에 익명 세션 하나 (docs/ANON_START.md) */}
         <AnonBoot />
+        {/* v3.20: 기본 터치감 — 누른 자리 먹물 번짐 + 짧은 진동 */}
+        <TouchFx />
       </body>
     </html>
   );

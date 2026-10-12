@@ -4,6 +4,7 @@ import { startTransition, useActionState, useEffect, useRef, useState, type Form
 import { saveEntryAction, type FormState } from "@/app/actions";
 import { DeleteEntryButton } from "@/components/DeleteEntryButton";
 import { MAX_MOODS, MAX_NOTE, MOODS, moodTone, type Promise_ } from "@/lib/entry";
+import { celebrate } from "@/lib/fx";
 
 interface Props {
   date: string;
@@ -152,7 +153,11 @@ export function EntryForm({ date, promiseText, notePlaceholder, initial }: Props
                       name="promise"
                       value={o.value}
                       checked={on}
-                      onChange={() => setPromise(o.value)}
+                      onChange={(e) => {
+                        setPromise(o.value);
+                        // v3.20 보상 순간: "해봤어요" 도장을 찍을 때 금빛 가루
+                        if (o.value === "kept") celebrate(e.currentTarget.nextElementSibling);
+                      }}
                       className="sr-only"
                     />
                     <span className="promise-stamp">

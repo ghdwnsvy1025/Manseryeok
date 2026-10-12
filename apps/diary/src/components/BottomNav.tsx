@@ -55,11 +55,12 @@ export function BottomNav() {
                 href={t.href}
                 prefetch={true}
                 aria-current={active ? "page" : undefined}
-                className={`flex h-16 flex-col items-center justify-center gap-1 text-[15px] ${
+                className={`flex h-16 flex-col items-center justify-center gap-[3px] text-[15px] ${
                   active ? "font-bold text-lamp" : "text-muted"
                 }`}
               >
-                <span aria-hidden className={`h-1 w-1 rounded-full ${active ? "bg-lamp" : "bg-transparent"}`} />
+                {/* v3.20 Q3 = A: 탭 아이콘(오늘 = 해, 쓰기 = 붓, 나 = 도장). 고른 탭은 금빛 — 모양은 디자이너(.nav-icon[data-icon]) */}
+                <span aria-hidden className="nav-icon" data-icon={t.href === "/" ? "sun" : t.href === "/write" ? "brush" : "seal"} />
                 <span className="relative">
                   {t.label}
                   <Pending />

@@ -40,7 +40,7 @@ import { addDays, formatKoreanDate, hourKST, parseYmd, todayKST } from "@/lib/ti
 export const dynamic = "force-dynamic";
 
 /** 한지 카드 공통 — 키트 테두리(card-frame) 위에 카드 종이(card-paper) */
-const card = "card-frame card-paper p-5";
+const card = "card-frame card-light card-paper p-5";
 /** 금색 면 버튼 — 키트 gold-wash. 화면에 하나만. 늘 56px (v3.1에서 밤 분기 삭제) */
 const goldButton = "gold-plate mt-5 flex h-14 items-center justify-center rounded-xl text-[17px] font-bold text-gold-ink";
 

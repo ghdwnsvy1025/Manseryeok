@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { moodTone, type Promise_ } from "@/lib/entry";
+import { CelebrateOnMount } from "@/components/CelebrateOnMount";
 
 interface Props {
   entry: { happiness: number; moods: string[]; note: string | null; promise?: Promise_ | null };
@@ -39,7 +40,7 @@ export function TodayEntryCard({ entry, today, ganjiKo, sameGanjiTimes, metCards
   const nth = sameGanjiTimes <= 10 ? `${ORDINAL[sameGanjiTimes]} 번째` : `${sameGanjiTimes}번째`;
   const cardLine = sameGanjiTimes <= 1 ? `${ganjiKo} 카드를 처음 만났어요` : `${ganjiKo} 카드에 ${nth} 도장을 찍었어요`;
   return (
-    <section className="card-frame card-paper p-5">
+    <section className="card-frame card-light card-paper p-5">
       {justSaved && <p className="saved-line mb-2 text-sm font-bold text-gold">저장했어요</p>}
       <div className="flex items-baseline justify-between">
         <h2 className="text-sm text-muted">오늘의 기록</h2>
@@ -72,6 +73,8 @@ export function TodayEntryCard({ entry, today, ganjiKo, sameGanjiTimes, metCards
       <div className="entry-news mt-4">
         <p className="entry-news__card" data-first={sameGanjiTimes <= 1 ? "" : undefined}>
           {cardLine}
+          {/* v3.20 보상 순간: 저장 직후 카드 첫 만남이면 금빛 가루 한 번 */}
+          {justSaved && sameGanjiTimes <= 1 && <CelebrateOnMount id={`first:${today}`} delay={900} />}
         </p>
         <dl className="kv mt-2">
           {promise && (
@@ -94,7 +97,11 @@ export function TodayEntryCard({ entry, today, ganjiKo, sameGanjiTimes, metCards
           </div>
         </dl>
         <ul className="entry-news__chips" aria-label="지표">
-          <li className="chip">연속 {streak}일</li>
+          <li className="chip" data-milestone={[7, 30, 100].includes(streak) ? "" : undefined}>
+            연속 {streak}일
+            {/* v3.20 보상 순간: 연속 7·30·100일 */}
+            {justSaved && [7, 30, 100].includes(streak) && <CelebrateOnMount id={`streak:${today}:${streak}`} delay={1300} />}
+          </li>
           {points && <li className="chip">하면 좋아요 {points.kept}/{points.answered}</li>}
         </ul>
       </div>

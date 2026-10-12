@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import type { CalendarMonth } from "@/lib/calendar";
 import { CalendarDayDetail } from "@/components/CalendarDayDetail";
+import { celebrate } from "@/lib/fx";
 
 const DOW = ["일", "월", "화", "수", "목", "금", "토"];
 
@@ -34,6 +35,8 @@ export function MonthCalendar({ cal, days, initialSelected = null, today }: { ca
       if (sessionStorage.getItem(key)) return;
       sessionStorage.setItem(key, "1");
       setStampIn(true);
+      // v3.20 보상 순간: 도장이 꽝 찍힌 뒤 금빛 가루
+      window.setTimeout(() => celebrate(document.querySelector(".cal__cell[data-stamp-in]")), 380);
     } catch {
       /* 저장소를 못 쓰면 연출 없이 */
     }
