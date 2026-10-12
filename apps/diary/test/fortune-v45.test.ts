@@ -103,11 +103,46 @@ describe("v4.6 오늘의 짜임", () => {
     expect(angleOf(base)).toEqual({ angle: "calm", focus: null });
     expect(angleOf({ relations: { hits: [], flags: [] }, areas: [{ period: "오늘", area: "재물", signal: "↑", why: "" }], facts: [] } as never)).toEqual({ angle: "focus", focus: "재물" });
     expect(angleOf({ relations: { hits: [], flags: [] }, areas: [{ period: "오늘", area: "재물", signal: "↑", why: "" }], facts: ["이달 운 戊戌은 힘이 드는 편이에요."] } as never).angle).toBe("change");
-    expect(angleOf({ relations: { hits: [{ kind: "충" }], flags: [] }, areas: [], facts: [] } as never).angle).toBe("change");
+    // v4.8: 변화형은 내 일지·월지와 충일 때만. 연지 충은 변화형이 아니다
+    expect(angleOf({ relations: { hits: [{ kind: "충", pos: "일" }], flags: [] }, areas: [], facts: [] } as never).angle).toBe("change");
+    expect(angleOf({ relations: { hits: [{ kind: "충", pos: "연" }], flags: [] }, areas: [], facts: [] } as never).angle).toBe("calm");
+    // v4.8: 판정이 보통이면 담백형
+    expect(angleOf({ relations: { hits: [], flags: [] }, areas: [{ period: "오늘", area: "재물", signal: "↑", why: "" }], facts: [], dayLuck: { total: "보통" } } as never).angle).toBe("calm");
   });
   it("brief에 angle·focusArea·chain이 들어간다", () => {
     const b = briefFor("2026-10-13");
     expect(["change", "focus", "calm"]).toContain(b.angle);
     expect(b.chain.length).toBeGreaterThan(0);
+  });
+});
+
+describe("v4.8 반복 줄이기", () => {
+  it("표현 돌리기: 같은 뜻을 날짜마다 다른 말로", async () => {
+    const { varyFact } = await import("@/lib/fortune/brief");
+    const f = "'기회와 확장' 쪽은 모자란 부분에 힘을 보태 줘요.";
+    const outs = new Set([0, 1, 2].map((k) => varyFact(f, k)));
+    expect(outs.size).toBe(3);
+    expect([...outs].every((o) => o.startsWith("'기회와 확장' 쪽은"))).toBe(true);
+  });
+  it("진입 방식·말투·기억이 brief에 들어간다", () => {
+    const b = briefFor("2026-10-13");
+    expect(["scene", "reason", "contrast"]).toContain(b.opening);
+    expect(b.tone.length).toBeGreaterThan(0);
+    expect(b.recent).toEqual([]);
+  });
+  it("최근 운세와 헤드라인·첫 문장이 겹치면 탈락", () => {
+    const base = SYSTEM_EXAMPLES[1]!.text;
+    const t = { ...base, headline: "해야 할 일이 보이는 날", do: "미뤄 둔 답장을 오늘 정리해요.", dont: "남의 몫까지 먼저 떠맡지 않아요.", body: "오늘은 할 일이 하나둘 눈에 밟히는 날이에요. 책임감이 커지는 만큼 마음이 조금 무거울 수 있어요.\n\n미뤄 둔 정리를 하나 끝내면 한결 가벼워져요. 할 수 있는 만큼만 맡으면 무리 없이 지나가요." };
+    const b = { ...briefFor("2026-10-10", "무난"), areas: [], recent: [{ date: "2026-10-09", headline: "해야 할 일이 보이는 날", start: "오늘은 할 일이 하나둘 눈에 밟히는 날이에요. 책임감이 커지는 만큼 마음이 조금 무거울 수 있어요." }] };
+    const issues = validateFortuneText(t, b);
+    expect(issues.some((i) => i.includes("헤드라인과 겹침"))).toBe(true);
+    expect(issues.some((i) => i.includes("첫 문장과 겹침"))).toBe(true);
+  });
+  it("겉과 속 문장: 천간·지지가 반대 방향일 때만", async () => {
+    const { oppositeParts } = await import("@/lib/fortune/core");
+    expect(oppositeParts("용", "기")).toBe(true);
+    expect(oppositeParts("구", "희")).toBe(false); // v4.8: 용·기가 맞붙을 때만
+    expect(oppositeParts("용", "희")).toBe(false);
+    expect(oppositeParts("한", "기")).toBe(false);
   });
 });

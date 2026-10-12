@@ -264,7 +264,9 @@ describe("v4.2 합은 점수 없이 플래그만 · 위아래 문장 없음 · �
     expect(r.parts.rel).toBe(0); // 육합은 점수 없음
     // 오늘 플래그 문장(절각 = 운 내부 상충)은 맥락 문장보다 앞이라 10문장 상한에 잘리지 않는다
     const full = computeCoreFortune({ pillars: pillarsOf(PROFILE_C), profile: PROFILE_C, date: "2026-10-07", todayHanja: "壬午" });
-    expect(full.facts).toContain("오늘은 겉과 속이 달라 힘이 한곳에 모이지 않아요.");
+    // v4.8: 겉과 속 문장은 천간·지지가 용·기로 맞붙을 때만 (oppositeParts). 아니면 나오지 않는다
+    const opposite = (full.dayLuck.stem.label === "용" && full.dayLuck.branch.label === "기") || (full.dayLuck.stem.label === "기" && full.dayLuck.branch.label === "용");
+    expect(full.facts.includes("오늘은 겉과 속이 달라 힘이 한곳에 모이지 않아요.")).toBe(opposite);
     expect(full.facts.length).toBeLessThanOrEqual(10);
   });
 

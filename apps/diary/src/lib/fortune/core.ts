@@ -170,6 +170,10 @@ export function resolveYongsin(p: Pillars, b: Balance): { y: Yongsin | null; vot
 }
 
 const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n));
+/** v4.8: 천간·지지 라벨이 반대 방향인가 (하나는 용·희, 다른 하나는 기·구) */
+const GOOD_LABEL = new Set(["용", "희"]), BAD_LABEL = new Set(["기", "구"]);
+// v4.8: 용신(용)과 기신(기)이 맞붙을 때만 — 희·구까지 넣으면 25%로 여전히 잦았다
+export const oppositeParts = (a: RoleLabel, b: RoleLabel): boolean => (a === "용" && b === "기") || (a === "기" && b === "용");
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
 function partOf(dayStem: string, ch: string, isStem: boolean, l: Luck | null): CoreLuckPart {
@@ -387,7 +391,8 @@ export function computeCoreFortune(input: CoreInput): CoreFortune {
   const flagFacts = new Set<string>();
   for (const f of flags) {
     if (f.startsWith("용신 손상") && !f.includes("묶음")) flagFacts.add("오늘은 나에게 모자란 부분이 더 눌리는 날이라 평소보다 힘이 들 수 있어요.");
-    else if (f.startsWith("운 내부 상충")) flagFacts.add("오늘은 겉과 속이 달라 힘이 한곳에 모이지 않아요.");
+    // v4.8: 코어 플래그(절각·개두)는 60갑자의 약 40%에 붙는다. 글 재료로는 천간·지지가 실제로 반대 방향일 때만(하나는 용·희, 하나는 기·구)
+    else if (f.startsWith("운 내부 상충") && oppositeParts(stem.label, branch.label)) flagFacts.add("오늘은 겉과 속이 달라 힘이 한곳에 모이지 않아요.");
     // v4.5: "중화 사주" 문장은 글 재료에서 뺀다 — 모델이 매일 그대로 옮겨 적어 읽는 사람에게 뜻이 없었다(플래그는 relations에 남는다)
   }
   facts.push(...flagFacts);

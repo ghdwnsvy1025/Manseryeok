@@ -50,13 +50,15 @@ const PROFILES: { label: string; p: BirthProfile }[] = [
   { label: "C 1984-11-03 07:30 여", p: { gender: "female", calendar: "solar", isLeapMonth: false, birthYear: 1984, birthMonth: 11, birthDay: 3, birthHour: 7, birthMinute: 30, city: "busan" } },
   { label: "D 2001-08-21 22:10 남", p: { gender: "male", calendar: "solar", isLeapMonth: false, birthYear: 2001, birthMonth: 8, birthDay: 21, birthHour: 22, birthMinute: 10, city: "daegu" } },
 ];
-const DATES = ["2026-10-10", "2026-10-13"];
+const DATES = process.env.WEEK ? ["2026-10-12","2026-10-13","2026-10-14","2026-10-15","2026-10-16","2026-10-17","2026-10-18"] : ["2026-10-10", "2026-10-13"];
 
 test("fortune review: 사주 4 × 날짜 2 — 모델 호출 8회, 저장 없음", async () => {
   loadEnv();
   if (!process.env.ANTHROPIC_API_KEY) throw new Error(".env.local에 ANTHROPIC_API_KEY가 필요합니다");
   const lines: string[] = [];
-  for (const { label, p } of PROFILES) {
+  const recent: { date: string; headline: string; start: string }[] = [];
+  const starts: string[] = [];
+  for (const { label, p } of process.env.WEEK ? PROFILES.slice(0, 1) : PROFILES) {
     const prof = computeProfile({ ...p, name: "샘플" });
     if (!prof.ok) throw new Error(prof.error);
     for (const date of DATES) {
@@ -70,9 +72,14 @@ test("fortune review: 사주 4 × 날짜 2 — 모델 호출 8회, 저장 없음
       const band = bandOf(score10);
       const input = { core, personal, today: todayInfo, date, weekday, score10, band };
       const fallback = templateText(templateInputFromCore(core), personal, todayInfo);
-      const r = await generateFortuneText(input, fallback);
+      const r = await generateFortuneText({ ...input, recent: recent.slice(0, 3) }, fallback);
       const t = r.source === "template" ? null : r.lastModelText;
-      const ang = angleOf(core);
+      if (t) {
+        const st = t.body.replace(/\n+/g, " ").split(/(?<=[.!?])\s+/).slice(0, 2).join(" ");
+        recent.unshift({ date, headline: t.headline, start: st });
+        starts.push(st);
+      }
+      const ang = angleOf(core, band);
       lines.push("", `===== [${ang.angle}${ang.focus ? ":" + ang.focus : ""}] ${label} · ${date} ${weekday} ${today.ko}일 · ${score10} ${band} · source=${r.source} attempts=${r.attempts}`);
       lines.push(`facts: ${core.facts.slice(0, 6).join(" / ")}`);
       lines.push(`검사: ${r.issues.map((xs) => (xs.length ? xs.join(" / ") : "통과")).join(" | ")}`);
@@ -83,5 +90,10 @@ test("fortune review: 사주 4 × 날짜 2 — 모델 호출 8회, 저장 없음
       } else lines.push(`[템플릿] ${fallback.headline} / ${fallback.body}`);
     }
   }
+  // 반복 지표 (WEEK 모드): 같은 공식 문장, 이웃한 날 첫 두 문장 겹침
+  const formula = /(힘|성격)이 (아주 )?(강하게|세게) 들어오는데/;
+  const { tokenOverlap } = await import("@/lib/fortune/validate");
+  const neighbor = starts.slice(1).map((s2, k) => tokenOverlap(s2, starts[k]!));
+  lines.push("", `[지표] 공식 문장 ${starts.filter((s2) => formula.test(s2)).length}/${starts.length}일, 이웃한 날 첫 두 문장 겹침 평균 ${neighbor.length ? Math.round((neighbor.reduce((a2, b2) => a2 + b2, 0) / neighbor.length) * 100) : 0}% 최대 ${neighbor.length ? Math.round(Math.max(...neighbor) * 100) : 0}%`);
   console.log(["", ...lines, ""].join(String.fromCharCode(10)));
 }, 600_000);

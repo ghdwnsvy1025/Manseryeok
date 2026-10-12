@@ -3,6 +3,7 @@
 // 2) 없으면 코어 판정(v4: core.ts) → 10점 환산 → 내 기록 보정 → 글(3단계 llm.ts: 모델 → 검사 → 재작성 1회 → 템플릿) → 캐시에 쓴다.
 // v3의 computeBaseFortune(base.ts)은 더 쓰지 않는다 (백테스트·테스트가 참조하므로 파일은 둔다).
 import { visibleAreas } from "./visible";
+import { recentFromRows, type RecentFortune } from "./brief";
 import "server-only";
 import { createHash } from "node:crypto";
 import { ENGINE_VERSION } from "@saju/engine";
@@ -10,7 +11,7 @@ import { adminClient } from "../supabase/admin";
 import { ownerFilter, saveFortuneCache, type FortuneCacheDb, type FortuneCacheRow } from "./cache";
 import { dayGanji } from "../ganji";
 import type { BirthProfile, PillarsSnapshot } from "../profile";
-import { parseYmd } from "../time";
+import { addDays, parseYmd } from "../time";
 import { computeCoreFortune } from "./core";
 import { generateFortuneText } from "./llm";
 import { adjustWithEntries, bandOf, fitPercent, toTenPoint, type EntryLike } from "./personal";
@@ -18,7 +19,7 @@ import { templateInputFromCore, templateText } from "./text";
 import type { FortuneContent } from "./types";
 
 /** 캐시 지문에 들어간다. 올리면 기존 캐시가 전부 무효 */
-export const FORTUNE_VERSION = "v4.7";
+export const FORTUNE_VERSION = "v4.8";
 
 export type FortuneOwner = { userId: string; guestKey?: undefined } | { guestKey: string; userId?: undefined };
 
@@ -95,7 +96,23 @@ async function getTodayFortuneUncached(req: FortuneRequest): Promise<FortuneCont
   }
   if (cached && cached.profile_fingerprint === fp) return cached.content as FortuneContent;
 
-  const content = await computeFortune(req);
+  // v4.8 기억(2층): 최근 3일 이 사람의 운세 헤드라인·첫 두 문장. 모델이 같은 말을 되풀이하지 않게 (없거나 실패하면 빈 배열)
+  let recent: RecentFortune[] = [];
+  try {
+    const { data } = await sb
+      .from("night_fortunes")
+      .select("fortune_date, content")
+      .eq(col, val)
+      .gte("fortune_date", addDays(req.date, -3))
+      .lt("fortune_date", req.date)
+      .order("fortune_date", { ascending: false })
+      .limit(3);
+    recent = recentFromRows((data ?? []) as { fortune_date: string; content: { headline?: string; body?: string } | null }[]);
+  } catch (e) {
+    console.warn("최근 운세 읽기 실패", e instanceof Error ? e.message : e);
+  }
+
+  const content = await computeFortune({ ...req, recent });
 
   const row: FortuneCacheRow = {
     user_id: req.owner.userId ?? null,
@@ -113,7 +130,7 @@ async function getTodayFortuneUncached(req: FortuneRequest): Promise<FortuneCont
 }
 
 /** 캐시 없이 계산만. 테스트와 미리보기용 */
-export async function computeFortune(req: Omit<FortuneRequest, "owner">, opts: { useModel?: boolean } = {}): Promise<FortuneContent> {
+export async function computeFortune(req: Omit<FortuneRequest, "owner"> & { recent?: RecentFortune[] }, opts: { useModel?: boolean } = {}): Promise<FortuneContent> {
   const p = parseYmd(req.date);
   if (!p) throw new Error(`잘못된 날짜: ${req.date}`);
   const today = dayGanji(req.date);
@@ -134,7 +151,7 @@ export async function computeFortune(req: Omit<FortuneRequest, "owner">, opts: {
   const useModel = opts.useModel ?? Boolean(process.env.ANTHROPIC_API_KEY);
   if (useModel) {
     try {
-      const r = await generateFortuneText({ core, personal, today: todayInfo, date: req.date, weekday, score10, band }, fallback);
+      const r = await generateFortuneText({ core, personal, today: todayInfo, date: req.date, weekday, score10, band, recent: req.recent ?? [] }, fallback);
       text = r.text;
       source = r.source;
       attempts = r.attempts;

@@ -130,6 +130,13 @@ export function validateFortuneText(t: ModelText | null | undefined, b: FortuneB
   }
   for (const sent of splitSentences(t.body)) if (exSentences.some((x) => tokenOverlap(sent, x) >= 0.8)) add(`예시 문장을 베낌 "${sent.slice(0, 20)}…"`);
 
+  // v4.8 기억: 최근 3일 헤드라인과 같거나 많이 겹치면, 첫 두 문장이 최근 첫 두 문장과 50% 이상 겹치면 탈락
+  const startNow = splitSentences(t.body.replace(/\n+/g, " ")).slice(0, 2).join(" ");
+  for (const r of b.recent ?? []) {
+    if (t.headline.trim() === r.headline.trim() || tokenOverlap(t.headline, r.headline) >= 0.6) add(`최근(${r.date}) 헤드라인과 겹침 "${r.headline}"`);
+    if (tokenOverlap(startNow, r.start) >= 0.5) add(`최근(${r.date}) 운세 첫 문장과 겹침`);
+  }
+
   // 단정 · 기간 약속 · 명령조
   if (PROMISE_RE.test(everything)) add("기간 약속 (\"N일 더 쓰면\" 꼴)");
   if (CERTAIN_RE.test(everything)) add("길흉 단정 표현");

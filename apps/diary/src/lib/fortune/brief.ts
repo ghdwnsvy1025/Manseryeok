@@ -46,6 +46,8 @@ export interface BriefInput {
   weekday: string;
   score10: number;
   band: "좋음" | "무난" | "주의";
+  /** v4.8: 최근 3일 이 사람의 운세(헤드라인·첫 두 문장). 없으면 빈 배열 */
+  recent?: RecentFortune[];
 }
 
 /** v4.4: facts 안의 맥락 문장(올해·이달·10년 단위 운). 이것이 있을 때만 글이 그 운을 말할 수 있다 — validate가 같은 정규식으로 본다 */
@@ -59,12 +61,56 @@ export const ABSTRACT_LABELS: readonly string[] = Object.values(TEN_GOD_THEME).f
 export type FortuneAngle = "change" | "focus" | "calm";
 
 /** 엔진 결과로 오늘의 짜임을 고른다. 같은 입력이면 늘 같은 짜임 */
-export function angleOf(core: Pick<CoreFortune, "relations" | "areas" | "facts">): { angle: FortuneAngle; focus: AreaName | null } {
-  const changing = core.relations.hits.some((h) => h.kind === "충") || hasContextFact(core.facts);
+export function angleOf(core: Pick<CoreFortune, "relations" | "areas" | "facts"> & { dayLuck?: Pick<CoreFortune["dayLuck"], "total"> }, band?: "좋음" | "무난" | "주의"): { angle: FortuneAngle; focus: AreaName | null } {
+  // v4.8: 변화형은 내 일지·월지와 충인 날, 또는 운이 "바뀌는" 날만(올해·이달 운과 어긋나는 날은 뺀다). 전엔 50% → 목표 15~20%
+  const changing =
+    core.relations.hits.some((h) => h.kind === "충" && (h.pos === "일" || h.pos === "월")) ||
+    core.facts.some((f) => CONTEXT_FACT_RE.test(f) && !f.includes("어긋나"));
   if (changing) return { angle: "change", focus: null };
+  // v4.8: 판정이 "보통"이거나 점수 단계가 무난인 날은 담백형 (전엔 영역 신호만 있으면 집중형 → 담백형 2%)
+  if (core.dayLuck?.total === "보통" || band === "무난") return { angle: "calm", focus: null };
   const strong = core.areas.find((a) => a.period === "오늘" && a.signal !== "→");
   if (strong) return { angle: "focus", focus: strong.area };
   return { angle: "calm", focus: null };
+}
+
+/** v4.8 기억: 최근 운세 한 편의 요약 (헤드라인 + 첫 두 문장) */
+export interface RecentFortune {
+  date: string;
+  headline: string;
+  start: string;
+}
+export function recentFromRows(rows: { fortune_date: string; content: { headline?: string; body?: string } | null }[]): RecentFortune[] {
+  return rows
+    .filter((r) => r.content?.headline && r.content?.body)
+    .map((r) => ({
+      date: r.fortune_date,
+      headline: r.content!.headline!,
+      start: r.content!.body!.replace(/\n+/g, " ").split(/(?<=[.!?])\s+/).slice(0, 2).join(" "),
+    }));
+}
+
+/** v4.8 진입 방식(1층): 원인→결과는 지키되 날마다 들어가는 길을 바꾼다 */
+export type FortuneOpening = "scene" | "reason" | "contrast";
+const OPENINGS: FortuneOpening[] = ["scene", "reason", "contrast"];
+
+/** v4.8 표현 돌리기(1층): 엔진의 관계 말을 날짜마다 다른 말로. 뜻은 같다 */
+const PHRASE_VARIANTS: [string, string[]][] = [
+  ["나에게 모자란 부분을 채워 줘서 도움이 돼요", ["나에게 모자란 부분을 채워 줘서 도움이 돼요", "평소 비어 있던 자리를 메워 줘요", "내게 부족하던 쪽을 받쳐 줘요"]],
+  ["모자란 부분에 힘을 보태 줘요", ["모자란 부분에 힘을 보태 줘요", "부족한 쪽을 거들어 줘요", "약한 쪽에 손을 보태 줘요"]],
+  ["원래 나에게 넘치는 쪽이라 오늘은 과해지기 쉬워요", ["원래 나에게 넘치는 쪽이라 오늘은 과해지기 쉬워요", "이미 넉넉한 쪽에 더 얹히는 셈이라 지나치기 쉬워요", "평소에도 센 쪽이라 오늘은 넘치기 쉬워요"]],
+  ["나와 조금 어긋나서 신경이 쓰일 수 있어요", ["나와 조금 어긋나서 신경이 쓰일 수 있어요", "나와 맞지 않아 자꾸 걸리적거릴 수 있어요", "나와 박자가 달라 마음이 쓰일 수 있어요"]],
+  ["둘을 합치면 오늘은", ["둘을 합치면 오늘은", "전체로 보면 오늘은", "두 성격을 더하면 오늘은"]],
+];
+export function varyFact(f: string, seed: number): string {
+  let out = f;
+  for (const [from, alts] of PHRASE_VARIANTS) if (out.includes(from)) out = out.replace(from, alts[seed % alts.length]!);
+  return out;
+}
+/** 날짜 → 고르는 수 (같은 날이면 늘 같다) */
+export function daySeed(date: string): number {
+  const [y, m, d] = date.split("-").map(Number) as [number, number, number];
+  return Math.floor(Date.UTC(y, m - 1, d) / 86_400_000);
 }
 
 export interface FortuneBrief {
@@ -76,6 +122,12 @@ export interface FortuneBrief {
   focusArea: string | null;
   /** v4.6: 원인 → 나와의 관계 → 합친 결과. 본문 둘째 단계가 이 순서로 "~라서 ~해요"를 잇는다 */
   chain: string[];
+  /** v4.8: 오늘 들어가는 길(scene = 장면부터, reason = 이유부터, contrast = 평소와 견줘서) */
+  opening: FortuneOpening;
+  /** v4.8: 최근 운세 — 같은 헤드라인 꼴·첫 문장 공식·결론 말을 피한다 */
+  recent: RecentFortune[];
+  /** v4.8: 단계별 말투 */
+  tone: string;
   /** 사용자용 낱말로 바뀐 사실 문장 (한자·십신 없음) */
   facts: string[];
   /** 신호 있는 영역. 이 순서·개수·period·area대로 areas 줄을 쓴다. v4.2: 오늘(≤2) → 이달(1) → 올해(1) */
@@ -116,7 +168,8 @@ export function extractNumbers(texts: string[]): number[] {
 
 export function buildBrief(input: BriefInput): FortuneBrief {
   const { core, personal, today } = input;
-  const facts = core.facts.map(plainFact);
+  const seed = daySeed(input.date);
+  const facts = core.facts.map((f) => varyFact(plainFact(f), seed));
   const caveats = core.caveats.map(hanjaToKo);
   const areas = core.areas.map((a) => ({ period: a.period, area: a.area, word: AREA_WORD[a.area], signal: a.signal, why: plainFact(a.why) }));
 
@@ -142,7 +195,7 @@ export function buildBrief(input: BriefInput): FortuneBrief {
     String(y), String(m), String(d),
   ]);
   const withContext = hasContextFact(facts);
-  const ang = angleOf(core);
+  const ang = angleOf(core, input.band);
 
   return {
     today: { date: input.date, weekday: input.weekday, ganji: `${today.ko}일`, solarTerm, useSolarTerm: term.isTermDay, solarTermName: term.name },
@@ -150,6 +203,9 @@ export function buildBrief(input: BriefInput): FortuneBrief {
     angle: ang.angle,
     focusArea: ang.focus ? AREA_WORD[ang.focus] : null,
     chain: facts.slice(0, 3),
+    opening: OPENINGS[seed % OPENINGS.length]!,
+    recent: input.recent ?? [],
+    tone: input.band === "좋음" ? "경쾌하고 가볍게, 들뜨지 않게" : input.band === "주의" ? "차분하게, 기대를 낮춰 주는 위로로" : "담담하게, 일상의 말투로",
     facts,
     areas,
     keywords: core.keywords,
