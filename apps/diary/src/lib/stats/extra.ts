@@ -91,6 +91,31 @@ export function streakOf(entries: StatEntry[], today: string): Streak {
   return { current, best };
 }
 
+export interface Habit {
+  current: number;
+  best: number;
+  /** 이번 달 기록한 날 수 */
+  thisMonth: number;
+  /** 최근 30일 중 기록한 날 비율 (0~100) */
+  rate30: number;
+  total: number;
+}
+
+/** v3.21 기록 습관: 연속 · 최고 연속 · 이번 달 · 최근 30일 기록률 · 전체 */
+export function habitOf(entries: StatEntry[], today: string): Habit {
+  const s = streakOf(entries, today);
+  const days = new Set(entries.map((e) => e.entry_date));
+  let last30 = 0;
+  for (let i = 0; i < 30; i++) if (days.has(addDays(today, -i))) last30++;
+  return {
+    current: s.current,
+    best: s.best,
+    thisMonth: [...days].filter((d) => d.startsWith(today.slice(0, 7))).length,
+    rate30: Math.round((100 * last30) / 30),
+    total: days.size,
+  };
+}
+
 export interface SeriesPoint {
   date: string;
   /** 그날 행복도(1~10). 기록 없으면 null — 그래프에서 끊긴다 */

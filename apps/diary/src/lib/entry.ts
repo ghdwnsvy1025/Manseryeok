@@ -7,8 +7,13 @@ export const MOODS = [
   "뿌듯함",
   "설렘",
   "평온",
+  "감사함",
+  "신남",
   "무덤덤",
+  "피곤함",
   "지침",
+  "외로움",
+  "긴장됨",
   "답답함",
   "짜증남",
   "불안",
@@ -21,7 +26,7 @@ export type Mood = (typeof MOODS)[number];
 
 /** 기분 색 구분 (2026-10-09 Q3): 긍정 = 금빛, 무덤덤 = 색 없음, 부정 = 차분한 남색. 빨강 없음. 화면은 data-tone으로 칠한다 */
 export type MoodTone = "pos" | "neutral" | "neg";
-const POSITIVE_MOODS: readonly string[] = ["기쁨", "뿌듯함", "설렘", "평온"];
+const POSITIVE_MOODS: readonly string[] = ["기쁨", "뿌듯함", "설렘", "평온", "감사함", "신남"];
 export function moodTone(m: string): MoodTone {
   if (POSITIVE_MOODS.includes(m)) return "pos";
   if (m === "무덤덤") return "neutral";

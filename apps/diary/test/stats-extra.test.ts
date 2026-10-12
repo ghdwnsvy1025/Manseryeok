@@ -45,3 +45,21 @@ describe("happinessSeries", () => {
     expect(s[2]).toEqual({ date: "2026-10-09", happiness: 1, happiness10: 0, avg7: 5, fortune: 7.4 });
   });
 });
+
+describe("habitOf (기록 습관)", () => {
+  it("연속·최고·이번 달·30일 기록률·전체", async () => {
+    const { habitOf } = await import("@/lib/stats/extra");
+    const h = habitOf([e("2026-10-10", 5), e("2026-10-11", 6), e("2026-10-12", 7), e("2026-09-25", 5), e("2026-09-26", 5), e("2026-09-27", 5), e("2026-09-28", 5)], "2026-10-12");
+    expect(h).toEqual({ current: 3, best: 4, thisMonth: 3, rate30: 23, total: 7 });
+  });
+});
+
+describe("새 기분", () => {
+  it("피곤함은 부정, 감사함·신남은 긍정", async () => {
+    const { MOODS, moodTone } = await import("@/lib/entry");
+    expect(MOODS).toContain("피곤함");
+    expect(moodTone("피곤함")).toBe("neg");
+    expect(moodTone("감사함")).toBe("pos");
+    expect(moodTone("신남")).toBe("pos");
+  });
+});

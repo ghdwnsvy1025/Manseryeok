@@ -168,7 +168,7 @@ describe("v4.1 보강 (乙亥 丙戌 己丑 辛未 × 2026-10-07 甲寅: 천간�
     expect(r.facts[0]).toBe("오늘은 '약속과 역할'(정관)의 성격이 아주 강해요.");
     expect(r.facts.some((f) => f.includes("겹"))).toBe(false);
     expect(r.facts.some((f) => f.includes("위아래"))).toBe(false);
-    expect(r.facts.filter((f) => f.includes("모자란 부분에 힘을 보태 줘요"))).toHaveLength(1);
+    expect(r.facts.filter((f) => f.includes("을 옆에서 거들어 줘요"))).toHaveLength(1); // v4.9: 무엇이 부족한지 이름을 댄다
     expect(r.facts.some((f) => f.includes("기울지 않고"))).toBe(false);
     expect(r.facts.some((f) => f.includes("크게 영향을 주지 않아요"))).toBe(false);
     // 코어가 올리지 않은 한·한(B 중화 사주, 2026-06-15 庚申 편관·편관)은 v4.1 ① 그대로 "보통"
@@ -185,7 +185,7 @@ describe("v4.1 보강 (乙亥 丙戌 己丑 辛未 × 2026-10-07 甲寅: 천간�
   });
 
   test("② 한신도 영역에 오르고 신호는 → (직업) — 코어가 올린(Y-12) 한신은 점수 그대로라 ↑. v4.2: 오늘 줄 뒤에 이달·올해 줄", () => {
-    expect(r.areas[0]).toEqual({ period: "오늘", area: "직업", signal: "↑", why: "'약속과 역할'(정관) 쪽이 힘을 보태요" });
+    expect(r.areas[0]).toEqual({ period: "오늘", area: "직업", signal: "↑", why: "'약속과 역할'(정관) 쪽이 부족한 쪽을 거들어요" });
     expect(r.areas.map((a) => `${a.period}:${a.area}${a.signal}`)).toEqual(["오늘:직업↑", "이달:가족↓", "올해:학업↓"]);
     const todayOf = (c: CoreFortune) => c.areas.filter((a) => a.period === "오늘").map((a) => a.area + a.signal);
     expect(todayOf(v4(PROFILE_B, "2026-06-15"))).toEqual(["직업→", "연애→"]);
@@ -206,7 +206,7 @@ describe("v4.1 보강 (乙亥 丙戌 己丑 辛未 × 2026-10-07 甲寅: 천간�
     // v4.4: 2026-10-07(추분 보름째, 충 없음)은 평일 — 맥락 문장은 contextFacts에만
     expect(r.contextFacts).toEqual([
       "지금 10년 단위 운 癸未은 수월한 편이에요.",
-      "지금 10년 단위 운이 내게 모자란 쪽을 누르고 있어요.",
+      expect.stringMatching(/^지금 10년 단위 운이 내게 부족한 .+힘을 누르고 있어요\.$/),
       "지금 10년 단위 운은 겉과 속이 달라요.",
       "올해 운 丙午은 조심할 편이에요.",
       "이달 운 丁酉은 조심할 편이에요.",
@@ -289,9 +289,9 @@ describe("v4.2 합은 점수 없이 플래그만 · 위아래 문장 없음 · �
 
   test("영역 period: 오늘(일운 ≤2) → 이달(월운 1) → 올해(세운 1), 모두 코어 luckAreas. 용신 없으면 비어 있다", () => {
     expect(c.areas).toEqual([
-      { period: "오늘", area: "직업", signal: "↑", why: "'약속과 역할'(정관) 쪽이 힘을 보태요" },
-      { period: "이달", area: "가족", signal: "↓", why: "'혼자 생각'(편인) 쪽이 조금 어긋나요" },
-      { period: "올해", area: "학업", signal: "↓", why: "'배움과 쉼'(정인) 쪽이 조금 어긋나요" },
+      { period: "오늘", area: "직업", signal: "↑", why: "'약속과 역할'(정관) 쪽이 부족한 쪽을 거들어요" },
+      { period: "이달", area: "가족", signal: "↓", why: "'혼자 생각'(편인) 쪽이 잘 맞지 않아요" },
+      { period: "올해", area: "학업", signal: "↓", why: "'배움과 쉼'(정인) 쪽이 잘 맞지 않아요" },
     ]);
     expect(c.context.wolun?.간지).toBe("丁酉"); // 丁 = 편인(가족·건강 ↓), 酉 = 식신
     expect(c.context.seun.간지).toBe("丙午"); // 丙 = 정인(학업 ↓), 午 = 편인

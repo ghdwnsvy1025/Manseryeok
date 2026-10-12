@@ -7,7 +7,7 @@ import { Booting } from "@/components/Booting";
 import { characterOf, characterOfGanji } from "@/lib/character";
 import { StatsSummary } from "@/components/StatsSummary";
 import { countEntries, getSajuProfile, listEntriesInMonth, listEntriesForStats, listFortuneScores } from "@/lib/db";
-import { growingSeries, happinessSeries, moodTop, pointStats, streakOf } from "@/lib/stats/extra";
+import { growingSeries, habitOf, happinessSeries, moodTop, pointStats, streakOf } from "@/lib/stats/extra";
 import { HappinessChart } from "@/components/HappinessChart";
 import { MonthCalendar, type DayInfo } from "@/components/MonthCalendar";
 import { buildMonth, resolveMonth } from "@/lib/calendar";
@@ -185,9 +185,12 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
         </Link>
         {/* 제목 자리 = 내 카드 (v3.3 → v3.8 정사각): 폭 54%, 이 화면의 그림 하나. 카드 자체가 테두리를 가지고 있어 틀을 더 두르지 않는다 */}
         <img src={me.cardSrc} alt={`내 카드 ${me.ganjiKo}`} width={1080} height={1080} className="h-auto w-[54%] max-w-[220px]" />
+        {/* v3.21: "경진일"만으로는 뜻을 몰라 — 이 카드가 나(태어난 날의 간지)라는 걸 한 줄로 */}
         <h1 className="mt-3 font-serif text-[20px] leading-snug">
-          {profile.name !== "손님" && <>{profile.name}의 </>}<span className="text-ganji">{me.ganjiKo}일</span>
+          {profile.name !== "손님" ? <>{profile.name}의 카드, </> : <>나의 카드, </>}
+          <span className="text-ganji">{me.ganjiKo}</span>
         </h1>
+        <p className="me-card-hint mt-1 text-[13px] text-muted">태어난 날의 간지(일주)로 정해진 내 카드예요</p>
         {/* v3.13: 점 대신 이름–값 줄맞춤. "이 기기에만 저장돼요"는 설정에만 (2026-10-10) */}
         <dl className="kv me-progress mt-3 w-full max-w-[260px]">
           <div className="kv__row">
@@ -207,9 +210,9 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
       </header>
 
 
-      <section className="flex flex-col gap-4">
+      <section className="me-sep me-sep--wide flex flex-col gap-4">
         <div>
-          <h2 className="font-serif text-[22px]">내 행복도</h2>
+          <h2 className="sec-tag">내 행복도</h2>
           {/* v3.13 Q6 = B: 같은 자리에서 60갑자 / 달력 전환 (링크, JS 없음). 모양은 디자이너(.view-switch) */}
           <nav className="view-switch mt-2" aria-label="보기">
             <Link href="/me" scroll={false} aria-current={isCal ? "page" : undefined} className="view-switch__item" data-icon="calendar">
@@ -234,12 +237,12 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
             pickedEntries={selected === null ? [] : all.filter((e) => e.day_ganji_index === selected)}
           />
         )}
-        <StatsSummary h={h} fitPercent={fitPercent(all.length)} stems={byStem(all)} branches={byBranch(all)} elements={byElement(all)} points={points} moods={moods} streak={streak} chart={<HappinessChart series={series} emptyArt={me.characterSrc} />} />
+        <StatsSummary h={h} fitPercent={fitPercent(all.length)} stems={byStem(all)} branches={byBranch(all)} elements={byElement(all)} points={points} moods={moods} streak={streak} habit={habitOf(all, today)} chart={<HappinessChart series={series} emptyArt={me.characterSrc} />} />
       </section>
       {/* v3.15 Q1 = A: 접힌 상태가 기본. 제목 줄에 여덟 글자(시·일·월·년, 오행 색) 미리보기, 누르면 생년월일·나무패·오행 분포. 모양은 디자이너(.saju-fold*) */}
-      <details className="saju-fold card-frame card-light card-paper p-5">
+      <details className="saju-fold me-sep me-sep--wide card-frame card-light card-paper p-5">
         <summary className="saju-fold__summary flex cursor-pointer list-none items-center justify-between gap-3 [&::-webkit-details-marker]:hidden">
-          <h2 className="font-serif text-[22px]">내 사주</h2>
+          <h2 className="sec-tag">내 사주</h2>
           <span className="saju-fold__preview font-serif text-[17px]" lang="zh-Hant" aria-label="내 사주 여덟 글자">
             {infos.map((info, k) =>
               info ? (

@@ -103,16 +103,32 @@ const hourPillar = (dayStem: string, i: number): string => STEMS[([0, 2, 4, 6, 8
 
 // ---------- 사용자용 낱말 (text.ts BANNED를 지킨다: 기운·흐름·용신·기신·십신·일간·일지 금지) ----------
 /** v4.5: 생활어. "한"(치우치지 않음)은 글에 쓸 내용이 없어 문장을 만들지 않는다 */
-const LABEL_WORD: Record<Exclude<RoleLabel, null>, string | null> = {
-  용: "나에게 모자란 부분을 채워 줘서 도움이 돼요",
-  희: "모자란 부분에 힘을 보태 줘요",
-  한: null,
-  구: "나와 조금 어긋나서 신경이 쓰일 수 있어요",
-  기: "원래 나에게 넘치는 쪽이라 오늘은 과해지기 쉬워요",
+/** v4.9 (2026-10-12): "모자란 부분" 같은 모호한 말 대신 무엇이 부족한지 이름을 댄다. 용신 그룹 → 생활 속 힘 (모두 "힘"으로 끝나 조사는 을/이) */
+export const GROUP_POWER: Record<"비겁" | "식상" | "재성" | "관성" | "인성", string> = {
+  비겁: "내 힘으로 버티는 힘",
+  식상: "표현하고 여유를 갖는 힘",
+  재성: "실속을 챙기는 힘",
+  관성: "책임을 지키는 힘",
+  인성: "배우고 쉬어 가는 힘",
 };
+/** 라벨 → 생활어. gp = 내 용신 그룹의 힘(없으면 일반 말). "한"은 문장 없음 */
+function labelWord(l: Exclude<RoleLabel, null>, gp: string | null): string | null {
+  switch (l) {
+    case "용":
+      return "평소 내게 부족한 쪽이라 오늘 반갑게 채워져요";
+    case "희":
+      return gp ? `내게 부족한 ${gp}을 옆에서 거들어 줘요` : "내게 부족한 쪽을 옆에서 거들어 줘요";
+    case "구":
+      return "지금 내게 잘 맞지 않는 쪽이라 무리하면 쉽게 지쳐요";
+    case "기":
+      return "원래 나에게 넘치는 쪽이라 오늘은 과해지기 쉬워요";
+    default:
+      return null;
+  }
+}
 /** v4.5: 충·복음이 걸린 내 자리 → 생활 영역 (태어난 해=오래된 인연, 달=집안·일터, 날=나와 가까운 사람, 시=앞으로의 계획) */
 const POS_LIFE: Record<"연" | "월" | "일" | "시", string> = { 연: "오래된 인연", 월: "집안이나 일터", 일: "나와 가까운 사람", 시: "앞으로의 계획" };
-const LABEL_SHORT: Record<Exclude<RoleLabel, null>, string> = { 용: "모자란 부분을 채워요", 희: "힘을 보태요", 한: "그 성격대로 가요", 구: "조금 어긋나요", 기: "넘치는 쪽을 더해요" };
+const LABEL_SHORT: Record<Exclude<RoleLabel, null>, string> = { 용: "부족한 쪽을 채워요", 희: "부족한 쪽을 거들어요", 한: "그 성격대로 가요", 구: "잘 맞지 않아요", 기: "넘치는 쪽을 더해요" };
 const VERDICT_WORD: Record<Verdict5, string> = { "매우 유리": "꽤 수월한 편", 유리: "수월한 편", 보통: "보통", 주의: "조심할 편", 어려움: "힘이 드는 편" };
 const AREA_WORD: Record<AreaName, string> = { 대인: "사람", 재물: "돈", 직업: "일", 학업: "배움", 연애: "연애", 가족: "가족", 건강: "몸" };
 
@@ -366,7 +382,8 @@ export function computeCoreFortune(input: CoreInput): CoreFortune {
   else facts.push(`오늘은 '${st}'(${stem.tenGod})${batchim(st) ? "과" : "와"} '${bt}'(${branch.tenGod})${batchim(bt) ? "이" : "가"} 함께 와요.`);
   // 라벨 문장은 같은 것이면 한 번만
   const labelFacts = new Set<string>();
-  for (const part of [stem, branch]) { const wl = wordLabel(part); const w = wl ? LABEL_WORD[wl] : null; if (w) labelFacts.add(`'${TEN_GOD_THEME[part.tenGod]}' 쪽은 ${w}.`); }
+  const gp = y ? GROUP_POWER[y.용신그룹] : null;
+  for (const part of [stem, branch]) { const wl = wordLabel(part); const w = wl ? labelWord(wl, gp) : null; if (w) labelFacts.add(`'${TEN_GOD_THEME[part.tenGod]}' 쪽은 ${w}.`); }
   facts.push(...labelFacts);
   if (l) facts.push(`둘을 합치면 오늘은 ${VERDICT_WORD[total]}이에요.`);
   else facts.push("태어난 시간을 몰라 오늘이 수월한지 힘든지는 단정하지 않아요.");
@@ -390,7 +407,7 @@ export function computeCoreFortune(input: CoreInput): CoreFortune {
   // v4.3: 합 관련 플래그("… 합으로 묶음", "긴장이 풀리는 시기")는 문장을 만들지 않는다 — 큰 특징만 나열
   const flagFacts = new Set<string>();
   for (const f of flags) {
-    if (f.startsWith("용신 손상") && !f.includes("묶음")) flagFacts.add("오늘은 나에게 모자란 부분이 더 눌리는 날이라 평소보다 힘이 들 수 있어요.");
+    if (f.startsWith("용신 손상") && !f.includes("묶음")) flagFacts.add(y ? `오늘은 내게 부족한 ${GROUP_POWER[y.용신그룹]}이 더 약해지는 날이라 평소보다 힘이 들 수 있어요.` : "오늘은 내게 부족한 쪽이 더 약해지는 날이라 평소보다 힘이 들 수 있어요.");
     // v4.8: 코어 플래그(절각·개두)는 60갑자의 약 40%에 붙는다. 글 재료로는 천간·지지가 실제로 반대 방향일 때만(하나는 용·희, 하나는 기·구)
     else if (f.startsWith("운 내부 상충") && oppositeParts(stem.label, branch.label)) flagFacts.add("오늘은 겉과 속이 달라 힘이 한곳에 모이지 않아요.");
     // v4.5: "중화 사주" 문장은 글 재료에서 뺀다 — 모델이 매일 그대로 옮겨 적어 읽는 사람에게 뜻이 없었다(플래그는 relations에 남는다)
@@ -408,7 +425,7 @@ export function computeCoreFortune(input: CoreInput): CoreFortune {
     contextFacts.push(daeunFact);
     // 대운 플래그(용신 손상 · 운 내부 상충) 문장은 근거에만 (v4.1 ③ → v4.4)
     const df = daeun?.플래그 ?? [];
-    if (df.some((f) => f.startsWith("용신 손상"))) contextFacts.push("지금 10년 단위 운이 내게 모자란 쪽을 누르고 있어요.");
+    if (df.some((f) => f.startsWith("용신 손상"))) contextFacts.push(y ? `지금 10년 단위 운이 내게 부족한 ${GROUP_POWER[y.용신그룹]}을 누르고 있어요.` : "지금 10년 단위 운이 내게 부족한 쪽을 누르고 있어요.");
     if (df.some((f) => f.startsWith("운 내부 상충"))) contextFacts.push("지금 10년 단위 운은 겉과 속이 달라요.");
   }
   contextFacts.push(seunFact);

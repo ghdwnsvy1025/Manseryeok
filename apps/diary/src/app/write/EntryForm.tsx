@@ -176,7 +176,7 @@ export function EntryForm({ date, promiseText, notePlaceholder, initial }: Props
           <p className="mt-1 text-sm text-muted">
             {MAX_MOODS}개까지, 안 골라도 돼요 {moods.length > 0 && <span className="text-ganji">({moods.length}/{MAX_MOODS})</span>}
           </p>
-          <div className="mt-3 flex flex-wrap gap-x-2 gap-y-3">
+          <div className="mt-3 flex flex-wrap gap-2">
             {MOODS.map((m) => {
               const on = moods.includes(m);
               const full = !on && moods.length >= MAX_MOODS;
@@ -193,7 +193,7 @@ export function EntryForm({ date, promiseText, notePlaceholder, initial }: Props
                   />
                   <span
                     data-tone={moodTone(m)}
-                    className={`tag h-10 cursor-pointer px-2 text-[15px] peer-focus-visible:outline-2 peer-focus-visible:outline-gold ${
+                    className={`tag mood-tag h-10 cursor-pointer text-[14px] peer-focus-visible:outline-2 peer-focus-visible:outline-gold ${
                       on ? "tag--on font-bold text-paper-2" : "text-ink"
                     } ${full ? "cursor-not-allowed opacity-45" : ""}`}
                   >
@@ -209,7 +209,6 @@ export function EntryForm({ date, promiseText, notePlaceholder, initial }: Props
           <label htmlFor="note" className="text-[17px] font-bold">
             한 줄
           </label>
-          <p className="mt-1 text-sm text-muted">안 써도 돼요</p>
           {/* 편지지 괘선 위에 손글씨. 안내 문구(placeholder)는 앱 글이라 본문 서체 */}
           <textarea
             id="note"

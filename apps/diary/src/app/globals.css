@@ -2673,3 +2673,137 @@ button.cal__cell {
     display: none;
   }
 }
+
+/* ── v3.21 운세 소제목 정렬 · 나 탭 구분 (명세 22) ─────────────────────────────
+   새 그림 없음(키트 재사용: gold-wash, tag-strip-paper, divider). 새 모션 없음. 문구 그대로 */
+
+/* 1. 운세 소제목 셋(오늘의 특징 / 오늘 해 볼 것 / 오늘 챙기면 좋은 것) = 같은 체계.
+   송명 18px 먹색, 아래 10px, 왼쪽 시작선 = 섹션 왼쪽. 앞 표식은 금빛 세로선 3×16px 하나 */
+.traits__title,
+.actions__title,
+.gaewoon__title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 10px;
+  font-family: var(--font-serif);
+  font-size: 18px;
+  font-weight: 400;
+  line-height: 1.3;
+  color: var(--color-ink);
+}
+.traits__title::before,
+.actions__title::before,
+.gaewoon__title::before {
+  content: "";
+  flex: none;
+  width: 3px;
+  height: 16px;
+  border-radius: 1.5px;
+  background: var(--color-gold) url("/ui/gold-wash.webp") center / 256px 256px;
+}
+/* 섹션 사이 24px: 특징 → 붓선 → 해 볼 것은 마크업 mt-6, 개운은 여기서 */
+.gaewoon {
+  margin-top: 24px;
+}
+.gaewoon__reason {
+  margin-top: 0;
+}
+
+/* 2. 나 탭 섹션 머리표 = 한지 띠지(키트 tag-strip-paper), 13px 먹색 굵게. 기존 제목 글자만 */
+.sec-tag {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  width: fit-content;
+  height: 30px;
+  margin: 0;
+  padding: 0 4px;
+  border-style: solid;
+  border-width: 0 12px;
+  border-image: url("/ui/tag-strip-paper-clean.webp") 0 44 fill / 0 12px / 0 stretch;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--color-ink);
+  white-space: nowrap;
+}
+.saju-fold__summary h2.sec-tag {
+  line-height: 1;
+}
+
+/* "자세한 통계" summary도 같은 띠지 머리표(꺾쇠는 띠지 안 오른쪽). 손가락 자리 44px는 summary, 띠지는 ::before 30px */
+.more-stats {
+  border-block: 0;
+}
+.more-stats__summary.tap {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 6px;
+  width: fit-content;
+  min-height: 44px;
+  margin-inline: 0;
+  padding: 0 14px 0 16px;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--color-ink);
+}
+.more-stats__summary.tap::before {
+  content: "";
+  position: absolute;
+  inset: 7px 0;
+  z-index: -1;
+  border-style: solid;
+  border-width: 0 12px;
+  border-image: url("/ui/tag-strip-paper-clean.webp") 0 44 fill / 0 12px / 0 stretch;
+}
+.more-stats__summary.tap::after {
+  width: 12px;
+  height: 12px;
+}
+
+/* 섹션 사이: 붓선(키트 divider) 하나 + 위아래 24px. 앞 형제와의 flex gap을 빼고 맞춘다
+   (기본 = gap 16px 칸 안, --wide = gap 24px 칸 안). 붓선은 요소 위 32px 자리에 절대 위치 */
+.me-sep {
+  position: relative;
+  margin-top: 40px;
+}
+.me-sep--wide {
+  margin-top: 32px;
+}
+.me-sep::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -32px;
+  height: 8px;
+  background: url("/ui/divider-clean.png") center / 100% 100% no-repeat;
+  opacity: 0.85;
+  pointer-events: none;
+}
+.card-frame.me-sep::before {
+  top: -33px;
+  left: -1px;
+  right: -1px;
+}
+
+/* 4. 쓰기 기분 띠지 18개: 375px에서 한 줄 4개(5줄). 글자 14px, 찢긴 끝 8px + 안쪽 5px — 기분 색 상자(::after)와 글자 사이 숨 5px.
+   간격 8px(마크업 gap-2). 고른 긍정의 금빛 오려 내기 마스크도 같은 끝 폭 */
+.tag.mood-tag {
+  border-width: 0 8px;
+  border-image-width: 0 8px;
+  padding-inline: 5px;
+}
+@supports (-webkit-mask-box-image: none) or (mask-border: none) {
+  input:checked + .tag.mood-tag[data-tone="pos"]::before {
+    inset: 0 -8px;
+    -webkit-mask-box-image: url("/ui/tag-strip-paper-clean.webp") 0 44 / 0 8px stretch;
+    mask-border: url("/ui/tag-strip-paper-clean.webp") 0 44 fill / 0 8px stretch;
+  }
+}

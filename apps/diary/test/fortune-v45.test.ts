@@ -119,7 +119,7 @@ describe("v4.6 오늘의 짜임", () => {
 describe("v4.8 반복 줄이기", () => {
   it("표현 돌리기: 같은 뜻을 날짜마다 다른 말로", async () => {
     const { varyFact } = await import("@/lib/fortune/brief");
-    const f = "'기회와 확장' 쪽은 모자란 부분에 힘을 보태 줘요.";
+    const f = "'기회와 확장' 쪽은 내게 부족한 실속을 챙기는 힘을 옆에서 거들어 줘요.";
     const outs = new Set([0, 1, 2].map((k) => varyFact(f, k)));
     expect(outs.size).toBe(3);
     expect([...outs].every((o) => o.startsWith("'기회와 확장' 쪽은"))).toBe(true);

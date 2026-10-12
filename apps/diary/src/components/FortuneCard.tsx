@@ -230,8 +230,8 @@ export function FortuneCard({ fortune, ganjiKo, canVote, vote, defaultOpen }: Pr
                 </ul>
               </section>
             )}
-            <span aria-hidden className="rule rule--light mt-5" />
-            <section className="actions mt-4" aria-labelledby="actions-title">
+            <span aria-hidden className="rule rule--light mt-6" />
+            <section className="actions mt-6" aria-labelledby="actions-title">
               <h3 id="actions-title" className="actions__title">오늘 해 볼 것</h3>
               <div className="action action--do break-keep">
                 <span className="sig sig--gold">하면 좋아요</span>
@@ -243,36 +243,36 @@ export function FortuneCard({ fortune, ganjiKo, canVote, vote, defaultOpen }: Pr
               </div>
               {/* v4.7 (2026-10-12): 오늘의 개운 네 칸(색·음식·시간·활동). 전통 오행 대응표로 앱이 고른다(모델 아님). 모양은 디자이너(.gaewoon*) */}
               {gaewoon ? (
-                <div className="gaewoon" aria-label="오늘의 개운">
-                  <p className="gaewoon__title">오늘의 개운</p>
+                <div className="gaewoon" aria-label="오늘 챙기면 좋은 것">
+                  <p className="gaewoon__title">오늘 챙기면 좋은 것</p>
                   <p className="gaewoon__reason break-keep">{gaewoon.reason}</p>
                   <ul className="gaewoon__grid">
                     <li className="gaewoon__item" data-kind="color">
-                      <span className="gaewoon__label">색</span>
+                      <span className="gaewoon__label">행운 색</span>
                       <span className="gaewoon__value">
                         <span aria-hidden className="gaewoon__swatch" style={{ backgroundColor: gaewoon.color.hex }} />
                         {gaewoon.color.name}
                       </span>
                     </li>
                     <li className="gaewoon__item" data-kind="food">
-                      <span className="gaewoon__label">음식</span>
+                      <span className="gaewoon__label">추천 음식</span>
                       <span className="gaewoon__value break-keep">{gaewoon.food}</span>
                     </li>
                     <li className="gaewoon__item" data-kind="time">
-                      <span className="gaewoon__label">시간</span>
+                      <span className="gaewoon__label">힘이 나는 시간</span>
                       <span className="gaewoon__value break-keep">{gaewoon.time}</span>
                     </li>
                     <li className="gaewoon__item" data-kind="activity">
-                      <span className="gaewoon__label">활동</span>
+                      <span className="gaewoon__label">추천 활동</span>
                       <span className="gaewoon__value break-keep">{gaewoon.activity}</span>
                     </li>
                   </ul>
-                  <p className="gaewoon__note">전통 오행 대응표를 참고한 가벼운 제안이에요.</p>
+                  <p className="gaewoon__note">전통 오행 대응표를 참고했어요.</p>
                 </div>
               ) : (
                 fortune.core?.dayLuck.method === "용신 없음" && (
                   <p className="gaewoon__empty">
-                    태어난 시간을 넣으면 오늘의 개운이 보여요.{" "}
+                    태어난 시간을 넣으면 오늘 챙기면 좋은 것이 보여요.{" "}
                     <Link href="/onboarding?next=/" className="underline underline-offset-4">
                       시간 넣기
                     </Link>
@@ -282,7 +282,7 @@ export function FortuneCard({ fortune, ganjiKo, canVote, vote, defaultOpen }: Pr
             </section>
 
             {/* 붓선 — 행동 섹션과 투표 사이 */}
-            <span aria-hidden className="rule rule--light mt-5" />
+            <span aria-hidden className="rule rule--light mt-6" />
 
             {/* v3.14: 누르는 즉시 바뀌고 카드가 접히지 않는다 (클라이언트 컴포넌트) */}
             {canVote && <VoteButtons date={fortune.date} initial={vote} />}
