@@ -1,3 +1,4 @@
+import { happinessTier } from "@/lib/entry";
 import type { SeriesPoint } from "@/lib/stats/extra";
 
 /**
@@ -65,7 +66,7 @@ export function HappinessChart({ series, emptyArt }: { series: SeriesPoint[]; em
         {fortunePath && <path d={fortunePath} className="hchart__fortune" fill="none" />}
         {linePath && <path d={linePath} className="hchart__line" fill="none" />}
         {series.map((p, i) =>
-          p.happiness10 === null ? null : <circle key={p.date} cx={x(i, n)} cy={y(p.happiness10)} r={3} className="hchart__dot" />,
+          p.happiness10 === null ? null : <circle key={p.date} cx={x(i, n)} cy={y(p.happiness10)} r={3} className="hchart__dot" data-tier={happinessTier(p.happiness10)} />,
         )}
         <text x={PAD.l} y={H - 6} className="hchart__axis">
           {first}

@@ -9,6 +9,8 @@ export const MOODS = [
   "평온",
   "감사함",
   "신남",
+  "홀가분함",
+  "든든함",
   "무덤덤",
   "피곤함",
   "지침",
@@ -26,7 +28,7 @@ export type Mood = (typeof MOODS)[number];
 
 /** 기분 색 구분 (2026-10-09 Q3): 긍정 = 금빛, 무덤덤 = 색 없음, 부정 = 차분한 남색. 빨강 없음. 화면은 data-tone으로 칠한다 */
 export type MoodTone = "pos" | "neutral" | "neg";
-const POSITIVE_MOODS: readonly string[] = ["기쁨", "뿌듯함", "설렘", "평온", "감사함", "신남"];
+const POSITIVE_MOODS: readonly string[] = ["기쁨", "뿌듯함", "설렘", "평온", "감사함", "신남", "홀가분함", "든든함"];
 export function moodTone(m: string): MoodTone {
   if (POSITIVE_MOODS.includes(m)) return "pos";
   if (m === "무덤덤") return "neutral";
@@ -98,4 +100,9 @@ export function validateEntry(
   const promiseText = promise && promiseTextRaw ? promiseTextRaw : null;
 
   return { ok: true, value: { entryDate, happiness, moods: moods as Mood[], note: text || null, promise, promiseText } };
+}
+
+/** v3.22: 네 단계 — 8~10 초록(top) · 6~7 금(high) · 4~5 종이(mid) · 0~3 남색(low) */
+export function happinessTier(h: number): "top" | "high" | "mid" | "low" {
+  return h >= 8 ? "top" : h >= 6 ? "high" : h >= 4 ? "mid" : "low";
 }

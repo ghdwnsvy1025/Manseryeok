@@ -185,12 +185,10 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
         </Link>
         {/* 제목 자리 = 내 카드 (v3.3 → v3.8 정사각): 폭 54%, 이 화면의 그림 하나. 카드 자체가 테두리를 가지고 있어 틀을 더 두르지 않는다 */}
         <img src={me.cardSrc} alt={`내 카드 ${me.ganjiKo}`} width={1080} height={1080} className="h-auto w-[54%] max-w-[220px]" />
-        {/* v3.21: "경진일"만으로는 뜻을 몰라 — 이 카드가 나(태어난 날의 간지)라는 걸 한 줄로 */}
         <h1 className="mt-3 font-serif text-[20px] leading-snug">
           {profile.name !== "손님" ? <>{profile.name}의 카드, </> : <>나의 카드, </>}
           <span className="text-ganji">{me.ganjiKo}</span>
         </h1>
-        <p className="me-card-hint mt-1 text-[13px] text-muted">태어난 날의 간지(일주)로 정해진 내 카드예요</p>
         {/* v3.13: 점 대신 이름–값 줄맞춤. "이 기기에만 저장돼요"는 설정에만 (2026-10-10) */}
         <dl className="kv me-progress mt-3 w-full max-w-[260px]">
           <div className="kv__row">
@@ -212,9 +210,8 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
 
       <section className="me-sep me-sep--wide flex flex-col gap-4">
         <div>
-          <h2 className="sec-tag">내 행복도</h2>
-          {/* v3.13 Q6 = B: 같은 자리에서 60갑자 / 달력 전환 (링크, JS 없음). 모양은 디자이너(.view-switch) */}
-          <nav className="view-switch mt-2" aria-label="보기">
+          {/* v3.22: 머리표·설명 문장 없음 — 달력은 보면 안다. v3.13 Q6 = B: 같은 자리에서 60갑자 / 달력 전환 (링크, JS 없음). 모양은 디자이너(.view-switch) */}
+          <nav className="view-switch" aria-label="보기">
             <Link href="/me" scroll={false} aria-current={isCal ? "page" : undefined} className="view-switch__item" data-icon="calendar">
               달력
             </Link>
@@ -222,9 +219,6 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
               60갑자
             </Link>
           </nav>
-          <p className="mt-2 text-sm text-muted">
-            {isCal ? "날마다 남긴 행복도가 도장으로 찍혀요. 날짜를 누르면 그날 카드와 기록이 아래에 나와요." : "60가지 날 가운데 나는 어떤 날에 행복했는지. 기록한 날의 동물이 칸에 찍혀요."}
-          </p>
         </div>
         {isCal ? (
           <MonthCalendar cal={calMonth} days={calDays} initialSelected={pickedDay} today={today} />

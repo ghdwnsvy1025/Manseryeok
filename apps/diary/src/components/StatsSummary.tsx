@@ -48,7 +48,7 @@ function Bars({ title, items, element = false }: { title: string; items: Bucket[
 }
 
 /** 맞춤도 + 지표 세 칸 + 30일 그래프 + 사실 한 줄들 + 천간·지지·오행 한 판. 기간 약속·재촉 문구는 쓰지 않는다 */
-export function StatsSummary({ h, fitPercent, stems, branches, elements, points, moods, streak, habit, chart }: Props) {
+export function StatsSummary({ h, fitPercent, stems, branches, elements, points, moods, habit, chart }: Props) {
   // v3.13: 점 대신 이름–값 줄 (왼쪽 무엇, 오른쪽 간지 + 평균 + 횟수)
   const facts: { label: string; ganji: string; mean: number | null; n: number }[] = [];
   if (h.bestGanji) facts.push({ label: "가장 행복한 날", ganji: `${h.bestGanji.ko}일`, mean: h.bestGanji.mean, n: h.bestGanji.n });
@@ -57,17 +57,41 @@ export function StatsSummary({ h, fitPercent, stems, branches, elements, points,
 
   return (
     <div className="flex flex-col gap-4">
-      {/* 지표 세 칸 (Q4 = A+B+D): 연속 기록 · 오늘의 포인트 · 자주 고른 기분 */}
-      {h.total > 0 && (
-        <ul className="metrics me-sep" aria-label="내 지표">
-          <li className="metric">
-            <span className="metric__label">연속 기록</span>
-            <span className="metric__value">
-              {streak.current}
-              <small>일</small>
+      {/* v3.22: 달력 바로 아래 그래프 — 제목 없이 달력과 한 덩어리 */}
+      {h.total > 0 && <div className="hchart-wrap card-frame card-light card-paper px-5 py-4">{chart}</div>}
+
+      {/* v3.22 기록 습관: 큰 숫자 "N일째" + 최고, 최근 30일 도장 점 30개, 이번 달·30일 기록률. 모양은 디자이너(.habit*) */}
+      {h.total > 0 && habit && (
+        <div className="habit card-frame card-light card-paper px-5 py-4" aria-label="기록 습관">
+          <div className="habit__head">
+            <span className="habit__label">연속 기록</span>
+            <span className="habit__value">
+              {habit.current}
+              <small>일째</small>
             </span>
-            <span className="metric__sub">최고 {streak.best}일</span>
-          </li>
+            <span className="habit__best">최고 {habit.best}일</span>
+          </div>
+          <ol className="habit__dots" aria-label={`최근 30일 중 ${habit.last30.filter(Boolean).length}일 기록`}>
+            {habit.last30.map((on, k) => (
+              <li key={k} className="habit__dot" data-on={on ? "" : undefined} data-today={k === habit.last30.length - 1 ? "" : undefined} />
+            ))}
+          </ol>
+          <dl className="kv habit__kv mt-3">
+            <div className="kv__row">
+              <dt>이번 달 기록</dt>
+              <dd>{habit.thisMonth}일</dd>
+            </div>
+            <div className="kv__row">
+              <dt>최근 30일 기록률</dt>
+              <dd>{habit.rate30}%</dd>
+            </div>
+          </dl>
+        </div>
+      )}
+
+      {/* v3.22 지표 두 칸: 하면 좋아요 · 자주 고른 기분 (연속 기록은 위 기록 습관으로) */}
+      {h.total > 0 && (
+        <ul className="metrics metrics--two" aria-label="내 지표">
           <li className="metric metric--points">
             {/* v3.15 Q4 = A: 제목 "하면 좋아요", 큰 숫자 "3/5일", 최근 7번 답을 도장 점으로(해봤어요 = 찍힌 점, 못 했어요 = 빈 점). 퍼센트 없음 */}
             <span className="metric__label">하면 좋아요</span>
@@ -109,48 +133,12 @@ export function StatsSummary({ h, fitPercent, stems, branches, elements, points,
         </ul>
       )}
 
-      {/* 행복도 그래프 (Q7) */}
-      {h.total > 0 && (
-        <div className="card-frame card-light card-paper px-5 py-4">
-          <p className="text-[15px] font-bold">내 행복도</p>
-          <div className="mt-3">{chart}</div>
-        </div>
-      )}
-
       {/* v3.17 정리: 자주 보지 않는 통계는 접는다 — 맞춤도 · 가장 행복한 날 · 글자별 막대. 모양은 디자이너(.more-stats*) */}
       {h.total > 0 && (
         <details className="more-stats me-sep">
           <summary className="more-stats__summary tap cursor-pointer list-none [&::-webkit-details-marker]:hidden">자세한 통계</summary>
           <div className="mt-3 flex flex-col gap-4">
-            {/* v3.21: 기록 습관 — 연속 기록 통계 (모양은 디자이너 .habit*) */}
-            {habit && (
-              <div className="habit card-frame card-light card-paper px-5 py-4">
-                <p className="text-[15px] font-bold">기록 습관</p>
-                <dl className="kv mt-2">
-                  <div className="kv__row">
-                    <dt>지금 연속</dt>
-                    <dd>{habit.current}일</dd>
-                  </div>
-                  <div className="kv__row">
-                    <dt>가장 길게 이어 쓴 날</dt>
-                    <dd>{habit.best}일</dd>
-                  </div>
-                  <div className="kv__row">
-                    <dt>이번 달 기록</dt>
-                    <dd>{habit.thisMonth}일</dd>
-                  </div>
-                  <div className="kv__row">
-                    <dt>최근 30일 중 기록한 날</dt>
-                    <dd>
-                      {habit.rate30}%
-                      <span className="kv__bar" aria-hidden>
-                        <span style={{ width: `${habit.rate30}%` }} />
-                      </span>
-                    </dd>
-                  </div>
-                </dl>
-              </div>
-            )}
+
             <div className="card-frame card-light card-paper px-5 py-4">
               <div className="flex items-baseline justify-between">
                 {/* v3.14: 맞춤도 뜻은 "?"를 누르면 한 줄 (details, JS 없음) */}

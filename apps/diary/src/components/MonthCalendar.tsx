@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { happinessTier } from "@/lib/entry";
 import { useEffect, useState } from "react";
 import type { CalendarMonth } from "@/lib/calendar";
 import { CalendarDayDetail } from "@/components/CalendarDayDetail";
@@ -14,9 +15,6 @@ export interface DayInfo {
 }
 
 /** 행복도 세 단계 (2026-10-10 Q2 = A): 7~10 high(금빛) · 4~6 mid(옅은 녹갈) · 1~3 low(차분한 남색). 빨강 없음 */
-export function happinessTier(h: number): "high" | "mid" | "low" {
-  return h >= 7 ? "high" : h >= 4 ? "mid" : "low";
-}
 
 /**
  * 나 화면 달력 (v3.15). 날짜를 누르면 서버를 거치지 않고 아래 상세가 바로 바뀐다 — 그 달 기록(행복도·기분·메모·간지)을 서버가 미리 담아 준다

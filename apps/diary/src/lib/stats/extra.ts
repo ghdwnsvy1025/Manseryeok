@@ -99,20 +99,24 @@ export interface Habit {
   /** 최근 30일 중 기록한 날 비율 (0~100) */
   rate30: number;
   total: number;
+  /** v3.22 최근 30일, 오래된 날 → 오늘 순. true = 기록함 */
+  last30: boolean[];
 }
 
 /** v3.21 기록 습관: 연속 · 최고 연속 · 이번 달 · 최근 30일 기록률 · 전체 */
 export function habitOf(entries: StatEntry[], today: string): Habit {
   const s = streakOf(entries, today);
   const days = new Set(entries.map((e) => e.entry_date));
-  let last30 = 0;
-  for (let i = 0; i < 30; i++) if (days.has(addDays(today, -i))) last30++;
+  const dots: boolean[] = [];
+  for (let i = 29; i >= 0; i--) dots.push(days.has(addDays(today, -i)));
+  const last30 = dots.filter(Boolean).length;
   return {
     current: s.current,
     best: s.best,
     thisMonth: [...days].filter((d) => d.startsWith(today.slice(0, 7))).length,
     rate30: Math.round((100 * last30) / 30),
     total: days.size,
+    last30: dots,
   };
 }
 
