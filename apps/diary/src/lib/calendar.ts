@@ -37,7 +37,15 @@ export function resolveMonth(param: string | undefined, today: string): string {
   return param;
 }
 
-function shift(ym: string, delta: number): string {
+/**
+ * 한 달 범위를 DB 질의용으로. `to`는 다음 달 1일(미포함)이라 30일 이하 달에서도 유효한 날짜다
+ * (전체검토 2026-10-14 A-1: `${ym}-31`은 9·11·2·4·6월에 Postgres가 거부해 나 화면이 통째로 깨졌다)
+ */
+export function monthRange(ym: string): { from: string; toExclusive: string } {
+  return { from: `${ym}-01`, toExclusive: `${shift(ym, 1)}-01` };
+}
+
+export function shift(ym: string, delta: number): string {
   let y = Number(ym.slice(0, 4));
   let m = Number(ym.slice(5)) + delta;
   while (m < 1) {

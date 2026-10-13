@@ -38,6 +38,8 @@ import { nightCarryDate } from "@/lib/writeNav";
 import { addDays, formatKoreanDate, hourKST, parseYmd, todayKST } from "@/lib/time";
 
 export const dynamic = "force-dynamic";
+/** 운세 생성(모델 호출 20초 타임아웃 × 최대 3회, 전체 40초 기한)이 Vercel 기본 함수 상한(10~15초)에 끊기지 않게. SDK 옵션은 fortune/llm.ts CLIENT_OPTIONS (A-2) */
+export const maxDuration = 60;
 
 /** 한지 카드 공통 — 키트 테두리(card-frame) 위에 카드 종이(card-paper) */
 const card = "card-frame card-light card-paper p-5";

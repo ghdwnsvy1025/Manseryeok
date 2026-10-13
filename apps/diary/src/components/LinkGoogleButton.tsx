@@ -2,16 +2,13 @@
 
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { safeNext } from "@/lib/safeNext";
 
 interface Props {
   /** 돌아올 앱 안 경로 */
   next?: string;
   label?: string;
   className?: string;
-}
-
-function safeNext(next?: string): string | null {
-  return next && next.startsWith("/") && !next.startsWith("//") ? next : null;
 }
 
 /**
@@ -28,7 +25,7 @@ export function LinkGoogleButton({ next = "/settings", label = "Google로 연결
     setError(null);
     const supabase = createClient();
     const callback = new URL("/auth/callback", window.location.origin);
-    const n = safeNext(next);
+    const n = safeNext(next, "");
     if (n) callback.searchParams.set("next", n);
     const { data } = await supabase.auth.getSession();
     const anonymous = Boolean(data.session?.user.is_anonymous);

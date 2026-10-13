@@ -4,6 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { EntryInput, Promise_ } from "./entry";
 import type { DayGanji } from "./ganji";
 import { CITIES, type CityId } from "./cities";
+import { monthRange } from "./calendar";
 import type { BirthProfile, ComputedProfile, ProfileInput, PillarsSnapshot } from "./profile";
 
 export interface EntryRow {
@@ -207,8 +208,9 @@ export async function listEntries(sb: SupabaseClient, userId: string, limit = 30
 
 /** 한 달 기록 전부(메모·기분 포함) — 나 화면 달력이 날짜 상세를 서버 왕복 없이 보여 주려고 (v3.15). ym = "2026-10" */
 export async function listEntriesInMonth(sb: SupabaseClient, userId: string, ym: string): Promise<EntryRow[]> {
+  const { from, toExclusive } = monthRange(ym);
   const q = (cols: string) =>
-    sb.from("night_entries").select(cols).eq("user_id", userId).gte("entry_date", `${ym}-01`).lte("entry_date", `${ym}-31`).order("entry_date", { ascending: true });
+    sb.from("night_entries").select(cols).eq("user_id", userId).gte("entry_date", from).lt("entry_date", toExclusive).order("entry_date", { ascending: true });
   let { data, error } = await q(ENTRY_COLUMNS);
   if (error && isMissingColumnError(error)) ({ data, error } = await q(ENTRY_COLUMNS_LEGACY));
   if (error) fail("한 달 기록 읽기", error);

@@ -138,6 +138,14 @@ export interface FortuneContent {
   attempts?: number;
   /** 3단계: source가 llm일 때 쓴 모델 ID */
   model?: string;
+  /** 모델 토큰 사용량 합계 (재작성·검수 포함). 비용 집계용 — night_fortunes.tokens_in/out에도 같은 값이 들어간다 */
+  usage?: { input: number; output: number; cacheRead: number; cacheWrite: number };
+  /** 템플릿으로 떨어진 까닭이 API 일시 장애(429·5xx·타임아웃)면 "api". 이 결과는 하루 캐시에 쓰지 않는다 (A-3) */
+  transient?: "api";
+  /** transient일 때 다시 만들어도 되는 시각(ISO). 이 전에는 캐시를 그대로 쓴다 */
+  retryAfter?: string;
+  /** 같은 날 프로필을 고쳐 다시 만든 횟수. 상한(REGEN_LIMIT)을 넘으면 모델 없이 템플릿만 (B-H1 비용 상한) */
+  regen?: number;
   /** v3 재료. v4 캐시에는 없다 */
   base?: Omit<BaseFortune, "score"> & { score: number };
   /** v4 재료 */

@@ -17,7 +17,17 @@ const nextConfig: NextConfig = {
   // 키트 이미지·카드·캐릭터는 내용이 바뀌면 파일명이 바뀐다(에셋 재납품). 1년 캐시로 탭 전환마다 304 왕복이 생기지 않게 한다
   async headers() {
     const immutable = [{ key: "Cache-Control", value: "public, max-age=31536000, immutable" }];
+    // 보안 헤더 (전체검토 2026-10-14 B-M1). frame-ancestors 'none'으로 iframe에 끼워 "기록 모두 지우기" 같은 버튼을 몰래 누르게 하는 클릭재킹을 막는다.
+    // 전체 CSP(script-src 등)는 Next 인라인 스크립트에 nonce가 필요해 여기서 다루지 않는다 — frame-ancestors만 강제. HSTS는 Vercel이 붙인다
+    const security = [
+      { key: "Content-Security-Policy", value: "frame-ancestors 'none'" },
+      { key: "X-Frame-Options", value: "DENY" },
+      { key: "X-Content-Type-Options", value: "nosniff" },
+      { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+      { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), payment=()" },
+    ];
     return [
+      { source: "/:path*", headers: security },
       { source: "/ui/:path*", headers: immutable },
       { source: "/cards-square/:path*", headers: immutable },
       { source: "/characters/:path*", headers: immutable },

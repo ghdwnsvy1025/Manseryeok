@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Booting } from "@/components/Booting";
 import { getUser } from "@/lib/supabase/server";
 import { getSajuProfile } from "@/lib/db";
+import { safeNext as checkNext } from "@/lib/safeNext";
 import { ProfileForm } from "./ProfileForm";
 
 export const dynamic = "force-dynamic";
@@ -9,7 +10,7 @@ export const dynamic = "force-dynamic";
 export default async function OnboardingPage({ searchParams }: { searchParams: Promise<{ next?: string }> }) {
   const { next } = await searchParams;
   const { supabase, user } = await getUser();
-  const safeNext = next && next.startsWith("/") && !next.startsWith("//") ? next : "/";
+  const safeNext = checkNext(next);
 
   // 세션이 아직 없는 첫 요청: 리디렉트하지 않고 뼈대만 그린다 (docs/ANON_START.md 1절, B2)
   if (!user) return <Booting title="태어난 날을 적어요" cards={1} />;
@@ -49,6 +50,16 @@ export default async function OnboardingPage({ searchParams }: { searchParams: P
             : null
         }
       />
+      {/* 첫 온보딩(익명)만: 다른 기기에서 Google로 쓰던 사람이 생년월일을 다시 넣지 않고 자기 기록으로 돌아가는 길 (전체검토 D-H-1) */}
+      {!existing && user.is_anonymous && (
+        <p className="mt-4 text-center text-[14px] text-muted">
+          이미 Google로 쓰던 분은{" "}
+          <Link href={`/login?next=${encodeURIComponent(safeNext)}`} className="tap underline underline-offset-4">
+            여기서 로그인
+          </Link>
+          해요.
+        </p>
+      )}
       {/* 편집 모드(프로필이 이미 있을 때)만: 취소 글자 링크 + 경고 한 줄 (전수조사 C) */}
       {existing && (
         <div className="mt-4 flex flex-col items-center gap-1 text-center">

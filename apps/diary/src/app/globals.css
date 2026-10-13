@@ -43,12 +43,9 @@
   /* v3.22 행복도 top(8~10) 도장 — frame #767b3c를 진하게 올린 초록(빨강 금지). 종이색 숫자 대비 5.2:1 */
   --color-moss: #4e6a2f;
 
-  /* 옛 이름 별칭. 01·03 명세가 끝나면 지운다. 새 코드에서 쓰지 않는다 */
-  --color-night: var(--color-paper);
+  /* 옛 이름 별칭. 01·03 명세가 끝나면 지운다. 새 코드에서 쓰지 않는다 (v3.26: night·lamp·lamp-ink는 사용처가 없어 지웠다) */
   --color-surface: var(--color-paper-2);
   --color-surface-2: var(--color-paper-3);
-  --color-lamp: var(--color-gold);
-  --color-lamp-ink: var(--color-gold-ink);
   --color-moon: var(--color-ganji);
 
   --font-sans: "Pretendard Variable", "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
@@ -80,8 +77,10 @@ body {
   min-height: 100dvh;
 }
 
+/* 포커스 링 (v3.26): 먹 2px + 바깥 2px. 금색은 한지 위 1.73:1이라 포커스에 쓰지 않는다(먹 11.6:1).
+   링은 요소 바깥(offset)이라 남색 띠·금면 위에서도 한지 바탕에 그려진다 — 남색 면 안쪽에 링이 들어가는 자리만 paper-2 예외 */
 :focus-visible {
-  outline: 2px solid var(--color-gold);
+  outline: 2px solid var(--color-ink);
   outline-offset: 2px;
 }
 
@@ -240,7 +239,7 @@ input:checked + .tag {
 
 /* 생년월일 입력칸 (v3.3 — 양식지 form-sheet 참조는 지웠다, 파일은 public/ui에 둔다).
    56px · 녹갈 1px · 눌린 한지색(paper-3) · 숫자 Song Myung 22px. 상태만 분명히:
-   빈 칸 = 흐린 자리표시 / 입력 중 = 금색 2px / 채움 = 먹색 글자 / 오류(aria-invalid) = 먹색 1.5px */
+   빈 칸 = 흐린 자리표시 / 입력 중 = moss 2px(v3.26 — 금 2px은 paper-3 위 1.5:1) / 채움 = 먹색 글자 / 오류(aria-invalid) = 먹색 1.5px */
 .field {
   display: block;
   width: 100%;
@@ -265,9 +264,12 @@ input:checked + .tag {
   font-size: 16px;
 }
 .field:focus {
+  border-color: var(--color-moss);
+  box-shadow: inset 0 0 0 1px var(--color-moss);
+}
+/* 손가락·마우스 포커스는 moss 테두리만, 키보드 포커스(:focus-visible)는 전역 먹 링까지 (v3.26) */
+.field:focus:not(:focus-visible) {
   outline: none;
-  border-color: var(--color-gold);
-  box-shadow: inset 0 0 0 1px var(--color-gold);
 }
 .field[aria-invalid="true"]:not(:focus) {
   border-color: var(--color-ink);
@@ -324,7 +326,7 @@ input:checked + .tag {
 }
 input:focus-visible + .seg__cell,
 .seg__cell:focus-visible {
-  outline: 2px solid var(--color-gold);
+  outline: 2px solid var(--color-ink);
   outline-offset: 2px;
 }
 
@@ -434,7 +436,7 @@ input:checked + .promise-seg__cell {
   box-shadow: none;
 }
 input:focus-visible + .promise-seg__cell {
-  outline: 2px solid var(--color-gold);
+  outline: 2px solid var(--color-ink);
   outline-offset: 2px;
 }
 
@@ -563,11 +565,12 @@ details[open] > .fortune-body {
   background-repeat: no-repeat;
   animation: burst-fly 600ms ease-out 120ms both;
 }
+/* v3.26: 1024 PNG(2.4MB) 대신 512 webp(78KB). SaveBurst가 조각 자리를 퍼센트로 계산해 시트 해상도와 무관 */
 .burst-bit--paper {
-  background-image: url("/ui/pop-paper-bits-clean.png");
+  background-image: url("/ui/pop-paper-bits-clean-512.webp");
 }
 .burst-bit--gold {
-  background-image: url("/ui/pop-gold-dust-clean.png");
+  background-image: url("/ui/pop-gold-dust-clean-512.webp");
 }
 @keyframes burst-fly {
   /* 카드 가장자리 뒤에서 나타나 바깥으로 — 가운데에서 시작하면 카드에 가려 안 보인다 */
@@ -875,12 +878,12 @@ details[open] > .fortune-body {
 }
 
 
-/* 약속 쪽지 (쓰기 화면, 행복도 아래): 키트 note-slip(위가 살짝 접힌 한지, 1024×512). 접힌 위 90px·양옆 28px·아래 28px은 조각으로,
-   몸통만 늘인다. 안쪽 글자는 접힌 띠 아래에 */
+/* 약속 쪽지 (쓰기 화면, 행복도 아래): 키트 note-slip(위가 살짝 접힌 한지). v3.26부터 512×256 webp(15KB) — 조각 수치는 이미지 픽셀이라
+   1024판의 90·28·30·28을 반으로(45·14·15·14), 화면 px(30·10·12)는 그대로. 접힌 위·양옆·아래는 조각으로, 몸통만 늘인다. 안쪽 글자는 접힌 띠 아래에 */
 .note-slip {
   border-style: solid;
   border-width: 30px 10px 12px;
-  border-image: url("/ui/note-slip-clean.png") 90 28 30 28 fill / 30px 10px 12px / 0 stretch;
+  border-image: url("/ui/note-slip-clean-512.webp") 45 14 15 14 fill / 30px 10px 12px / 0 stretch;
   padding: 2px 8px 6px;
   color: var(--color-ink);
 }
@@ -940,7 +943,7 @@ input:checked + .promise-stamp > .promise-stamp__mark[data-kind="na"] {
 }
 input:focus-visible + .promise-stamp > .promise-stamp__mark {
   border-radius: 50%;
-  outline: 2px solid var(--color-gold);
+  outline: 2px solid var(--color-ink);
   outline-offset: 2px;
 }
 
@@ -1124,7 +1127,7 @@ input:focus-visible + .promise-stamp > .promise-stamp__mark {
   opacity: 0.55;
 }
 .vote__btn:focus-visible {
-  outline: 2px solid var(--color-gold);
+  outline: 2px solid var(--color-ink);
   outline-offset: 2px;
 }
 
@@ -2605,7 +2608,8 @@ button.cal__cell {
   font-weight: 700;
 }
 
-/* 3. 하단 탭 아이콘 22px — 선 2~3획 SVG mask, 색은 글자색(고른 탭 금빛, 나머지 muted) */
+/* 3. 하단 탭 아이콘 22px — 선 2~3획 SVG mask, 색은 글자색(나머지 muted). v3.26: 고른 탭의 라벨은 gold-ink(12:1)라
+   아이콘만 금빛 장식으로 남긴다(aria-hidden). 활성 표시는 라벨 아래 2px 금빛 짧은 밑줄 한 줄(.nav-label, 아래) */
 .nav-icon {
   display: block;
   width: 22px;
@@ -2622,6 +2626,24 @@ button.cal__cell {
 }
 .nav-icon[data-icon="seal"] {
   --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='6' r='3.3'/%3E%3Cpath d='M10.3 8.9l-.6 4.1h4.6l-.6-4.1'/%3E%3Crect x='5' y='13' width='14' height='7.5' rx='1'/%3E%3C/svg%3E");
+}
+
+a[aria-current="page"] > .nav-icon {
+  color: var(--color-gold);
+}
+/* 활성 탭 밑줄 (v3.26): 라벨 글자 폭만큼, 글자 아래 2px, gold-wash 결. 면이 아니라 선이라 "금색 면 하나" 규칙 밖 */
+.nav-label {
+  padding-bottom: 3px;
+}
+a[aria-current="page"] > .nav-label::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--color-gold) url("/ui/gold-wash.webp") center / 64px 64px;
 }
 
 /* 4. 카드 무게: 보조 카드는 이중선 + 귀퉁이 장식 대신 녹갈 한 줄. 한지 결은 그대로, 주인공 운세 카드(card-gold)만 무겁다 */

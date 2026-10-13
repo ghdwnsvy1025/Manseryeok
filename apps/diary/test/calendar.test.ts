@@ -1,5 +1,20 @@
 import { describe, expect, it } from "vitest";
-import { buildMonth, resolveMonth } from "@/lib/calendar";
+import { buildMonth, monthRange, resolveMonth } from "@/lib/calendar";
+
+describe("monthRange", () => {
+  it("끝은 다음 달 1일(미포함) — 30일 이하 달에서도 유효한 날짜 (A-1)", () => {
+    expect(monthRange("2026-09")).toEqual({ from: "2026-09-01", toExclusive: "2026-10-01" });
+    expect(monthRange("2026-02")).toEqual({ from: "2026-02-01", toExclusive: "2026-03-01" });
+    expect(monthRange("2026-12")).toEqual({ from: "2026-12-01", toExclusive: "2027-01-01" });
+  });
+  it("범위 끝이 실제 달력에 있는 날짜다", () => {
+    for (const m of ["01", "02", "04", "06", "09", "11"]) {
+      const { toExclusive } = monthRange(`2026-${m}`);
+      const d = new Date(`${toExclusive}T00:00:00Z`);
+      expect(d.toISOString().slice(0, 10)).toBe(toExclusive);
+    }
+  });
+});
 
 describe("resolveMonth", () => {
   it("미래·잘못된 값은 이번 달", () => {

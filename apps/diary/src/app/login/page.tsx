@@ -1,13 +1,25 @@
 import Link from "next/link";
+import { countEntries } from "@/lib/db";
+import { getUser } from "@/lib/supabase/server";
 import { GoogleButton } from "./GoogleButton";
 
+export const dynamic = "force-dynamic";
+
 /**
- * 기존 Google 사용자용. 앱 안에서 여기로 오는 링크는 없고, 주소를 직접 치면 열린다 (docs/ANON_START.md 2절).
+ * 기존 Google 사용자용. 온보딩 아래 "이미 Google로 쓰던 분" 링크와 설정의 Google 줄에서 온다 (전체검토 D-H-1; 전에는 주소를 직접 쳐야 했다).
  * 세션이 익명이면 GoogleButton이 "연결"과 "기존 계정으로 로그인" 두 버튼을 처음부터 보인다 (B10) — 기존 사용자가 새 기기에서 두 번 실패하지 않게.
  * 모양(톤 v3.2): 한지 위에 글과 버튼만. 카드 없음, 그림 없음, 금색 면은 Google 버튼 하나.
  */
 export default async function LoginPage({ searchParams }: { searchParams: Promise<{ next?: string; error?: string }> }) {
   const { next, error } = await searchParams;
+  // 익명 세션의 기록 수 — "기존 계정으로 로그인"이 그 기록을 버린다는 확인에 쓴다 (D-H-1b). 실패하면 0 (확인 없이 진행)
+  let entryCount = 0;
+  try {
+    const { supabase, user } = await getUser();
+    if (user?.is_anonymous) entryCount = await countEntries(supabase, user.id);
+  } catch (e) {
+    console.error("로그인 화면 기록 수", e);
+  }
   return (
     <main className="flex flex-1 flex-col justify-center">
       <p className="text-sm text-muted">사주읽는밤 일기</p>
@@ -29,7 +41,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
           로그인하지 못했어요. 다시 눌러 주세요.
         </p>
       )}
-      <GoogleButton next={next} />
+      <GoogleButton next={next} entryCount={entryCount} />
       <Link href="/" className="mt-5 text-center text-[15px] text-muted underline underline-offset-4">
         로그인 없이 시작하기
       </Link>

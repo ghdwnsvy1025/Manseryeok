@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Booting } from "@/components/Booting";
-import { BurstPreload } from "@/components/BurstPreload";
+import { BURST_ASSETS } from "@/components/BurstPreload";
 import { characterOfGanji } from "@/lib/character";
 import { getUser } from "@/lib/supabase/server";
 import { getEntry, getSajuProfile, readCachedFortune } from "@/lib/db";
@@ -89,11 +89,11 @@ export default async function WritePage({ searchParams }: { searchParams: Promis
           )}
         </nav>
       </header>
-      {/* 저장 뒤 팡에 쓸 그날 캐릭터·틀·도장을 미리 받아 둔다 (전수조사 B8) */}
-      <BurstPreload cardSrc={characterOfGanji(ganji.ko).cardSrc} />
+      {/* 쓰기 화면 재료(도장·띠지·쪽지·괘선)만 미리. 팡 그림(카드·틀·조각)은 저장 버튼을 누르는 순간 EntryForm이 받는다 (전체검토 C-P1 — 전에는 열 때마다 preload) */}
       <WritePreload />
       <EntryForm
         date={date}
+        warmAssets={[characterOfGanji(ganji.ko).cardSrc, ...BURST_ASSETS]}
         notePlaceholder={isToday ? "오늘 기억하고 싶은 일 하나" : carried ? "어젯밤까지의 하루, 기억하고 싶은 일 하나" : "그날 기억하고 싶은 일 하나"}
         promiseText={promiseText}
         initial={

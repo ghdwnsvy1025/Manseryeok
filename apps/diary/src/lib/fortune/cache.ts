@@ -11,6 +11,9 @@ export interface FortuneCacheRow {
   score: number;
   content: unknown;
   model: string | null;
+  /** 모델 토큰 합계. 템플릿이면 null */
+  tokens_in?: number | null;
+  tokens_out?: number | null;
 }
 
 /** supabase-js 체인에서 쓰는 부분만. 테스트에서 가짜를 끼운다 */

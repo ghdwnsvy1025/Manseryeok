@@ -43,7 +43,7 @@ export function BottomNav() {
   return (
     <nav
       aria-label="주 메뉴"
-      className="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-night/90 backdrop-blur pb-[env(safe-area-inset-bottom)]"
+      className="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-paper/90 backdrop-blur pb-[env(safe-area-inset-bottom)]"
     >
       <ul className="mx-auto grid max-w-md grid-cols-3">
         {TABS.map((t) => {
@@ -56,12 +56,12 @@ export function BottomNav() {
                 prefetch={true}
                 aria-current={active ? "page" : undefined}
                 className={`flex h-16 flex-col items-center justify-center gap-[3px] text-[15px] ${
-                  active ? "font-bold text-lamp" : "text-muted"
+                  active ? "font-bold text-gold-ink" : "text-muted"
                 }`}
               >
-                {/* v3.20 Q3 = A: 탭 아이콘(오늘 = 해, 쓰기 = 붓, 나 = 도장). 고른 탭은 금빛 — 모양은 디자이너(.nav-icon[data-icon]) */}
+                {/* v3.20 Q3 = A: 탭 아이콘(오늘 = 해, 쓰기 = 붓, 나 = 도장). 고른 탭 아이콘은 금빛 장식, 라벨은 gold-ink + 금빛 밑줄(v3.26) — 모양은 디자이너(.nav-icon, .nav-label) */}
                 <span aria-hidden className="nav-icon" data-icon={t.href === "/" ? "sun" : t.href === "/write" ? "brush" : "seal"} />
-                <span className="relative">
+                <span className="nav-label relative">
                   {t.label}
                   <Pending />
                 </span>

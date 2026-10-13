@@ -6,6 +6,7 @@ import { COEF, computeCoreFortune, ipchunDate, resolveYongsin, seunOf, toBirthIn
 import { buildBrief, hanjaToKo, hasContextFact, plainFact, type BriefInput } from "@/lib/fortune/brief";
 import { ownerFilter, saveFortuneCache } from "@/lib/fortune/cache";
 import { generateFortuneText, OUTPUT_SCHEMA, SYSTEM } from "@/lib/fortune/llm";
+import { REGEN_LIMIT, TRANSIENT_RETRY_MS, regenCountOf, regenPolicy, retryAfterFor, usableCachedContent } from "@/lib/fortune/policy";
 import { solarTermOf, solarTermsOfYear, termDayWord } from "@/lib/fortune/solarTerms";
 import { AREA_OVERLAP_MAX, CONTEXT_MENTION_RE, STRUCTURE_WORDS, tokenOverlap, validateFortuneText, type ModelText } from "@/lib/fortune/validate";
 import { adjustWithEntries, bandOf, fitPercent, happinessToScore, toTenPoint } from "@/lib/fortune/personal";
@@ -699,7 +700,7 @@ describe("3단계 파이프라인 (모델은 가짜)", () => {
     expect(OUTPUT_SCHEMA.properties.areas.items.required).toEqual(["period", "area", "line"]);
     const p = calls[0] as { model: string; temperature?: unknown; max_tokens: number; thinking: unknown; output_config: { effort: string; format: { type: string; schema: unknown } }; system: { cache_control: unknown }[]; messages: { role: string }[] };
     expect(p.model).toBe("claude-sonnet-5");
-    expect(p.max_tokens).toBe(2048);
+    expect(p.max_tokens).toBe(4096);
     expect(p.temperature).toBeUndefined();
     expect(p.thinking).toEqual({ type: "adaptive" });
     expect(p.output_config.effort).toBe("low");
@@ -737,6 +738,49 @@ describe("3단계 파이프라인 (모델은 가짜)", () => {
     const r = await generateFortuneText(input, fallback, { client });
     expect(r).toMatchObject({ source: "template", attempts: 1, model: null });
     expect(r.issues[0]![0]).toContain("refusal");
+  });
+
+  test("A-5: max_tokens에 잘리면 다음 시도로 넘어가고, 그다음 통과하면 llm", async () => {
+    const calls: unknown[] = [];
+    const client = {
+      messages: {
+        create: async (params: unknown) => {
+          calls.push(params);
+          const usage = { input_tokens: 10, output_tokens: 5, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 };
+          if (calls.length === 1) return { stop_reason: "max_tokens", content: [{ type: "text", text: '{"headline":"잘' }], usage };
+          return { stop_reason: "end_turn", content: [{ type: "text", text: JSON.stringify(good) }], usage };
+        },
+      },
+    } as never;
+    const r = await generateFortuneText(input, fallback, { client });
+    expect(r.source).toBe("llm");
+    expect(r.attempts).toBe(2);
+    expect(r.issues[0]![0]).toContain("max_tokens");
+    expect(r.transient).toBeUndefined();
+    const second = calls[1] as { messages: { content: string }[] };
+    expect(second.messages[0]!.content).toContain("끊겨");
+  });
+
+  test("A-3: API 오류(타임아웃·5xx)면 템플릿이되 transient=api — 캐시에 쓰지 않는 신호", async () => {
+    const client = { messages: { create: async () => { throw new Error("Request timed out."); } } } as never;
+    const r = await generateFortuneText(input, fallback, { client });
+    expect(r).toMatchObject({ source: "template", attempts: 1, transient: "api" });
+    // 장애 템플릿은 retryAfter까지만 캐시로 쓰고, 지나면 다시 만든다
+    const now = Date.now();
+    const cached = { headline: "x", transient: "api", retryAfter: retryAfterFor(now) };
+    expect(usableCachedContent(cached, now + 1000)).not.toBeNull();
+    expect(usableCachedContent(cached, now + TRANSIENT_RETRY_MS + 1)).toBeNull();
+    expect(usableCachedContent({ headline: "x", transient: "api" }, now)).toBeNull(); // retryAfter 없는 옛 형식은 다시 만든다
+    expect(usableCachedContent({ headline: "정상", source: "llm" }, now)).not.toBeNull();
+    expect(usableCachedContent(null, now)).toBeNull();
+  });
+
+  test("B-H1: 같은 날 재생성은 REGEN_LIMIT까지만 모델을 쓴다", () => {
+    expect(regenPolicy(null)).toEqual({ regen: 0, useModel: true });
+    expect(regenPolicy({ content: {} })).toEqual({ regen: 1, useModel: true });
+    expect(regenPolicy({ content: { regen: REGEN_LIMIT - 1 } })).toEqual({ regen: REGEN_LIMIT, useModel: true });
+    expect(regenPolicy({ content: { regen: REGEN_LIMIT } })).toEqual({ regen: REGEN_LIMIT + 1, useModel: false });
+    expect(regenCountOf({ content: { regen: "x" } })).toBe(0);
   });
 
   test("키가 없으면 모델을 부르지 않고 템플릿", async () => {

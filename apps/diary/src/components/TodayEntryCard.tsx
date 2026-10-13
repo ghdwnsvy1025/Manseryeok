@@ -41,7 +41,7 @@ export function TodayEntryCard({ entry, today, ganjiKo, sameGanjiTimes, metCards
   const cardLine = sameGanjiTimes <= 1 ? `${ganjiKo} 카드를 처음 만났어요` : `${ganjiKo} 카드에 ${nth} 도장을 찍었어요`;
   return (
     <section className="card-frame card-light card-paper p-5">
-      {justSaved && <p className="saved-line mb-2 text-sm font-bold text-gold">저장했어요</p>}
+      {justSaved && <p className="saved-line mb-2 text-sm font-bold text-moss">저장했어요</p>}
       <div className="flex items-baseline justify-between">
         <h2 className="text-sm text-muted">오늘의 기록</h2>
         <Link href={`/write?date=${today}`} className="tap text-sm text-muted underline underline-offset-4">

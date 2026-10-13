@@ -6,7 +6,7 @@ import { NameForm } from "@/components/NameForm";
 import { NotificationSettings } from "@/components/NotificationSettings";
 import { SignOutButton } from "@/components/SignOutButton";
 import { Booting } from "@/components/Booting";
-import { getNotificationSettings, getSajuProfile } from "@/lib/db";
+import { countEntries, getNotificationSettings, getSajuProfile } from "@/lib/db";
 import { hourOf } from "@/lib/remind";
 import { getUser } from "@/lib/supabase/server";
 
@@ -25,7 +25,12 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
   if (!user) return <Booting title="설정" cards={3} />;
 
   const anonymous = Boolean(user.is_anonymous);
-  const [profile, notif] = await Promise.all([getSajuProfile(supabase, user.id), getNotificationSettings(supabase, user.id)]);
+  const [profile, notif, entryCount] = await Promise.all([
+    getSajuProfile(supabase, user.id),
+    getNotificationSettings(supabase, user.id),
+    // 익명이면 "모두 지우기"와 유실 경고에 기록 수를 보여 준다 (D-H-2)
+    anonymous ? countEntries(supabase, user.id) : Promise.resolve(0),
+  ]);
 
   return (
     <main className="flex flex-col gap-5">
@@ -42,7 +47,16 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
           <h2 className="font-serif text-[20px] leading-snug">Google 연결</h2>
           {anonymous ? (
             <>
-              <p className="mt-2 text-[15px] leading-relaxed text-muted">아직 이 기기에만 있는 기록이에요. Google로 연결하면 기기를 바꿔도 남아요.</p>
+              <p className="mt-2 text-[15px] leading-relaxed text-muted">
+                아직 이 기기에만 있는 기록이에요{entryCount > 0 ? ` (${entryCount}건)` : ""}. 브라우저 데이터를 지우거나 앱을 지우면 기록도 사라져요. Google로 연결하면 기기를 바꿔도 남아요.
+              </p>
+              <p className="mt-2 text-[14px] text-muted">
+                전에 다른 기기에서 Google로 쓰던 기록이 있으면{" "}
+                <Link href="/login" className="underline underline-offset-4">
+                  기존 계정으로 로그인
+                </Link>
+                해요.
+              </p>
               {error === "link" && (
                 <p role="alert" className="mt-3 text-[15px] leading-relaxed text-danger">
                   이 Google 계정은 이미 다른 기록과 연결돼 있어요. 그 기록으로 가려면{" "}
@@ -112,8 +126,8 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
         <div className={`${row} py-4`}>
           {anonymous ? (
             <>
-              <ClearAllButton />
-              <p className="mt-2 text-sm text-muted">이 기기의 기록을 모두 지워요. 되돌릴 수 없어요.</p>
+              <ClearAllButton entryCount={entryCount} />
+              <p className="mt-2 text-sm text-muted">기록과 생년월일을 모두 지우고 처음 상태로 돌아가요. 되돌릴 수 없어요.</p>
               {error === "delete" && (
                 <p role="alert" className="mt-2 text-sm text-danger">
                   지우지 못했어요. 잠시 뒤 다시 눌러 주세요.

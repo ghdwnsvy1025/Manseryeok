@@ -17,6 +17,8 @@ import { generateFortuneText } from "./llm";
 import { adjustWithEntries, bandOf, fitPercent, toTenPoint, type EntryLike } from "./personal";
 import { templateInputFromCore, templateText } from "./text";
 import type { FortuneContent } from "./types";
+import { dailyCap, regenPolicy, retryAfterFor, usableCachedContent } from "./policy";
+export { REGEN_LIMIT, TRANSIENT_RETRY_MS, dailyCap, regenCountOf, regenPolicy, retryAfterFor, usableCachedContent } from "./policy";
 
 /** 캐시 지문에 들어간다. 올리면 기존 캐시가 전부 무효 */
 export const FORTUNE_VERSION = "v4.9";
@@ -48,7 +50,7 @@ export interface FortuneRequest {
 /** 읽어 둔 캐시 행이 지금 원국·출생 입력에 맞으면 그 내용. 아니면 null (다시 계산해야 한다) */
 export function cachedFortuneContent(row: FortuneCacheLookup | null, pillars: PillarsSnapshot, profile: BirthProfile | null): FortuneContent | null {
   if (!row || row.profile_fingerprint !== fingerprint(pillars, profile)) return null;
-  return row.content as FortuneContent;
+  return usableCachedContent(row.content);
 }
 
 const WEEKDAYS = ["일요일", "월요일", "화요일", "수요일", "목요일", "금요일", "토요일"];
@@ -94,7 +96,12 @@ async function getTodayFortuneUncached(req: FortuneRequest): Promise<FortuneCont
   } else {
     cached = req.cached;
   }
-  if (cached && cached.profile_fingerprint === fp) return cached.content as FortuneContent;
+  if (cached && cached.profile_fingerprint === fp) {
+    const usable = usableCachedContent(cached.content);
+    if (usable) return usable;
+    // API 장애 템플릿의 재시도 시각이 지났다 → 아래에서 다시 만든다 (지문은 같으니 regen으로 세지 않는다)
+  }
+  const regenerating = Boolean(cached && cached.profile_fingerprint !== fp);
 
   // v4.8 기억(2층): 최근 3일 이 사람의 운세 헤드라인·첫 두 문장. 모델이 같은 말을 되풀이하지 않게 (없거나 실패하면 빈 배열)
   let recent: RecentFortune[] = [];
@@ -125,7 +132,28 @@ async function getTodayFortuneUncached(req: FortuneRequest): Promise<FortuneCont
     console.warn("최근 운세 읽기 실패", e instanceof Error ? e.message : e);
   }
 
-  const content = await computeFortune({ ...req, recent });
+  // 비용 상한: 같은 날 재생성 횟수와 하루 전체 모델 호출 수 (B-H1)
+  const { regen, useModel: regenOk } = regenPolicy(regenerating ? cached : null);
+  let useModel = Boolean(process.env.ANTHROPIC_API_KEY) && regenOk;
+  if (!regenOk) console.warn(`[fortune] 같은 날 재생성 ${regen}회째 — 모델 없이 템플릿 (${col}=${val})`);
+  if (useModel) {
+    try {
+      const { count } = await sb.from("night_fortunes").select("id", { count: "exact", head: true }).eq("fortune_date", req.date).not("model", "is", null);
+      if ((count ?? 0) >= dailyCap()) {
+        useModel = false;
+        console.warn(`[fortune] 오늘 모델 호출 ${count}건 — 일일 상한 ${dailyCap()} 도달, 템플릿만`);
+      }
+    } catch (e) {
+      console.warn("일일 상한 조회 실패(모델은 그대로 씀)", e instanceof Error ? e.message : e);
+    }
+  }
+
+  const computed = await computeFortune({ ...req, recent }, { useModel });
+  const content: FortuneContent = regen > 0 ? { ...computed, regen } : computed;
+
+  // API 장애 템플릿은 retryAfter(10분)까지만 쓰는 짧은 캐시로 — 장애 중 화면을 열 때마다 모델을 부르지 않게 (A-3)
+  const toCache: FortuneContent = content.transient === "api" ? { ...content, retryAfter: retryAfterFor() } : content;
+  if (content.transient === "api") console.warn(`[fortune] API 장애로 템플릿 — ${toCache.retryAfter}까지 짧게 캐시 (${col}=${val} ${req.date})`);
 
   const row: FortuneCacheRow = {
     user_id: req.owner.userId ?? null,
@@ -133,8 +161,10 @@ async function getTodayFortuneUncached(req: FortuneRequest): Promise<FortuneCont
     fortune_date: req.date,
     profile_fingerprint: fp,
     score: content.score,
-    content,
+    content: toCache,
     model: content.source === "llm" ? content.model ?? null : null,
+    tokens_in: content.usage ? content.usage.input + content.usage.cacheRead + content.usage.cacheWrite : null,
+    tokens_out: content.usage ? content.usage.output : null,
   };
   // 지문만 달라진 기존 행은 update. 없으면 insert — 동시 요청으로 중복 키가 나면 cache.ts가 그 행을 찾아 update한다
   const { path, error } = await saveFortuneCache(sb as unknown as FortuneCacheDb, req.owner, row, cached?.id ?? null);
@@ -161,6 +191,8 @@ export async function computeFortune(req: Omit<FortuneRequest, "owner"> & { rece
   let source: FortuneContent["source"] = "template";
   let attempts = 0;
   let model: string | undefined;
+  let usage: FortuneContent["usage"];
+  let transient: FortuneContent["transient"];
   const useModel = opts.useModel ?? Boolean(process.env.ANTHROPIC_API_KEY);
   if (useModel) {
     try {
@@ -169,8 +201,11 @@ export async function computeFortune(req: Omit<FortuneRequest, "owner"> & { rece
       source = r.source;
       attempts = r.attempts;
       if (r.model) model = r.model;
+      if (r.attempts > 0) usage = r.usage;
+      transient = r.transient;
     } catch (e) {
       console.warn("운세 글 생성 실패, 템플릿 사용:", e instanceof Error ? e.message : e);
+      transient = "api";
     }
   }
 
@@ -189,6 +224,8 @@ export async function computeFortune(req: Omit<FortuneRequest, "owner"> & { rece
     source,
     attempts,
     ...(model ? { model } : {}),
+    ...(usage ? { usage } : {}),
+    ...(transient ? { transient } : {}),
     core,
     personal,
     fitPercent: fitPercent(req.entries.length),

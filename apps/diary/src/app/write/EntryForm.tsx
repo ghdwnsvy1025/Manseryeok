@@ -13,6 +13,11 @@ interface Props {
   /** "한 줄" 안내 문구. 과거 날짜면 "그날…" (B7). 없으면 오늘 문구 */
   notePlaceholder?: string;
   initial: { happiness: number; moods: string[]; note: string; promise: Promise_ | null } | null;
+  /**
+   * 저장 버튼을 누르는 순간 미리 받아 둘 그림(팡 조각·카드·틀). 쓰기 화면이 열릴 때 preload하면 기록을 안 쓰고 나가는
+   * 사람도 전부 받았다(전체검토 C-P1) — 저장을 누른 뒤 서버 왕복 동안 받으면 팡이 뜰 때쯤 이미 와 있다
+   */
+  warmAssets?: readonly string[];
 }
 
 /** 약속 도장 3자리. value는 저장 규칙(entry.ts PROMISES)과 같다 */
@@ -41,7 +46,7 @@ function hint(n: number): string {
  * 행복도는 도장(키트 stamp), 기분은 종이 띠지(tag-strip), 메모는 편지지 괘선 위 손글씨.
  * 폼 필드 이름·값과 저장 로직은 그대로다.
  */
-export function EntryForm({ date, promiseText, notePlaceholder, initial }: Props) {
+export function EntryForm({ date, promiseText, notePlaceholder, initial, warmAssets = [] }: Props) {
   const [state, action, pending] = useActionState<FormState, FormData>(saveEntryAction, { error: null });
   const [happiness, setHappiness] = useState<number | null>(initial?.happiness ?? null);
   const [promise, setPromise] = useState<Promise_ | null>(initial?.promise ?? null);
@@ -84,6 +89,12 @@ export function EntryForm({ date, promiseText, notePlaceholder, initial }: Props
       return;
     }
     const data = new FormData(e.currentTarget);
+    // 팡 그림은 지금부터 받는다 — 서버 저장 왕복(수백 ms)이 끝나면 대개 도착해 있다
+    for (const src of warmAssets) {
+      const img = new Image();
+      img.decoding = "async";
+      img.src = src;
+    }
     startTransition(() => action(data));
   }
 
@@ -117,7 +128,7 @@ export function EntryForm({ date, promiseText, notePlaceholder, initial }: Props
                     className="peer sr-only"
                   />
                   <span
-                    className={`stamp flex aspect-square cursor-pointer items-center justify-center font-serif text-[22px] peer-focus-visible:outline-2 peer-focus-visible:outline-gold ${
+                    className={`stamp flex aspect-square cursor-pointer items-center justify-center font-serif text-[22px] peer-focus-visible:outline-2 peer-focus-visible:outline-ink ${
                       on ? "stamp--on text-paper-2" : "text-line"
                     }`}
                   >
@@ -193,7 +204,7 @@ export function EntryForm({ date, promiseText, notePlaceholder, initial }: Props
                   />
                   <span
                     data-tone={moodTone(m)}
-                    className={`tag mood-tag h-10 cursor-pointer text-[14px] peer-focus-visible:outline-2 peer-focus-visible:outline-gold ${
+                    className={`tag mood-tag h-10 cursor-pointer text-[14px] peer-focus-visible:outline-2 peer-focus-visible:outline-ink ${
                       on ? "tag--on font-bold text-paper-2" : "text-ink"
                     } ${full ? "cursor-not-allowed opacity-45" : ""}`}
                   >
@@ -218,7 +229,7 @@ export function EntryForm({ date, promiseText, notePlaceholder, initial }: Props
             value={note}
             onChange={(e) => setNote(e.target.value)}
             placeholder={notePlaceholder ?? "오늘 기억하고 싶은 일 하나"}
-            className="ruled mt-2 w-full resize-none bg-transparent px-1 font-hand text-[17px] break-keep text-ink placeholder:font-sans placeholder:text-[16px] placeholder:text-faint focus:outline-none focus-visible:outline-2 focus-visible:outline-gold"
+            className="ruled mt-2 w-full resize-none bg-transparent px-1 font-hand text-[17px] break-keep text-ink placeholder:font-sans placeholder:text-[16px] placeholder:text-faint focus:outline-none focus-visible:outline-2 focus-visible:outline-ink"
           />
         </div>
       </div>

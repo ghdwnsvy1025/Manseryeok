@@ -125,6 +125,34 @@ export interface GenerateResult {
   /** v4.10: 문맥 검수 결과. 검수 모델이 없으면 undefined. 통과 = 문제 없음 / 적용 = 문제를 고친 글을 씀 / 탈락 = 고친 글이 검사에 걸리거나 호출 실패라 초고 그대로 */
   review?: { status: "통과" | "적용" | "탈락"; problems: string[]; why?: string };
   usage: { input: number; output: number; cacheRead: number; cacheWrite: number };
+  /**
+   * 템플릿으로 떨어진 까닭이 "일시적"인지. api = 429·5xx·타임아웃·연결 오류처럼 조금 뒤 다시 부르면 될 수 있는 것 →
+   * 이 결과는 하루 캐시에 쓰지 않는다 (전체검토 A-3). 검사 탈락·거절·키 없음은 다시 불러도 같으니 캐시해도 된다
+   */
+  transient?: "api";
+}
+
+/**
+ * SDK 기본값은 타임아웃 10분·재시도 2회라 Vercel 함수 상한(기본 10~15초)을 넘기면 응답이 끊기고 캐시도 안 남는다 (전체검토 A-2).
+ * 재시도는 generateFortuneText의 attempt 루프가 맡으므로 SDK 재시도는 끈다. 시간은 page.tsx의 maxDuration(30초) 안에 3회가 들어가게.
+ */
+export const CLIENT_OPTIONS = { timeout: 20_000, maxRetries: 0 } as const;
+/** 시도 전부 합친 상한(ms). 이 시간이 지나면 남은 시도를 건너뛰고 템플릿. page.tsx maxDuration(60초) 안에 들어간다 (2026-10-14 실측: 8초 타임아웃은 첫 호출이 자주 걸렸다) */
+export const TOTAL_DEADLINE_MS = 40_000;
+/**
+ * adaptive thinking은 생각 토큰도 max_tokens에 들어간다. 출력 JSON은 ~500토큰이라 2048로도 대개 되지만 생각이 길어지면 잘려
+ * JSON.parse가 터졌다 (A-5). 넉넉히 잡아도 실제 출력만큼만 과금된다
+ */
+export const MAX_TOKENS = 4096;
+
+/** 응답이 max_tokens에 잘렸을 때. attempt 루프가 이것을 보고 다음 시도로 넘어간다 */
+export class TruncatedError extends Error {
+  /** SyntaxError와 구조가 같아 instanceof 좁히기가 never가 되는 것을 막는 표식 */
+  readonly truncated = true;
+  constructor() {
+    super("응답이 잘림 (stop_reason=max_tokens)");
+    this.name = "TruncatedError";
+  }
 }
 
 export interface GenerateOptions {
@@ -146,7 +174,7 @@ export async function callModel(
 ): Promise<ModelText | null> {
   const response = await client.messages.create({
     model,
-    max_tokens: 2048,
+    max_tokens: MAX_TOKENS,
     thinking: { type: "adaptive" },
     output_config: { effort: "low", format: { type: "json_schema", schema: OUTPUT_SCHEMA as unknown as Record<string, unknown> } },
     system: [{ type: "text", text: SYSTEM, cache_control: { type: "ephemeral" } }],
@@ -159,6 +187,7 @@ export async function callModel(
   usage.cacheWrite += u.cache_creation_input_tokens ?? 0;
   console.info(`[fortune llm] ${model} attempt=${attempt} in=${u.input_tokens} out=${u.output_tokens} cache_read=${u.cache_read_input_tokens ?? 0} cache_write=${u.cache_creation_input_tokens ?? 0} stop=${response.stop_reason}`);
   if (response.stop_reason === "refusal") return null;
+  if (response.stop_reason === "max_tokens") throw new TruncatedError();
   const text = response.content.find((b) => b.type === "text");
   if (!text) throw new Error("모델 응답에 text 블록이 없음");
   return JSON.parse(text.text) as ModelText;
@@ -184,10 +213,11 @@ export async function generateFortuneText(input: BriefInput, fallback: TemplateT
   const briefJson = renderBrief(brief);
   const model = opts.model ?? fortuneModel();
   const maxAttempts = opts.maxAttempts ?? MAX_ATTEMPTS;
+  const startedAt = Date.now();
   const usage = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
   const result: GenerateResult = { text: fallback, source: "template", attempts: 0, model: null, issues: [], usage };
 
-  const client = opts.client ?? (process.env.ANTHROPIC_API_KEY ? new Anthropic() : null);
+  const client = opts.client ?? (process.env.ANTHROPIC_API_KEY ? new Anthropic(CLIENT_OPTIONS) : null);
   if (!client) {
     result.issues.push(["ANTHROPIC_API_KEY 없음"]);
     return result;
@@ -196,17 +226,31 @@ export async function generateFortuneText(input: BriefInput, fallback: TemplateT
   let messages: Anthropic.MessageParam[] = [{ role: "user", content: briefJson }];
   let prev: ModelText | null = null;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    if (attempt > 1 && Date.now() - startedAt > TOTAL_DEADLINE_MS) {
+      result.issues.push([`전체 기한 ${TOTAL_DEADLINE_MS / 1000}초 초과 — 남은 시도 생략`]);
+      break;
+    }
     result.attempts = attempt;
     let parsed: ModelText | null;
     try {
       parsed = await callModel(client, model, messages, usage, attempt);
     } catch (e) {
+      // 잘림(max_tokens)과 JSON 파싱 실패는 같은 brief로 한 번 더 써 보면 되는 일 — 다음 시도로
+      if (e instanceof TruncatedError || e instanceof SyntaxError) {
+        const why = e instanceof TruncatedError ? e.message : `JSON 파싱 실패: ${e.message}`;
+        console.warn(`[fortune llm] ${why} (attempt ${attempt})`);
+        result.issues.push([why]);
+        messages = rewriteMessages(briefJson, prev, ["앞 응답이 중간에 끊겨 JSON이 완성되지 않았어요. 생각은 짧게, 정해진 JSON만 완결되게 써요."]);
+        continue;
+      }
       const why =
         e instanceof Anthropic.RateLimitError ? `요청 과다 (429)`
         : e instanceof Anthropic.APIError ? `API 오류 ${e.status ?? ""} ${e.message}`.trim()
         : e instanceof Error ? e.message : String(e);
       console.warn("[fortune llm] 호출 실패, 템플릿 사용:", why);
       result.issues.push([why]);
+      // 429·5xx·타임아웃·연결 오류는 조금 뒤 다시 부르면 될 수 있다 → 이 템플릿을 하루 캐시에 굳히지 않는다 (A-3)
+      result.transient = "api";
       return result;
     }
     if (parsed === null) {

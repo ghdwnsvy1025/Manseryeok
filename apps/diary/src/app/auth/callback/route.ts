@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { ensureUserRow, getSajuProfile } from "@/lib/db";
+import { safeNext } from "@/lib/safeNext";
 
 /**
  * Google 로그인·연결(linkIdentity)에서 돌아오는 곳. 레거시와 같은 경로라 Supabase 리디렉트 허용 목록을 그대로 쓴다.
@@ -9,8 +10,7 @@ import { ensureUserRow, getSajuProfile } from "@/lib/db";
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = request.nextUrl;
   const code = searchParams.get("code");
-  const rawNext = searchParams.get("next") ?? "/";
-  const next = rawNext.startsWith("/") && !rawNext.startsWith("//") ? rawNext : "/";
+  const next = safeNext(searchParams.get("next"));
 
   // Supabase가 오류를 쿼리로 돌려준 경우. 연결하려던 Google이 이미 다른 계정에 묶여 있으면 identity_already_exists
   const providerError = searchParams.get("error");

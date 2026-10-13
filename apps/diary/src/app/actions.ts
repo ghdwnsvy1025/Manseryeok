@@ -19,6 +19,7 @@ import {
   saveSajuProfile,
 } from "@/lib/db";
 import { isAllowedRemindHour } from "@/lib/remind";
+import { validatePushSubscription } from "@/lib/pushSubscription";
 import { validateEntry, validateEntryDate } from "@/lib/entry";
 import { dayGanji } from "@/lib/ganji";
 import { COMPUTE_ERROR, computeProfile, validateName, validateProfile, type ProfileField } from "@/lib/profile";
@@ -31,12 +32,6 @@ export interface FormState {
 
 /** 익명 세션이 아직 안 만들어졌을 때 (첫 요청 직후). AnonBoot가 곧 세션을 만들고 화면을 새로 그린다 */
 const NOT_READY = "준비하고 있어요. 잠시 뒤 다시 눌러 주세요.";
-
-/** 저장 뒤 돌아갈 곳. 외부 주소로 튀지 않게 앱 안 경로만 허용한다. */
-function safeNext(value: FormDataEntryValue | null, fallback: string): string {
-  const s = typeof value === "string" ? value : "";
-  return s.startsWith("/") && !s.startsWith("//") ? s : fallback;
-}
 
 /** AnonBoot가 익명 세션을 만든 직후 한 번: night_profiles 행을 만든다 (이름 "손님") */
 export async function bootAnonAction(): Promise<void> {
@@ -240,14 +235,14 @@ export async function enablePushAction(subscriptionJson: string, remindHour: num
   } catch {
     return { ok: false, error: "구독 정보를 읽지 못했어요." };
   }
-  if (!sub || typeof sub !== "object" || typeof (sub as { endpoint?: unknown }).endpoint !== "string") {
-    return { ok: false, error: "구독 정보가 올바르지 않아요." };
-  }
+  // endpoint가 알려진 푸시 서비스의 https 주소이고 암호 키가 있을 때만 (B-M4: 임의 URL로 매일 서버가 POST하던 구멍)
+  const checked = validatePushSubscription(sub);
+  if (!checked.ok) return { ok: false, error: checked.reason };
   const hour = isAllowedRemindHour(remindHour) ? remindHour : 21;
   try {
     await saveNotificationSettings(supabase, user.id, {
       enabled: true,
-      web_push: sub,
+      web_push: checked.value,
       remind_at: `${String(hour).padStart(2, "0")}:00`,
     });
   } catch (e) {
@@ -280,18 +275,4 @@ export async function setRemindHourAction(form: FormData): Promise<void> {
     console.error(e);
   }
   revalidatePath("/settings");
-}
-
-/**
- * 공유 버튼으로 공유를 마친 횟수만 남긴다 (v3.16). 누가 눌렀는지는 저장하지 않는다 (종류, 방법, 시각뿐).
- * 테이블(0004_share_events.sql)이 아직 없거나 실패해도 사용자에겐 영향이 없게 조용히 넘어간다.
- */
-export async function recordShareAction(kind: "fortune", method: "image" | "link" | "download"): Promise<void> {
-  if (kind !== "fortune" || !["image", "link", "download"].includes(method)) return;
-  try {
-    const { error } = await adminClient().from("night_share_events").insert({ kind, method });
-    if (error) console.warn("공유 횟수 기록 실패", error.message);
-  } catch (e) {
-    console.warn("공유 횟수 기록 실패", e instanceof Error ? e.message : e);
-  }
 }
