@@ -48,6 +48,16 @@ export function tokenOverlap(a: string, b: string): number {
   return ta.filter((t) => tb.has(t)).length / ta.length;
 }
 
+/** v4.9: 칸마다 같은 말 반복 — "오늘" 영역 줄·do·dont가 본문 어느 문장과든 이만큼 겹치면 탈락 (어절 앞 두 글자 = 대략의 어간) */
+export const REPEAT_OVERLAP_MAX = 0.5;
+const REPEAT_STOP = new Set(["오늘", "오늘은", "이달엔", "올해는", "평소", "평소엔", "평소보다", "하루예요", "날이에요", "있어요", "좋아요", "해요", "편이", "쪽이", "쪽으로", "조금", "한결"]);
+const stemsOf = (s: string): string[] => tokensOf(s).filter((t) => !REPEAT_STOP.has(t)).map((t) => t.slice(0, 2));
+export function stemOverlap(a: string, b: string): number {
+  const sa = stemsOf(a), sb = new Set(stemsOf(b));
+  if (sa.length < 3) return 0;
+  return sa.filter((t) => sb.has(t)).length / sa.length;
+}
+
 /** v4.5: 직장인을 가정한 장면. 학생·주부·쉬는 사람은 공감하지 못한다 — 본문·하면·피해요에서 본다 (영역 "일" 줄은 제외) */
 export const WORKPLACE_WORDS = ["거래처", "제안서", "보고서", "회의", "출근", "퇴근", "상사", "팀장", "동료", "업무"] as const;
 /** v4.5: 주의인 날 본문에 나오면 앞뒤가 어긋나는 반전 말 */
@@ -170,13 +180,18 @@ export function validateFortuneText(t: ModelText | null | undefined, b: FortuneB
   const gotPeriod = t.areas.map((a, i) => a?.period ?? wantPeriod[i]);
   if (want.length === got.length && wantPeriod.some((p, i) => p !== undefined && p !== gotPeriod[i])) add(`areas period 불일치: 기대 [${wantPeriod.join(",")}] / 받음 [${gotPeriod.join(",")}]`);
   const firstSentence = splitSentences(t.body)[0] ?? "";
+  const bodySents = splitSentences(t.body.replace(/\n+/g, " "));
   t.areas.forEach((a, i) => {
     const line = String(a?.line ?? "");
     if (!line.trim()) add(`areas[${i}] line 비어 있음`);
     else if (splitSentences(line).length !== 1) add(`areas[${i}] line은 1문장`);
     if (line.length > LIMITS.areaLineMax) add(`areas[${i}] line ${line.length}자 (${LIMITS.areaLineMax}자 안)`);
     if (firstSentence && tokenOverlap(line, firstSentence) >= AREA_OVERLAP_MAX) add(`areas[${i}] line이 본문 첫 문장과 겹침`);
+    else if (a?.period === "오늘" && bodySents.some((s) => stemOverlap(line, s) >= REPEAT_OVERLAP_MAX)) add(`areas[${i}] line이 본문 문장을 되풀이함`);
   });
+  // v4.9: do·dont도 본문을 되풀이하면 탈락
+  if (bodySents.some((s) => stemOverlap(t.do, s) >= REPEAT_OVERLAP_MAX)) add("do가 본문 문장을 되풀이함");
+  if (bodySents.some((s) => stemOverlap(t.dont, s) >= REPEAT_OVERLAP_MAX)) add("dont가 본문 문장을 되풀이함");
 
   // 내 숫자 문장: 기록이 있으면 횟수와 평균이 본문에 있어야 하고, 없으면 기록 이야기를 하면 안 된다
   const bodyNums = new Set((t.body.match(NUMBER_RE) ?? []).map(Number));

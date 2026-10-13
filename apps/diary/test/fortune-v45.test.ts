@@ -146,3 +146,20 @@ describe("v4.8 반복 줄이기", () => {
     expect(oppositeParts("한", "기")).toBe(false);
   });
 });
+
+describe("v4.9 칸마다 같은 말 반복", () => {
+  it("오늘 영역 줄·do·dont가 본문 문장을 되풀이하면 탈락", async () => {
+    const { stemOverlap } = await import("@/lib/fortune/validate");
+    // 실제 v4.8 샘플에서 나온 되풀이
+    expect(stemOverlap("오늘은 혼자 결정하기 전에 가까운 사람에게 먼저 얘기해요.", "오늘 같은 날은 혼자 끙끙대기보다 가까운 사람에게 얘기를 꺼내는 편이 나아요.")).toBeGreaterThanOrEqual(0.5);
+    const base = SYSTEM_EXAMPLES[1]!.text;
+    const b = { ...briefFor("2026-10-10", "무난"), areas: [] };
+    expect(validateFortuneText(base, b).some((i) => i.includes("되풀이"))).toBe(false);
+    const t = { ...base, do: "답장을 미뤄 둔 메시지나 약속을 오늘 끝내 둬요." };
+    expect(validateFortuneText(t, b).some((i) => i.includes("do가 본문 문장을 되풀이"))).toBe(true);
+  });
+  it("SYSTEM이 칸 역할과 '아니에요' 기억을 말한다", () => {
+    expect(SYSTEM).toContain("칸마다 맡은 일이 다릅니다");
+    expect(SYSTEM).toContain("vote: -1");
+  });
+});

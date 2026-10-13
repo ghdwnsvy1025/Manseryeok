@@ -79,6 +79,8 @@ export interface RecentFortune {
   date: string;
   headline: string;
   start: string;
+  /** v4.9: 그날 "맞아요"(1)·"아니에요"(-1). -1이면 오늘은 그 주제를 앞세우지 않는다 */
+  vote?: 1 | -1;
 }
 export function recentFromRows(rows: { fortune_date: string; content: { headline?: string; body?: string } | null }[]): RecentFortune[] {
   return rows

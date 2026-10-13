@@ -267,7 +267,6 @@ export function FortuneCard({ fortune, ganjiKo, canVote, vote, defaultOpen }: Pr
                       <span className="gaewoon__value break-keep">{gaewoon.activity}</span>
                     </li>
                   </ul>
-                  <p className="gaewoon__note">전통 오행 대응표를 참고했어요.</p>
                 </div>
               ) : (
                 fortune.core?.dayLuck.method === "용신 없음" && (

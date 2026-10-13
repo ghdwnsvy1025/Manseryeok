@@ -19,7 +19,7 @@ import { templateInputFromCore, templateText } from "./text";
 import type { FortuneContent } from "./types";
 
 /** 캐시 지문에 들어간다. 올리면 기존 캐시가 전부 무효 */
-export const FORTUNE_VERSION = "v4.8";
+export const FORTUNE_VERSION = "v4.9";
 
 export type FortuneOwner = { userId: string; guestKey?: undefined } | { guestKey: string; userId?: undefined };
 
@@ -108,6 +108,19 @@ async function getTodayFortuneUncached(req: FortuneRequest): Promise<FortuneCont
       .order("fortune_date", { ascending: false })
       .limit(3);
     recent = recentFromRows((data ?? []) as { fortune_date: string; content: { headline?: string; body?: string } | null }[]);
+    // v4.9: 그날 누른 "맞아요/아니에요"를 붙인다 (로그인 사용자만)
+    if (recent.length && req.owner.userId) {
+      const { data: votes } = await sb
+        .from("night_fortune_feedback")
+        .select("fortune_date, vote")
+        .eq("user_id", req.owner.userId)
+        .in("fortune_date", recent.map((r) => r.date));
+      const byDate = new Map(((votes ?? []) as { fortune_date: string; vote: number }[]).map((v) => [v.fortune_date, v.vote]));
+      recent = recent.map((r) => {
+        const v = byDate.get(r.date);
+        return v === 1 || v === -1 ? { ...r, vote: v } : r;
+      });
+    }
   } catch (e) {
     console.warn("최근 운세 읽기 실패", e instanceof Error ? e.message : e);
   }

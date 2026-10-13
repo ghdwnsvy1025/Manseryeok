@@ -76,6 +76,11 @@ export function StatsSummary({ h, fitPercent, stems, branches, elements, points,
               <li key={k} className="habit__dot" data-on={on ? "" : undefined} data-today={k === habit.last30.length - 1 ? "" : undefined} />
             ))}
           </ol>
+          {/* v3.23: 점 줄의 뜻 — 양 끝에 "30일 전"과 "오늘" 두 단어만 */}
+          <p className="habit__ends" aria-hidden>
+            <span>30일 전</span>
+            <span>오늘</span>
+          </p>
           <dl className="kv habit__kv mt-3">
             <div className="kv__row">
               <dt>이번 달 기록</dt>
@@ -135,7 +140,7 @@ export function StatsSummary({ h, fitPercent, stems, branches, elements, points,
 
       {/* v3.17 정리: 자주 보지 않는 통계는 접는다 — 맞춤도 · 가장 행복한 날 · 글자별 막대. 모양은 디자이너(.more-stats*) */}
       {h.total > 0 && (
-        <details className="more-stats me-sep">
+        <details className="more-stats me-sep card-frame card-light card-paper">
           <summary className="more-stats__summary tap cursor-pointer list-none [&::-webkit-details-marker]:hidden">자세한 통계</summary>
           <div className="mt-3 flex flex-col gap-4">
 

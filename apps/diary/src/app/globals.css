@@ -2509,12 +2509,6 @@ button.cal__cell {
   box-sizing: border-box;
   border: 0.5px solid color-mix(in srgb, var(--color-ink) 20%, transparent);
 }
-.gaewoon__note {
-  margin: 8px 0 0;
-  font-size: 12px;
-  line-height: 1.5;
-  color: var(--color-muted);
-}
 .gaewoon__empty {
   margin: 16px 0 0;
   font-size: 14px;
@@ -2937,4 +2931,93 @@ button.cal__cell {
 }
 .metrics--two .metric__dots {
   gap: 5px;
+}
+
+/* ── v3.23 나 탭: 접힌 서랍 두 개 · 연속 기록 점의 뜻 (명세 23 "v3.23 추가") ─────────────
+   새 그림 없음, 새 모션 없음. .gaewoon__note는 마크업에서 빠져 CSS도 지웠다 */
+
+/* 1. 자세한 통계 + 내 사주 = 서랍 두 개. 붓선은 묶음 위(자세한 통계)에 한 번만.
+   두 서랍 모두 card-light 한 줄 틀, 접힌 높이 60px(위아래 8px + summary 44px), 머리표 띠지 30px 13px, 오른쪽 꺾쇠 14px muted */
+.more-stats,
+.saju-fold {
+  padding: 8px 20px;
+}
+.more-stats[open],
+.saju-fold[open] {
+  padding-bottom: 20px;
+}
+/* v3.21의 .more-stats { border-block: 0 }(틀 없는 줄)을 되돌려 card-light 한 줄 틀을 사방에 */
+.more-stats.card-light {
+  border: 1px solid color-mix(in srgb, var(--color-frame) 55%, transparent);
+}
+/* 내 사주는 자세한 통계 바로 밑 8px(main gap 24px를 뺀다), 붓선 없음. 기록이 없어 자세한 통계가 없으면 원래 붓선 그대로 */
+.me-sep:has(.more-stats) + .saju-fold {
+  margin-top: -16px;
+}
+.me-sep:has(.more-stats) + .saju-fold::before {
+  content: none;
+}
+/* 자세한 통계 summary: 한 줄 전체가 손가락 자리. 띠지는 글자 칸(1열)만, 꺾쇠는 오른쪽 끝(3열) — 내 사주 summary와 같은 자리 */
+.more-stats > .more-stats__summary.tap {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr) 14px;
+  align-items: center;
+  width: 100%;
+  min-height: 44px;
+  margin: 0;
+  padding: 0 0 0 16px;
+}
+/* 절대 위치 칸은 끝 줄을 꼭 적는다(auto면 summary 끝까지 늘어난다) */
+.more-stats > .more-stats__summary.tap::before {
+  grid-area: 1 / 1 / 2 / 2;
+  inset: 7px -16px;
+}
+.more-stats > .more-stats__summary.tap::after {
+  grid-column: 3;
+  grid-row: 1;
+  width: 14px;
+  height: 14px;
+}
+/* 내 사주 머리표도 44px 줄 가운데(sec-tag 기본 align-self: flex-start를 덮는다) — 자세한 통계 띠지와 같은 높이 */
+.saju-fold__summary h2.sec-tag {
+  align-self: center;
+}
+/* 서랍 안의 통계는 카드 속 카드가 되지 않게 틀을 벗기고 녹갈 0.5px 괘선으로만 나눈다 */
+.more-stats .card-light {
+  border: 0;
+  border-top: 0.5px solid color-mix(in srgb, var(--color-frame) 55%, transparent);
+  border-radius: 0;
+  background: none;
+  padding: 16px 0 0;
+}
+
+/* 2. 연속 기록 점: 30개 한 줄(오래된 날 → 오늘). 375px 카드 안쪽 약 295px에선 점 약 8px, 넓으면 12px.
+   한 줄이라야 양 끝 "30일 전 / 오늘"이 점과 맞는다. 빈 날 = 더 흐린 녹갈 점선 원 → 금빛 도장이 이어진 구간이 연속 기록 */
+.habit__dots {
+  grid-template-columns: repeat(30, minmax(0, 1fr));
+  column-gap: 2px;
+  row-gap: 0;
+  align-items: center;
+}
+.habit__dot {
+  box-sizing: border-box;
+  width: min(12px, 100%);
+  height: auto;
+  aspect-ratio: 1;
+  box-shadow: none;
+  border: 1px dashed color-mix(in srgb, var(--color-frame) 40%, transparent);
+}
+.habit__dot[data-on] {
+  border: 0;
+}
+.habit__dot[data-today] {
+  outline-offset: 0.5px;
+}
+.habit__ends {
+  display: flex;
+  justify-content: space-between;
+  margin: 6px 0 0;
+  font-size: 12px;
+  line-height: 1.3;
+  color: var(--color-muted);
 }
