@@ -2008,55 +2008,6 @@ input:checked + .tag[data-tone="neg"] {
   border-radius: 18%;
 }
 
-/* 달력 날짜 상세 */
-.day-detail__date {
-  margin: 0 0 12px;
-  font-family: var(--font-serif);
-  font-size: 18px;
-  line-height: 1.3;
-  text-align: center;
-  color: var(--color-ink);
-}
-.day-detail__card {
-  position: relative;
-  width: 60%;
-  max-width: 240px;
-  margin-inline: auto;
-}
-.day-detail__card img {
-  display: block;
-  border: 0;
-  box-shadow: none;
-}
-.day-detail__card[data-empty] img {
-  filter: grayscale(1) opacity(0.35);
-}
-.day-detail__stamp {
-  position: absolute;
-  right: 10px;
-  bottom: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 56px;
-  height: 56px;
-  transform: rotate(-8deg);
-  font-family: var(--font-serif);
-  font-size: 22px;
-  line-height: 1;
-  color: var(--color-paper-2);
-  font-variant-numeric: tabular-nums;
-  isolation: isolate;
-}
-.day-detail__stamp::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  background: url("/ui/stamp-inked-red-clean.png") center / contain no-repeat;
-  opacity: calc(0.6 + var(--h, 0) * 0.4);
-}
-
 /* 맞춤도 제목 + ? (details) */
 .fit-help {
   flex: 1;
@@ -2215,24 +2166,6 @@ button.cal__cell {
   .cal__cell[data-stamp-in] .cal__stamp {
     animation: none;
   }
-}
-
-/* 날짜 상세: 머리는 간지 이름만(송명 24px 남색 가운데), 도장은 금빛 하나(상세엔 단계가 없다) */
-.day-detail__date {
-  margin: 0 0 12px;
-  font-size: 24px;
-  line-height: 1.25;
-  color: var(--color-ganji);
-}
-.day-detail__stamp {
-  color: var(--color-ink);
-  font-weight: 700;
-}
-.day-detail__stamp::before {
-  background: var(--color-gold) url("/ui/gold-wash.webp") center / 256px 256px;
-  opacity: 1;
-  -webkit-mask: url("/ui/stamp-inked-red-clean.png") center / contain no-repeat;
-  mask: url("/ui/stamp-inked-red-clean.png") center / contain no-repeat;
 }
 
 /* 내 사주 접기: 한 줄 summary — 제목 / 여덟 글자 미리보기 / ▾ */
@@ -3055,3 +2988,90 @@ a[aria-current="page"] > .nav-label::after {
 .kv__num[data-tier="top"] { --num-face: var(--color-moss); --num-ink: var(--color-paper-2); }
 .kv__num[data-tier="high"] { --num-face: var(--color-gold) url("/ui/gold-wash.webp") center / 256px 256px; --num-ink: var(--color-ink); }
 .kv__num[data-tier="low"] { --num-face: color-mix(in srgb, var(--color-sky) 82%, var(--color-paper-2)); --num-ink: var(--color-paper-2); }
+
+/* ── v3.25 일주 얼굴 (명세 23 "v3.25 일주 얼굴") ─────────────────────────────
+   그림 = public/faces/<일주>.webp (512 투명, 머리만). 새 그림·새 모션 없음. 빨강 없음.
+   예전 .day-detail__card 규칙과 --h 기반 붉은 도장은 지웠다 */
+
+/* 1. 60갑자 격자 칸: 얼굴이 칸의 80% 안팎, 가운데 (테두리·kept·오늘 점은 기존 규칙) */
+.album-cell__img {
+  padding: 5%;
+}
+
+/* 2. 달력 날짜 상세 머리: 얼굴 · 간지 이름 · 행복도 도장, 가로 한 줄 가운데 */
+.day-detail__head {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+}
+.day-detail__face {
+  flex: none;
+  display: block;
+  width: 72px;
+  height: 72px;
+  padding: 6px;
+  border-radius: 50%;
+  object-fit: contain;
+  background: var(--color-paper-2) url("/ui/card-paper.webp") center / 256px 256px;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-frame) 40%, transparent);
+}
+.day-detail__head[data-empty] .day-detail__face {
+  filter: grayscale(1);
+  opacity: 0.4;
+}
+.day-detail__date {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: 24px;
+  line-height: 1.25;
+  color: var(--color-ganji);
+}
+.day-detail__head[data-empty] .day-detail__date {
+  color: var(--color-muted);
+}
+/* 행복도 도장: 달력과 같은 네 단계 면. 모양은 stamp-inked-red 알파를 마스크로만 빌린다 */
+.day-detail__stamp {
+  position: relative;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  transform: rotate(-8deg);
+  font-family: var(--font-serif);
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: var(--stamp-num, var(--color-ink));
+  isolation: isolate;
+}
+.day-detail__stamp::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: var(--stamp-face, color-mix(in srgb, var(--color-frame) 28%, var(--color-paper-2)));
+  -webkit-mask: url("/ui/stamp-inked-red-clean.png") center / contain no-repeat;
+  mask: url("/ui/stamp-inked-red-clean.png") center / contain no-repeat;
+}
+.day-detail__stamp[data-tier="top"] {
+  --stamp-face:
+    linear-gradient(color-mix(in srgb, var(--color-moss) 90%, transparent), color-mix(in srgb, var(--color-moss) 90%, transparent)),
+    url("/ui/card-paper.webp") center / 256px 256px;
+  --stamp-num: var(--color-paper-2);
+}
+.day-detail__stamp[data-tier="high"] {
+  --stamp-face: var(--color-gold) url("/ui/gold-wash.webp") center / 256px 256px;
+  --stamp-num: var(--color-ink);
+}
+.day-detail__stamp[data-tier="mid"] {
+  --stamp-face: color-mix(in srgb, var(--color-frame) 28%, var(--color-paper-2));
+  --stamp-num: var(--color-ink);
+}
+.day-detail__stamp[data-tier="low"] {
+  --stamp-face: color-mix(in srgb, var(--color-sky) 82%, var(--color-paper-2));
+  --stamp-num: var(--color-paper-2);
+}

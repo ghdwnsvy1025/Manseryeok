@@ -25,6 +25,8 @@ export interface MyCharacter {
   animal: string;
   /** 동물만 그려진 그림 (제목 옆·로딩·격자 칸) */
   characterSrc: string;
+  /** v3.25 얼굴만(512×512 투명, 바이럴 세션 2026-10-14). 작은 자리용 — 60갑자 격자 칸·달력 날짜 상세 */
+  faceSrc: string;
   /** 정사각 카드(능력·설명 없음, 1080×1080) (팡·welcome·나 화면 머리·공유 카드) */
   cardSrc: string;
 }
@@ -36,6 +38,7 @@ export function characterOfGanji(ganjiKo: string): MyCharacter {
     ganjiKo,
     animal: BRANCH_ANIMAL[branch] ?? "",
     characterSrc: `/characters/${ganjiKo}.webp`,
+    faceSrc: `/faces/${ganjiKo}.webp`,
     // ?v=2: 2026-10-09 가장자리 검은 띠(0~7px)를 잘라 다시 저장. 1년 immutable 캐시라 주소를 바꿔야 폰이 새 파일을 받는다
     cardSrc: `/cards-square/${ganjiKo}.webp?v=2`,
   };

@@ -55,8 +55,8 @@ export function GanjiGrid({ cells, selected, todayIndex, basePath, pickedEntries
                 style={{ "--ink": ink } as React.CSSProperties}
               >
                 {c.n ? (
-                  // 모은 칸 = 캐릭터만 (v3.3). 지연 로딩
-                  <img src={`/characters/${c.ko}.webp`} alt="" width={64} height={64} loading="lazy" decoding="async" className="album-cell__img" />
+                  // 모은 칸 = 얼굴만 (v3.25, 작은 칸에서도 표정이 보이게). 지연 로딩
+                  <img src={characterOfGanji(c.ko).faceSrc} alt="" width={64} height={64} loading="lazy" decoding="async" className="album-cell__img" />
                 ) : (
                   <span className="font-serif text-[12px] leading-none text-muted">{c.hanja[1]}</span>
                 )}
