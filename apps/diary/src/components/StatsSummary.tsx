@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import type { Bucket, Highlights } from "@/lib/stats/ganji";
 import type { Habit, MoodCount, PointStats, Streak } from "@/lib/stats/extra";
-import { moodTone } from "@/lib/entry";
+import { happinessTier, moodTone } from "@/lib/entry";
 
 interface Props {
   h: Highlights;
@@ -192,7 +192,7 @@ export function StatsSummary({ h, fitPercent, stems, branches, elements, points,
                     <dt>{f.label}</dt>
                     <dd>
                       <span className="text-ganji">{f.ganji}</span>
-                      <span className="kv__num">{f.mean}</span>
+                      <span className="kv__num" data-tier={f.mean !== null ? happinessTier(f.mean) : undefined}>{f.mean}</span>
                       <span className="kv__n">{f.n}번</span>
                     </dd>
                   </div>

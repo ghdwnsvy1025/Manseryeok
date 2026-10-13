@@ -1,6 +1,5 @@
 import { BRANCHES, BRANCHES_KO, STEMS, STEMS_KO } from "@saju/engine";
 import { VoteButtons } from "@/components/VoteButtons";
-import { FortuneShareButton } from "@/components/FortuneShareButton";
 import Link from "next/link";
 import { gaewoonOf } from "@/lib/fortune/gaewoon";
 import { SignalLegend } from "@/components/SignalLegend";
@@ -188,11 +187,8 @@ export function FortuneCard({ fortune, ganjiKo, canVote, vote, defaultOpen }: Pr
       <div className="fortune-body">
         <div>
           <div className="px-5 pb-5">
-            {/* v3.16: 헤드라인 줄 오른쪽에 "공유" (오늘의 운세 한 장). summary 밖이라 눌러도 카드가 접히지 않는다 */}
-            <div className="flex items-start justify-between gap-3">
-              <h2 className="border-l-2 border-gold pl-3 font-serif text-[24px] leading-snug">{fortune.headline}</h2>
-              <FortuneShareButton date={fortune.date} ganjiKo={ganjiKo} band={fortune.band} score={fortune.score} headline={fortune.headline} />
-            </div>
+            {/* v3.24: 공유 버튼 삭제 — 헤드라인이 끝 글자 하나만 줄바꿈되던 문제. 헤드라인이 줄 전체를 쓴다 */}
+            <h2 className="border-l-2 border-gold pl-3 font-serif text-[24px] leading-snug break-keep">{fortune.headline}</h2>
             {/* 본문 2~3문단 (v3.7). 문단 사이 12px, 들여쓰기 없음 */}
             <div className="mt-3 flex flex-col gap-3 text-[16px] leading-[1.7] text-ink/90">
               {paragraphs.map((p, i) => (
@@ -245,7 +241,6 @@ export function FortuneCard({ fortune, ganjiKo, canVote, vote, defaultOpen }: Pr
               {gaewoon ? (
                 <div className="gaewoon" aria-label="오늘 챙기면 좋은 것">
                   <p className="gaewoon__title">오늘 챙기면 좋은 것</p>
-                  <p className="gaewoon__reason break-keep">{gaewoon.reason}</p>
                   <ul className="gaewoon__grid">
                     <li className="gaewoon__item" data-kind="color">
                       <span className="gaewoon__label">행운 색</span>
