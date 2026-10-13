@@ -8,6 +8,8 @@ import type { AreaName, AreaPeriod } from "./types";
 
 /** 모델이 돌려주는 JSON */
 export interface ModelText {
+  /** v4.10: 뼈대 한 줄 — 모델이 글을 쓰기 전에 먼저 정하는 "오늘 들어오는 성격 → 나와의 관계 → 그래서 생기는 마음·행동". 화면에는 안 나가고 검수와 기록에만 쓴다 */
+  핵심?: string;
   headline: string;
   body: string;
   /** v4.2: period는 brief.areas와 같은 순서로 돌려받는다 (빠지면 brief 것으로 본다) */
@@ -192,6 +194,12 @@ export function validateFortuneText(t: ModelText | null | undefined, b: FortuneB
   // v4.9: do·dont도 본문을 되풀이하면 탈락
   if (bodySents.some((s) => stemOverlap(t.do, s) >= REPEAT_OVERLAP_MAX)) add("do가 본문 문장을 되풀이함");
   if (bodySents.some((s) => stemOverlap(t.dont, s) >= REPEAT_OVERLAP_MAX)) add("dont가 본문 문장을 되풀이함");
+  // v4.10: 이음말 — 첫 문장이 '그래서·그러니·그런데'로 시작하면 받을 앞 문장이 없고(비약), '그래서'는 본문에 한 번까지(같은 이음말 되풀이)
+  if (/^(그래서|그러니|그러니까|그런데|그러다 보니)/.test(firstSentence)) add(`첫 문장이 이음말로 시작 "${firstSentence.slice(0, 12)}…" (받을 앞 문장이 없음)`);
+  const sosCount = (t.body.match(/그래서/g) ?? []).length;
+  if (sosCount > 1) add(`'그래서'가 ${sosCount}번 (본문에 한 번까지 — 원인이 되는 앞 문장이 있을 때만)`);
+  const connectiveStarts = bodySents.filter((s) => /^(그래서|그러니|그러니까|그런데|그래도|그러다 보니|하지만)/.test(s)).length;
+  if (bodySents.length >= 4 && connectiveStarts >= 3) add(`이음말로 시작하는 문장이 ${connectiveStarts}개 (문장을 '~라서·~는데'로 한 문장에 묶거나 이음말 없이 잇기)`);
 
   // 내 숫자 문장: 기록이 있으면 횟수와 평균이 본문에 있어야 하고, 없으면 기록 이야기를 하면 안 된다
   const bodyNums = new Set((t.body.match(NUMBER_RE) ?? []).map(Number));

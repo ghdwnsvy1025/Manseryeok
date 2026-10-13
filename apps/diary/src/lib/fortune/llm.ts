@@ -6,7 +6,8 @@ import Anthropic from "@anthropic-ai/sdk";
 import { buildBrief, renderBrief, type BriefInput, type FortuneBrief } from "./brief";
 import type { TemplateText } from "./text";
 import { FORTUNE_EXAMPLES } from "./examples";
-import { validateFortuneText, type ModelText } from "./validate";
+import { validateFortuneText, LIMITS, type ModelText } from "./validate";
+import { REVIEW_SYSTEM, reviewUser, parseReview, problemLine, reviewRewriteContent, reviewModel } from "./review";
 
 export const DEFAULT_FORTUNE_MODEL = "claude-sonnet-5";
 /** 환경변수 FORTUNE_MODEL로 덮어쓴다 (날짜 접미사 없는 ID) */
@@ -39,6 +40,11 @@ export const SYSTEM = `당신은 "사주읽는밤" 일기 앱의 작가입니다
 - 전문용어를 쓰지 않습니다: brief.jargon의 낱말(십신·용신·기신·일간·일지·천간·지지·오행·삼합·육합·대운·세운, 비견~정인 같은 이름)은 괄호 안에서도 쓰지 않습니다. brief.banned의 낱말도 쓰지 않습니다.
 - 숫자는 brief.allowedNumbers에 있는 것만 씁니다. 시각("오전 7시"), 횟수, 금액, 퍼센트를 새로 만들지 않습니다. 시간대는 "아침·점심·저녁·밤"처럼 말로만 씁니다.
 - 점수는 화면에 있으니 글에 쓰지 않습니다. brief.score.value를 글에 적지 않고, "6.3점", "10점 만점" 같은 점수 표현을 만들지 않습니다 (brief.mine의 기록 평균 "평균 7.5점"은 예외로 그대로 씁니다).
+
+[뼈대 — 글을 쓰기 전에 먼저 정합니다]
+- 핵심: JSON의 첫 칸. "오늘 들어오는 성격 → 나와의 관계(채워 줌·과해짐·부딪힘·맞물림) → 그래서 오늘 이 사람에게 생기는 마음이나 행동" 한 줄(40자 안팎, 사주 용어 없이, brief.chain의 순서대로). 화면에 나가지 않습니다.
+- headline·body·areas·do·dont는 모두 이 한 줄에서 나옵니다. 핵심에 없는 결론·장면·행동을 덧붙이지 않고, 핵심과 반대 방향으로 가지 않습니다(핵심이 '서두르기 쉬운 날'인데 do가 '바로 연락해요'가 되지 않게).
+- body의 첫 문장은 핵심의 '마음'을, 둘째 문단의 장면은 핵심의 '행동'을 보여 주고, do·dont는 그 행동을 어떻게 하거나 피할지입니다. 마무리 문장·do·dont가 핵심 없이도 성립하는 말('오늘도 힘내요', '마음을 편히 가져요', '무리하지 않아요')이면 실패입니다 — 아무 날에나 맞는 말은 쓰지 않습니다.
 
 [구성 — JSON 하나]
 - headline: 12자 안팎 한 구절. 오늘의 느낌을 사실 하나와 묶어서. 쉼표로 두 토막을 이어 붙이지 않습니다("경쟁심 센 날, 속도 늦추기" ✗ → "마음이 앞서기 쉬운 날" ○). 다른 날에도 그대로 쓸 수 있는 말이면 실패입니다.
@@ -80,8 +86,9 @@ export const SYSTEM_EXAMPLES = FORTUNE_EXAMPLES;
 export const OUTPUT_SCHEMA = {
   type: "object",
   additionalProperties: false,
-  required: ["headline", "body", "areas", "do", "dont"],
+  required: ["핵심", "headline", "body", "areas", "do", "dont"],
   properties: {
+    핵심: { type: "string" },   // v4.10: 뼈대 한 줄 — 첫 칸에 두어 글보다 먼저 정하게(구조화 출력은 속성 순서대로 씀). 화면에는 안 나감
     headline: { type: "string" },
     body: { type: "string" },
     areas: {
@@ -113,6 +120,10 @@ export interface GenerateResult {
   issues: string[][];
   /** 마지막 모델 응답 원문 (검사 실패 분석용) */
   lastModelText?: ModelText;
+  /** v4.10: 모델이 먼저 정한 뼈대 한 줄(핵심). 화면에는 안 나감 */
+  core?: string;
+  /** v4.10: 문맥 검수 결과. 검수 모델이 없으면 undefined. 통과 = 문제 없음 / 적용 = 문제를 고친 글을 씀 / 탈락 = 고친 글이 검사에 걸리거나 호출 실패라 초고 그대로 */
+  review?: { status: "통과" | "적용" | "탈락"; problems: string[]; why?: string };
   usage: { input: number; output: number; cacheRead: number; cacheWrite: number };
 }
 
@@ -121,6 +132,8 @@ export interface GenerateOptions {
   /** 기본 2 (첫 글 + 재작성 1회). 샘플 스크립트처럼 호출 수를 묶을 때 1 */
   maxAttempts?: number;
   model?: string;
+  /** v4.10: 검수 모델. undefined면 환경변수 FORTUNE_REVIEW_MODEL, null이면 검수 안 함 */
+  reviewModel?: string | null;
 }
 
 /** 한 번 호출해 JSON을 돌려준다. refusal이면 null */
@@ -204,9 +217,29 @@ export async function generateFortuneText(input: BriefInput, fallback: TemplateT
     const issues = validateFortuneText(parsed, brief);
     result.issues.push(issues);
     if (issues.length === 0) {
-      result.text = { headline: parsed.headline, body: parsed.body, do: parsed.do, dont: parsed.dont, ...(parsed.areas.length ? { areas: parsed.areas.map((a, i) => ({ period: brief.areas[i]!.period, area: a.area, signal: brief.areas[i]!.signal, line: a.line })) } : {}) };
+      let fin = parsed;
+      // v4.10: 문맥 검수 — FORTUNE_REVIEW_MODEL이 있을 때만(기본 꺼짐: 하루 사용자마다 호출이 늘어남). 문제가 있으면 한 번 고쳐 쓰고, 고친 글도 같은 검사를 통과할 때만 씀
+      const rm = opts.reviewModel === undefined ? reviewModel() : opts.reviewModel;
+      if (rm) {
+        try {
+          const rv = await client.messages.create({ model: rm, max_tokens: 1024, system: [{ type: "text", text: REVIEW_SYSTEM, cache_control: { type: "ephemeral" } }], messages: [{ role: "user", content: reviewUser(fin, brief) }] });
+          const rvu = rv.usage; usage.input += rvu.input_tokens; usage.output += rvu.output_tokens; usage.cacheRead += rvu.cache_read_input_tokens ?? 0; usage.cacheWrite += rvu.cache_creation_input_tokens ?? 0;
+          const problems = parseReview(rv.content.filter((x) => x.type === "text").map((x) => (x as { text: string }).text).join(""), fin);
+          if (!problems.length) result.review = { status: "통과", problems: [] };
+          else {
+            const fixed = await callModel(client, model, [{ role: "user", content: reviewRewriteContent(briefJson, fin, problems, LIMITS.bodyMax) }], usage, attempt + 1);
+            const fixIssues = fixed ? validateFortuneText(fixed, brief) : ["모델이 거절함"];
+            if (fixed && fixIssues.length === 0) { fin = fixed; result.review = { status: "적용", problems: problems.map(problemLine) }; }
+            else result.review = { status: "탈락", problems: problems.map(problemLine), why: fixIssues.join(" / ") };
+          }
+        } catch (e) {
+          result.review = { status: "탈락", problems: [], why: `검수 호출 실패: ${e instanceof Error ? e.message : String(e)}` };
+        }
+      }
+      result.text = { headline: fin.headline, body: fin.body, do: fin.do, dont: fin.dont, ...(fin.areas.length ? { areas: fin.areas.map((a, i) => ({ period: brief.areas[i]!.period, area: a.area, signal: brief.areas[i]!.signal, line: a.line })) } : {}) };
       result.source = "llm";
       result.model = model;
+      result.core = fin.핵심;
       return result;
     }
     console.warn(`[fortune llm] 검사 탈락 (attempt ${attempt}):`, issues.join(" / "));
