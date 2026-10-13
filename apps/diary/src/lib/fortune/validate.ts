@@ -147,6 +147,10 @@ export function validateFortuneText(t: ModelText | null | undefined, b: FortuneB
   for (const r of b.recent ?? []) {
     if (t.headline.trim() === r.headline.trim() || tokenOverlap(t.headline, r.headline) >= 0.6) add(`최근(${r.date}) 헤드라인과 겹침 "${r.headline}"`);
     if (tokenOverlap(startNow, r.start) >= 0.5) add(`최근(${r.date}) 운세 첫 문장과 겹침`);
+    // v4.11: 이달·올해 영역 줄은 신호가 한 달·한 해 내내 같아 날마다 같은 문장이 되던 것(되풀이 검토 2026-10-14) — 뜻은 같아도 문장은 바꿔 쓰게
+    for (const line of r.areas ?? []) t.areas.forEach((a, i) => {
+      if (a?.period && a.period !== "오늘" && (String(a.line).trim() === line.trim() || tokenOverlap(String(a.line), line) >= 0.6)) add(`areas[${i}] ${a.period} 줄이 최근(${r.date}) 줄과 겹침 "${line.slice(0, 18)}…" (같은 뜻을 다른 장면·다른 말로)`);
+    });
   }
 
   // 단정 · 기간 약속 · 명령조

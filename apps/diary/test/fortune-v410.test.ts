@@ -96,3 +96,20 @@ describe("v4.10 문맥 검수", () => {
     const c = reviewRewriteContent("{}", good, ps, 420); expect(c).toContain("420자 이내"); expect(c).toContain("먼저 쓴 글:");
   });
 });
+
+describe("v4.11 이달·올해 영역 줄 되풀이", () => {
+  test("recentFromRows가 이달·올해 줄을 싣고, 같은 줄을 다시 쓰면 탈락. 오늘 줄과 다른 말로 쓴 줄은 통과", async () => {
+    const { recentFromRows } = await import("@/lib/fortune/brief");
+    const rows = [{ fortune_date: "2026-06-14", content: { headline: "어제 제목", body: "어제 첫 문장이에요. 둘째 문장이에요.", areas: [{ period: "오늘", line: "오늘 줄" }, { period: "올해", line: "올해는 내 속도만 고집하면 사람이 멀어지기 쉬워요." }] } }];
+    const recent = recentFromRows(rows); expect(recent[0]!.areas).toEqual(["올해는 내 속도만 고집하면 사람이 멀어지기 쉬워요."]);
+    const b2 = { ...brief, recent };
+    const yearIdx = good.areas.findIndex((a) => a.period === "올해");
+    if (yearIdx >= 0) {
+      const same = { ...good, areas: good.areas.map((a, i) => (i === yearIdx ? { ...a, line: "올해는 내 속도만 고집하면 사람이 멀어지기 쉬워요." } : a)) };
+      expect(validateFortuneText(same, b2).some((x) => x.includes("최근(2026-06-14) 줄과 겹침"))).toBe(true);
+      const other = { ...good, areas: good.areas.map((a, i) => (i === yearIdx ? { ...a, line: "올해는 혼자 정한 순서를 한 번쯤 바꿔 보면 사람 일이 풀려요." } : a)) };
+      expect(validateFortuneText(other, b2).some((x) => x.includes("줄과 겹침"))).toBe(false);
+    }
+    expect(validateFortuneText(good, b2).some((x) => x.includes("줄과 겹침"))).toBe(false);
+  });
+});

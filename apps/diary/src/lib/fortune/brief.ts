@@ -81,15 +81,21 @@ export interface RecentFortune {
   start: string;
   /** v4.9: 그날 "맞아요"(1)·"아니에요"(-1). -1이면 오늘은 그 주제를 앞세우지 않는다 */
   vote?: 1 | -1;
+  /** v4.11: 그날의 이달·올해 영역 줄. 신호가 한 달·한 해 내내 같아 같은 사람이 날마다 같은 문장을 읽던 것(되풀이 검토 2026-10-14: B 사주 4일 연속 "올해는 내 속도를 앞세우…") — validate가 같은 뜻을 다른 각도로 쓰게 막는다 */
+  areas?: string[];
 }
-export function recentFromRows(rows: { fortune_date: string; content: { headline?: string; body?: string } | null }[]): RecentFortune[] {
+export function recentFromRows(rows: { fortune_date: string; content: { headline?: string; body?: string; areas?: { period?: string; line?: string }[] } | null }[]): RecentFortune[] {
   return rows
     .filter((r) => r.content?.headline && r.content?.body)
-    .map((r) => ({
-      date: r.fortune_date,
-      headline: r.content!.headline!,
-      start: r.content!.body!.replace(/\n+/g, " ").split(/(?<=[.!?])\s+/).slice(0, 2).join(" "),
-    }));
+    .map((r) => {
+      const areas = (r.content!.areas ?? []).filter((a) => a && a.period !== "오늘" && a.line).map((a) => String(a.line));
+      return {
+        date: r.fortune_date,
+        headline: r.content!.headline!,
+        start: r.content!.body!.replace(/\n+/g, " ").split(/(?<=[.!?])\s+/).slice(0, 2).join(" "),
+        ...(areas.length ? { areas } : {}),
+      };
+    });
 }
 
 /** v4.8 진입 방식(1층): 원인→결과는 지키되 날마다 들어가는 길을 바꾼다 */
