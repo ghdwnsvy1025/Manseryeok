@@ -1,0 +1,34 @@
+name: diary
+
+on:
+  push:
+    branches: [rebuild, main]
+    paths: ["apps/diary/**", "packages/**", ".github/workflows/diary.yml"]
+  pull_request:
+    paths: ["apps/diary/**", "packages/**", ".github/workflows/diary.yml"]
+  schedule:
+    - cron: "0 0 * * 1" # 월요일 09:00 KST, npm audit
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      # file: 링크라 패키지마다 따로 설치한다 (apps/diary/README.md)
+      - run: npm ci
+        working-directory: packages/saju-engine
+      - run: npm ci
+        working-directory: packages/saju-core-rules
+      - run: npm ci
+        working-directory: apps/diary
+      - run: npx tsc --noEmit && npx vitest run
+        working-directory: packages/saju-engine
+      - run: npx tsc --noEmit && npx vitest run
+        working-directory: packages/saju-core-rules
+      - run: npm run typecheck && npm test
+        working-directory: apps/diary
+      - run: npm audit --omit=dev --audit-level=critical
+        working-directory: apps/diary

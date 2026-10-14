@@ -2,6 +2,28 @@
 
 > 결정일: 2026-10-04 · 지금 앱(레거시)은 그대로 두고 새 앱을 옆에 지은 뒤, 데이터만 옮겨 배포를 갈아끼운다.
 > 이 문서가 기준이다. 결정을 바꾸면 이 문서부터 고친다.
+> 새 앱 실행·테스트·배포·환경변수는 `apps/diary/README.md`. 운세 세부는 `docs/FORTUNE_V4.md`, 익명 시작은 `docs/ANON_START.md`.
+
+## 0. 현재 상태 (2026-10-15)
+
+| 항목 | 상태 |
+|---|---|
+| 코드 | 1~5단계 모두 구현 끝. 브랜치 `rebuild`(origin에 있음). 그 뒤 익명 시작(10-06), 설정 화면, 운세 v4(Claude, 재작성·검수, v4.11), 전체검토 10가지 수정(10-14, `caa78e2`)이 더해졌다 |
+| 배포 전환 | **안 됨**. `rebuild`가 `main`에 머지되지 않았다(`main` = `legacy-final` `2fa5ff0`). Vercel Production Branch 전환 여부는 저장소로는 알 수 없다 — 대시보드에서 확인하고 이 칸을 고친다 |
+| DB | 마이그레이션 `0001_night_core`·`0002_anon`·`0003_promise`·`0004_share_events` 네 개, SQL Editor 수동 적용. 테이블 7개(2절 표 + `night_share_events`, 공유 버튼 삭제 뒤 쓰기 없음) |
+| 레거시 | 루트(`src/` 등)에 그대로 남아 동결. 9절 7번(삭제)은 배포 전환 뒤. 그 전까지는 루트 `README.md`의 동결 표지를 따른다 |
+| 테스트 | `apps/diary` vitest 26파일 235개, `packages/saju-engine` 146개, `packages/saju-core-rules` 47개. CI는 `.github/workflows/diary.yml` |
+
+### 10-04 이후 바뀐 결정
+| 주제 | 처음 결정 (10-04) | 지금 |
+|---|---|---|
+| 비로그인 | 운세 보기만, 기록은 Google 로그인 | **익명 시작**(10-06). 첫 방문에 익명 세션, 기록·운세 모두 가능, Google은 나중에 `linkIdentity`로 연결. `ANON_START.md` |
+| LLM | gpt-4o-mini 1회 | **Claude Sonnet 5**(`FORTUNE_MODEL`로 덮어씀). 검사 탈락 시 재작성 최대 2회, 선택적 검수 모델(`FORTUNE_REVIEW_MODEL`). 하루 호출 상한 `FORTUNE_DAILY_CAP`(기본 2000), 같은 날 재생성 5회, 호출 시간 20초·전체 40초. `FORTUNE_V4.md` |
+| 공유 | "가장 행복한 날" 카드 | 운세 한 장 공유를 거쳐 **v3.24에서 삭제**(`ce9294b`). 지금 앱에 공유 기능 없음. 관련 코드는 10-14에 정리 |
+| 화면 | 오늘·쓰기·나 | 같은 세 탭 + `/settings`(설정), `/welcome`, `/onboarding`, `/login`(직접 접근), `/stats?key=`(운영 숫자) |
+| API | 5개 | 라우트는 `/api/cron/remind`·`/auth/callback` 둘. 나머지는 서버 액션(`src/app/actions.ts`) |
+| 크론 | 매시 UTC 10~14시 | **하루 1회 UTC 12시(한국 밤 9시)**, Vercel 무료 플랜 제한. `REMIND_HOURS` 하나 |
+| 분석 | PostHog | 새 앱에서 **쓰지 않음**. 로깅은 `console.*`뿐 |
 
 ---
 
@@ -26,12 +48,12 @@
 | 핵심 기능 | ① 일기 ② 기록이 쌓일수록 정확해지는 운세 ③ 심화: 간지별 내 행복도 |
 | 화면 | **오늘 · 쓰기 · 나** 세 개 |
 | 기록 입력 | 행복도 1~10 + 기분 최대 3개 + 한 줄 메모. 카테고리 점수 7개는 **제거** |
-| 비로그인 | 오늘 운세 보기만 가능. 기록 버튼을 누르면 Google 로그인 |
+| 비로그인 | ~~오늘 운세 보기만 가능. 기록 버튼을 누르면 Google 로그인~~ → 익명 시작 (0절) |
 | 첫 주 보상 | 엔진이 즉시 만드는 "오늘 간지 × 내 일간" 한 줄 (LLM 없음) |
 | 저장 후 보상 | 명언 대신 "내일은 ○○일" 한 줄. 명언 데이터는 보관만 |
 | 진행 지표 | 맞춤도 % 하나. XP·레벨 제거 |
 | 재방문 | 저녁 로컬 알림(PWA) + 카카오 채널 "사주읽는밤" |
-| 공유 | "내가 가장 행복한 날은 乙卯일" 카드 (바이럴 60갑자 카드 디자인 재사용) |
+| 공유 | ~~"내가 가장 행복한 날은 乙卯일" 카드~~ → 삭제 (0절) |
 | 수익 | 이 앱은 무료 습관 앱. 영역별 깊은 풀이는 사주 코어 유료 상품으로 연결. 그 전까지 잠금 탭 없음 |
 | 이름 | **사주읽는밤 일기** (카카오 채널·바이럴과 통일) |
 | LLM 예산 | 월 20만 원 이하 (1,000 DAU 기준) |
@@ -48,22 +70,22 @@ w        = n / (n + k)      n = 오늘과 같은 간지 성분(일간·일지·�
 | 주제 | 결정 |
 |---|---|
 | 위치 | 이 저장소 안 `apps/diary/` (새 앱) · `packages/saju-engine/` (공용 엔진). 루트 `app/`은 쓰지 않는다 — Next.js가 루트 `app/`을 `src/app`보다 먼저 잡아 레거시가 깨진다 |
-| 스택 | Next.js 15 · React 19 · Supabase(같은 프로젝트, 새 테이블) · Tailwind · PostHog · Vercel |
+| 스택 | Next.js 15 · React 19 · Supabase(같은 프로젝트, 새 테이블) · Tailwind · ~~PostHog~~ · Vercel |
 | 엔진 | `src/lib/saju/`를 `packages/saju-engine/`로 옮겨 원본으로 삼는다. 사주 코어는 지금처럼 커밋 해시를 적어 복사(vendor)한다 |
-| LLM | 운세 1회 호출 · 입력 2,000토큰 이내 · 사용자(게스트는 프로필 지문)·날짜 단위 서버 캐시 |
-| DB | 테이블 6개, 이름은 모두 `night_` 접두어 (레거시 테이블과 겹치지 않게): `night_profiles` · `night_saju_profiles` · `night_entries` · `night_fortunes` · `night_fortune_feedback` · `night_notification_settings`. 간지 통계는 저장하지 않고 읽을 때 계산. 마이그레이션은 `apps/diary/supabase/migrations/`, 적용은 SQL Editor |
-| API | 5개: 운세 생성 · 기록 저장 · 간지 통계 · 알림 등록 · 계정 삭제 |
+| LLM | 운세 1회 호출(탈락 시 재작성) · 사용자·날짜 단위 서버 캐시 · 모델은 0절 |
+| DB | 테이블 6개(지금 7개, 0절), 이름은 모두 `night_` 접두어 (레거시 테이블과 겹치지 않게): `night_profiles` · `night_saju_profiles` · `night_entries` · `night_fortunes` · `night_fortune_feedback` · `night_notification_settings`. 간지 통계는 저장하지 않고 읽을 때 계산. 마이그레이션은 `apps/diary/supabase/migrations/`, 적용은 SQL Editor |
+| API | ~~5개~~ → 라우트 2개 + 서버 액션 (0절) |
 
 ## 3. 단계
 
 | 단계 | 내용 | 기간 | 상태 |
 |---|---|---|---|
 | 0 | 데이터 전체 백업 · 레거시 동결 · 이 문서 | 1일 | **완료 2026-10-04** |
-| 1 | 엔진 패키지 분리 · 새 앱 뼈대 · Google 로그인 · 기록 저장 | 5일 | **코드 완료 2026-10-04** · DB 적용과 실계정 로그인 확인 대기 |
-| 2 | 운세 v3 (엔진 점수 + LLM 1회 + 캐시) | 4일 | **코드 완료 2026-10-04** · 게스트 흐름 확인, 로그인 사용자 화면은 사용자 확인 대기 |
+| 1 | 엔진 패키지 분리 · 새 앱 뼈대 · Google 로그인 · 기록 저장 | 5일 | **완료** (DB 적용됨, 10-04 실데이터 이관) |
+| 2 | 운세 v3 (엔진 점수 + LLM 1회 + 캐시) | 4일 | **완료** → 운세 v4로 대체(`FORTUNE_V4.md`) |
 | 3 | 간지별 행복도 · 맞춤도 · 나 탭 | 4일 | **코드 완료 2026-10-04** |
 | 4 | 저녁 알림 · 설치 유도 · 공유 카드 | 3일 | **코드 완료 2026-10-04** · 실기기 푸시 수신은 배포 뒤 확인 |
-| 5 | 레거시 데이터 이관 · 배포 전환 · 레거시 보관 | 1일 | **이관 완료 2026-10-04** · 배포 전환은 디자인 반영 뒤 사용자가 Vercel에서 (아래 9절) |
+| 5 | 레거시 데이터 이관 · 배포 전환 · 레거시 보관 | 1일 | **이관 완료 2026-10-04** · **배포 전환 안 됨**(0절) · 사용자가 Vercel에서 (아래 9절) |
 
 ## 4. 0단계 기록
 
@@ -100,7 +122,7 @@ w        = n / (n + k)      n = 오늘과 같은 간지 성분(일간·일지·�
 
 ## 6. 2단계 기록
 
-- `src/lib/fortune/`: `base.ts`(엔진 점수: 십신 가감 + 일지·월지 합충 + 용신/기신) · `personal.ts`(베이지안 수축, K=5; 맞춤도 K=20) · `text.ts`(템플릿 문장, 금지어 검사) · `llm.ts`(gpt-4o-mini 1회, JSON 스키마, 입력 4,000자 상한) · `index.ts`(캐시 `night_fortunes`, 지문 = 버전+엔진+네 기둥).
+- `src/lib/fortune/`: `base.ts`(엔진 점수: 십신 가감 + 일지·월지 합충 + 용신/기신) · `personal.ts`(베이지안 수축, K=5; 맞춤도 K=20) · `text.ts`(템플릿 문장, 금지어 검사) · `llm.ts`(처음엔 gpt-4o-mini 1회 — 지금은 Claude, 0절) · `index.ts`(캐시 `night_fortunes`, 지문 = 버전+엔진+네 기둥).
 - 게스트: 생년월일을 쿠키(`night_guest`, 180일)에만 두고 서버엔 저장하지 않는다. 캐시 키는 생년월일시 해시라 같은 사주면 캐시를 나눠 쓴다.
 - 모델 문장에 금지어가 있으면 템플릿으로 대체한다. 모델 실패·키 없음도 템플릿.
 - 피드백 "맞아요/아니에요"는 `night_fortune_feedback`에 저장만 한다 (점수 반영은 3단계에서 간지 통계와 함께).
@@ -115,8 +137,8 @@ w        = n / (n + k)      n = 오늘과 같은 간지 성분(일간·일지·�
 
 ## 8. 4단계 기록
 
-- **저녁 알림**: Web Push(VAPID). 사용자가 "나" 탭에서 켜면 브라우저 구독을 `night_notification_settings.web_push`에 저장. Vercel Cron이 매시 정각 UTC 10~14시(한국 19~23시)에 `/api/cron/remind`를 부르고(`vercel.json`), 그 시각이 알림 시각이면서 오늘 기록이 없는 사람에게만 보낸다. 만료 구독(404/410)은 자동으로 끈다. 서비스 워커(`public/sw.js`)는 캐시 없이 푸시만.
-  - 배포 시 Vercel 환경변수에 넣을 것: `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`, `CRON_SECRET` (로컬 `.env.local`에 생성해 둠. 같은 값을 써야 기존 구독이 유지된다).
+- **저녁 알림**: Web Push(VAPID). 사용자가 설정에서 켜면 브라우저 구독을 `night_notification_settings.web_push`에 저장. Vercel Cron이 하루 1회 UTC 12시(한국 21시)에 `/api/cron/remind`를 부르고(`vercel.json`. 처음 계획은 매시 UTC 10~14시), 그 시각이 알림 시각이면서 오늘 기록이 없는 사람에게만 보낸다. 만료 구독(404/410)은 자동으로 끈다. 서비스 워커(`public/sw.js`)는 캐시 없이 푸시만.
+  - 배포 시 Vercel 환경변수에 넣을 것: `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`, `CRON_SECRET`, `STATS_KEY` (로컬 `.env.local`에 생성해 둠. 같은 값을 써야 기존 구독이 유지된다).
   - 아이폰은 홈 화면에 추가한 PWA에서만 푸시가 된다. 화면이 그렇게 안내한다.
   - 카카오 채널은 링크(`https://pf.kakao.com/_WJJxiX`)만. 채널 메시지 자동 발송은 카카오 비즈니스 API가 필요해 보류.
 - **앱으로 두기**: `manifest.webmanifest` + 설치 안내(카톡 인앱·iOS·Android 분기, `beforeinstallprompt` 있으면 버튼). 아이콘은 레거시 것을 임시로 복사 → 디자인 명세 04에서 교체.
@@ -140,7 +162,7 @@ w        = n / (n + k)      n = 오늘과 같은 간지 성분(일간·일지·�
 
 1. 디자인 세션 작업을 검토·커밋해 `rebuild`에 올린다 (`public/characters/` 60장 포함 — 공유 카드가 쓴다).
 2. Vercel 프로젝트 Settings → General → **Root Directory = `apps/diary`**, Framework = Next.js. Node 20 이상.
-3. Settings → Environment Variables (Production): `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `ANTHROPIC_API_KEY`(운세 글, Claude Sonnet 5), `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`, `CRON_SECRET`. 값은 로컬 `apps/diary/.env.local`과 같게 (VAPID가 다르면 기존 알림 구독이 끊긴다).
+3. Settings → Environment Variables (Production): `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `ANTHROPIC_API_KEY`(운세 글, Claude Sonnet 5), `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`, `CRON_SECRET`, `STATS_KEY`. 선택: `FORTUNE_MODEL`, `FORTUNE_REVIEW_MODEL`, `FORTUNE_DAILY_CAP`. 전체 목록은 `apps/diary/.env.example`. 값은 로컬 `apps/diary/.env.local`과 같게 (VAPID가 다르면 기존 알림 구독이 끊긴다).
 4. Settings → Git → Production Branch를 `rebuild`로 바꾸거나, `rebuild`를 `main`에 머지한다. 머지하는 쪽을 권장 (그래야 "main = 운영"이 유지된다). 머지 전 `main`의 레거시 코드는 태그 `legacy-final`로 남아 있다.
 5. 배포 뒤 확인: `/` 게스트 운세 · Google 로그인(`/auth/callback`은 레거시와 같은 경로라 Supabase 리디렉트 목록 수정 불필요) · `/me` 격자 · `/manifest.webmanifest` · 크론은 다음 날 UTC 12시(한국 21시)에 Vercel 로그에서 `/api/cron/remind` 200 확인.
 6. 크론은 무료 플랜 제한(하루 1회)에 맞춰 **밤 9시 고정**이다. 유료 플랜으로 가면 `REMIND_HOURS`와 `vercel.json`을 매시로 늘린다.
