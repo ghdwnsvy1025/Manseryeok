@@ -1,6 +1,6 @@
 // 간지별 내 행복도. 기록을 60갑자 · 천간 · 지지 · 오행으로 묶어 평균을 낸다.
 // 저장하지 않고 읽을 때 계산한다. 기록 수천 건이어도 즉시 끝난다.
-import { BRANCHES, BRANCHES_KO, GANJI_60, STEMS, STEMS_KO, STEM_META, BRANCH_META } from "@saju/engine";
+import { BRANCHES, BRANCHES_KO, ELEMENT_EN_TO_KO, ELEMENT_WORD as ENGINE_ELEMENT_WORD, GANJI_60, STEMS, STEMS_KO, STEM_META, BRANCH_META } from "@saju/engine";
 import type { EntryLike } from "../fortune/personal";
 
 export type Signal = "없음" | "약함" | "보통" | "뚜렷함";
@@ -28,8 +28,8 @@ export interface GanjiCell extends Bucket {
   hanja: string; // 甲子
 }
 
-const ELEMENT_KO: Record<string, string> = { wood: "목", fire: "화", earth: "토", metal: "금", water: "수" };
-const ELEMENT_WORD: Record<string, string> = { 목: "나무", 화: "불", 토: "흙", 금: "쇠", 수: "물" };
+const ELEMENT_KO: Record<string, string> = ELEMENT_EN_TO_KO;
+const ELEMENT_WORD: Record<string, string> = ENGINE_ELEMENT_WORD;
 
 function round1(x: number): number {
   return Math.round(x * 10) / 10;

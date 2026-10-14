@@ -26,6 +26,15 @@ export const ELEMENT_EN_TO_KO: Record<Element, ElementKo> = {
   water: "수",
 };
 
+/** 오행 우리말 (목 → 나무) */
+export const ELEMENT_WORD: Record<ElementKo, string> = {
+  목: "나무",
+  화: "불",
+  토: "흙",
+  금: "쇠",
+  수: "물",
+};
+
 export type ElementVector = Record<ElementKo, number>;
 
 const stemToElement: Record<string, ElementKo> = {

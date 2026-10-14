@@ -1,0 +1,148 @@
+{
+  "_설명": [
+    "만세력 공통 회귀 케이스 표. 세 구현이 같은 표를 각자 테스트에서 돌린다.",
+    "원본: 사주 일기/Manseryeok/packages/saju-engine/test/fixtures/shared-cases.json",
+    "복사본: 사주 코어/core/test/fixtures/manseryeok-shared-cases.json, 바이럴/scripts/fixtures/manseryeok-shared-cases.json — 원본을 고치면 두 곳에 그대로 복사한다.",
+    "입력은 한국 표준시(동경 135°) 시계 시각. 시간 보정 없음, 서머타임 해 없음, 날은 자정에 바뀜(midnight).",
+    "expect는 정답이다: 음력은 한국천문연구원(KASI) 음력, 절입 시각은 KASI 발표값(= lunar-javascript 절기 + 1시간, 분 단위 일치).",
+    "known은 구현이 정답과 다르게 내는 값을 그대로 적은 것이다(알려진 차이). 테스트는 known이 있으면 그 값을 기대한다 — 구현을 고쳐 정답이 나오면 테스트가 깨지니 그때 known을 지운다.",
+    "known 키: engine = @saju/engine과 그 복사본(사주 코어 vendor/manseryeok), viral = 바이럴 saju.js.",
+    "바이럴은 연주(입춘 기준 해)·일주·음력 변환만 계산하므로 year·day·solar·error만 비교한다."
+  ],
+  "cases": [
+    {
+      "id": "기본-1990-01-01",
+      "설명": "1990-01-01 12:00 서울. 입춘 전이라 1989년(己巳)",
+      "input": { "calendar": "solar", "year": 1990, "month": 1, "day": 1, "hour": 12, "minute": 0 },
+      "expect": { "solar": "1990-01-01", "year": "己巳", "month": "丙子", "day": "丙寅", "hour": "甲午" }
+    },
+    {
+      "id": "기본-1990-05-15",
+      "설명": "엔진 fixture와 같은 날",
+      "input": { "calendar": "solar", "year": 1990, "month": 5, "day": 15, "hour": 14, "minute": 30 },
+      "expect": { "solar": "1990-05-15", "year": "庚午", "month": "辛巳", "day": "庚辰", "hour": "癸未" }
+    },
+    {
+      "id": "자정-2000-01-01-0000",
+      "설명": "자정 정각은 새 날",
+      "input": { "calendar": "solar", "year": 2000, "month": 1, "day": 1, "hour": 0, "minute": 0 },
+      "expect": { "solar": "2000-01-01", "year": "己卯", "month": "丙子", "day": "戊午", "hour": "壬子" }
+    },
+    {
+      "id": "자정-1999-12-31-2359",
+      "설명": "자정 1분 전은 전날 (midnight 규칙. 자시 규칙이면 다음 날 일주가 된다)",
+      "input": { "calendar": "solar", "year": 1999, "month": 12, "day": 31, "hour": 23, "minute": 59 },
+      "expect": { "solar": "1999-12-31", "year": "己卯", "month": "丙子", "day": "丁巳", "hour": "庚子" }
+    },
+    {
+      "id": "시간모름-1995-10-25",
+      "설명": "시간 모름 → 시주 없음",
+      "input": { "calendar": "solar", "year": 1995, "month": 10, "day": 25 },
+      "expect": { "solar": "1995-10-25", "year": "乙亥", "month": "丙戌", "day": "己丑", "hour": null }
+    },
+    {
+      "id": "입춘-2024-전",
+      "설명": "2024 입춘 2/4 17:27(KASI). 17:20은 양쪽 다 입춘 전",
+      "input": { "calendar": "solar", "year": 2024, "month": 2, "day": 4, "hour": 17, "minute": 20 },
+      "expect": { "solar": "2024-02-04", "year": "癸卯", "month": "乙丑", "day": "戊戌", "hour": "辛酉" }
+    },
+    {
+      "id": "입춘-2024-사이",
+      "설명": "17:24는 KASI로 입춘 전. 엔진은 입춘을 17:21:27로 계산해(저정밀 태양 황경) 이미 甲辰년 寅월로 본다",
+      "input": { "calendar": "solar", "year": 2024, "month": 2, "day": 4, "hour": 17, "minute": 24 },
+      "expect": { "solar": "2024-02-04", "year": "癸卯", "month": "乙丑", "day": "戊戌", "hour": "辛酉" },
+      "known": { "engine": { "year": "甲辰", "month": "丙寅" } }
+    },
+    {
+      "id": "입춘-2024-후",
+      "설명": "17:30은 양쪽 다 입춘 뒤",
+      "input": { "calendar": "solar", "year": 2024, "month": 2, "day": 4, "hour": 17, "minute": 30 },
+      "expect": { "solar": "2024-02-04", "year": "甲辰", "month": "丙寅", "day": "戊戌", "hour": "辛酉" }
+    },
+    {
+      "id": "입춘-2025-사이",
+      "설명": "2025 입춘 2/3 23:10(KASI). 23:09는 입춘 전. 엔진은 23:08:40으로 계산해 乙巳년으로 본다",
+      "input": { "calendar": "solar", "year": 2025, "month": 2, "day": 3, "hour": 23, "minute": 9 },
+      "expect": { "solar": "2025-02-03", "year": "甲辰", "month": "丁丑", "day": "癸卯", "hour": "壬子" },
+      "known": { "engine": { "year": "乙巳", "month": "戊寅" } }
+    },
+    {
+      "id": "입춘-2025-후",
+      "input": { "calendar": "solar", "year": 2025, "month": 2, "day": 3, "hour": 23, "minute": 12 },
+      "expect": { "solar": "2025-02-03", "year": "乙巳", "month": "戊寅", "day": "癸卯", "hour": "壬子" }
+    },
+    {
+      "id": "경칩-2024-사이",
+      "설명": "2024 경칩 3/5 11:22:45(KASI). 11:20은 아직 寅월. 엔진은 11:16:12로 계산해 卯월로 본다 (바이럴은 월주 없음)",
+      "input": { "calendar": "solar", "year": 2024, "month": 3, "day": 5, "hour": 11, "minute": 20 },
+      "expect": { "solar": "2024-03-05", "year": "甲辰", "month": "丙寅", "day": "戊辰", "hour": "戊午" },
+      "known": { "engine": { "month": "丁卯" } }
+    },
+    {
+      "id": "경칩-2024-후",
+      "input": { "calendar": "solar", "year": 2024, "month": 3, "day": 5, "hour": 11, "minute": 25 },
+      "expect": { "solar": "2024-03-05", "year": "甲辰", "month": "丁卯", "day": "戊辰", "hour": "戊午" }
+    },
+    {
+      "id": "음력30일-1990-02-30",
+      "설명": "음력 30일 입력이 양력 날짜 검사(2월 30일)로 거부되면 안 된다 (레거시 버그)",
+      "input": { "calendar": "lunar", "year": 1990, "month": 2, "day": 30, "hour": 10, "minute": 0 },
+      "expect": { "solar": "1990-03-26", "year": "庚午", "month": "己卯", "day": "庚寅", "hour": "辛巳" }
+    },
+    {
+      "id": "음력30일-1984-10-30",
+      "input": { "calendar": "lunar", "year": 1984, "month": 10, "day": 30, "hour": 12, "minute": 0 },
+      "expect": { "solar": "1984-11-22", "year": "甲子", "month": "乙亥", "day": "庚申", "hour": "壬午" }
+    },
+    {
+      "id": "음력없는날-2023-01-30",
+      "설명": "음력 2023년 1월은 29일까지",
+      "input": { "calendar": "lunar", "year": 2023, "month": 1, "day": 30, "hour": 10, "minute": 0 },
+      "expect": { "error": true }
+    },
+    {
+      "id": "윤달-2023-윤2-15",
+      "input": { "calendar": "lunar", "year": 2023, "month": 2, "day": 15, "isLeap": true, "hour": 12, "minute": 0 },
+      "expect": { "solar": "2023-04-05", "year": "癸卯", "month": "丙辰", "day": "癸巳", "hour": "戊午" }
+    },
+    {
+      "id": "윤달-1990-윤5-1",
+      "input": { "calendar": "lunar", "year": 1990, "month": 5, "day": 1, "isLeap": true, "hour": 10, "minute": 0 },
+      "expect": { "solar": "1990-06-23", "year": "庚午", "month": "壬午", "day": "己未", "hour": "己巳" }
+    },
+    {
+      "id": "윤달없음-2023-윤3",
+      "설명": "2023년에 윤3월은 없다",
+      "input": { "calendar": "lunar", "year": 2023, "month": 3, "day": 15, "isLeap": true, "hour": 12, "minute": 0 },
+      "expect": { "error": true }
+    },
+    {
+      "id": "한중음력-1990-09-01",
+      "설명": "한국 음력 9월 1일 = 양력 10/19. lunar-javascript(중국 음력, 동경 120°)는 초하루가 하루 빨라 10/18 → 일주가 하루 어긋난다",
+      "input": { "calendar": "lunar", "year": 1990, "month": 9, "day": 1, "hour": 12, "minute": 0 },
+      "expect": { "solar": "1990-10-19", "year": "庚午", "month": "丙戌", "day": "丁巳", "hour": "丙午" },
+      "known": { "engine": { "solar": "1990-10-18", "day": "丙辰", "hour": "甲午" } }
+    },
+    {
+      "id": "한중음력-2023-03-30",
+      "설명": "한국 음력 2023년 3월은 30일까지(→ 양력 5/19). 중국 음력은 29일까지라 엔진은 '존재하지 않음' 오류",
+      "input": { "calendar": "lunar", "year": 2023, "month": 3, "day": 30, "hour": 12, "minute": 0 },
+      "expect": { "solar": "2023-05-19", "year": "癸卯", "month": "丁巳", "day": "丁丑", "hour": "丙午" },
+      "known": { "engine": { "error": true } }
+    },
+    {
+      "id": "한중윤달-2012-윤3-1",
+      "설명": "2012년 윤달: 한국은 윤3월, 중국은 윤4월. 엔진은 한국 윤3월을 '존재하지 않음'으로 거부",
+      "input": { "calendar": "lunar", "year": 2012, "month": 3, "day": 1, "isLeap": true, "hour": 12, "minute": 0 },
+      "expect": { "solar": "2012-04-21", "year": "壬辰", "month": "甲辰", "day": "壬子", "hour": "丙午" },
+      "known": { "engine": { "error": true } }
+    },
+    {
+      "id": "한중윤달-2017-윤5-1",
+      "설명": "2017년 윤달: 한국은 윤5월, 중국은 윤6월",
+      "input": { "calendar": "lunar", "year": 2017, "month": 5, "day": 1, "isLeap": true, "hour": 12, "minute": 0 },
+      "expect": { "solar": "2017-06-24", "year": "丁酉", "month": "丙午", "day": "壬午", "hour": "丙午" },
+      "known": { "engine": { "error": true } }
+    }
+  ]
+}

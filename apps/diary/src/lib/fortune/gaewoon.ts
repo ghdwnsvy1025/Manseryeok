@@ -2,12 +2,12 @@
 // 기준(Q2 = B): 오늘 들어오는 글자가 나에게 용·희(도움)면 그 오행을 더 살리고, 기·구(넘침·어긋남)·한이면 내 용신 오행으로 균형.
 // 근거: 색·방위·장소는 사주 코어 content/src/brief.ts EL_LUCK(입문 3강 표). 맛·시간대는 널리 쓰이는 오행 대응(맛 = 오미, 시간 = 지지 시각).
 // 시간 모름으로 용신이 확정되지 않으면 null (Q5 = A: 근거 없이 권하지 않는다).
-import { BRANCH_META, STEM_META, type StemHanja } from "@saju/engine";
+import { BRANCH_META, ELEMENT_EN_TO_KO, ELEMENT_WORD, STEM_META, type ElementKo, type StemHanja } from "@saju/engine";
 import type { CoreFortune } from "./types";
 
-export type El = "목" | "화" | "토" | "금" | "수";
-const EN_TO_EL: Record<string, El> = { wood: "목", fire: "화", earth: "토", metal: "금", water: "수" };
-export const EL_WORD: Record<El, string> = { 목: "나무", 화: "불", 토: "흙", 금: "쇠", 수: "물" };
+export type El = ElementKo;
+const EN_TO_EL: Record<string, El> = ELEMENT_EN_TO_KO;
+export const EL_WORD: Record<El, string> = ELEMENT_WORD;
 
 interface Table {
   colors: { name: string; hex: string }[];

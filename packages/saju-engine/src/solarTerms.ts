@@ -41,7 +41,48 @@ const TERM_APPROX: Record<number, { month: number; day: number }> = {
   195: { month: 10, day: 8  }, // 한로
   225: { month: 11, day: 7  }, // 입동
   255: { month: 12, day: 7  }, // 대설
+  // 12중기 (월주 경계는 아니지만 24절기 날짜용)
+  300: { month: 1,  day: 20 }, // 대한
+  330: { month: 2,  day: 19 }, // 우수
+    0: { month: 3,  day: 21 }, // 춘분
+   30: { month: 4,  day: 20 }, // 곡우
+   60: { month: 5,  day: 21 }, // 소만
+   90: { month: 6,  day: 21 }, // 하지
+  120: { month: 7,  day: 23 }, // 대서
+  150: { month: 8,  day: 23 }, // 처서
+  180: { month: 9,  day: 23 }, // 추분
+  210: { month: 10, day: 23 }, // 상강
+  240: { month: 11, day: 22 }, // 소설
+  270: { month: 12, day: 22 }, // 동지
 };
+
+/** 24절기, 황경 순(소한부터). jie = 월주 경계가 되는 절입 */
+export const SOLAR_TERMS_24: readonly { lon: number; ko: string; jie: boolean }[] = [
+  { lon: 285, ko: "소한", jie: true },
+  { lon: 300, ko: "대한", jie: false },
+  { lon: 315, ko: "입춘", jie: true },
+  { lon: 330, ko: "우수", jie: false },
+  { lon: 345, ko: "경칩", jie: true },
+  { lon: 0, ko: "춘분", jie: false },
+  { lon: 15, ko: "청명", jie: true },
+  { lon: 30, ko: "곡우", jie: false },
+  { lon: 45, ko: "입하", jie: true },
+  { lon: 60, ko: "소만", jie: false },
+  { lon: 75, ko: "망종", jie: true },
+  { lon: 90, ko: "하지", jie: false },
+  { lon: 105, ko: "소서", jie: true },
+  { lon: 120, ko: "대서", jie: false },
+  { lon: 135, ko: "입추", jie: true },
+  { lon: 150, ko: "처서", jie: false },
+  { lon: 165, ko: "백로", jie: true },
+  { lon: 180, ko: "추분", jie: false },
+  { lon: 195, ko: "한로", jie: true },
+  { lon: 210, ko: "상강", jie: false },
+  { lon: 225, ko: "입동", jie: true },
+  { lon: 240, ko: "소설", jie: false },
+  { lon: 255, ko: "대설", jie: true },
+  { lon: 270, ko: "동지", jie: false },
+];
 
 /**
  * 태양의 겉보기 황경(apparent geocentric ecliptic longitude, degrees)
@@ -136,4 +177,14 @@ export function equationOfTime(jde: number): number {
     1.25 * e * e * Math.sin(2 * M);
 
   return E * (1440 / (2 * Math.PI)); // 분 단위
+}
+
+const yearTermsCache = new Map<number, { ko: string; date: string }[]>();
+/** 그 해의 24절기 입절일(KST 날짜 YYYY-MM-DD), 황경 순(소한 → 동지) */
+export function solarTermsOfYear(year: number): { ko: string; date: string }[] {
+  const hit = yearTermsCache.get(year);
+  if (hit) return hit;
+  const list = SOLAR_TERMS_24.map((t) => ({ ko: t.ko, date: getSolarTermKSTIso(year, t.lon).slice(0, 10) }));
+  yearTermsCache.set(year, list);
+  return list;
 }

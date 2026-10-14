@@ -5,7 +5,7 @@
 //   2. 오늘 지지가 내 일지·월지와 합인가 충인가
 //   3. 오늘 글자가 내 용신(모자란 쪽)인가 기신(이미 많은 쪽)인가
 // 길흉 예언이 아니라 "오늘이 평소보다 수월한가"의 정도다. 범위는 0.15~0.90으로 자른다.
-import { BRANCH_META, STEM_META, findYongsin, getTenGod, type StemHanja, type TenGod } from "@saju/engine";
+import { BRANCH_META, ELEMENT_EN_TO_KO, STEM_META, findYongsin, getTenGod, type StemHanja, type TenGod } from "@saju/engine";
 import type { PillarsSnapshot } from "../profile";
 import type { BaseFortune, BranchRelation, TenGodFamily, YongsinHit } from "./types";
 
@@ -80,7 +80,7 @@ const RELATION_OFFSET: Record<Exclude<BranchRelation, null>, number> = {
   복음: 0,
 };
 
-const ELEMENT_KO: Record<string, string> = { wood: "목", fire: "화", earth: "토", metal: "금", water: "수" };
+const ELEMENT_KO: Record<string, string> = ELEMENT_EN_TO_KO;
 
 function clamp(n: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, n));

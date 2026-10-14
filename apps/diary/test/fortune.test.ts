@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { STEMS, getTenGod } from "@saju/engine";
+import { STEMS, getTenGod, solarTermsOfYear } from "@saju/engine";
 import { fromBirth, toCorePillars } from "@saju/core-rules";
 import { branchRelation, computeBaseFortune, FAMILY_OF } from "@/lib/fortune/base";
 import { COEF, computeCoreFortune, ipchunDate, resolveYongsin, seunOf, toBirthInput, UNKNOWN_HOUR_MIN } from "@/lib/fortune/core";
@@ -7,7 +7,7 @@ import { buildBrief, hanjaToKo, hasContextFact, plainFact, type BriefInput } fro
 import { ownerFilter, saveFortuneCache } from "@/lib/fortune/cache";
 import { generateFortuneText, OUTPUT_SCHEMA, SYSTEM } from "@/lib/fortune/llm";
 import { REGEN_LIMIT, TRANSIENT_RETRY_MS, regenCountOf, regenPolicy, retryAfterFor, usableCachedContent } from "@/lib/fortune/policy";
-import { solarTermOf, solarTermsOfYear, termDayWord } from "@/lib/fortune/solarTerms";
+import { solarTermOf, termDayWord } from "@/lib/fortune/solarTerms";
 import { AREA_OVERLAP_MAX, CONTEXT_MENTION_RE, STRUCTURE_WORDS, tokenOverlap, validateFortuneText, type ModelText } from "@/lib/fortune/validate";
 import { adjustWithEntries, bandOf, fitPercent, happinessToScore, toTenPoint } from "@/lib/fortune/personal";
 import { BANNED, findBanned, templateInputFromCore, templateText } from "@/lib/fortune/text";

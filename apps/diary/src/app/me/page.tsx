@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { BRANCH_META, ELEMENT_ORDER, STEM_META, calculateElementDistribution, calculateHiddenStems, getTenGod, type Element, type ElementKo, type StemHanja } from "@saju/engine";
+import { BRANCH_META, ELEMENT_KO_TO_EN, ELEMENT_ORDER, STEM_META, calculateElementDistribution, calculateHiddenStems, getTenGod, type Element, type ElementKo, type StemHanja } from "@saju/engine";
 import { getUser } from "@/lib/supabase/server";
 import { GanjiGrid } from "@/components/GanjiGrid";
 import { Booting } from "@/components/Booting";
@@ -73,8 +73,6 @@ function elementPercents(pillars: Pillars4): { el: ElementKo; pct: number }[] {
   const d = calculateElementDistribution(stems, branches);
   return ELEMENT_ORDER.map((el) => ({ el, pct: Math.round(d.percentage[el]) }));
 }
-
-const ELEMENT_KO_TO_EN: Record<ElementKo, Element> = { 목: "wood", 화: "fire", 토: "earth", 금: "metal", 수: "water" };
 
 /** 오행 글자색 (톤 v3.6) — 나무패 안의 천간·지지 한자에만. 토큰 el-* (globals.css @theme) */
 const ELEMENT_TEXT: Record<Element, string> = {
