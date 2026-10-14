@@ -102,10 +102,11 @@ describe("v4.4 facts — 대운·세운·월운 문장은 바뀌는 날·충인 
     expect(onlyContext(v4(PROFILE_B, "2026-02-03"))).toEqual([]);
   });
 
-  test("(c) 대운 교체일(B 2026-05-09 戊辰 → 己巳)엔 10년 운 1문장, 전날엔 없음. 대운 플래그 문장은 facts에 없다", () => {
-    const day = v4(PROFILE_B, "2026-05-09");
-    const eve = v4(PROFILE_B, "2026-05-08");
-    expect(fromBirth(toBirthInput(PROFILE_B)).대운.목록.find((d) => d.순서 === 4)?.시작일?.slice(0, 10)).toBe("2026-05-09");
+  // 엔진 1.1.0(절입 시각 KASI 기준)에서 교체일이 05-09 → 05-10으로 옮겨졌다
+  test("(c) 대운 교체일(B 2026-05-10 戊辰 → 己巳)엔 10년 운 1문장, 전날엔 없음. 대운 플래그 문장은 facts에 없다", () => {
+    const day = v4(PROFILE_B, "2026-05-10");
+    const eve = v4(PROFILE_B, "2026-05-09");
+    expect(fromBirth(toBirthInput(PROFILE_B)).대운.목록.find((d) => d.순서 === 4)?.시작일?.slice(0, 10)).toBe("2026-05-10");
     expect(day.context.daeun).toMatchObject({ 순서: 4, 간지: "己巳" });
     expect(eve.context.daeun).toMatchObject({ 순서: 3, 간지: "戊辰" });
     expect(onlyContext(day)).toEqual(["지금 10년 단위 운 己巳은 꽤 수월한 편이에요."]);

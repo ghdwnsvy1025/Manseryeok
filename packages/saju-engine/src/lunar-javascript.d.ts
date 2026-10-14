@@ -17,4 +17,9 @@ declare module "lunar-javascript" {
     getSolar(): Solar;
     toString(): string;
   }
+  /** 寿星万年历 천문 계산. 절입 시각에 쓴다 */
+  export const ShouXingUtil: {
+    /** 누적 태양 황경 w(라디안)에 도달하는 시각. J2000 기준 일수, 베이징 시각(UT+8h) */
+    qiAccurate(w: number): number;
+  };
 }

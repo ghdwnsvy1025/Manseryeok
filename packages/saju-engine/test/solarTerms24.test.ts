@@ -1,6 +1,7 @@
-/** 24절기 — 12중기도 12절입과 같은 뉴턴 반복으로 구한다 (앱 운세의 "한로 사흘째"가 이걸 쓴다) */
+/** 24절기 — 12중기도 12절입과 같은 寿星 고정밀 황경으로 구한다 (앱 운세의 "한로 사흘째"가 이걸 쓴다) */
 import { expect, test } from "vitest";
 import { SOLAR_TERMS_24, getSolarTermKSTIso, solarTermsOfYear } from "../src/solarTerms";
+import { calculateSaju } from "../src/calculator";
 
 test("24절기 표는 소한부터 15° 간격", () => {
   expect(SOLAR_TERMS_24).toHaveLength(24);
@@ -23,4 +24,24 @@ test("절입은 getSolarTermKSTIso와 같은 날", () => {
       if (t.jie) expect(list[i]!.date).toBe(getSolarTermKSTIso(y, t.lon).slice(0, 10));
     });
   }
+});
+
+test("절입 시각은 한국천문연구원 발표값과 초 단위로 맞는다", () => {
+  expect(getSolarTermKSTIso(2024, 315)).toBe("2024-02-04T17:27:07+09:00"); // 입춘
+  expect(getSolarTermKSTIso(2024, 345)).toBe("2024-03-05T11:22:45+09:00"); // 경칩
+  expect(getSolarTermKSTIso(2025, 315)).toBe("2025-02-03T23:10:28+09:00"); // 입춘
+});
+
+test("1900년 초 입력도 대운 절기(1899년)를 구할 수 있다", () => {
+  const r = calculateSaju({
+    year: 1900, month: 1, day: 10, hour: 12, minute: 0, gender: "male",
+    options: { calendarType: "solar", timezone: "Asia/Seoul", dayChangeRule: "midnight", timeCorrection: "none" },
+  });
+  expect(r.pillars.year.ganji).toBe("己亥"); // 입춘 전이라 1899년
+  expect(r.daeun).toBeTruthy();
+  const late = calculateSaju({
+    year: 2100, month: 12, day: 30, hour: 12, minute: 0, gender: "female",
+    options: { calendarType: "solar", timezone: "Asia/Seoul", dayChangeRule: "midnight", timeCorrection: "none" },
+  });
+  expect(late.daeun).toBeTruthy();
 });

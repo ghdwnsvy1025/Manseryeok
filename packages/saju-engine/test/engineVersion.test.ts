@@ -11,11 +11,13 @@ import { ENGINE_VERSION, calculateSaju, lunarToSolar, solarTermsOfYear } from ".
 
 const FINGERPRINTS: Record<string, string> = {
   "1.0.0": "2eebe4324076036f",
+  // 2026-10-15: 음력을 한국천문연구원 음력(korean-lunar-calendar, 2050년까지)으로, 절입 시각을 寿星 고정밀 황경으로, 초 반올림 수정
+  "1.1.0": "8ab0eba99426d3ae",
 };
 
 function fingerprint(): string {
   const h = createHash("sha256");
-  // 1901-2099를 11일 간격으로 (1900년 초·2100년 끝은 대운 절기 범위 밖이라 오류), 하루 세 시각 (자정 직후·정오·자시) + 시간 모름
+  // 1901-2099를 11일 간격으로 (1.0.0 때 1900년 초·2100년 끝이 대운 절기 범위 밖이라 뺐다. 옛 지문과 맞추려고 범위는 그대로 둔다), 하루 세 시각 (자정 직후·정오·자시) + 시간 모름
   for (let t = Date.UTC(1901, 0, 10); t < Date.UTC(2099, 11, 1); t += 11 * 86400000) {
     const d = new Date(t);
     const year = d.getUTCFullYear(), month = d.getUTCMonth() + 1, day = d.getUTCDate();

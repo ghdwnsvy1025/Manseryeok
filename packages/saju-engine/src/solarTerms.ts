@@ -1,13 +1,14 @@
+/// <reference path="./lunar-javascript.d.ts" />
 // ============================================================
 // 절기(節氣) 계산 엔진
-// Jean Meeus "Astronomical Algorithms" 2nd Edition, Chapter 25
-// 정확도: ~0.01°~0.05° ≈ 15~45분 (1800-2200년 유효)
-//
-// 중요: 월주 경계가 되는 12개 절입만 구현
-// 입춘(315°)은 년주 판단에도 사용
+// 절입 시각: lunar-javascript의 寿星万年历 고정밀 태양 황경(VSOP87 축약 + ΔT)
+//   한국천문연구원 발표 절입 시각과 초 단위까지 맞는다 (2024 입춘 17:27:07, 경칩 11:22:45)
+//   (2026-10-15 이전엔 Meeus 25장 저정밀 식이라 KASI보다 2~6분 일렀다 — ENGINE_VERSION 1.1.0)
+// 입춘(315°)은 년주, 12절입은 월주 경계
 // ============================================================
 
-import { gregorianToJdn, jdeToKSTIso, mod } from "./jdn";
+import { ShouXingUtil } from "lunar-javascript";
+import { jdeToKSTIso, mod } from "./jdn";
 
 const DEG2RAD = Math.PI / 180;
 
@@ -27,7 +28,7 @@ export const SOLAR_TERM_INFO: Record<number, { ko: string; hanja: string }> = {
   285: { ko: "소한", hanja: "小寒" },
 };
 
-// 황경별 해당 그레고리력 대략 날짜 (Newton-Raphson 초기값)
+// 황경별 해당 그레고리력 대략 날짜 (지원 황경 목록 겸 참고값)
 const TERM_APPROX: Record<number, { month: number; day: number }> = {
   285: { month: 1,  day: 6  }, // 소한
   315: { month: 2,  day: 4  }, // 입춘
@@ -114,44 +115,30 @@ export function sunApparentLongitude(jde: number): number {
   return mod(apparent, 360);
 }
 
+/** 절기 계산 지원 범위. 입력 연도(1900-2100)의 앞뒤 해 절기까지 쓰므로 넉넉히 둔다 */
+const SOLAR_TERM_MIN_YEAR = 1800;
+const SOLAR_TERM_MAX_YEAR = 2200;
+
 /**
- * 태양황경이 targetLongitude에 도달하는 JDE (Newton-Raphson 반복)
- * year: 해당 황경이 속하는 그레고리력 연도
- * Returns: JDE (UT 기준)
+ * 태양황경이 longitude에 도달하는 시각
+ * year: 해당 황경이 속하는 그레고리력 연도 (소한·대한·입춘·우수·경칩은 1~3월, 나머지는 같은 해 3~12월)
+ * Returns: 율리우스일 (UT 기준 — kstToJDE와 같은 기준. 이름은 옛 그대로 JDE)
  */
 export function getSolarTermJDE(year: number, longitude: number): number {
-  if (year < 1900 || year > 2100) {
+  if (year < SOLAR_TERM_MIN_YEAR || year > SOLAR_TERM_MAX_YEAR) {
     throw new Error(
-      `지원 범위(1900-2100)를 벗어난 연도입니다: ${year}년. 절기 데이터를 확인할 수 없습니다.`
+      `지원 범위(${SOLAR_TERM_MIN_YEAR}-${SOLAR_TERM_MAX_YEAR})를 벗어난 연도입니다: ${year}년. 절기 데이터를 확인할 수 없습니다.`
     );
   }
-
-  const approx = TERM_APPROX[longitude];
-  if (!approx) {
+  if (!TERM_APPROX[longitude]) {
     throw new Error(`지원하지 않는 태양황경: ${longitude}°`);
   }
 
-  // 시작 JDE: 대략 날짜의 자정(UTC)
-  const startJDN = gregorianToJdn(year, approx.month, approx.day);
-  let jde = startJDN - 0.5;
-
-  // Newton-Raphson 반복 (최대 50회, 수렴 기준: ~1분)
-  for (let i = 0; i < 50; i++) {
-    const lng = sunApparentLongitude(jde);
-
-    // 각도 차 (360° 랩어라운드 처리)
-    let delta = longitude - lng;
-    if (delta > 180) delta -= 360;
-    if (delta < -180) delta += 360;
-
-    // 보정 (태양은 평균 365.25일에 360° 이동)
-    const correction = (delta / 360.0) * 365.25;
-    jde += correction;
-
-    if (Math.abs(correction) < 1.0 / 1440.0) break; // 1분 정밀도
-  }
-
-  return jde;
+  // 寿星 누적 황경: 0 = 2000년 춘분이 아니라 1999년 춘분. 1~3월 절기(285°~345°)는 그 전 해 춘분에서 센다
+  const cycle = longitude >= 285 ? year - 2000 : year - 1999;
+  const w = ((cycle * 360 + longitude) * Math.PI) / 180;
+  // qiAccurate: J2000 기준 일수, 베이징 시각(UT+8h). UT 율리우스일로 바꾼다
+  return ShouXingUtil.qiAccurate(w) - 8 / 24 + 2451545;
 }
 
 /** KST ISO 문자열 반환 */

@@ -36,8 +36,13 @@ export function jdnToGregorian(jd: number): {
   second: number;
 } {
   const jd1 = jd + 0.5;
-  const Z = Math.floor(jd1);
-  const F = jd1 - Z;
+  let Z = Math.floor(jd1);
+  // 시각은 초 단위로 반올림한 뒤 나눈다 (분·초를 따로 반올림하면 "21:36:60"이 나온다)
+  let secondOfDay = Math.round((jd1 - Z) * 86400);
+  if (secondOfDay >= 86400) {
+    Z += 1;
+    secondOfDay -= 86400;
+  }
 
   let A: number;
   if (Z < 2299161) {
@@ -56,11 +61,9 @@ export function jdnToGregorian(jd: number): {
   const month = E < 14 ? E - 1 : E - 13;
   const year = month > 2 ? C - 4716 : C - 4715;
 
-  const hourFrac = F * 24;
-  const hour = Math.floor(hourFrac);
-  const minFrac = (hourFrac - hour) * 60;
-  const minute = Math.floor(minFrac);
-  const second = Math.round((minFrac - minute) * 60);
+  const hour = Math.floor(secondOfDay / 3600);
+  const minute = Math.floor((secondOfDay % 3600) / 60);
+  const second = secondOfDay % 60;
 
   return { year, month, day, hour, minute, second };
 }

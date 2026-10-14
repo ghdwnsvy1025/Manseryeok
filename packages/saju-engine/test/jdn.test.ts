@@ -2,7 +2,8 @@
 // 단위 테스트: Julian Day Number
 // ============================================================
 
-import { gregorianToJdn, jdnToGregorian, mod } from "../src/jdn";
+import { gregorianToJdn, jdeToKSTIso, jdnToGregorian, mod } from "../src/jdn";
+import { getSolarTermKSTIso } from "../src/solarTerms";
 
 describe("gregorianToJdn", () => {
   test("2019-01-27 = JDN 2458511 (기준일 검증)", () => {
@@ -45,5 +46,25 @@ describe("jdnToGregorian", () => {
     expect(result.year).toBe(2019);
     expect(result.month).toBe(1);
     expect(result.day).toBe(27);
+  });
+});
+
+describe("jdeToKSTIso", () => {
+  test("초 반올림이 60초를 만들지 않고 분·시·날로 올라간다", () => {
+    // KST 2000-02-04 21:36:59.6 → 21:37:00
+    const kst = Date.UTC(2000, 1, 4, 12, 36, 59, 600);
+    const jd = kst / 86400000 + 2440587.5;
+    expect(jdeToKSTIso(jd)).toBe("2000-02-04T21:37:00+09:00");
+    // KST 2000-02-04 23:59:59.7 → 다음 날 00:00:00
+    const midnight = Date.UTC(2000, 1, 4, 14, 59, 59, 700) / 86400000 + 2440587.5;
+    expect(jdeToKSTIso(midnight)).toBe("2000-02-05T00:00:00+09:00");
+  });
+
+  test("1900-2100 절입 시각 어디에도 60초·60분이 없다", () => {
+    for (let y = 1900; y <= 2100; y++) {
+      for (const lon of [285, 315, 345, 15, 45, 75, 105, 135, 165, 195, 225, 255]) {
+        expect(getSolarTermKSTIso(y, lon)).not.toMatch(/:60/);
+      }
+    }
   });
 });
