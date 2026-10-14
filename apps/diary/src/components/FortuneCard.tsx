@@ -6,8 +6,8 @@ import { SignalLegend } from "@/components/SignalLegend";
 import { AREA_WORD } from "@/lib/fortune/core";
 import type { AreaSignal, FortuneContent } from "@/lib/fortune/types";
 
-/** 화살표 색: ↑ 금색, → 보조, ↓ 먹색. 빨강 없음 (톤 결정표 "길흉을 색으로 말하지 않는다") */
-const SIGNAL_COLOR: Record<AreaSignal, string> = { "↑": "text-gold", "→": "text-muted", "↓": "text-ink" };
+/** 화살표 색: ↑ 진한 금 글자(gold-ink), → 보조, ↓ 먹색. 빨강 없음 (톤 결정표 "길흉을 색으로 말하지 않는다"). 금색 글자는 쓰지 않는다 (v3.26) */
+const SIGNAL_COLOR: Record<AreaSignal, string> = { "↑": "text-gold-ink font-bold", "→": "text-muted", "↓": "text-ink" };
 const SIGNAL_WORD: Record<AreaSignal, string> = { "↑": "좋아요", "→": "보통이에요", "↓": "조심해요" };
 type Period = "오늘" | "이달" | "올해";
 
@@ -154,7 +154,7 @@ export function FortuneCard({ fortune, ganjiKo, canVote, vote, defaultOpen }: Pr
         {/* 머리 (v3.7): 날짜·간지는 제목에 있으니 "오늘의 운세"만. 오른쪽은 +/× */}
         <span className="flex items-start justify-between gap-3">
           <span className="text-[15px] text-muted">오늘의 운세</span>
-          <span aria-hidden className="text-2xl leading-none text-gold transition-transform group-open:rotate-45">
+          <span aria-hidden className="text-2xl leading-none text-gold-ink transition-transform group-open:rotate-45">
             +
           </span>
         </span>
