@@ -5,7 +5,8 @@ import type { EntryInput, Promise_ } from "./entry";
 import type { DayGanji } from "./ganji";
 import { CITIES, type CityId } from "./cities";
 import { monthRange } from "./calendar";
-import type { BirthProfile, ComputedProfile, ProfileInput, PillarsSnapshot } from "./profile";
+import { ENGINE_VERSION } from "@saju/engine";
+import { computeProfile, type BirthProfile, type ComputedProfile, type ProfileInput, type PillarsSnapshot } from "./profile";
 
 export interface EntryRow {
   id: string;
@@ -75,7 +76,32 @@ export function isMissingColumnError(error: { code?: string; message: string } |
 export async function getSajuProfile(sb: SupabaseClient, userId: string): Promise<SajuProfileRow | null> {
   const { data, error } = await sb.from("night_saju_profiles").select(PROFILE_COLUMNS).eq("user_id", userId).maybeSingle();
   if (error) fail("사주 프로필 읽기", error);
-  return data as SajuProfileRow | null;
+  const row = data as SajuProfileRow | null;
+  return row ? refreshStaleProfile(sb, userId, row) : null;
+}
+
+/**
+ * 원국 스냅숏이 다른 엔진 버전으로 계산됐으면 지금 엔진으로 다시 계산해 저장한다 (지연 갱신).
+ * 엔진 1.1.0(KASI 음력)에서 음력 입력 약 3.4%의 일주가 하루 어긋났던 것을 읽을 때마다 고친다.
+ * - 저장은 engine_version이 읽은 값 그대로일 때만 — 그사이 사용자가 프로필을 고쳤으면 덮지 않는다
+ * - 저장이 실패해도 이번 화면은 새 원국으로 보이고, 다음 읽기에서 다시 시도한다
+ * - 지금 엔진이 거절하는 생일(음력 2051년 이후 등)은 옛 스냅숏을 그대로 둔다
+ */
+export async function refreshStaleProfile(sb: SupabaseClient, userId: string, row: SajuProfileRow): Promise<SajuProfileRow> {
+  if (row.engine_version === ENGINE_VERSION) return row;
+  const computed = computeProfile({ name: row.name, ...birthProfileOf(row) });
+  if (!computed.ok) {
+    console.warn("[profile] 원국 다시 계산 실패 — 옛 스냅숏 유지", row.engine_version, computed.error);
+    return row;
+  }
+  const { pillars, engineVersion } = computed.value;
+  const { error } = await sb
+    .from("night_saju_profiles")
+    .update({ pillars, engine_version: engineVersion })
+    .eq("user_id", userId)
+    .eq("engine_version", row.engine_version);
+  if (error) console.error("[profile] 원국 다시 저장 실패", error);
+  return { ...row, pillars, engine_version: engineVersion };
 }
 
 export async function saveSajuProfile(
