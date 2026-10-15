@@ -37,6 +37,11 @@
   --color-el-earth: #a67c2e;
   --color-el-metal: #6f6f6a;
   --color-el-water: #1c2b52;       /* = water */
+  /* v3.28 글자 전용 진한 오행 — 오늘 머리 간지 한자(.medal-pair__hanja)에만. 한지 paper #f1debb 위 대비:
+     토 4.75:1 · 금 5.25:1 · 화 5.55:1 (원래 el-* 는 토 2.87 · 금 3.83 로 큰 글자 3:1에도 못 미친다). 목·수는 el-* 그대로 */
+  --color-el-earth-ink: #7d5a1c;
+  --color-el-metal-ink: #5a5a55;
+  --color-el-fire-ink: #a52419;
   /* v3.6 쪽지·먹 도장 측정값 (ui-kit/note-slip-clean 평균 #f3e2be, stamp-inked-ink-clean 평균 #32261b) */
   --color-note: #f3e2be;
   --color-ink-stamp: #32261b;
@@ -849,10 +854,15 @@ details[open] > .fortune-body {
 }
 .medal-pair__hanja {
   font-family: var(--font-serif);
-  font-size: 30px;
+  /* v3.28: 30 → 34px. 두 글자 + 라벨 폭 108px 안에서 한 줄 */
+  font-size: 34px;
   line-height: 1.1;
   color: var(--color-ink);
 }
+/* v3.28: 머리 한자의 오행 색만 진한 글자용 토큰으로 — 한지 위 대비 3:1 미달이던 토·금·(화) 보강. 다른 화면의 text-el-* 는 그대로 */
+.medal-pair__hanja .text-el-earth { color: var(--color-el-earth-ink); }
+.medal-pair__hanja .text-el-metal { color: var(--color-el-metal-ink); }
+.medal-pair__hanja .text-el-fire { color: var(--color-el-fire-ink); }
 /* v3.27 달창(만월창): 바깥 108px 그대로. 키트 moon-window-*-512.webp(투명 고리, 알파 측정: 안지름 77%·바깥 97%)를
    맨 위에 겹치고, 그 아래 한지 창(card-paper 원, 지름 79% — 고리 안쪽 1%가 창 가장자리를 덮어 1px 폴백 테두리를 숨긴다)
    안에 얼굴 faces/*.webp(512 투명, 머리만)을 contain으로. 두 얼굴은 같은 크기 — 간지별 보정 표는 없다.
