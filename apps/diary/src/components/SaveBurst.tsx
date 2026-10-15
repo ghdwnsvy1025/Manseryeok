@@ -29,6 +29,8 @@ interface Props {
    *   실루엣(검은 컷아웃, 1.2초 정지) → 팡 → 같은 자리·같은 크기의 정사각 카드. 글·버튼은 부모가 둔다(형제 .burst-text — 실루엣 동안 CSS가 숨긴다).
    */
   mode?: "save" | "reveal";
+  /** save 모드: 저장한 날을 부르는 말 ("오늘", "어제", "10월 13일"). 기본 "오늘" */
+  when?: string;
 }
 
 /** 키트 sprite sheet(1024×1024) 안의 조각 위치 [x, y, w, h] — ui-kit/pop-pieces.json에서 측정 */
@@ -75,7 +77,7 @@ function Bit({ kind, box, size, dx, dy, rot }: { kind: "paper" | "gold"; box: [n
  * v3.6: 자동으로 닫히지 않고 "확인" 금색 버튼으로만 닫힌다(바깥 탭 무시). 설명 한 줄(행복도·간지·약속 지킴). reduced-motion이면 팡·흩날림 없이 카드만.
  * 오늘 화면(/?saved=날짜)에서 한 번만 뜬다. 저장 자체는 서버 액션이 끝낸 뒤라 성공이 보장된다.
  */
-export function SaveBurst({ ganjiKo, ganjiHanja, cardSrc, characterSrc, happiness, signature = "", kept = false, recentHappiness = [], mode = "save" }: Props) {
+export function SaveBurst({ ganjiKo, ganjiHanja, cardSrc, characterSrc, happiness, signature = "", kept = false, recentHappiness = [], mode = "save", when = "오늘" }: Props) {
   const [phase, setPhase] = useState<"hidden" | "open" | "closing">("hidden");
   const reveal = mode === "reveal";
   // reveal(v3.8): 실루엣 → 열림. 실루엣 1.2초(reduced-motion 0.6초) 동안 cardSrc를 미리 받고, 받아진 뒤에 팡(최대 3초, 그 뒤엔 그냥 교체).
@@ -246,10 +248,10 @@ export function SaveBurst({ ganjiKo, ganjiHanja, cardSrc, characterSrc, happines
     >
       {cardBlock}
       <p className="burst-text mt-6 text-center">
-        <span className="block font-serif text-[22px] leading-snug text-ink">{ganjiKo}일 카드에 오늘 도장을 찍었어요</span>
+        <span className="block font-serif text-[22px] leading-snug text-ink">{ganjiKo}일 카드에 {when} 도장을 찍었어요</span>
         {happiness !== undefined && (
           <span className="burst-caption block">
-            오늘 행복도 {happiness}점을 {ganjiKo}일 카드에 찍었어요{kept && ". 오늘 포인트도 해냈어요"}
+            {when} 행복도 {happiness}점을 {ganjiKo}일 카드에 찍었어요{kept && `. ${when} 포인트도 해냈어요`}
           </span>
         )}
       </p>

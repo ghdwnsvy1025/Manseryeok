@@ -68,7 +68,8 @@ export async function saveEntryAction(_prev: FormState, form: FormData): Promise
   revalidatePath("/");
   revalidatePath("/me");
   revalidatePath("/write");
-  redirect(`/?saved=${checked.value.entryDate}`);
+  // at = 저장 시각. 같은 내용으로 다시 저장해도 팡이 다시 뜨게 SaveBurst 열쇠에 들어간다
+  redirect(`/?saved=${checked.value.entryDate}&at=${Date.now()}`);
 }
 
 /**

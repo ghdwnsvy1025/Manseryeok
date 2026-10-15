@@ -95,8 +95,8 @@ async function FortuneSection({
   }
 }
 
-export default async function TodayPage({ searchParams }: { searchParams: Promise<{ saved?: string }> }) {
-  const { saved } = await searchParams;
+export default async function TodayPage({ searchParams }: { searchParams: Promise<{ saved?: string; at?: string }> }) {
+  const { saved, at } = await searchParams;
   const today = todayKST();
   const ganji = dayGanji(today);
   const hour = hourKST();
@@ -108,7 +108,9 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
   if (!user) return <Booting title={formatKoreanDate(today)} cards={2} />;
 
   // 한 단계에 전부 읽는다 — 운세 캐시 행·투표도 여기서. 캐시가 맞으면 Suspense 없이 바로 그린다 (전수조사 A-2·3)
-  const [profile, entry, entries, linkState, recent, cachedRow, vote] = await Promise.all([
+  // 방금 저장한 날짜 (오늘·어젯밤·지난 날 모두). 오늘이 아니면 그날 기록을 따로 읽어 팡에 쓴다
+  const savedDate = saved && parseYmd(saved) ? saved : null;
+  const [profile, entry, entries, linkState, recent, cachedRow, vote, savedOtherEntry] = await Promise.all([
     getSajuProfile(supabase, user.id),
     getEntry(supabase, user.id, today),
     listEntriesForStats(supabase, user.id),
@@ -116,6 +118,7 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
     listEntries(supabase, user.id, 8),
     readFortuneCacheRow(supabase, user.id, today),
     getFortuneVote(supabase, user.id, today),
+    savedDate && savedDate !== today ? getEntry(supabase, user.id, savedDate) : Promise.resolve(null),
   ]);
   // 생년월일이 없으면 먼저 받는다 — /write·/me와 같은 규칙 (B1). 오늘 화면 안에서 폼을 그리지 않는다
   if (!profile) redirect("/onboarding?next=/");
@@ -126,8 +129,12 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
   const myHanja = `${profile.pillars.day.stem}${profile.pillars.day.branch}`;
   // 오늘 일진 캐릭터 — 머리의 두 번째 메달 (v3.6). 팡 카드도 같은 것을 쓴다
   const todayCharacter = characterOfGanji(ganji.ko);
-  // 팡 카드 아래 지난 도장들: 최근 7개 기록의 행복도 (오늘 제외, 최신순)
-  const recentHappiness = recent.filter((e) => e.entry_date !== today).slice(0, 7).map((e) => e.happiness);
+  // 팡 (2026-10-15: 어떤 날짜든 저장하면 무조건 뜬다 — 전엔 오늘만). 카드는 저장한 날의 일진
+  const burstEntry = savedDate === today ? entry : savedOtherEntry;
+  const burstGanji = savedDate ? dayGanji(savedDate) : ganji;
+  const burstCharacter = characterOfGanji(burstGanji.ko);
+  // 팡 카드 아래 지난 도장들: 최근 7개 기록의 행복도 (저장한 날 제외, 최신순)
+  const recentHappiness = recent.filter((e) => e.entry_date !== savedDate).slice(0, 7).map((e) => e.happiness);
 
   const showLinkPrompt =
     Boolean(entry) && shouldShowLinkPrompt({ isAnonymous: Boolean(user.is_anonymous), entryCount: entries.length, promptCount: linkState.promptCount });
@@ -159,6 +166,7 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
   // B8: 과거 날짜를 저장하고 돌아온 경우 — 팡은 오늘만, 과거는 제목 아래 작은 한지 띠 한 번
   const savedPast = saved && saved !== today && parseYmd(saved) ? saved : null;
   const savedPastLabel = savedPast ? formatKoreanDate(savedPast).replace(/\s*\S+요일$/, "") : "";
+  const burstWhen = !savedPast ? "오늘" : savedPast === addDays(today, -1) ? "어제" : savedPastLabel;
 
   // 새벽 4시 전이고 어제 기록이 없으면 "어젯밤" — 쓰기 화면도 같은 규칙으로 어제를 연다 (writeNav.nightCarryDate)
   const carry = nightCarryDate(today, hour, entries.some((e) => e.entry_date === addDays(today, -1)));
@@ -194,16 +202,17 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
   return (
     <main className="flex flex-col gap-5">
       {/* 저장 완료 "팡" — 방금 저장하고 돌아왔을 때 한 번 (톤 v3.1). 카드는 오늘 일진 캐릭터 + char-frame 틀 (05 v3.5) */}
-      {entry && saved === today && <BurstPreload cardSrc={todayCharacter.cardSrc} />}
-      {entry && saved === today && (
+      {burstEntry && <BurstPreload cardSrc={burstCharacter.cardSrc} />}
+      {burstEntry && savedDate && (
         <SaveBurst
-          ganjiKo={ganji.ko}
-          ganjiHanja={ganji.hanja}
-          cardSrc={todayCharacter.cardSrc}
+          ganjiKo={burstGanji.ko}
+          ganjiHanja={burstGanji.hanja}
+          cardSrc={burstCharacter.cardSrc}
           recentHappiness={recentHappiness}
-          happiness={entry.happiness}
-          kept={entry.promise === "kept"}
-          signature={`${today}|${entry.happiness}|${entry.moods.join(",")}|${entry.note ?? ""}|${entry.promise ?? ""}`}
+          happiness={burstEntry.happiness}
+          kept={burstEntry.promise === "kept"}
+          when={burstWhen}
+          signature={`${savedDate}|${at ?? ""}|${burstEntry.happiness}|${burstEntry.moods.join(",")}|${burstEntry.note ?? ""}|${burstEntry.promise ?? ""}`}
         />
       )}
       {/* 머리 (v3.9): 가운데 축. 제목(날짜·간지) → 한 줄 → 두 캐릭터 "나 × 오늘"을 가운데에 크게(각 100px).
