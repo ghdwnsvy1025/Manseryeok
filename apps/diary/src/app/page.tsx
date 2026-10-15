@@ -215,8 +215,8 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
           signature={`${savedDate}|${at ?? ""}|${burstEntry.happiness}|${burstEntry.moods.join(",")}|${burstEntry.note ?? ""}|${burstEntry.promise ?? ""}`}
         />
       )}
-      {/* 머리 (v3.9): 가운데 축. 제목(날짜·간지) → 한 줄 → 두 캐릭터 "나 × 오늘"을 가운데에 크게(각 100px).
-          그림은 이 한 쌍이 전부. 내 쪽 틀은 금색 선(나), 오늘 쪽은 녹갈 선 — 색으로 길흉을 말하지 않는다 */}
+      {/* 머리 (v3.9): 가운데 축. 제목(날짜·간지) → 한 줄 → 두 캐릭터 "나 × 오늘"을 가운데에 크게(각 108px).
+          그림은 이 한 쌍이 전부. v3.27: 얼굴 그림(faces)을 달창(moon-window) 창틀 안에 — 내 쪽 금빛 창틀, 오늘 쪽 녹갈 창틀. 색으로 길흉을 말하지 않는다 */}
       <header className="flex flex-col items-center text-center">
         {/* v3.10: 날짜는 위 한 줄(작게). 간지는 캐릭터 라벨이 말한다. 순번·기록 일수 줄은 뺐다(기록 일수는 나 화면 머리로) */}
         <h1 className="today-date">{formatKoreanDate(today)}</h1>
@@ -224,7 +224,8 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
         <div className="medal-pair" aria-label={`나 ${myCharacter.ganjiKo} × 오늘 ${ganji.ko}`}>
           <span className="medal-pair__item">
             <span className="medal medal--me" title={`내 일주 캐릭터 ${myCharacter.ganjiKo}(${myCharacter.animal})`}>
-              <img src={myCharacter.characterSrc} alt={`내 캐릭터 ${myCharacter.ganjiKo} ${myCharacter.animal}`} width={100} height={100} data-ganji={myCharacter.ganjiKo} />
+              <img src={myCharacter.faceSrc} alt={`내 캐릭터 ${myCharacter.ganjiKo} ${myCharacter.animal}`} width={100} height={100} data-ganji={myCharacter.ganjiKo} />
+              <span className="medal__frame" aria-hidden />
             </span>
             <span className="medal-pair__label">
               <span className="medal-pair__who">나</span>
@@ -236,7 +237,8 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
           </span>
           <span className="medal-pair__item">
             <span className="medal medal--today" title={`오늘 일진 캐릭터 ${ganji.ko}(${todayCharacter.animal})`}>
-              <img src={todayCharacter.characterSrc} alt={`오늘 ${ganji.ko}일 캐릭터 ${todayCharacter.animal}`} width={100} height={100} data-ganji={ganji.ko} />
+              <img src={todayCharacter.faceSrc} alt={`오늘 ${ganji.ko}일 캐릭터 ${todayCharacter.animal}`} width={100} height={100} data-ganji={ganji.ko} />
+              <span className="medal__frame" aria-hidden />
             </span>
             <span className="medal-pair__label">
               <span className="medal-pair__who">오늘</span>

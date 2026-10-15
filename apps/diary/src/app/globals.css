@@ -42,6 +42,9 @@
   --color-ink-stamp: #32261b;
   /* v3.22 행복도 top(8~10) 도장 — frame #767b3c를 진하게 올린 초록(빨강 금지). 종이색 숫자 대비 5.2:1 */
   --color-moss: #4e6a2f;
+  /* v3.27 달창 창틀 측정값(ui-kit/analysis.json): moon-window-gold 지배 #d3a555, moon-window-moss 지배 #837347. 창틀 그림을 못 받을 때 창 테두리 1px 폴백색 */
+  --color-moon-gold: #d3a555;
+  --color-moon-moss: #837347;
 
   /* 옛 이름 별칭. 01·03 명세가 끝나면 지운다. 새 코드에서 쓰지 않는다 (v3.26: night·lamp·lamp-ink는 사용처가 없어 지웠다) */
   --color-surface: var(--color-paper-2);
@@ -850,26 +853,46 @@ details[open] > .fortune-body {
   line-height: 1.1;
   color: var(--color-ink);
 }
+/* v3.27 달창(만월창): 바깥 108px 그대로. 키트 moon-window-*-512.webp(투명 고리, 알파 측정: 안지름 77%·바깥 97%)를
+   맨 위에 겹치고, 그 아래 한지 창(card-paper 원, 지름 79% — 고리 안쪽 1%가 창 가장자리를 덮어 1px 폴백 테두리를 숨긴다)
+   안에 얼굴 faces/*.webp(512 투명, 머리만)을 contain으로. 두 얼굴은 같은 크기 — 간지별 보정 표는 없다.
+   창틀을 못 받으면 창의 1px 테두리(측정색)가 예전처럼 보인다. 금빛 = 나, 녹갈 = 오늘. 색은 길흉이 아니다 */
 .medal {
+  position: relative;
   display: block;
   width: 108px;
   height: 108px;
-  overflow: hidden;
-  border: 1px solid var(--color-frame);
   border-radius: 50%;
+}
+.medal::before {
+  content: "";
+  position: absolute;
+  inset: 10.5%;
+  border-radius: 50%;
+  border: 1px solid var(--color-moon-moss);
   background: var(--color-paper-2) url("/ui/card-paper.webp") center / cover;
 }
-.medal--me {
-  border-color: var(--color-gold);
+.medal--me::before {
+  border-color: var(--color-moon-gold);
 }
 .medal > img {
-  display: block;
-  width: 100%;
-  height: 182%; /* 창에 그림의 위 55%가 들어온다 */
-  object-fit: cover;
-  object-position: 50% 12%;
+  position: absolute;
+  inset: 10.5%;
+  width: 79%;
+  height: 79%;
+  border-radius: 50%;
+  object-fit: contain;
+  object-position: 50% 50%;
 }
-/* 간지별 보정 표: 필요한 것만. 예) .medal > img[data-ganji="갑자"] { object-position: 50% 0; height: 200%; } */
+.medal__frame {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: url("/ui/moon-window-moss-512.webp") center / contain no-repeat;
+}
+.medal--me > .medal__frame {
+  background-image: url("/ui/moon-window-gold-512.webp");
+}
 .medal-pair__x {
   font-family: var(--font-serif);
   font-size: 20px;
