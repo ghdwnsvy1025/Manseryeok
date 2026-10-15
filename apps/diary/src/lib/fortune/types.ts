@@ -89,6 +89,8 @@ export interface CoreFortune {
     method: "라벨 점수" | "용신 없음";
     /** 천간+지지 합계 (raw) */
     raw: number;
+    /** v4.12: 시간 모름일 때 12개 시주 다수결 일치율(0~1). 점수 유불리 폭에 곱해졌다. 시간을 알면 없음 */
+    agreement?: number;
   };
   relations: { hits: CoreRelationHit[]; flags: string[] };
   /** v4.7: 내 용신·희신 오행(개운 칸용). 시간 모름으로 용신이 확정되지 않으면 null. 옛 캐시엔 없다 */

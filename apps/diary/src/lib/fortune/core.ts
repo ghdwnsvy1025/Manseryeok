@@ -86,7 +86,8 @@ export function toScore01(sum: number): number {
   return 0.5 + COEF.lowAmp * Math.tanh(lin / COEF.lowAmp);
 }
 
-/** 시간 모름(Y-10): 12개 시주 중 이 개수 이상에서 용신 오행이 같아야 그 용신을 쓴다 */
+/** 시간 모름(Y-10): 12개 시주 중 이 개수 이상에서 용신 오행이 같아야 개운(색·음식 등)을 권한다.
+ *  v4.12: 점수·판정은 이 문턱과 무관하게 다수결 용신으로 계산하고, 일치율(표/12)만큼 유불리 폭을 줄인다 */
 export const UNKNOWN_HOUR_MIN = 10;
 
 // ---------- 글자표 (코어 base.ts와 같은 값. 코어 index가 export하지 않는 상수만 여기 둔다) ----------
@@ -171,18 +172,24 @@ export function seunOf(date: string): { 해: number; 간지: string; 입춘전: 
   return { 해, 간지: yearGanji(해), 입춘전 };
 }
 
-/** 시간 모름(Y-10): 12개 시주를 넣어 용신이 UNKNOWN_HOUR_MIN개 이상 모이면 그 용신, 아니면 null */
-export function resolveYongsin(p: Pillars, b: Balance): { y: Yongsin | null; votes: number | null } {
-  if (p[3]) return { y: yongsin(p, b), votes: null };
+/**
+ * 시간 모름(Y-10): 12개 시주를 넣어 가장 많이 나온 용신 오행(다수결)을 쓴다 (v4.12, 2026-10-15 사용자 결정).
+ * agreement = 표/12 — 점수의 유불리 폭을 이만큼 줄인다. 시간을 알면 agreement 1.
+ * 예전(v4.11까지)은 10/12 미만이면 용신을 버려(null) 점수가 거의 매일 5.0에 붙었다.
+ */
+export function resolveYongsin(p: Pillars, b: Balance): { y: Yongsin | null; votes: number | null; agreement: number } {
+  if (p[3]) return { y: yongsin(p, b), votes: null, agreement: 1 };
   const uh = unknownHour(p);
-  const el = uh.용신오행.값;
-  if (!el || uh.용신오행.표 < UNKNOWN_HOUR_MIN) return { y: null, votes: uh.용신오행.표 };
+  // tally.값은 8표 미만이면 null이라 분포에서 직접 고른다. 동률이면 먼저 나온 시주(子시부터) 쪽
+  const top = Object.entries(uh.용신오행.분포).sort((a, c) => c[1] - a[1])[0];
+  if (!top) return { y: null, votes: 0, agreement: 0 };
+  const [el, votes] = top;
   for (let i = 0; i < 12; i++) {
     const q: Pillars = [p[0], p[1], p[2], hourPillar(p[2][0]!, i)];
     const yq = yongsin(q, balance(q));
-    if (yq.용신오행 === el) return { y: yq, votes: uh.용신오행.표 };
+    if (yq.용신오행 === el) return { y: yq, votes, agreement: votes / 12 };
   }
-  return { y: null, votes: uh.용신오행.표 };
+  return { y: null, votes, agreement: 0 };
 }
 
 const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n));
@@ -216,11 +223,13 @@ export function computeCoreFortune(input: CoreInput): CoreFortune {
   const facts: string[] = [];
 
   // ---- 용신 (시간 모름 처리) ----
-  const { y, votes } = resolveYongsin(p, b);
+  const { y, votes, agreement } = resolveYongsin(p, b);
+  /** 유불리 폭 (v4.12). 시간을 알면 1, 모르면 다수결 일치율 */
+  const w = y ? agreement : 0;
   const yRel = y ?? yongsin(p, b); // 충·합 방향 계산용. y가 없으면 방향은 쓰지 않는다
   const hourUnknown = !p[3];
   if (hourUnknown) {
-    caveats.push(y ? `시간 모름 (12개 시주 중 ${votes}개에서 같은 판정이라 그대로 계산)` : `시간 모름 (12개 시주 중 ${votes ?? 0}개만 같아 유불리 축을 뺌)`);
+    caveats.push(y ? `시간 모름 (12개 시주 중 ${votes}개가 같은 판정 — 유불리 폭 ${Math.round(w * 100)}%)` : `시간 모름 (용신을 정하지 못해 유불리 축을 뺌)`);
   }
 
   // ---- 원국 관계 ----
@@ -264,7 +273,10 @@ export function computeCoreFortune(input: CoreInput): CoreFortune {
   for (const h of hits) {
     if (h.kind !== "충") continue; // 합·복음은 0
     // 용신 없음: 방향은 말하지 않되 충은 조금 뺀다
-    relScore += !y ? -COEF.relNoYongsin * h.strength : h.direction === "유리" ? COEF.rel * h.strength : h.direction === "불리" ? -COEF.rel * h.strength : 0;
+    const noDir = -COEF.relNoYongsin * h.strength;
+    const dir = h.direction === "유리" ? COEF.rel * h.strength : h.direction === "불리" ? -COEF.rel * h.strength : 0;
+    // v4.12: 시간 모름은 방향 있는 값과 방향 없는 값을 일치율로 섞는다 (w = 1이면 예전 그대로)
+    relScore += !y ? noDir : w * dir + (1 - w) * noDir;
   }
   relScore = clamp(relScore, -COEF.relMax, COEF.relMax);
   const flags = [...(l?.플래그 ?? []), ...lr.플래그];
@@ -313,10 +325,10 @@ export function computeCoreFortune(input: CoreInput): CoreFortune {
   if (wolun?.clash) ctxScore += COEF.wolunClash;
   // v4.2: 운 지지 ↔ 오늘 지지의 합(union)은 점수에 넣지 않는다 (합은 플래그만)
   // v4.1 ③: 대운·세운 자체 판정을 소폭 반영 (월운은 0)
-  ctxScore += (daeun?.합계 ?? 0) * COEF.daeunVerdict + (seunItem.합계 ?? 0) * COEF.seunVerdict;
+  ctxScore += ((daeun?.합계 ?? 0) * COEF.daeunVerdict + (seunItem.합계 ?? 0) * COEF.seunVerdict) * w;
 
   // ---- 점수 ----
-  const score01 = toScore01(raw + relScore + ctxScore);
+  const score01 = toScore01(raw * w + relScore + ctxScore);
 
   // ---- 영역 (숫자 없음, 신호만) — v4.2: 오늘(일운 ≤2) → 이달(월운 1) → 올해(세운 1), 전부 코어 luckAreas ----
   const gender = input.profile?.gender;
@@ -446,16 +458,17 @@ export function computeCoreFortune(input: CoreInput): CoreFortune {
   facts.splice(10);
 
   return {
-    dayLuck: { stem, branch, total, method, raw },
+    dayLuck: { stem, branch, total, method, raw, ...(w < 1 ? { agreement: w } : {}) },
     relations: { hits, flags },
-    luckEls: y ? { 용: y.용신오행, 희: (Object.entries(y.오행역할).find(([, r]) => r === "희")?.[0] as "목" | "화" | "토" | "금" | "수" | undefined) ?? null } : null,
+    // 개운은 근거가 확실할 때만 (Q5 = A): 시간 모름이면 10/12 이상 모였을 때
+    luckEls: y && (!hourUnknown || (votes ?? 0) >= UNKNOWN_HOUR_MIN) ? { 용: y.용신오행, 희: (Object.entries(y.오행역할).find(([, r]) => r === "희")?.[0] as "목" | "화" | "토" | "금" | "수" | undefined) ?? null } : null,
     context: { ...(daeun ? { daeun } : {}), seun: seunItem, ...(wolun ? { wolun } : {}), 입춘전: seun.입춘전 },
     areas,
     facts,
     contextFacts,
     keywords,
     caveats,
-    parts: { raw: round2(raw), rel: round2(relScore), ctx: round2(ctxScore), score01: round2(score01) },
+    parts: { raw: round2(raw * w), rel: round2(relScore), ctx: round2(ctxScore), score01: round2(score01) },
   };
 }
 

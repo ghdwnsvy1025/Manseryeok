@@ -148,7 +148,7 @@ export function templateInputFromCore(core: CoreFortune): TemplateInput {
   const labels = [core.dayLuck.stem.label, core.dayLuck.branch.label];
   const yongsin: BaseFortune["yongsin"] =
     core.dayLuck.raw > 0 && labels.some((x) => x === "용" || x === "희") ? "용신" : core.dayLuck.raw < 0 && labels.some((x) => x === "기" || x === "구") ? "기신" : null;
-  const fitNote = core.caveats.some((c) => c.startsWith("시간 모름")) && core.dayLuck.method === "용신 없음" ? "태어난 시간을 모르면 운세의 폭이 넓어져요." : undefined;
+  const fitNote = core.caveats.some((c) => c.startsWith("시간 모름")) && (core.dayLuck.method === "용신 없음" || (core.dayLuck.agreement ?? 1) < 1) ? "태어난 시간을 모르면 운세의 폭이 넓어져요." : undefined;
   return { tenGod: core.dayLuck.stem.tenGod, relation, yongsin, areas: core.areas, ...(fitNote ? { fitNote } : {}) };
 }
 

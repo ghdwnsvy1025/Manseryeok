@@ -217,10 +217,12 @@ describe("v4.1 보강 (乙亥 丙戌 己丑 辛未 × 2026-10-07 甲寅: 천간�
     expect(r.facts.length).toBeLessThanOrEqual(10);
     // 월운 플래그(절각)는 문장이 되지 않는다
     expect(r.contextFacts.some((f) => f.includes("이달") && f.includes("겉과 속"))).toBe(false);
-    // 용신이 없으면 판정 몫이 없고 ctx는 충·합만
-    const noY = v4({ ...PROFILE_A, birthYear: 1985, birthMonth: 5, birthDay: 3, birthHour: null, birthMinute: null }, "2026-06-15");
-    expect(noY.context.seun.합계).toBeUndefined();
-    expect(noY.parts.ctx).toBe(0);
+    // v4.12: 시간 모름(1985-05-03, 금 7/12)은 다수결 용신으로 판정 몫을 내되 일치율 7/12만큼 줄인다 (충 몫은 그대로)
+    const lowY = v4({ ...PROFILE_A, birthYear: 1985, birthMonth: 5, birthDay: 3, birthHour: null, birthMinute: null }, "2026-06-15");
+    expect(lowY.context.seun.합계).toBeDefined();
+    const clashCtx = (lowY.context.daeun?.clash ? (lowY.context.daeun.clash.최고경보 ? COEF.daeunClashAlert : COEF.daeunClash) : 0) + (lowY.context.seun.clash ? COEF.seunClash : 0) + (lowY.context.wolun?.clash ? COEF.wolunClash : 0);
+    const verdictCtx = ((lowY.context.daeun?.합계 ?? 0) * COEF.daeunVerdict + (lowY.context.seun.합계 ?? 0) * COEF.seunVerdict) * (7 / 12);
+    expect(lowY.parts.ctx).toBeCloseTo(clashCtx + verdictCtx, 2);
   });
 });
 
@@ -239,9 +241,11 @@ describe("v4.2 합은 점수 없이 플래그만 · 위아래 문장 없음 · �
     expect(clash.relations.hits.map((h) => [h.kind, h.direction])).toEqual([["충", "유리"], ["복음", "중립"]]);
     expect(clash.parts.rel).toBe(COEF.rel * 2);
     for (const r of [c, half, clash, v4(PROFILE_B, "2026-10-05")]) for (const h of r.relations.hits) if (h.kind !== "충") expect(h.direction).toBe("중립");
-    // 용신 없음(시간 모름)도 충만 뺀다: 寅申충 강도 3 × −0.25 = −0.75
-    const noY = v4({ ...PROFILE_A, birthYear: 1985, birthMonth: 5, birthDay: 3, birthHour: null, birthMinute: null }, "2026-06-15");
-    expect(noY.parts.rel).toBe(-0.75);
+    // v4.12 시간 모름(일치율 7/12): 충은 방향 있는 값 × 7/12 + 방향 없는 값(강도 × −0.25) × 5/12
+    const lowY = v4({ ...PROFILE_A, birthYear: 1985, birthMonth: 5, birthDay: 3, birthHour: null, birthMinute: null }, "2026-06-15");
+    const ch = lowY.relations.hits.find((h) => h.kind === "충")!;
+    const dir = ch.direction === "유리" ? COEF.rel * ch.strength : ch.direction === "불리" ? -COEF.rel * ch.strength : 0;
+    expect(lowY.parts.rel).toBeCloseTo((7 / 12) * dir + (5 / 12) * -COEF.relNoYongsin * ch.strength, 2);
     // 운 지지 ↔ 오늘 지지 합(union)도 점수에 없다: ctx는 충 + 판정 몫뿐
     expect(c.parts.ctx).toBe(-0.17);
     expect("union" in COEF).toBe(false);
@@ -288,7 +292,7 @@ describe("v4.2 합은 점수 없이 플래그만 · 위아래 문장 없음 · �
     expect(c.contextFacts).toContain("지금 10년 단위 운은 겉과 속이 달라요.");
   });
 
-  test("영역 period: 오늘(일운 ≤2) → 이달(월운 1) → 올해(세운 1), 모두 코어 luckAreas. 용신 없으면 비어 있다", () => {
+  test("영역 period: 오늘(일운 ≤2) → 이달(월운 1) → 올해(세운 1), 모두 코어 luckAreas. 시간 모름도 다수결 용신으로 나온다 (v4.12)", () => {
     expect(c.areas).toEqual([
       { period: "오늘", area: "직업", signal: "↑", why: "'약속과 역할'(정관) 쪽이 부족한 쪽을 거들어요" },
       { period: "이달", area: "가족", signal: "↓", why: "'혼자 생각'(편인) 쪽이 잘 맞지 않아요" },
@@ -299,8 +303,8 @@ describe("v4.2 합은 점수 없이 플래그만 · 위아래 문장 없음 · �
     const ORDER = ["오늘", "이달", "올해"];
     const periods = c.areas.map((a) => a.period);
     expect(periods).toEqual([...periods].sort((x, y) => ORDER.indexOf(x) - ORDER.indexOf(y)));
-    const noY = v4({ ...PROFILE_A, birthYear: 1985, birthMonth: 5, birthDay: 3, birthHour: null, birthMinute: null }, "2026-06-15");
-    expect(noY.areas).toEqual([]);
+    const lowY = v4({ ...PROFILE_A, birthYear: 1985, birthMonth: 5, birthDay: 3, birthHour: null, birthMinute: null }, "2026-06-15");
+    expect(lowY.areas.length).toBeGreaterThan(0);
     // 템플릿 영역 줄에도 period가 실리고 문장엔 기간 접두가 없다
     const t = templateText(templateInputFromCore(c), { n: 0, mean: null, sameGanjiCount: 0, sameGanjiMean: null, weight: 0, score: 0.5 }, { ko: "갑인", stemKo: "갑", branchKo: "인" });
     expect(t.areas!.map((a) => a.period)).toEqual(["오늘", "이달", "올해"]);
@@ -323,25 +327,39 @@ describe("v4 시간 모름 (Y-10)", () => {
     expect(templateInputFromCore(r).fitNote).toBeUndefined();
   });
 
-  test("용신이 10/12 미만이면 유불리 축을 빼고 십신·충합만 (1985-05-03 시간 모름: 금 7 / 수 5)", () => {
+  test("v4.12 용신이 10/12 미만이어도 다수결 용신을 쓰고 유불리 폭을 일치율만큼 줄인다 (1985-05-03 시간 모름: 금 7 / 수 5)", () => {
     const prof: BirthProfile = { ...PROFILE_A, birthYear: 1985, birthMonth: 5, birthDay: 3, birthHour: null, birthMinute: null };
     const pillars = pillarsOf(prof);
     const p = toCorePillars(pillars);
-    expect(resolveYongsin(p, balance(p))).toEqual({ y: null, votes: 7 });
+    const res = resolveYongsin(p, balance(p));
+    expect(res.y?.용신오행).toBe("금");
+    expect(res.votes).toBe(7);
+    expect(res.agreement).toBeCloseTo(7 / 12);
     const r = v4(prof, "2026-06-15", pillars); // 庚申
-    expect(r.dayLuck.method).toBe("용신 없음");
-    expect(r.dayLuck.raw).toBe(0);
-    expect(r.dayLuck.stem.label).toBeNull();
-    expect(r.dayLuck.total).toBe("보통");
-    expect(r.areas).toEqual([]);
-    expect(r.keywords).toEqual({ positive: [], negative: [] });
-    expect(r.context.seun.판정).toBeNull();
-    // 寅申충은 방향 없이 조금만 뺀다
-    expect(r.relations.hits.some((h) => h.kind === "충" && h.direction === "중립")).toBe(true);
-    expect(r.parts.rel).toBeLessThan(0);
+    expect(r.dayLuck.method).toBe("라벨 점수");
+    expect(r.dayLuck.agreement).toBeCloseTo(7 / 12);
+    expect(r.dayLuck.stem.label).not.toBeNull();
+    expect(r.caveats.some((c) => c.startsWith("시간 모름") && c.includes("58%"))).toBe(true);
+    // 점수 분해: score01 = toScore01(raw × 7/12 + rel + ctx) — parts.raw는 줄인 값
+    expect(r.parts.raw).toBeCloseTo(r.dayLuck.raw * (7 / 12), 2);
+    // 개운은 근거가 확실할 때만(10/12 이상) — 여기서는 권하지 않는다
+    expect(r.luckEls).toBeNull();
+    // 안내 한 줄은 그대로
     expect(templateInputFromCore(r).fitNote).toBe("태어난 시간을 모르면 운세의 폭이 넓어져요.");
     const t = templateText(templateInputFromCore(r), { n: 0, mean: null, sameGanjiCount: 0, sameGanjiMean: null, weight: 0, score: r.parts.score01 }, { ko: "경신", stemKo: "경", branchKo: "신" });
     expect(t.body).toContain("운세의 폭이 넓어져요");
+  });
+
+  test("v4.12 시간 모름 사용자도 점수가 날마다 움직인다 (예전: 1984-11-03 시간 모름이 30일 중 21일 5.0)", () => {
+    const prof: BirthProfile = { ...PROFILE_A, gender: "female", birthYear: 1984, birthMonth: 11, birthDay: 3, birthHour: null, birthMinute: null };
+    const pillars = pillarsOf(prof);
+    const scores = Array.from({ length: 30 }, (_, i) => {
+      const d = new Date(Date.UTC(2026, 9, 15 + i)).toISOString().slice(0, 10);
+      return toTenPoint(v4(prof, d, pillars).parts.score01);
+    });
+    const most = Math.max(...Object.values(scores.reduce<Record<string, number>>((m, x) => ({ ...m, [x]: (m[x] ?? 0) + 1 }), {})));
+    expect(new Set(scores).size).toBeGreaterThanOrEqual(10);
+    expect(most).toBeLessThanOrEqual(8);
   });
 });
 

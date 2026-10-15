@@ -21,7 +21,7 @@ import { dailyCap, regenPolicy, retryAfterFor, usableCachedContent } from "./pol
 export { REGEN_LIMIT, TRANSIENT_RETRY_MS, dailyCap, regenCountOf, regenPolicy, retryAfterFor, usableCachedContent } from "./policy";
 
 /** 캐시 지문에 들어간다. 올리면 기존 캐시가 전부 무효 */
-export const FORTUNE_VERSION = "v4.11";
+export const FORTUNE_VERSION = "v4.12";
 
 export type FortuneOwner = { userId: string; guestKey?: undefined } | { guestKey: string; userId?: undefined };
 
