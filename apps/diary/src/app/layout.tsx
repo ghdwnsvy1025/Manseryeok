@@ -4,6 +4,7 @@ import { AnonBoot } from "@/components/AnonBoot";
 import { BottomNav } from "@/components/BottomNav";
 import { TouchFx } from "@/components/TouchFx";
 import { PwaRegister } from "@/components/PwaRegister";
+import { Analytics } from "@/components/Analytics";
 import "./globals.css";
 
 // 한글 글꼴은 서브셋 지정이 안 돼 미리 불러오지 않는다.
@@ -45,6 +46,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <AnonBoot />
         {/* v3.20: 기본 터치감 — 누른 자리 먹물 번짐 + 짧은 진동 */}
         <TouchFx />
+        {/* 이용 통계 (PostHog): 경로마다 pageview, 로그인 사용자 식별. 이벤트 목록은 docs/측정.md */}
+        <Analytics />
       </body>
     </html>
   );

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { track } from "@/lib/analytics";
 
 type Env = "standalone" | "kakao-ios" | "kakao-android" | "ios" | "android" | "desktop" | "unknown";
 
@@ -51,7 +52,10 @@ export function InstallHint() {
       {promptEvent ? (
         <button
           type="button"
-          onClick={() => promptEvent.prompt().finally(() => setPromptEvent(null))}
+          onClick={() => {
+            track("install_prompt_click", { env });
+            promptEvent.prompt().finally(() => setPromptEvent(null));
+          }}
           className="mt-3 h-11 rounded-full border border-frame bg-transparent px-4 text-sm font-bold text-ink"
         >
           앱으로 설치

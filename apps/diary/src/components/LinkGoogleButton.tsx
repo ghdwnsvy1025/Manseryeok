@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { track } from "@/lib/analytics";
 import { createClient } from "@/lib/supabase/client";
 import { safeNext } from "@/lib/safeNext";
 
@@ -29,6 +30,7 @@ export function LinkGoogleButton({ next = "/settings", label = "Google로 연결
     if (n) callback.searchParams.set("next", n);
     const { data } = await supabase.auth.getSession();
     const anonymous = Boolean(data.session?.user.is_anonymous);
+    track("login_start", { provider: "google", mode: anonymous ? "link" : "fresh", from: next.startsWith("/settings") ? "settings" : "prompt" });
     const options = { redirectTo: callback.toString() };
     const { error } = anonymous
       ? await supabase.auth.linkIdentity({ provider: "google", options })

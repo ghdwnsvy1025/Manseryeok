@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { deleteAllAction } from "@/app/actions";
+import { track } from "@/lib/analytics";
 
 /** 첫 누름 뒤 이 시간 안에 다시 눌러야 지운다. 지나면 처음으로 돌아간다 */
 export const CONFIRM_WINDOW_MS = 5000;
@@ -28,6 +29,7 @@ export function ClearAllButton({ entryCount }: { entryCount: number }) {
       return;
     }
     setArmed(false);
+    track("clear_all", { entries: entryCount });
     startTransition(async () => {
       await deleteAllAction();
     });

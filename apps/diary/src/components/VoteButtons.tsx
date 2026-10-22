@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { fortuneVoteAction } from "@/app/actions";
+import { track } from "@/lib/analytics";
 import { celebrate } from "@/lib/fx";
 
 /**
@@ -28,6 +29,7 @@ export function VoteButtons({ date, initial }: { date: string; initial: 1 | -1 |
     const next = vote === v ? null : v;
     // v3.20 보상 순간: "맞아요"를 새로 눌렀을 때만 금빛 가루
     if (next === 1 && el) celebrate(el);
+    track("fortune_feedback", { v: next ?? 0 });
     setVote(next);
     try {
       sessionStorage.setItem(key, String(next ?? 0));

@@ -10,6 +10,7 @@ import { RetryButton } from "@/components/RetryButton";
 import { SaveBurst } from "@/components/SaveBurst";
 import { SavedPastNotice } from "@/components/SavedPastNotice";
 import { TodayEntryCard } from "@/components/TodayEntryCard";
+import { TrackOnMount } from "@/components/track/TrackOnMount";
 import { getUser } from "@/lib/supabase/server";
 import { birthProfileOf, getEntry, getFortuneVote, getLinkPromptState, getSajuProfile, listEntries, listEntriesForStats, readFortuneCacheRow, type SajuProfileRow } from "@/lib/db";
 import { characterOf, characterOfGanji } from "@/lib/character";
@@ -203,6 +204,10 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
     <main className="flex flex-col gap-5">
       {/* 저장 완료 "팡" — 방금 저장하고 돌아왔을 때 한 번 (톤 v3.1). 카드는 오늘 일진 캐릭터 + char-frame 틀 (05 v3.5) */}
       {burstEntry && <BurstPreload cardSrc={burstCharacter.cardSrc} />}
+      {/* 저장 성공은 여기서 센다 (쓰기 폼은 redirect로 끝나 성공을 모른다). at로 한 번만 — 새로고침에 다시 안 센다 */}
+      {burstEntry && savedDate && (
+        <TrackOnMount event="diary_saved" props={{ when: savedDate === today ? "today" : savedDate === addDays(today, -1) ? "yesterday" : "past" }} once={`saved:${savedDate}|${at ?? ""}`} />
+      )}
       {burstEntry && savedDate && (
         <SaveBurst
           ganjiKo={burstGanji.ko}

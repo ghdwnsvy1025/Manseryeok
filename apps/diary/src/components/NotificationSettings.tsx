@@ -3,6 +3,7 @@
 import { useEffect, useState, useTransition } from "react";
 import { disablePushAction, enablePushAction, setRemindHourAction } from "@/app/actions";
 import { REMIND_HOURS } from "@/lib/remind";
+import { track } from "@/lib/analytics";
 
 interface Props {
   enabled: boolean;
@@ -44,11 +45,13 @@ export function NotificationSettings({ enabled, remindHour, kakaoChannelUrl }: P
       try {
         const permission = await Notification.requestPermission();
         if (permission !== "granted") {
+          track("settings_push_toggle", { on: true, result: "denied" });
           setError("알림 권한을 허용해야 보내 드릴 수 있어요. 브라우저 설정에서 바꿀 수 있어요.");
           return;
         }
         const key = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
         if (!key) {
+          track("settings_push_toggle", { on: true, result: "no_key" });
           setError("서버에 알림 키가 없어요.");
           return;
         }
@@ -58,9 +61,11 @@ export function NotificationSettings({ enabled, remindHour, kakaoChannelUrl }: P
           existing ??
           (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(key) as BufferSource }));
         const r = await enablePushAction(JSON.stringify(sub.toJSON()), remindHour);
+        track("settings_push_toggle", { on: true, result: r.ok ? "ok" : "error" });
         if (!r.ok) setError(r.error ?? "저장하지 못했어요.");
       } catch (e) {
         console.error(e);
+        track("settings_push_toggle", { on: true, result: "error" });
         setError("알림을 켜지 못했어요. 잠시 뒤 다시 눌러 주세요.");
       }
     });
@@ -76,6 +81,7 @@ export function NotificationSettings({ enabled, remindHour, kakaoChannelUrl }: P
         // 구독 해제 실패해도 서버 쪽은 끈다
       }
       await disablePushAction();
+      track("settings_push_toggle", { on: false, result: "ok" });
     });
   }
 
@@ -134,7 +140,7 @@ export function NotificationSettings({ enabled, remindHour, kakaoChannelUrl }: P
       <div className="border-t border-line pt-3">
         <p className="text-[15px] font-bold">카카오 채널</p>
         <p className="mt-0.5 text-sm text-muted">앱 알림이 어려우면 채널 추가로 소식을 받을 수 있어요.</p>
-        <a href={kakaoChannelUrl} target="_blank" rel="noreferrer" className="tap mt-1 text-sm text-muted underline underline-offset-4">
+        <a href={kakaoChannelUrl} target="_blank" rel="noreferrer" onClick={() => track("kakao_channel_click")} className="tap mt-1 text-sm text-muted underline underline-offset-4">
           사주읽는밤 채널 추가
         </a>
       </div>

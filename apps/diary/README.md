@@ -32,7 +32,7 @@ npm test           # vitest
 
 - Root Directory **`apps/diary`**, Framework Next.js, Node 20 이상. "Include source files outside of the Root Directory" 켬(엔진 패키지 때문).
 - 리전 `icn1`, 크론 하루 1회 UTC 12시(`vercel.json`, 무료 플랜 제한).
-- 환경변수는 `.env.example`이 전체 목록이다. 필수: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `ANTHROPIC_API_KEY`, VAPID 3개, `CRON_SECRET`, `STATS_KEY`. 선택: `FORTUNE_MODEL`, `FORTUNE_REVIEW_MODEL`, `FORTUNE_DAILY_CAP`. VAPID는 로컬 `.env.local`과 같은 값이어야 기존 알림 구독이 유지된다.
+- 환경변수는 `.env.example`이 전체 목록이다. 필수: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `ANTHROPIC_API_KEY`, VAPID 3개, `CRON_SECRET`, `STATS_KEY`. 선택: `FORTUNE_MODEL`, `FORTUNE_REVIEW_MODEL`, `FORTUNE_DAILY_CAP`, `NEXT_PUBLIC_POSTHOG_KEY`(이용 통계, `docs/측정.md`). VAPID는 로컬 `.env.local`과 같은 값이어야 기존 알림 구독이 유지된다.
 - 배포 전환 절차와 현재 상태: `REBUILD_PLAN.md` 0절·9절.
 
 ## 마이그레이션 적용 기록

@@ -6,6 +6,7 @@ import { GanjiGrid } from "@/components/GanjiGrid";
 import { Booting } from "@/components/Booting";
 import { characterOf, characterOfGanji } from "@/lib/character";
 import { StatsSummary } from "@/components/StatsSummary";
+import { TrackOnMount } from "@/components/track/TrackOnMount";
 import { countEntries, getSajuProfile, listEntriesInMonth, listEntriesForStats, listFortuneScores } from "@/lib/db";
 import { growingSeries, habitOf, happinessSeries, moodTop, pointStats, streakOf } from "@/lib/stats/extra";
 import { HappinessChart } from "@/components/HappinessChart";
@@ -176,6 +177,7 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
 
   return (
     <main className="flex flex-col gap-6">
+      <TrackOnMount event="stats_view" props={{ view: isCal ? "calendar" : "grid" }} />
       <header className="relative flex flex-col items-center pt-2">
         {/* 설정은 한곳에 모았다 (docs/ANON_START.md 3절): Google 연결 · 알림 · 생년월일 · 앱으로 두기 · 로그아웃 */}
         <Link href="/settings" prefetch={true} className="tap absolute -top-3 right-0 text-sm text-muted underline underline-offset-4">

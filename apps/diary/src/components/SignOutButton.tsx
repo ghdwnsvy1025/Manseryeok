@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { signOutAction } from "@/app/actions";
+import { track } from "@/lib/analytics";
 import { CONFIRM_WINDOW_MS } from "./ClearAllButton";
 
 /**
@@ -24,6 +25,7 @@ export function SignOutButton() {
       return;
     }
     setArmed(false);
+    track("sign_out");
     startTransition(async () => {
       await signOutAction();
     });

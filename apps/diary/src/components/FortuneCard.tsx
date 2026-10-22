@@ -1,5 +1,6 @@
 import { BRANCHES, BRANCHES_KO, STEMS, STEMS_KO } from "@saju/engine";
 import { VoteButtons } from "@/components/VoteButtons";
+import { FortuneViewTrack } from "@/components/track/FortuneViewTrack";
 import Link from "next/link";
 import { gaewoonOf } from "@/lib/fortune/gaewoon";
 import { SignalLegend } from "@/components/SignalLegend";
@@ -186,6 +187,8 @@ export function FortuneCard({ fortune, ganjiKo, canVote, vote, defaultOpen }: Pr
 
       <div className="fortune-body">
         <div>
+          {/* 이용 통계: 카드가 보인 순간(펼쳐짐) fortune_view 한 번 */}
+          <FortuneViewTrack band={fortune.band} />
           <div className="px-5 pb-5">
             {/* v3.24: 공유 버튼 삭제 — 헤드라인이 끝 글자 하나만 줄바꿈되던 문제. 헤드라인이 줄 전체를 쓴다 */}
             <h2 className="border-l-2 border-gold pl-3 font-serif text-[24px] leading-snug break-keep">{fortune.headline}</h2>

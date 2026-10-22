@@ -4,10 +4,16 @@ import { startTransition, useActionState, useEffect, useRef, useState, type Form
 import { saveEntryAction, type FormState } from "@/app/actions";
 import { DeleteEntryButton } from "@/components/DeleteEntryButton";
 import { MAX_MOODS, MAX_NOTE, MOODS, moodTone, type Promise_ } from "@/lib/entry";
+import { track } from "@/lib/analytics";
+import { lengthBucket } from "@/lib/analytics/core";
 import { celebrate } from "@/lib/fx";
+
+/** 어느 날의 기록인지 — 이용 통계용 (날짜 자체는 보내지 않는다) */
+export type WriteWhen = "today" | "last_night" | "past";
 
 interface Props {
   date: string;
+  when?: WriteWhen;
   /** 그날 운세의 "하면 좋아요" 한 줄 = 오늘의 작은 약속 (톤 v3.2). 운세 캐시가 없으면 null → 약속 블록 생략 */
   promiseText: string | null;
   /** "한 줄" 안내 문구. 과거 날짜면 "그날…" (B7). 없으면 오늘 문구 */
@@ -46,7 +52,7 @@ function hint(n: number): string {
  * 행복도는 도장(키트 stamp), 기분은 종이 띠지(tag-strip), 메모는 편지지 괘선 위 손글씨.
  * 폼 필드 이름·값과 저장 로직은 그대로다.
  */
-export function EntryForm({ date, promiseText, notePlaceholder, initial, warmAssets = [] }: Props) {
+export function EntryForm({ date, when = "today", promiseText, notePlaceholder, initial, warmAssets = [] }: Props) {
   const [state, action, pending] = useActionState<FormState, FormData>(saveEntryAction, { error: null });
   const [happiness, setHappiness] = useState<number | null>(initial?.happiness ?? null);
   const [promise, setPromise] = useState<Promise_ | null>(initial?.promise ?? null);
@@ -56,6 +62,17 @@ export function EntryForm({ date, promiseText, notePlaceholder, initial, warmAss
   const [missingHappiness, setMissingHappiness] = useState(false);
   const happinessRef = useRef<HTMLFieldSetElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
+
+  // 이용 통계 (측정.md): 열림 한 번, 저장 시도·막힘·오류. 본문·날짜는 보내지 않는다
+  const opened = useRef(false);
+  useEffect(() => {
+    if (opened.current) return;
+    opened.current = true;
+    track("diary_write_open", { when, edit: Boolean(initial), has_promise: Boolean(promiseText) });
+  }, [when, initial, promiseText]);
+  useEffect(() => {
+    if (state.error) track("diary_save_error", { when });
+  }, [state, when]);
 
   // 하이드레이션 전에 누른 값을 잃지 않는다 (2026-10-08 진단: 폰에서 JS가 붙기 전 첫 탭은 native 라디오만 바뀌고
   // React 상태는 null이라 "첫 클릭이 안 먹은" 것처럼 보였고, 같은 도장을 다시 눌러도 change가 안 났다).
@@ -83,12 +100,22 @@ export function EntryForm({ date, promiseText, notePlaceholder, initial, warmAss
   function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (happiness === null) {
+      track("diary_save_blocked", { reason: "happiness", when });
       setMissingHappiness(true);
       happinessRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
       happinessRef.current?.querySelector("input")?.focus({ preventScroll: true });
       return;
     }
     const data = new FormData(e.currentTarget);
+    track("diary_save", {
+      when,
+      edit: Boolean(initial),
+      happiness,
+      mood: moods[0] ?? null,
+      moods_count: moods.length,
+      length_bucket: lengthBucket(note.trim().length),
+      promise: promiseText ? (promise ?? "unanswered") : null,
+    });
     // 팡 그림은 지금부터 받는다 — 서버 저장 왕복(수백 ms)이 끝나면 대개 도착해 있다
     for (const src of warmAssets) {
       const img = new Image();

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { track } from "@/lib/analytics";
 import { createClient } from "@/lib/supabase/client";
 import { loginButtons, type LoginMode } from "@/lib/linkPrompt";
 import { safeNext } from "@/lib/safeNext";
@@ -59,6 +60,7 @@ export function GoogleButton({ next, entryCount = 0 }: Props) {
     setArmed(false);
     setBusy(true);
     setError(null);
+    track("login_start", { provider: "google", mode, from: "login" });
     const supabase = createClient();
     const options = { redirectTo: callbackUrl(next) };
     let result: { error: { message: string } | null };

@@ -1,7 +1,9 @@
 "use client";
 
-import { startTransition, useActionState, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
+import { startTransition, useActionState, useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { saveProfileAction, type FormState } from "@/app/actions";
+import { track } from "@/lib/analytics";
+import { ONBOARDING_FLAG } from "@/lib/analytics/core";
 import { CITIES } from "@/lib/cities";
 import type { ProfileField } from "@/lib/profile";
 
@@ -71,6 +73,18 @@ export function ProfileForm({ next, initial, serverAction = saveProfileAction, a
   const [timeUnknown, setTimeUnknown] = useState(initial?.timeUnknown ?? false);
   // 서버 검증이 걸린 묶음(B3). 그 묶음만 오류 표시 — 날짜는 연·월·일 칸, 시각은 시·분 칸, 세그먼트는 먹색 1.5px 테두리
   const field: ProfileField | undefined = state.error ? state.field : undefined;
+
+  // 이용 통계 (측정.md): 묶음을 처음 채울 때 onboarding_step 한 번씩, 제출·오류. 값은 보내지 않는다 — 어느 묶음인지만
+  const mode = initial ? "edit" : "first";
+  const stepsSent = useRef(new Set<string>());
+  const step = (s: "date" | "time" | "city" | "gender") => {
+    if (stepsSent.current.has(s)) return;
+    stepsSent.current.add(s);
+    track("onboarding_step", { step: s, mode });
+  };
+  useEffect(() => {
+    if (state.error) track("onboarding_error", { field: state.field ?? "form", mode });
+  }, [state, mode]);
   const invalidAt = (f: ProfileField) => (field === f ? true : undefined);
   const segClass = (f: ProfileField) => (field === f ? "seg seg--invalid" : "seg");
   /** 그 묶음 바로 아래 danger 한 줄 */
@@ -94,6 +108,8 @@ export function ProfileForm({ next, initial, serverAction = saveProfileAction, a
     return (e: FormEvent<HTMLInputElement>) => {
       const v = e.currentTarget.value.replace(/\D/g, "");
       if (v.length >= digits[i]) {
+        if (i === 2) step("date");
+        if (i === 3) step("time");
         const next = order[i + 1]?.current;
         if (next) {
           next.focus();
@@ -119,6 +135,13 @@ export function ProfileForm({ next, initial, serverAction = saveProfileAction, a
   function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const data = new FormData(e.currentTarget);
+    track("onboarding_submit", { mode, time_known: !timeUnknown, calendar });
+    // 성공하면 서버 액션이 /welcome으로 보낸다 — 거기서 이 표를 읽어 onboarding_done을 보낸다 (OnboardingDoneTrack)
+    try {
+      sessionStorage.setItem(ONBOARDING_FLAG, mode);
+    } catch {
+      /* 저장소 없음 */
+    }
     startTransition(() => action(data));
   }
 
@@ -172,10 +195,10 @@ export function ProfileForm({ next, initial, serverAction = saveProfileAction, a
         </span>
         <input type="checkbox" name="timeUnknown" checked={timeUnknown} onChange={(e) => setTimeUnknown(e.target.checked)} className="sr-only" tabIndex={-1} aria-hidden />
         <div className="seg" role="group" aria-labelledby="time-label">
-          <button type="button" aria-pressed={!timeUnknown} onClick={() => setTimeUnknown(false)} className={`tag seg__cell${!timeUnknown ? " tag--on" : ""}`}>
+          <button type="button" aria-pressed={!timeUnknown} onClick={() => { setTimeUnknown(false); step("time"); }} className={`tag seg__cell${!timeUnknown ? " tag--on" : ""}`}>
             알아요
           </button>
-          <button type="button" aria-pressed={timeUnknown} onClick={() => setTimeUnknown(true)} className={`tag seg__cell${timeUnknown ? " tag--on" : ""}`}>
+          <button type="button" aria-pressed={timeUnknown} onClick={() => { setTimeUnknown(true); step("time"); }} className={`tag seg__cell${timeUnknown ? " tag--on" : ""}`}>
             몰라요
           </button>
         </div>
@@ -194,7 +217,7 @@ export function ProfileForm({ next, initial, serverAction = saveProfileAction, a
           태어난 곳
         </label>
         <span className="relative block">
-          <select id="city" name="city" defaultValue={initial?.city ?? "seoul"} aria-invalid={invalidAt("city")} className="field field--select">
+          <select id="city" name="city" defaultValue={initial?.city ?? "seoul"} onChange={() => step("city")} aria-invalid={invalidAt("city")} className="field field--select">
             {CITIES.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}
@@ -216,8 +239,8 @@ export function ProfileForm({ next, initial, serverAction = saveProfileAction, a
           성별
         </span>
         <div className={segClass("gender")} role="radiogroup" aria-labelledby="gender-label">
-          <SegRadio name="gender" value="female" current={gender} label="여성" onChange={setGender} />
-          <SegRadio name="gender" value="male" current={gender} label="남성" onChange={setGender} />
+          <SegRadio name="gender" value="female" current={gender} label="여성" onChange={(g) => { setGender(g); step("gender"); }} />
+          <SegRadio name="gender" value="male" current={gender} label="남성" onChange={(g) => { setGender(g); step("gender"); }} />
         </div>
         {errorAt("gender")}
       </div>

@@ -2,6 +2,7 @@
 // 기록 고치기 모드의 "지우기" — 두 번 누르기 확인(ClearAllButton과 같은 방식). 서버 액션은 deleteEntryAction.
 import { useEffect, useState } from "react";
 import { deleteEntryAction } from "@/app/actions";
+import { track } from "@/lib/analytics";
 import { CONFIRM_WINDOW_MS } from "./ClearAllButton";
 
 export function DeleteEntryButton({ date }: { date: string }) {
@@ -19,7 +20,9 @@ export function DeleteEntryButton({ date }: { date: string }) {
         if (!armed) {
           e.preventDefault();
           setArmed(true);
+          return;
         }
+        track("diary_delete");
       }}
     >
       <input type="hidden" name="date" value={date} />

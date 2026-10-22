@@ -93,6 +93,7 @@ export default async function WritePage({ searchParams }: { searchParams: Promis
       <WritePreload />
       <EntryForm
         date={date}
+        when={isToday ? "today" : carried ? "last_night" : "past"}
         warmAssets={[characterOfGanji(ganji.ko).cardSrc, ...BURST_ASSETS]}
         notePlaceholder={isToday ? "오늘 기억하고 싶은 일 하나" : carried ? "어젯밤까지의 하루, 기억하고 싶은 일 하나" : "그날 기억하고 싶은 일 하나"}
         promiseText={promiseText}
