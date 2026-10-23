@@ -7,7 +7,7 @@
 // 길흉 예언이 아니라 "오늘이 평소보다 수월한가"의 정도다. 범위는 0.15~0.90으로 자른다.
 import { BRANCH_META, ELEMENT_EN_TO_KO, STEM_META, findYongsin, getTenGod, type StemHanja, type TenGod } from "@saju/engine";
 import type { PillarsSnapshot } from "../profile";
-import type { BaseFortune, BranchRelation, TenGodFamily, YongsinHit } from "./types";
+import type { BaseFortune, BranchRelation, TenGodFamily, Verdict5, YongsinHit } from "./types";
 
 export const FAMILY_OF: Record<TenGod, TenGodFamily> = {
   비견: "비겁",
@@ -35,6 +35,18 @@ const TEN_GOD_OFFSET: Record<TenGod, number> = {
   편인: 0.02,
   정인: 0.06,
 };
+
+/** v4.13 (2026-10-15 글품질 검수): 용신 그룹 → 생활 속 힘 (모두 "힘"으로 끝나 조사는 을/이). core(사실 문장)·text(템플릿)·brief(me.need)가 같은 이름을 쓴다 */
+export const GROUP_POWER: Record<TenGodFamily, string> = {
+  비겁: "내 힘으로 버티는 힘",
+  식상: "표현하고 여유를 갖는 힘",
+  재성: "실속을 챙기는 힘",
+  관성: "책임을 지키는 힘",
+  인성: "배우고 쉬어 가는 힘",
+};
+
+/** 코어 5단계 판정 → 생활어. core(사실·맥락 문장)·text(템플릿 이달 줄)·brief(month)가 같은 말을 쓴다 */
+export const VERDICT_WORD: Record<Verdict5, string> = { "매우 유리": "꽤 수월한 편", 유리: "수월한 편", 보통: "보통", 주의: "조심할 편", 어려움: "힘이 드는 편" };
 
 /** 십신을 생활어로. 사용자 문장에는 이 말을 쓴다 */
 export const TEN_GOD_THEME: Record<TenGod, string> = {

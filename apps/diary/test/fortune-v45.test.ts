@@ -48,8 +48,13 @@ describe("v4.5 SYSTEM 예시", () => {
   it("예시 세 편(좋음·무난·주의)이 들어 있고 모두 검사기를 통과한다", () => {
     expect(SYSTEM_EXAMPLES.map((e) => e.band)).toEqual(["좋음", "무난", "주의"]);
     for (const e of SYSTEM_EXAMPLES) {
-      const b = { ...briefFor("2026-10-10", e.band), areas: [] };
+      // v4.13: 예시는 각자 가정한 오늘 기운 이름(e.tenGods)으로 검사한다 — 이름·뜻·판정·이달 한 줄·추상어·생극 검사까지 통과
+      const b0 = briefFor("2026-10-10", e.band);
+      const b = { ...b0, areas: [], today: { ...b0.today, tenGods: e.tenGods } };
       expect(validateFortuneText(e.text, b).filter((i) => !i.startsWith("예시")), e.band).toEqual([]);
+      expect(e.text.body, e.band).toMatch(/^이달 /);
+      expect(e.text.body, e.band).toMatch(/맞는 날|맞는 편|안 맞는 날|보통 날/);
+      expect(e.text.body, e.band).not.toMatch(/모자랐던 부분|넘치는 힘|부족한 쪽/);
       expect(validateFortuneText(e.text, b).some((i) => i.startsWith("예시 headline")), "예시를 그대로 쓰면 걸린다").toBe(true);
     }
     expect(SYSTEM).toContain("직장 장면");
@@ -155,7 +160,7 @@ describe("v4.9 칸마다 같은 말 반복", () => {
     const base = SYSTEM_EXAMPLES[1]!.text;
     const b = { ...briefFor("2026-10-10", "무난"), areas: [] };
     expect(validateFortuneText(base, b).some((i) => i.includes("되풀이"))).toBe(false);
-    const t = { ...base, do: "답장을 미뤄 둔 메시지나 약속을 오늘 끝내 둬요." };
+    const t = { ...base, do: "미뤄 둔 답장 하나를 보내고 할 일을 또렷하게 줄 세워요." };
     expect(validateFortuneText(t, b).some((i) => i.includes("do가 본문 문장을 되풀이"))).toBe(true);
   });
   it("SYSTEM이 칸 역할과 '아니에요' 기억을 말한다", () => {

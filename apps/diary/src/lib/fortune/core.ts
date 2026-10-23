@@ -42,7 +42,7 @@ import {
 } from "@saju/core-rules";
 import { CITIES } from "../cities";
 import type { BirthProfile, PillarsSnapshot } from "../profile";
-import { FAMILY_OF, TEN_GOD_THEME } from "./base";
+import { FAMILY_OF, GROUP_POWER, TEN_GOD_THEME, VERDICT_WORD } from "./base";
 import { batchim } from "./text";
 import type {
   AreaName,
@@ -102,35 +102,34 @@ const SAMHAP: { 글자: string; 오행: "목" | "화" | "토" | "금" | "수" }[
 const POS: CoreRelationHit["pos"][] = ["연", "월", "일", "시"];
 const hourPillar = (dayStem: string, i: number): string => STEMS[([0, 2, 4, 6, 8][STEMS.indexOf(dayStem) % 5]! + i) % 10]! + BRANCHES[i]!;
 
-// ---------- 사용자용 낱말 (text.ts BANNED를 지킨다: 기운·흐름·용신·기신·십신·일간·일지 금지) ----------
+// ---------- 사용자용 낱말 (text.ts BANNED를 지킨다: 흐름·기신·십신·일간·일지 금지) ----------
 /** v4.5: 생활어. "한"(치우치지 않음)은 글에 쓸 내용이 없어 문장을 만들지 않는다 */
-/** v4.9 (2026-10-12): "모자란 부분" 같은 모호한 말 대신 무엇이 부족한지 이름을 댄다. 용신 그룹 → 생활 속 힘 (모두 "힘"으로 끝나 조사는 을/이) */
-export const GROUP_POWER: Record<"비겁" | "식상" | "재성" | "관성" | "인성", string> = {
-  비겁: "내 힘으로 버티는 힘",
-  식상: "표현하고 여유를 갖는 힘",
-  재성: "실속을 챙기는 힘",
-  관성: "책임을 지키는 힘",
-  인성: "배우고 쉬어 가는 힘",
-};
-/** 라벨 → 생활어. gp = 내 용신 그룹의 힘(없으면 일반 말). "한"은 문장 없음 */
-function labelWord(l: Exclude<RoleLabel, null>, gp: string | null): string | null {
+/** v4.9 (2026-10-12): "모자란 부분" 같은 모호한 말 대신 무엇이 부족한지 이름을 댄다 (GROUP_POWER는 base.ts로 옮김 — 템플릿·brief도 같은 이름을 쓴다) */
+export { GROUP_POWER, VERDICT_WORD };
+/**
+ * 라벨 → 생활어. gp = 내 용신 그룹의 힘, own = 이 글자 자신의 그룹의 힘. "한"은 문장 없음.
+ * v4.13 (글품질 검수 2026-10-15 §5): "부족한 쪽·넘치는 쪽·박자가 달라"처럼 무엇인지 이름 없는 말은 검사기(validate ABSTRACT_RE)가 막으므로 brief 재료부터 이름을 댄다.
+ * 생·극("누르다") 말도 쓰지 않는다 — 기운 이름을 대고 맞는지만 말한다
+ */
+function labelWord(l: Exclude<RoleLabel, null>, gp: string | null, own: string): string | null {
   switch (l) {
     case "용":
-      return "평소 내게 부족한 쪽이라 오늘 반갑게 채워져요";
+      return `내게 모자란 ${gp ?? own}이라 오늘 반갑게 채워져요`;
     case "희":
-      return gp ? `내게 부족한 ${gp}을 옆에서 거들어 줘요` : "내게 부족한 쪽을 옆에서 거들어 줘요";
+      return `내게 모자란 ${gp ?? own}을 옆에서 거들어 줘요`;
     case "구":
-      return "지금 내게 잘 맞지 않는 쪽이라 무리하면 쉽게 지쳐요";
+      return `지금 나와 맞지 않는 ${own}이라 무리하면 쉽게 지쳐요`;
     case "기":
-      return "원래 나에게 넘치는 쪽이라 오늘은 과해지기 쉬워요";
+      return `내게 이미 넉넉한 ${own}이라 오늘은 과해지기 쉬워요`;
     default:
       return null;
   }
 }
 /** v4.5: 충·복음이 걸린 내 자리 → 생활 영역 (태어난 해=오래된 인연, 달=집안·일터, 날=나와 가까운 사람, 시=앞으로의 계획) */
 const POS_LIFE: Record<"연" | "월" | "일" | "시", string> = { 연: "오래된 인연", 월: "집안이나 일터", 일: "나와 가까운 사람", 시: "앞으로의 계획" };
-const LABEL_SHORT: Record<Exclude<RoleLabel, null>, string> = { 용: "부족한 쪽을 채워요", 희: "부족한 쪽을 거들어요", 한: "그 성격대로 가요", 구: "잘 맞지 않아요", 기: "넘치는 쪽을 더해요" };
-const VERDICT_WORD: Record<Verdict5, string> = { "매우 유리": "꽤 수월한 편", 유리: "수월한 편", 보통: "보통", 주의: "조심할 편", 어려움: "힘이 드는 편" };
+/** 영역 why 한 토막 (v4.13: 이름을 댄다). gp = 내 용신 그룹의 힘 */
+const labelShort = (l: Exclude<RoleLabel, null>, gp: string | null): string =>
+  l === "용" ? `내게 모자란 ${gp ?? "힘"}을 채워요` : l === "희" ? `내게 모자란 ${gp ?? "힘"}을 거들어요` : l === "한" ? "그 성격대로 가요" : l === "구" ? "지금 나와 맞지 않아요" : "내게 이미 넉넉한 쪽이라 과해지기 쉬워요";
 const AREA_WORD: Record<AreaName, string> = { 대인: "사람", 재물: "돈", 직업: "일", 학업: "배움", 연애: "연애", 가족: "가족", 건강: "몸" };
 
 export interface CoreInput {
@@ -332,6 +331,8 @@ export function computeCoreFortune(input: CoreInput): CoreFortune {
 
   // ---- 영역 (숫자 없음, 신호만) — v4.2: 오늘(일운 ≤2) → 이달(월운 1) → 올해(세운 1), 전부 코어 luckAreas ----
   const gender = input.profile?.gender;
+  /** 내 용신 그룹의 생활 속 힘 (v4.9). 용신이 없으면 null */
+  const gp = y ? GROUP_POWER[y.용신그룹] : null;
   /** 한 운(luck)의 luckAreas 신호를 영역별로 합산해 |합|이 큰 순으로 max개. 한신은 0으로 들어가 "→" (v4.1 ②), 코어가 올린(Y-12) 한신 관성은 점수 그대로 */
   const areasOf = (lk: Luck, unit: "일운" | "월운" | "세운", period: AreaPeriod, max: number): CoreFortune["areas"] => {
     const assistedHere = lk.플래그.some((f) => f.includes("(Y-12)"));
@@ -342,7 +343,7 @@ export function computeCoreFortune(input: CoreInput): CoreFortune {
       const boostedHere = assistedHere && part.라벨 === "한" && part.그룹 === "관성";
       const eff = part.라벨 === "한" && !boostedHere ? 0 : part.점수;
       const theme = TEN_GOD_THEME[row.십신 as TenGod];
-      const why = `'${theme}'(${row.십신}) 쪽이 ${LABEL_SHORT[boostedHere ? "희" : part.라벨]}`;
+      const why = `'${theme}'(${row.십신}) 쪽이 ${labelShort(boostedHere ? "희" : part.라벨, gp)}`;
       for (const name of row.영역) {
         let area: AreaName | null = null;
         if (name === "연애(남·전통)") area = gender === "male" ? "연애" : null;
@@ -394,8 +395,7 @@ export function computeCoreFortune(input: CoreInput): CoreFortune {
   else facts.push(`오늘은 '${st}'(${stem.tenGod})${batchim(st) ? "과" : "와"} '${bt}'(${branch.tenGod})${batchim(bt) ? "이" : "가"} 함께 와요.`);
   // 라벨 문장은 같은 것이면 한 번만
   const labelFacts = new Set<string>();
-  const gp = y ? GROUP_POWER[y.용신그룹] : null;
-  for (const part of [stem, branch]) { const wl = wordLabel(part); const w = wl ? labelWord(wl, gp) : null; if (w) labelFacts.add(`'${TEN_GOD_THEME[part.tenGod]}' 쪽은 ${w}.`); }
+  for (const part of [stem, branch]) { const wl = wordLabel(part); const w = wl ? labelWord(wl, gp, GROUP_POWER[part.family]) : null; if (w) labelFacts.add(`'${TEN_GOD_THEME[part.tenGod]}'(${part.tenGod}) 쪽은 ${w}.`); }
   facts.push(...labelFacts);
   if (l) facts.push(`둘을 합치면 오늘은 ${VERDICT_WORD[total]}이에요.`);
   else facts.push("태어난 시간을 몰라 오늘이 수월한지 힘든지는 단정하지 않아요.");
@@ -419,9 +419,10 @@ export function computeCoreFortune(input: CoreInput): CoreFortune {
   // v4.3: 합 관련 플래그("… 합으로 묶음", "긴장이 풀리는 시기")는 문장을 만들지 않는다 — 큰 특징만 나열
   const flagFacts = new Set<string>();
   for (const f of flags) {
-    if (f.startsWith("용신 손상") && !f.includes("묶음")) flagFacts.add(y ? `오늘은 내게 부족한 ${GROUP_POWER[y.용신그룹]}이 더 약해지는 날이라 평소보다 힘이 들 수 있어요.` : "오늘은 내게 부족한 쪽이 더 약해지는 날이라 평소보다 힘이 들 수 있어요.");
+    // v4.13: "부족한 쪽"·"힘이 한곳에 모이지" 같은 이름 없는 말은 검사기가 막으므로 재료부터 이름을 댄다
+    if (f.startsWith("용신 손상") && !f.includes("묶음")) flagFacts.add(`오늘은 내게 모자란 ${gp ?? "힘"}이 더 약해지는 날이라 평소보다 힘이 들 수 있어요.`);
     // v4.8: 코어 플래그(절각·개두)는 60갑자의 약 40%에 붙는다. 글 재료로는 천간·지지가 실제로 반대 방향일 때만(하나는 용·희, 하나는 기·구)
-    else if (f.startsWith("운 내부 상충") && oppositeParts(stem.label, branch.label)) flagFacts.add("오늘은 겉과 속이 달라 힘이 한곳에 모이지 않아요.");
+    else if (f.startsWith("운 내부 상충") && oppositeParts(stem.label, branch.label)) flagFacts.add(`오늘은 내게 모자란 ${GROUP_POWER[stem.label === "용" ? stem.family : branch.family]}과 이미 넉넉한 ${GROUP_POWER[stem.label === "기" ? stem.family : branch.family]}이 같이 와서 어느 하나에 집중하기 어려워요.`);
     // v4.5: "중화 사주" 문장은 글 재료에서 뺀다 — 모델이 매일 그대로 옮겨 적어 읽는 사람에게 뜻이 없었다(플래그는 relations에 남는다)
   }
   facts.push(...flagFacts);
@@ -437,7 +438,7 @@ export function computeCoreFortune(input: CoreInput): CoreFortune {
     contextFacts.push(daeunFact);
     // 대운 플래그(용신 손상 · 운 내부 상충) 문장은 근거에만 (v4.1 ③ → v4.4)
     const df = daeun?.플래그 ?? [];
-    if (df.some((f) => f.startsWith("용신 손상"))) contextFacts.push(y ? `지금 10년 단위 운이 내게 부족한 ${GROUP_POWER[y.용신그룹]}을 누르고 있어요.` : "지금 10년 단위 운이 내게 부족한 쪽을 누르고 있어요.");
+    if (df.some((f) => f.startsWith("용신 손상"))) contextFacts.push(`지금 10년 단위 운은 내게 모자란 ${gp ?? "힘"}이 더 약해지는 때예요.`);
     if (df.some((f) => f.startsWith("운 내부 상충"))) contextFacts.push("지금 10년 단위 운은 겉과 속이 달라요.");
   }
   contextFacts.push(seunFact);
@@ -462,6 +463,8 @@ export function computeCoreFortune(input: CoreInput): CoreFortune {
     relations: { hits, flags },
     // 개운은 근거가 확실할 때만 (Q5 = A): 시간 모름이면 10/12 이상 모였을 때
     luckEls: y && (!hourUnknown || (votes ?? 0) >= UNKNOWN_HOUR_MIN) ? { 용: y.용신오행, 희: (Object.entries(y.오행역할).find(([, r]) => r === "희")?.[0] as "목" | "화" | "토" | "금" | "수" | undefined) ?? null } : null,
+    // v4.13: 글·템플릿이 "내게 필요한 기운"의 이름을 대기 위한 재료. 판정에 쓴 용신(v4.12 다수결 포함)이 있으면 늘 있다
+    need: y ? { 오행: y.용신오행, 그룹: y.용신그룹 } : null,
     context: { ...(daeun ? { daeun } : {}), seun: seunItem, ...(wolun ? { wolun } : {}), 입춘전: seun.입춘전 },
     areas,
     facts,

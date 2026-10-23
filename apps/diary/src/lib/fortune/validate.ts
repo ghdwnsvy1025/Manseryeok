@@ -1,8 +1,11 @@
 // 3단계 — 출력 검사기. "brief에 없는 것은 글에 나올 수 없다"를 기계로 확인한다. 사유가 하나라도 있으면 그 글은 쓰지 않는다(1회 재작성 → 템플릿).
 // 검사 항목: 금지어 · 전문용어 · 한자 · 이모지 · 숫자 날조 · 어미(~어요) · 명령조 · 기간 약속 · 문장 수 · 영역 일치 · 길이 상한 · 내 숫자 문장 · 구조 서술(v4.1) · 맥락 없는 운 언급(v4.4)
 //           · 점수 숫자(v4.2: "6.3점", "N점 만점") · 영역 period 일치 · 영역 줄이 본문 첫 문장과 60% 이상 겹침(v4.2). "이달엔/올해는" 접두는 모델 지시일 뿐 검사하지 않는다(템플릿 줄에는 접두가 없다).
+//           · v4.13 (글품질 검수 2026-10-15): 이름 없는 추상어("부족한 쪽") · 생·극 설명("누르다") · 오늘 기운 이름이 본문에 없음 / 오늘 것이 아닌 이름 / 같은 이름 3번 · 이달 한 줄 없음.
+//             주의인 날 반전 말은 이달·올해·10년 운을 말하는 문장은 빼고 본다(10-b: 맥락 문장의 "수월한 편"을 옮겨 적은 글이 템플릿으로 떨어지던 충돌).
+//           · v4.14 (10-c): 사유가 한 칸(areas[i]·do·dont)에만 있으면 slotIssues()가 그 칸을 돌려주고, llm.ts는 글 전체 대신 그 칸만 다시 쓰게 한다(통과한 본문을 버리지 않는다).
 import type { FortuneBrief } from "./brief";
-import { ABSTRACT_LABELS, hasContextFact, NUMBER_RE } from "./brief";
+import { ABSTRACT_LABELS, hasContextFact, NUMBER_RE, TEN_GOD_NAMES } from "./brief";
 import { FORTUNE_EXAMPLES } from "./examples";
 import type { AreaName, AreaPeriod } from "./types";
 
@@ -21,7 +24,8 @@ export interface ModelText {
 export const LIMITS = {
   headlineMax: 20,
   bodySentences: [4, 6] as const,
-  bodyMax: 420,
+  /** v4.13: 이달 한 줄 + 이름·뜻·판정이 들어가 420 → 480 */
+  bodyMax: 480,
   areaLineMax: 70,
   doDontMax: 45,
 } as const;
@@ -39,8 +43,18 @@ const CERTAIN_RE = /(반드시|틀림없이|꼭\s*(이루어|성공|잘\s*될)|�
 export const STRUCTURE_WORDS = ["글자", "짝이 되", "짝이 맞", "부딪히", "맞서", "한편이", "위아래", "윗글", "아랫글"] as const;
 /** v4.2: 점수는 화면에 있으니 글에 쓰지 않는다. "N점 만점" 꼴은 숫자와 상관없이 탈락 */
 const SCORE_PHRASE_RE = /점\s*만점|만점에/;
-/** v4.4: 올해·이달·10년 단위 운 언급. brief.facts에 맥락 문장이 없는 날 headline·body·do·dont에 나오면 탈락 (areas의 "이달엔/올해는" 줄은 예외) */
-export const CONTEXT_MENTION_RE = /(올해|이달|이번 달|10년 단위)\s*(의\s*)?운|10년\s*단위/;
+/** v4.4: 올해·10년 단위 운 언급. brief.facts에 맥락 문장이 없는 날 headline·body·do·dont에 나오면 탈락 (areas의 "올해는" 줄은 예외). v4.13: 이달은 뺐다 — 이달 한 줄은 매일(brief.month) */
+export const CONTEXT_MENTION_RE = /올해\s*(의\s*)?운|10년\s*단위/;
+/** v4.13: 이달 운 언급. brief.month가 없는 날(월운 없음)에만 막는다 */
+export const MONTH_MENTION_RE = /(이달|이번 달)\s*(의\s*)?운/;
+/** v4.13: 지시 대상 없는 추상어 (검수 §0·§2: 추상 문장 24/67 전부 이 꼴). 무엇이 부족한지·넘치는지 이름을 대야 한다 */
+/* "금을 거들어 주는 쪽"처럼 바로 앞에 목적어(을/를)가 있으면 이름이 있는 것이라 통과 — 첫 말뭉치(2026-10-16)에서 이름을 댄 문장까지 걸려 템플릿으로 떨어졌다.
+   v4.14: 목적어와 동사 사이에 부사 한 어절("힘을 옆에서 거들어 주는 쪽", "힘을 든든하게 채워 주는 쪽")이 끼어도 통과 — brief 라벨 문장(core.ts "~을 옆에서 거들어 줘요")을 옮겨 적은 글이 4차 말뭉치에서 3번 걸려 템플릿 1편(C 10-17)을 만들었다 */
+export const ABSTRACT_RE = /(아쉽던|아쉬웠던|부족한|부족했던|모자란|모자랐던|넘치는|넘쳤던) (쪽|부분|자리)|넘치는 힘|힘이 (한곳|한 곳)(에|으로|로) 모이|(?<![을를] (?:\S+ )?)(채워|거들어|받쳐) 주는 (쪽|힘)|쪽으로 (작용|쓰이)|박자가 (안 맞|달라)/;
+/** v4.13: 생·극 설명 ("내 기운이 어느 기운을 누른다") — 사용자 결정: 기운 이름을 한 번 대고 맞는지만. "발생해·탄생해"처럼 앞에 글자가 붙은 것은 일상어 */
+export const SHENG_KE_RE = /누르|눌리|눌려|(?<![가-힣])[생극](하|해)|상생|상극/;
+/** v4.13: 같은 기운 이름은 글 전체에서 이만큼까지 (한 번 대고 뜻 한 줄 — 되풀이하면 용어 나열) */
+export const TERM_MAX = 2;
 /** v4.2: 영역 줄이 본문 첫 문장을 되풀이하면 탈락 — 토큰(띄어쓰기 단위, 문장부호 제거) 겹침 비율 */
 export const AREA_OVERLAP_MAX = 0.6;
 const tokensOf = (s: string): string[] => s.replace(/[.,!?'"()]/g, " ").split(/\s+/).map((t) => t.trim()).filter((t) => t.length >= 2);
@@ -58,6 +72,31 @@ export function stemOverlap(a: string, b: string): number {
   const sa = stemsOf(a), sb = new Set(stemsOf(b));
   if (sa.length < 3) return 0;
   return sa.filter((t) => sb.has(t)).length / sa.length;
+}
+/** line이 되풀이하는 본문 문장 (가장 많이 겹치는 것). 없으면 null */
+function repeatedSentence(line: string, bodySents: string[]): string | null {
+  let best: string | null = null, bestScore = 0;
+  for (const s of bodySents) { const o = stemOverlap(line, s); if (o >= REPEAT_OVERLAP_MAX && o > bestScore) { best = s; bestScore = o; } }
+  return best;
+}
+const quoteHit = (s: string): string => `(본문 "${s.length > 28 ? s.slice(0, 28) + "…" : s}"와 같은 말 — 다른 장면·다른 행동으로)`;
+
+/**
+ * v4.14 (10-c): 탈락 사유가 전부 한 칸짜리(areas[i] 줄·do·dont)면 그 칸들을 돌려준다. 하나라도 본문·headline에 걸린 사유가 있으면 null (글 전체를 다시 쓴다).
+ * 칸 사유의 꼴: "areas[N] …", "do가/do는/do N자 …", "dont가/dont는/dont N자 …", "예시 do·dont를 그대로 씀". "areas 불일치"·"areas period 불일치"는 배열 모양이라 칸이 아니다.
+ */
+export interface SlotIssues { areas: number[]; do: boolean; dont: boolean }
+export function slotIssues(issues: string[]): SlotIssues | null {
+  const out: SlotIssues = { areas: [], do: false, dont: false };
+  for (const i of issues) {
+    const m = i.match(/^areas\[(\d+)\] /);
+    if (m) { const n = Number(m[1]); if (!out.areas.includes(n)) out.areas.push(n); continue; }
+    if (/^do(가|는) |^do \d+자/.test(i)) { out.do = true; continue; }
+    if (/^dont(가|는) |^dont \d+자/.test(i)) { out.dont = true; continue; }
+    if (i.startsWith("예시 do·dont를 그대로 씀")) { out.do = true; out.dont = true; continue; }
+    return null;
+  }
+  return issues.length ? out : null;
 }
 
 /** v4.5: 직장인을 가정한 장면. 학생·주부·쉬는 사람은 공감하지 못한다 — 본문·하면·피해요에서 본다 (영역 "일" 줄은 제외) */
@@ -88,6 +127,9 @@ function stripCommon(t: string): string {
     .replace(/지지(해|하|받|를\s?받|를\s?보내)/g, "")
     // "넘기지지 않-", "느껴지지 않-"처럼 '-지지 않/말/도/는' 꼴은 일상어
     .replace(/지지\s?(않|말|도\s?않|는\s?않|요)/g, "")
+    // v4.13: "무슨 일지", "할 일지 모르", "일지라도"처럼 '-ㄹ 일지'·'일지 모르' 꼴은 일상어 (2차 말뭉치 C 10-18이 이 오탐으로 템플릿에 떨어졌다)
+    .replace(/(할|될|올|갈|생길|있을|없을|모를|무슨|어떤|인) 일지/g, "")
+    .replace(/일지(도|라도)?\s?모르/g, "")
     .replace(/(\S+) 편인/g, (m, w: string) => (hasNieun(w.at(-1)!) ? "" : m));
 }
 
@@ -105,12 +147,31 @@ export function validateFortuneText(t: ModelText | null | undefined, b: FortuneB
   const everything = [t.headline, t.body, ...areaLines, t.do, t.dont].join(" ");
 
   // 금지어 · 전문용어 · 한자 · 이모지
-  for (const w of b.banned) if (everything.includes(w)) add(`금지어 "${w}"`);
   const plain = stripCommon(everything);
+  for (const w of b.banned) if (plain.includes(w)) add(`금지어 "${w}"`);
   for (const w of b.jargon) if (plain.includes(w)) add(`전문용어 "${w}"`);
-  if (/상관(이|은|을|과|의)\s/.test(plain)) add(`전문용어 "상관"`);
   if (HANJA_RE.test(everything)) add("한자가 있음 (글은 한글로만)");
   if (EMOJI_RE.test(everything)) add("이모지가 있음");
+
+  // v4.13: 이름 없는 추상어 · 생·극 설명 — 모델 글뿐 아니라 brief 재료(core.ts)도 같은 말을 쓰지 않는다 (테스트가 본다)
+  // v4.14: 걸린 문장을 인용한다 — 어느 칸의 어느 말이 걸렸는지 재작성과 분석에서 바로 보이게
+  const sentenceOf = (hit: string): string => { const s = splitSentences(everything.replace(/\n+/g, " ")).find((x) => x.includes(hit)) ?? ""; return s.length > 40 ? s.slice(0, 40) + "…" : s; };
+  const ab = everything.match(ABSTRACT_RE);
+  if (ab) add(`추상어 "${ab[0]}" (무엇이 모자라고 넘치는지 기운 이름을 대기; 문장 "${sentenceOf(ab[0])}")`);
+  const sk = everything.match(SHENG_KE_RE);
+  if (sk) add(`생·극 설명 "${sk[0]}" (기운 이름을 한 번 대고 맞는지만 말하기; 문장 "${sentenceOf(sk[0])}")`);
+
+  // v4.13: 오늘 기운 이름 — 본문에 오늘 것(brief.today.tenGods) 가운데 하나는 있어야 하고, 오늘 것이 아닌 이름은 날조, 같은 이름은 TERM_MAX번까지
+  const todayNames = (b.today?.tenGods ?? "").split("·").filter(Boolean);
+  if (todayNames.length) {
+    const inBody = TEN_GOD_NAMES.filter((n) => plain.includes(n));
+    if (!todayNames.some((n) => t.body.includes(n))) add(`오늘 기운 이름(${b.today.tenGods})이 본문에 없음 (이름 한 번 + 뜻 한 줄 + 맞는지 한 문장)`);
+    for (const n of inBody) if (!todayNames.includes(n)) add(`오늘 기운이 아닌 이름 "${n}" (brief.today.tenGods에 있는 것만)`);
+    for (const n of inBody) { const c = plain.split(n).length - 1; if (c > TERM_MAX) add(`이름 "${n}"이 ${c}번 (용어는 한 번, 바로 뒤에 뜻 한 줄)`); }
+  }
+  // v4.13: 이달 한 줄은 매일 — month가 있는 날 본문에 "이달"이 없으면 탈락
+  if (b.month && !/이달|이번 달/.test(t.body)) add(`이달 한 줄 없음 (brief.month.line "${b.month.line}"을 본문 첫 문장에)`);
+  if (!b.month && MONTH_MENTION_RE.test([t.headline, t.body, t.do, t.dont].join(" "))) add("이달 운 재료(brief.month)가 없는데 이달 운을 말함");
 
   // 구조 서술 (headline은 제외: 본문·영역 줄·하면·피해요)
   const prose = [t.body, ...areaLines, t.do, t.dont].join(" ");
@@ -128,10 +189,13 @@ export function validateFortuneText(t: ModelText | null | undefined, b: FortuneB
   // v4.5: 직장 가정 · 주의인 날 반전 · 시간대 나열 · 추상 이름 그대로 · 절기 첫날 아닌데 절기 이름
   const own = [t.body, t.do, t.dont].join(" ");
   for (const w of WORKPLACE_WORDS) if (own.includes(w)) add(`직장 장면 "${w}" (직업과 무관한 장면으로)`);
-  if (b.score?.band === "주의" && CARE_DAY_REVERSAL_RE.test(t.body)) add(`주의인 날 본문에 반전 말 "${t.body.match(CARE_DAY_REVERSAL_RE)![0]}"`);
+  // 10-b: 이달·올해·10년 운을 옮겨 적은 문장("이달 무술월은 수월한 편")은 오늘 이야기가 아니라 반전 검사에서 뺀다
+  const todayOnly = splitSentences(t.body.replace(/\n+/g, " ")).filter((s) => !/이달|이번 달|올해|10년/.test(s)).join(" ");
+  if (b.score?.band === "주의" && CARE_DAY_REVERSAL_RE.test(todayOnly)) add(`주의인 날 본문에 반전 말 "${todayOnly.match(CARE_DAY_REVERSAL_RE)![0]}"`);
   const times = TIME_WORDS.filter((w) => t.body.includes(w));
   if (times.length >= 3) add(`시간대 나열 (${times.join("·")}) — 장면 1~2개만`);
-  for (const l of ABSTRACT_LABELS) if (t.body.includes(l)) add(`추상 이름 "${l}"을 그대로 씀 (생활 속 마음·행동으로)`);
+  // v4.13: 성격 이름("압박과 책임")은 기운 이름 바로 뒤의 뜻 한 줄로는 쓸 수 있다 — 같은 문장에 십신 이름이 없을 때만 추상
+  for (const sent of splitSentences(t.body.replace(/\n+/g, " "))) for (const l of ABSTRACT_LABELS) if (sent.includes(l) && !TEN_GOD_NAMES.some((n) => sent.includes(n))) add(`추상 이름 "${l}"을 그대로 씀 (기운 이름 뒤의 뜻으로만, 아니면 생활 속 마음·행동으로)`);
   if (b.today && b.today.useSolarTerm === false && b.today.solarTermName && everything.includes(b.today.solarTermName)) add(`절기 이름 "${b.today.solarTermName}" (절기 첫날에만)`);
 
   // v4.5: 예시 베낌 — 예시 headline·do·dont와 같거나, 본문 문장이 예시 문장과 80% 이상 겹치면
@@ -140,7 +204,9 @@ export function validateFortuneText(t: ModelText | null | undefined, b: FortuneB
     if (t.headline.trim() === e.text.headline) add(`예시 headline을 그대로 씀 "${e.text.headline}"`);
     if (t.do.trim() === e.text.do || t.dont.trim() === e.text.dont) add("예시 do·dont를 그대로 씀");
   }
-  for (const sent of splitSentences(t.body)) if (exSentences.some((x) => tokenOverlap(sent, x) >= 0.8)) add(`예시 문장을 베낌 "${sent.slice(0, 20)}…"`);
+  // v4.13: 이달 한 줄·이름+뜻 문장·판정 문장은 꼴이 정해진 문장이라(brief.month.line을 그대로 옮기면 예시와 같아진다) 베낌 검사에서 뺀다 — 장면·할 것 문장만 본다
+  const formulaic = (s: string) => /이달|이번 달|맞는 (날|편)|안 맞는|보통 날/.test(s) || TEN_GOD_NAMES.some((n) => s.includes(n));
+  for (const sent of splitSentences(t.body)) if (!formulaic(sent) && exSentences.some((x) => tokenOverlap(sent, x) >= 0.8)) add(`예시 문장을 베낌 "${sent.slice(0, 20)}…"`);
 
   // v4.8 기억: 최근 3일 헤드라인과 같거나 많이 겹치면, 첫 두 문장이 최근 첫 두 문장과 50% 이상 겹치면 탈락
   const startNow = splitSentences(t.body.replace(/\n+/g, " ")).slice(0, 2).join(" ");
@@ -157,9 +223,9 @@ export function validateFortuneText(t: ModelText | null | undefined, b: FortuneB
   if (PROMISE_RE.test(everything)) add("기간 약속 (\"N일 더 쓰면\" 꼴)");
   if (CERTAIN_RE.test(everything)) add("길흉 단정 표현");
 
-  // v4.4: 맥락 문장이 없는 날에 올해·이달·10년 단위 운을 말하면 탈락 (영역 줄은 제외)
+  // v4.4: 맥락 문장이 없는 날에 올해·10년 단위 운을 말하면 탈락 (영역 줄은 제외). v4.13: 이달은 매일이라 뺐다
   const ownProse = [t.headline, t.body, t.do, t.dont].join(" ");
-  if (!hasContextFact(b.facts ?? []) && CONTEXT_MENTION_RE.test(ownProse)) add("오늘만: facts에 없는 올해·이달·10년 단위 운을 말함");
+  if (!hasContextFact(b.facts ?? []) && CONTEXT_MENTION_RE.test(ownProse)) add("오늘만: facts에 없는 올해·10년 단위 운을 말함");
 
   // 어미: 본문·영역 줄·하면/피해요의 모든 문장이 "~요"로 끝나야 하고, 명령조·반말 어미는 하나도 없어야 한다
   const sentences = [...splitSentences(t.body), ...areaLines.flatMap(splitSentences), ...splitSentences(t.do), ...splitSentences(t.dont)];
@@ -193,11 +259,13 @@ export function validateFortuneText(t: ModelText | null | undefined, b: FortuneB
     else if (splitSentences(line).length !== 1) add(`areas[${i}] line은 1문장`);
     if (line.length > LIMITS.areaLineMax) add(`areas[${i}] line ${line.length}자 (${LIMITS.areaLineMax}자 안)`);
     if (firstSentence && tokenOverlap(line, firstSentence) >= AREA_OVERLAP_MAX) add(`areas[${i}] line이 본문 첫 문장과 겹침`);
-    else if (a?.period === "오늘" && bodySents.some((s) => stemOverlap(line, s) >= REPEAT_OVERLAP_MAX)) add(`areas[${i}] line이 본문 문장을 되풀이함`);
+    else { const hit = a?.period === "오늘" ? repeatedSentence(line, bodySents) : null; if (hit) add(`areas[${i}] line이 본문 문장을 되풀이함 ${quoteHit(hit)}`); }
   });
-  // v4.9: do·dont도 본문을 되풀이하면 탈락
-  if (bodySents.some((s) => stemOverlap(t.do, s) >= REPEAT_OVERLAP_MAX)) add("do가 본문 문장을 되풀이함");
-  if (bodySents.some((s) => stemOverlap(t.dont, s) >= REPEAT_OVERLAP_MAX)) add("dont가 본문 문장을 되풀이함");
+  // v4.9: do·dont도 본문을 되풀이하면 탈락. v4.14: 어느 문장과 겹치는지 인용해 칸만 고쳐 쓸 때 피할 문장을 알게
+  const doHit = repeatedSentence(t.do, bodySents);
+  if (doHit) add(`do가 본문 문장을 되풀이함 ${quoteHit(doHit)}`);
+  const dontHit = repeatedSentence(t.dont, bodySents);
+  if (dontHit) add(`dont가 본문 문장을 되풀이함 ${quoteHit(dontHit)}`);
   // v4.10: 이음말 — 첫 문장이 '그래서·그러니·그런데'로 시작하면 받을 앞 문장이 없고(비약), '그래서'는 본문에 한 번까지(같은 이음말 되풀이)
   if (/^(그래서|그러니|그러니까|그런데|그러다 보니)/.test(firstSentence)) add(`첫 문장이 이음말로 시작 "${firstSentence.slice(0, 12)}…" (받을 앞 문장이 없음)`);
   const sosCount = (t.body.match(/그래서/g) ?? []).length;

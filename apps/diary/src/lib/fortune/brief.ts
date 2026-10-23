@@ -1,10 +1,9 @@
 // 3단계 — 글의 재료(brief). 모델에게 가는 유일한 입력이고, 검사기(validate.ts)는 "brief에 없는 것이 글에 나왔는가"를 이 묶음으로 판단한다.
 // 사주 코어 content/src/brief.ts의 축소판: 사실 + 낱말 + 금지 사항 + 분량 규칙. 설계: docs/FORTUNE_V4.md "3단계 — 글".
-import type { TenGod } from "@saju/engine";
 import { TEN_GOD_THEME } from "./base";
 import { AREA_WORD } from "./core";
 import { solarTermOf } from "./solarTerms";
-import { BANNED, batchim } from "./text";
+import { BANNED, batchim, namesFromCore } from "./text";
 import type { AreaName, AreaPeriod, AreaSignal, CoreFortune, PersonalAdjustment } from "./types";
 
 /** 사주 코어 content/validate.ts의 COMMON_BAN·HEALTH_BAN 복사. 하루 운세에서도 같은 선을 지킨다 */
@@ -16,25 +15,28 @@ export const CORE_BANNED = [
 /** 글에 쓰면 안 되는 말 전부 (text.ts BANNED + 코어 금지 낱말) */
 export const BANNED_ALL: readonly string[] = [...new Set([...BANNED, ...CORE_BANNED])];
 
-/** 전문용어. 괄호 안에서도 쓰지 않는다. ("상관"은 일상어와 겹쳐 뺀다 — validate가 문맥으로 본다) */
-export const JARGON = ["윗글자", "아랫글자", "오늘 글자", "내 글자", 
-  "십신", "용신", "기신", "희신", "구신", "한신", "일간", "일지", "월지", "연지", "시지", "천간", "지지", "오행",
-  "삼합", "육합", "반합", "방합", "상충", "대운", "세운", "월운", "일진", "사주팔자", "신강", "신약",
-  "비견", "겁재", "식신", "편재", "정재", "편관", "정관", "편인", "정인", "비겁", "식상", "재성", "관성", "인성", "칠살",
+/**
+ * 구조 전문용어. 괄호 안에서도 쓰지 않는다.
+ * v4.13 (글품질 검수 2026-10-15 §11-2, 00_공통기준 "용어 한 번 + 뜻 한 줄"): 십신 이름 10개·그룹 이름 5개·"오행"·"용신"은 뺐다 — 오늘 기운의 이름을 한 번 대고 맞는지 말하는 글이 된다.
+ * 자리·관계 말(일간·일지·천간·지지·삼합·육합·충·대운…)은 그대로 금지: 그건 이름이 아니라 구조 설명이다. 기신·희신·구신·한신도 그대로(이름 대신 "내게 이미 넉넉한 힘"처럼 말한다)
+ */
+export const JARGON = ["윗글자", "아랫글자", "오늘 글자", "내 글자",
+  "십신", "기신", "희신", "구신", "한신", "일간", "일지", "월지", "연지", "시지", "천간", "지지",
+  "삼합", "육합", "반합", "방합", "상충", "대운", "세운", "월운", "일진", "사주팔자", "신강", "신약", "칠살",
 ];
+/** 십신 이름 10개. 글에는 brief.today.tenGods에 있는 것만 쓸 수 있다 (validate) */
+export const TEN_GOD_NAMES: readonly string[] = ["비견", "겁재", "식신", "상관", "편재", "정재", "편관", "정관", "편인", "정인"];
 
 const STEMS = "甲乙丙丁戊己庚辛壬癸", BRANCHES = "子丑寅卯辰巳午未申酉戌亥", S_KO = "갑을병정무기경신임계", B_KO = "자축인묘진사오미신유술해";
-const TEN_GODS: TenGod[] = ["비견", "겁재", "식신", "상관", "편재", "정재", "편관", "정관", "편인", "정인"];
 
 /** 한자 간지를 한글 읽기로 ("丙午" → "병오", "壬" → "임"). 글은 한글로만 쓰므로 brief에서 먼저 바꾼다 */
 export function hanjaToKo(s: string): string {
   return [...s].map((ch) => (STEMS.includes(ch) ? S_KO[STEMS.indexOf(ch)]! : BRANCHES.includes(ch) ? B_KO[BRANCHES.indexOf(ch)]! : ch)).join("");
 }
 
-/** 사실 문장에서 괄호 속 십신 이름을 뗀다: "'표현'(식신) 쪽" → "'표현' 쪽". 모델이 전문용어를 따라 쓰지 않게 */
+/** 사실 문장을 글 재료로: 한자 간지만 한글로. v4.13: 괄호 속 십신 이름("'표현과 여유'(식신)")은 더 이상 떼지 않는다 — 이름이 지워져 글이 "부족한 쪽"밖에 못 쓰던 원인(검수 §4) */
 export function plainFact(f: string): string {
-  const re = new RegExp(`'([^']+)'\\((${TEN_GODS.join("|")})\\)`, "g");
-  return hanjaToKo(f.replace(re, "'$1'"));
+  return hanjaToKo(f);
 }
 
 export interface BriefInput {
@@ -102,12 +104,12 @@ export function recentFromRows(rows: { fortune_date: string; content: { headline
 export type FortuneOpening = "scene" | "reason" | "contrast";
 const OPENINGS: FortuneOpening[] = ["scene", "reason", "contrast"];
 
-/** v4.8 표현 돌리기(1층): 엔진의 관계 말을 날짜마다 다른 말로. 뜻은 같다 */
+/** v4.8 표현 돌리기(1층): 엔진의 관계 말을 날짜마다 다른 말로. 뜻은 같다. v4.13: core.ts labelWord의 새 문장(이름을 댐)에 맞춰 꼬리만 돌린다 — 검사기의 추상어·생극 금칙에 걸리는 말은 없다 */
 const PHRASE_VARIANTS: [string, string[]][] = [
-  ["평소 내게 부족한 쪽이라 오늘 반갑게 채워져요", ["평소 내게 부족한 쪽이라 오늘 반갑게 채워져요", "평소 비어 있던 자리라 오늘 든든하게 메워져요", "내게 늘 아쉽던 쪽이라 오늘 힘이 돼요"]],
+  ["이라 오늘 반갑게 채워져요", ["이라 오늘 반갑게 채워져요", "이라 오늘 든든하게 메워져요", "이라 오늘 제대로 힘이 돼요"]],
   ["을 옆에서 거들어 줘요", ["을 옆에서 거들어 줘요", "에 힘을 보태 줘요", "을 받쳐 줘요"]],
-  ["원래 나에게 넘치는 쪽이라 오늘은 과해지기 쉬워요", ["원래 나에게 넘치는 쪽이라 오늘은 과해지기 쉬워요", "이미 넉넉한 쪽에 더 얹히는 셈이라 지나치기 쉬워요", "평소에도 센 쪽이라 오늘은 넘치기 쉬워요"]],
-  ["지금 내게 잘 맞지 않는 쪽이라 무리하면 쉽게 지쳐요", ["지금 내게 잘 맞지 않는 쪽이라 무리하면 쉽게 지쳐요", "지금 나와 박자가 달라 애쓸수록 기운이 빠져요".replace("기운이", "힘이"), "지금 내 쪽과 맞지 않아 오래 붙들면 피곤해져요"]],
+  ["이라 오늘은 과해지기 쉬워요", ["이라 오늘은 과해지기 쉬워요", "이라 오늘은 지나치기 쉬워요", "이라 오늘은 넘치기 쉬워요"]],
+  ["이라 무리하면 쉽게 지쳐요", ["이라 무리하면 쉽게 지쳐요", "이라 애쓸수록 힘이 빠져요", "이라 오래 붙들면 피곤해져요"]],
   ["둘을 합치면 오늘은", ["둘을 합치면 오늘은", "전체로 보면 오늘은", "두 성격을 더하면 오늘은"]],
 ];
 export function varyFact(f: string, seed: number): string {
@@ -122,8 +124,15 @@ export function daySeed(date: string): number {
 }
 
 export interface FortuneBrief {
-  /** v4.4: solarTerm = 그날이 속한 24절기와 며칠째 ("한로 사흘째"). v4.5: 글에 쓸 수 있는 건 절기 첫날(useSolarTerm)뿐 — 매일 "한로 사흘째…"로 시작하던 것 */
-  today: { date: string; weekday: string; ganji: string; solarTerm: string; useSolarTerm: boolean; solarTermName: string };
+  /**
+   * v4.4: solarTerm = 그날이 속한 24절기와 며칠째 ("한로 사흘째"). v4.5: 글에 쓸 수 있는 건 절기 첫날(useSolarTerm)뿐 — 매일 "한로 사흘째…"로 시작하던 것.
+   * v4.13: tenGods = 오늘 기운 이름("편관·식신"), elements = 오늘 글자의 오행("임=수, 술=토"), fit = 나에게 맞는지(맞는 편·보통·안 맞는 편·판단 보류). 글은 이름을 한 번 대고 fit을 한 문장으로 쓴다
+   */
+  today: { date: string; weekday: string; ganji: string; solarTerm: string; useSolarTerm: boolean; solarTermName: string; tenGods: string; elements: string; fit: string };
+  /** v4.13: 나에게 필요한 기운의 이름 ("금(재성) · 실속을 챙기는 힘"). 용신이 없으면 null — 그때는 "맞는지"를 말하지 않는다 */
+  me: { need: string | null };
+  /** v4.13 (2026-10-15 사용자 결정: 이달 한 줄을 매일): 이달 간지·오행·판정 한 줄. 본문 첫 문장이 이 줄을 생활어로 푼다. 월운이 없으면 null */
+  month: { ganji: string; elements: string; verdict: string; line: string } | null;
   score: { value: number; band: string; word: string };
   /** v4.6: 오늘의 짜임과 중심 영역(focus일 때만, 생활어 "돈"·"사람"…) */
   angle: FortuneAngle;
@@ -159,8 +168,10 @@ export interface FortuneBrief {
     mine: string;
     /** v4.4: 요일·절기 장면 규칙 */
     scene: string;
-    /** v4.4: 올해·이달·10년 단위 운은 facts에 그 문장이 있을 때만 */
+    /** v4.4: 올해·10년 단위 운은 facts에 그 문장이 있을 때만. v4.13: 이달 한 줄(month)은 매일 */
     context: string;
+    /** v4.13: 용어는 한 번, 바로 뒤에 뜻 한 줄. 이름 없는 추상어·생극 설명 금지 */
+    terms: string;
   };
 }
 
@@ -204,9 +215,12 @@ export function buildBrief(input: BriefInput): FortuneBrief {
   ]);
   const withContext = hasContextFact(facts);
   const ang = angleOf(core, input.band);
+  const names = namesFromCore(core);
 
   return {
-    today: { date: input.date, weekday: input.weekday, ganji: `${today.ko}일`, solarTerm, useSolarTerm: term.isTermDay, solarTermName: term.name },
+    today: { date: input.date, weekday: input.weekday, ganji: `${today.ko}일`, solarTerm, useSolarTerm: term.isTermDay, solarTermName: term.name, tenGods: names.tenGods, elements: names.elements, fit: names.fit },
+    me: { need: names.need?.label ?? null },
+    month: names.month,
     score: { value: input.score10, band: input.band, word: BAND_WORD[input.band] },
     angle: ang.angle,
     focusArea: ang.focus ? AREA_WORD[ang.focus] : null,
@@ -225,7 +239,7 @@ export function buildBrief(input: BriefInput): FortuneBrief {
     jargon: JARGON,
     rules: {
       headline: "12자 안팎, 한 구절. 오늘 하루의 느낌을 사실 하나와 묶어서",
-      body: "4~6문장, 두 문단(빈 줄로 나눔). 사실들을 나열하지 말고 오늘의 성격·장면·내 기록으로만 쓰기. 첫 문단은 공감 한 문장 + chain 순서대로 원인→결과, 둘째 문단은 생활 장면 1~2개 + 마무리. 시간대를 차례로 늘어놓지 않기. 같은 문형 반복 금지. 같은 성격이 두 번 온 날은 \"겹친다\" 대신 \"아주 강하다/세다\"로",
+      body: `4~6문장, 두 문단(빈 줄로 나눔). 첫 문단 = ① 이달 한 줄(month.line을 생활어로) ② 오늘 기운 이름(today.tenGods) 한 번 + 뜻 한 줄 + 나에게 맞는지 한 문장(today.fit${names.need ? `, me.need "${names.need.label}"` : ""}). 둘째 문단 = ③ 생활 장면 하나(직업 무관) ④ 오늘 할 것 하나. 사실을 나열하지 말고 ①→②→③→④가 이유와 결과로 이어지게. 시간대를 차례로 늘어놓지 않기. 같은 문형 반복 금지. 같은 성격이 두 번 온 날은 "겹친다" 대신 "아주 강하다/세다"로`,
       areas: areas.length
         ? `areas 배열은 ${areas.length}개, 순서·period·area 이름은 입력과 똑같이. 각 line은 1문장. period가 "이달"이면 "이달엔", "올해"면 "올해는"으로 시작하는 1문장. line은 본문 첫 문장을 되풀이하지 않기`
         : "areas는 빈 배열 []",
@@ -237,9 +251,10 @@ export function buildBrief(input: BriefInput): FortuneBrief {
       scene: term.isTermDay
         ? `오늘은 ${input.weekday}, ${term.name}${batchim(term.name) ? "이" : "가"} 시작하는 날. 절기 이름은 한 번만 써도 되고, 요일도 한 번만. 직장·회사 장면(거래처·제안서·회의·출근·상사)은 쓰지 않기. "특별한·남다른·다른 날과 달리·차별" 금지`
         : `오늘은 ${input.weekday}. 절기 이름(${term.name})은 쓰지 않기. 요일은 꼭 필요할 때만 한 번. 직장·회사 장면(거래처·제안서·회의·출근·상사)은 쓰지 않기. "특별한·남다른·다른 날과 달리·차별" 금지`,
-      context: withContext
-        ? "facts에 올해·이달·10년 단위 운 문장이 있는 날이니 그 문장만 한 번 생활어로 풀어 넣기 (없는 운은 말하지 않기)"
-        : "facts에 올해·이달·10년 단위 운 문장이 없으니 올해 운·이달 운·10년 단위 운을 말하지 않기 (areas의 이달·올해 줄은 예외)",
+      context: `${names.month ? `이달 한 줄(month.line "${names.month.line}")은 매일 본문 첫 문장에 생활어로 넣기 (이달 오행 ${names.month.elements}). ` : ""}${withContext
+        ? "facts에 올해·10년 단위 운 문장이 있는 날이니 그 문장도 한 번 생활어로 풀어 넣기 (없는 운은 말하지 않기)"
+        : "facts에 올해·10년 단위 운 문장이 없으니 올해 운·10년 단위 운은 말하지 않기 (areas의 올해 줄은 예외)"}`,
+      terms: `오늘 기운 이름(${names.tenGods})과 오행(목·화·토·금·수)${names.need ? `, 내게 필요한 기운(${names.need.el})` : ""}은 글 전체에서 각각 한 번만 쓰고 바로 뒤에 뜻을 한 줄로 붙이기. today.tenGods에 없는 십신 이름은 쓰지 않기. jargon의 낱말은 금지. "누르다·눌리다·극하다·생하다" 같은 생·극 설명 금지. "부족한 쪽·모자란 부분·아쉽던 부분·넘치는 힘·채워 주는 힘·힘이 한곳에 모이다·박자가 안 맞다"처럼 무엇인지 이름 없는 말 금지 — 반드시 기운 이름과 ${names.need ? `"${names.need.power}"` : "그 힘의 이름"}을 대기`,
     },
   };
 }

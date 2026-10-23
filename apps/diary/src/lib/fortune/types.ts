@@ -95,6 +95,8 @@ export interface CoreFortune {
   relations: { hits: CoreRelationHit[]; flags: string[] };
   /** v4.7: 내 용신·희신 오행(개운 칸용). 시간 모름으로 용신이 확정되지 않으면 null. 옛 캐시엔 없다 */
   luckEls?: { 용: "목" | "화" | "토" | "금" | "수"; 희: "목" | "화" | "토" | "금" | "수" | null } | null;
+  /** v4.13 (2026-10-15): 내게 필요한 기운의 이름 — 용신 오행과 그 그룹. 글(brief.me.need)·템플릿이 "내게 모자란 금(실속을 챙기는 힘)"으로 쓴다. 용신이 없으면 null, 옛 캐시엔 없다 */
+  need?: { 오행: "목" | "화" | "토" | "금" | "수"; 그룹: TenGodFamily } | null;
   context: {
     daeun?: CoreLuckContextItem & { 순서: number };
     seun: CoreLuckContextItem & { 해: number };

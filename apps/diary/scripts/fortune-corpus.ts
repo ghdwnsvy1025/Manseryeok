@@ -43,7 +43,7 @@ test("fortune corpus: 사주 3 × 날짜 N", async () => {
   const client = new Anthropic({ timeout: 90_000, maxRetries: 1 });
   const out = process.env.CORPUS_OUT ?? path.join(ROOT, "..", "..", "..", "..", "문서", `운세말뭉치_${START}.json`);   // apps/diary → Manseryeok → 사주 일기 → 사주 앱/문서
   const corpus: { id: string; 칸: Record<string, string>; meta: Record<string, unknown> }[] = [];
-  let usage = { input: 0, output: 0 }, templates = 0;
+  let usage = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, templates = 0;
   for (const { name, p } of PROFILES) {
     const prof = computeProfile({ ...p, name: "x" }); if (!prof.ok) throw new Error(prof.error);
     const rows: { fortune_date: string; content: { headline?: string; body?: string } | null }[] = [];
@@ -58,14 +58,14 @@ test("fortune corpus: 사주 3 × 날짜 N", async () => {
       const input = { core, personal, today: todayInfo, date, weekday, score10, band, recent };
       const fallback = templateText(templateInputFromCore(core), personal, todayInfo);
       const r = await generateFortuneText(input, fallback, { maxAttempts: 2, client });   // 서비스용 클라이언트는 8초 타임아웃(전체검토 A-2)이라 말뭉치 생성에는 넉넉한 것을 따로 씀
-      usage.input += r.usage.input; usage.output += r.usage.output; if (r.source === "template") templates++;
+      usage.input += r.usage.input; usage.output += r.usage.output; usage.cacheRead += r.usage.cacheRead; usage.cacheWrite += r.usage.cacheWrite; if (r.source === "template") templates++;
       const t = r.text;
       corpus.push({ id: `${name}_${date}`, 칸: { headline: t.headline, body: t.body, do: t.do, dont: t.dont, ...(t.areas?.length ? { areas: t.areas.map((a) => a.line).join(" ") } : {}) },
-        meta: { source: r.source, attempts: r.attempts, band, angle: buildBrief(input).angle, core: r.core ?? null, review: r.review ?? null, issues: r.issues } });
+        meta: { source: r.source, attempts: r.attempts, patches: r.patches, band, angle: buildBrief(input).angle, core: r.core ?? null, review: r.review ?? null, issues: r.issues, ...(r.source === "template" && r.lastModelText ? { lastModelText: r.lastModelText } : {}) } });   // v4.14: 템플릿으로 떨어진 편은 마지막 탈락 초고를 남겨 검사기를 고친 뒤 오프라인 재검사할 수 있게
       rows.push({ fortune_date: date, content: { headline: t.headline, body: t.body } });
-      console.log(`${name} ${date} ${band} ${r.source} attempts=${r.attempts}${r.review ? ` review=${r.review.status}` : ""} :: ${t.headline}${r.source === "template" ? ` [사유: ${r.issues.map((x) => x.join(" / ")).join(" | ")}]` : ""}`);
+      console.log(`${name} ${date} ${band} ${r.source} attempts=${r.attempts}${r.patches ? ` patches=${r.patches}` : ""}${r.review ? ` review=${r.review.status}` : ""} :: ${t.headline}${r.source === "template" ? ` [사유: ${r.issues.map((x) => x.join(" / ")).join(" | ")}]` : ""}`);
     }
   }
   writeFileSync(out, JSON.stringify(corpus, null, 1), "utf8");
-  console.log(`저장 ${out} · ${corpus.length}편 · 템플릿 ${templates} · 토큰 입력 ${usage.input} 출력 ${usage.output}`);
+  console.log(`저장 ${out} · ${corpus.length}편 · 템플릿 ${templates} · 토큰 입력 ${usage.input} 출력 ${usage.output} 캐시읽기 ${usage.cacheRead} 캐시쓰기 ${usage.cacheWrite}`);
 }, 600_000);
