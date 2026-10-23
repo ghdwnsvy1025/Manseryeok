@@ -50,7 +50,7 @@ test("fortune corpus: 사주 3 × 날짜 N", async () => {
   let usage = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, templates = 0;
   for (const { name, p } of pickProfiles()) {
     const prof = computeProfile({ ...p, name: "x" }); if (!prof.ok) throw new Error(prof.error);
-    const rows: { fortune_date: string; content: { headline?: string; body?: string; stage?: string } | null }[] = [];
+    const rows: { fortune_date: string; content: { headline?: string; body?: string; stage?: string; tags?: NonNullable<Awaited<ReturnType<typeof generateFortuneText>>["tags"]> } | null }[] = [];
     for (let k = 0; k < DAYS; k++) {
       const date = addDays(START, k); const [y, m, d] = date.split("-").map(Number) as [number, number, number];
       const weekday = WEEKDAYS[new Date(Date.UTC(y, m - 1, d)).getUTCDay()]!;
@@ -58,15 +58,15 @@ test("fortune corpus: 사주 3 × 날짜 N", async () => {
       const core = computeCoreFortune({ pillars: prof.value.pillars, profile: p, date, todayHanja: today.hanja });
       const personal = adjustWithEntries(core.parts.score01, [], { index: today.index, stemKo: today.stemKo, branchKo: today.branchKo });
       const score10 = toTenPoint(personal.score), band = bandOf(score10);
-      const recent = recentFromRows(rows.slice(-7));   // v4.15: 무대는 7일을 피하고 글 겹침은 brief가 3일만 쓴다
+      const recent = recentFromRows(rows.slice(-14));   // v4.16: 태그 7일·제목 14일·첫 문장 3일은 brief가 가른다
       const input = { core, personal, today: todayInfo, date, weekday, score10, band, recent };
       const fallback = templateText(templateInputFromCore(core), personal, todayInfo);
-      const r = await generateFortuneText(input, fallback, { maxAttempts: 2, client });   // 서비스용 클라이언트는 8초 타임아웃(전체검토 A-2)이라 말뭉치 생성에는 넉넉한 것을 따로 씀
+      const r = await generateFortuneText(input, fallback, { maxAttempts: Number(process.env.CORPUS_ATTEMPTS ?? 2), client });   // v4.16: CORPUS_ATTEMPTS=3이면 운영과 같은 재작성 2회   // 서비스용 클라이언트는 8초 타임아웃(전체검토 A-2)이라 말뭉치 생성에는 넉넉한 것을 따로 씀
       usage.input += r.usage.input; usage.output += r.usage.output; usage.cacheRead += r.usage.cacheRead; usage.cacheWrite += r.usage.cacheWrite; if (r.source === "template") templates++;
       const t = r.text;
       corpus.push({ id: `${name}_${date}`, 칸: { headline: t.headline, body: t.body, do: t.do, dont: t.dont, ...(t.areas?.length ? { areas: t.areas.map((a) => a.line).join(" ") } : {}) },
-        meta: { source: r.source, attempts: r.attempts, patches: r.patches, band, angle: buildBrief(input).angle, stage: r.stage ?? null, blocks: r.lastModelText?.blocks?.map((x) => x.kind).join("→") ?? null, core: r.core ?? null, review: r.review ?? null, issues: r.issues, ...(r.source === "template" && r.lastModelText ? { lastModelText: r.lastModelText } : {}) } });   // v4.14: 템플릿으로 떨어진 편은 마지막 탈락 초고를 남겨 검사기를 고친 뒤 오프라인 재검사할 수 있게
-      rows.push({ fortune_date: date, content: { headline: t.headline, body: t.body, ...(r.stage ? { stage: r.stage } : {}) } });
+        meta: { source: r.source, attempts: r.attempts, patches: r.patches, band, angle: buildBrief(input).angle, stage: r.stage ?? null, structure: r.judge?.구조 ?? null, judge: r.judge ?? null, tags: r.tags ?? null, core: r.core ?? null, review: r.review ?? null, issues: r.issues, ...(r.source === "template" && r.lastModelText ? { lastModelText: r.lastModelText } : {}) } });   // v4.14: 템플릿으로 떨어진 편은 마지막 탈락 초고를 남겨 검사기를 고친 뒤 오프라인 재검사할 수 있게
+      rows.push({ fortune_date: date, content: { headline: t.headline, body: t.body, ...(r.stage ? { stage: r.stage } : {}), ...(r.tags ? { tags: r.tags } : {}) } });
       console.log(`${name} ${date} ${band} ${r.source} attempts=${r.attempts}${r.patches ? ` patches=${r.patches}` : ""}${r.review ? ` review=${r.review.status}` : ""} :: ${t.headline}${r.source === "template" ? ` [사유: ${r.issues.map((x) => x.join(" / ")).join(" | ")}]` : ""}`);
     }
   }

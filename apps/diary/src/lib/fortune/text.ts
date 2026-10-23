@@ -4,6 +4,7 @@
 //   이달 한 줄·오늘 기운 이름·맞는지 한 문장을 넣으며, 같은 영역 줄이 두 번 나오면 둘째 변형을 쓴다. 기운 이름 재료(namesFromCore)는 brief도 같이 쓴다.
 import { BRANCH_META, ELEMENT_EN_TO_KO, STEM_META, type TenGod } from "@saju/engine";
 import { GROUP_POWER, TEN_GOD_THEME, VERDICT_WORD } from "./base";
+import { pickExpression, TEN_GOD_EXPRESSIONS } from "./expressions";
 import type { AreaName, AreaPeriod, AreaSignal, BaseFortune, CoreFortune, PersonalAdjustment, RoleLabel } from "./types";
 
 /** 사용자 문장에 쓰면 안 되는 말. 테스트가 전 조합을 검사한다. v4.4: "특별한·남다른·다른 날과 달리·차별"(날마다 다르다고 우기는 말) 추가.
@@ -184,12 +185,14 @@ export type TemplateInput = Pick<BaseFortune, "tenGod" | "relation" | "yongsin">
   fitNote?: string;
   /** v4.13: 오늘의 라벨(합계 방향 쪽). 구·기면 headline·lead·do·dont를 뒤집는다. 없으면 yongsin(v3)으로 짐작 */
   role?: Exclude<RoleLabel, "한">;
-  /** v4.13: 이달 한 줄·오늘 기운 이름·내게 필요한 기운. v3 경로엔 없다 */
+  /** v4.13: 이달 한 줄·오늘 기운 이름·내게 필요한 기운. v4.16: 템플릿 본문엔 안 쓰고 brief만 쓴다 */
   names?: FortuneNames;
+  /** v4.16: 생활 표현 후보를 날짜로 고르는 수 (daySeed). 없으면 0 */
+  seed?: number;
 };
 
 /** v4.13: 오늘 기운 이름 한 문장 — 이름 한 번 + 뜻(괄호) */
-function nameLine(names: FortuneNames): string {
+export function nameLine(names: FortuneNames): string {
   const [a, b] = names.tenGodList;
   return a === b ? `오늘은 ${a}(${TEN_GOD_THEME[a]})이 아주 센 날이에요.` : `오늘은 ${a}(${TEN_GOD_THEME[a]})과 ${b}(${TEN_GOD_THEME[b]})이 함께 오는 날이에요.`;
 }
@@ -203,10 +206,12 @@ export function templateText(
   const reversed = role === "구" || role === "기";
   const t = (reversed ? BY_TEN_GOD_REVERSED : BY_TEN_GOD)[base.tenGod];
   const lines: string[] = [];
-  // v4.15: 이달 한 줄은 본문에 넣지 않는다 — 영역의 이달 줄이 매일 보인다(visible.ts)
-  if (base.names) lines.push(nameLine(base.names));
+  // v4.16: 템플릿도 사주 용어를 말하지 않는다 — 이름 문장 대신 생활 표현 후보(expressions.ts)에서 날짜로 하나
+  const pool = TEN_GOD_EXPRESSIONS[base.tenGod];
+  const seed = base.seed ?? 0;
+  lines.push(pickExpression(reversed ? [...pool.과할때, ...pool.경향] : role === "용" || role === "희" ? [...pool.활용, ...pool.경향] : pool.경향, seed) + ".");
   lines.push(t.lead);
-  if (role) lines.push(fitLine(role, base.names?.need ?? null));
+  // v4.16: 맞는지 판정 문장(fitLine)·이름 문장(nameLine)은 본문에 넣지 않는다 (이론은 내부 판단). 관계 줄은 결과만 말하는 문장이라 남긴다
   if (base.relation) lines.push(RELATION_LINE[base.relation]);
   const mine = personalLine(personal, today.ko, today.stemKo, today.branchKo);
   if (mine) lines.push(mine);

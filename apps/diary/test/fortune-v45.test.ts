@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildBrief, ABSTRACT_LABELS, STAGES } from "@/lib/fortune/brief";
+import { buildBrief, ABSTRACT_LABELS } from "@/lib/fortune/brief";
 import { computeCoreFortune, toScore01 } from "@/lib/fortune/core";
 import { SYSTEM, SYSTEM_EXAMPLES } from "@/lib/fortune/llm";
 import { adjustWithEntries, bandOf, toTenPoint } from "@/lib/fortune/personal";
@@ -48,15 +48,12 @@ describe("v4.5 SYSTEM 예시", () => {
   it("예시 세 편(좋음·무난·주의)이 들어 있고 모두 검사기를 통과한다", () => {
     expect(SYSTEM_EXAMPLES.map((e) => e.band)).toEqual(["좋음", "무난", "주의"]);
     for (const e of SYSTEM_EXAMPLES) {
-      // v4.13: 예시는 각자 가정한 오늘 기운 이름(e.tenGods)으로 검사한다 — 이름·뜻·판정·이달 한 줄·추상어·생극 검사까지 통과
+      // v4.16: 예시는 사주 용어·판정 문장 없이 검사기를 통과한다 (areas·최근은 비움)
       const b0 = briefFor("2026-10-10", e.band);
-      // v4.15: 예시의 사례 무대(e.stage)도 brief에 넣는다 — 무대 낱말 검사까지 통과
-      const b = { ...b0, areas: [], today: { ...b0.today, tenGods: e.tenGods }, stage: STAGES.find((s) => s.name === e.stage)! };
+      const b = { ...b0, areas: [], recent: [], avoid: { tags: [], headlines: [], scenes: [] } };
       expect(validateFortuneText(e.text, b).filter((i) => !i.startsWith("예시")), e.band).toEqual([]);
-      expect(e.text.body, e.band).not.toMatch(/이달/);   // v4.15: 이달은 areas의 이달 줄로
-      expect(e.text.blocks.map((x) => x.kind).filter((k) => k !== "원리" && k !== "성향").sort(), e.band).toEqual(["근거", "사례", "처방"]);
-      expect(e.text.body, e.band).toMatch(/맞는 날|맞는 편|안 맞는 날|보통 날/);
-      expect(e.text.body, e.band).not.toMatch(/모자랐던 부분|넘치는 힘|부족한 쪽/);
+      expect(e.text.body, e.band).not.toMatch(/비견|겁재|식신|상관|편재|정재|편관|정관|편인|정인|맞는 편|모자란|넉넉한/);
+      expect(["A", "B", "C", "D", "E"], e.band).toContain(e.text.판단.구조);
       expect(validateFortuneText(e.text, b).some((i) => i.startsWith("예시 headline")), "예시를 그대로 쓰면 걸린다").toBe(true);
     }
     expect(SYSTEM).toContain("직장 장면");
@@ -116,24 +113,15 @@ describe("v4.6 오늘의 짜임", () => {
     // v4.8: 판정이 보통이면 담백형
     expect(angleOf({ relations: { hits: [], flags: [] }, areas: [{ period: "오늘", area: "재물", signal: "↑", why: "" }], facts: [], dayLuck: { total: "보통" } } as never).angle).toBe("calm");
   });
-  it("brief에 angle·focusArea·chain이 들어간다", () => {
+  it("brief에 angle·focusArea가 들어간다", () => {
     const b = briefFor("2026-10-13");
     expect(["change", "focus", "calm"]).toContain(b.angle);
-    expect(b.chain.length).toBeGreaterThan(0);
   });
 });
 
 describe("v4.8 반복 줄이기", () => {
-  it("표현 돌리기: 같은 뜻을 날짜마다 다른 말로", async () => {
-    const { varyFact } = await import("@/lib/fortune/brief");
-    const f = "'기회와 확장' 쪽은 내게 부족한 실속을 챙기는 힘을 옆에서 거들어 줘요.";
-    const outs = new Set([0, 1, 2].map((k) => varyFact(f, k)));
-    expect(outs.size).toBe(3);
-    expect([...outs].every((o) => o.startsWith("'기회와 확장' 쪽은"))).toBe(true);
-  });
-  it("진입 방식·말투·기억이 brief에 들어간다", () => {
+  it("말투·기억이 brief에 들어간다 (v4.16: 표현 돌리기·진입 방식은 생활 표현 후보 풀로 대체)", () => {
     const b = briefFor("2026-10-13");
-    expect(["scene", "reason", "contrast"]).toContain(b.opening);
     expect(b.tone.length).toBeGreaterThan(0);
     expect(b.recent).toEqual([]);
   });
@@ -162,11 +150,11 @@ describe("v4.9 칸마다 같은 말 반복", () => {
     const base = SYSTEM_EXAMPLES[1]!.text;
     const b = { ...briefFor("2026-10-10", "무난"), areas: [] };
     expect(validateFortuneText(base, b).some((i) => i.includes("되풀이"))).toBe(false);
-    const t = { ...base, do: "미뤄 둔 답장 하나를 보내고 할 일을 또렷하게 줄 세워요." };
+    const t = { ...base, do: "혼자 정답을 찾으려고 너무 오래 붙잡지 않아요." };   // v4.16 예시 2의 본문 문장을 되풀이
     expect(validateFortuneText(t, b).some((i) => i.includes("do가 본문 문장을 되풀이"))).toBe(true);
   });
   it("SYSTEM이 칸 역할과 '아니에요' 기억을 말한다", () => {
-    expect(SYSTEM).toContain("칸마다 맡은 일이 다릅니다");
+    expect(SYSTEM).toContain("본문의 조언을 그대로 되풀이하지 않고");   // v4.16
     expect(SYSTEM).toContain("vote: -1");
   });
 });

@@ -150,8 +150,12 @@ export interface FortuneContent {
   retryAfter?: string;
   /** 같은 날 프로필을 고쳐 다시 만든 횟수. 상한(REGEN_LIMIT)을 넘으면 모델 없이 템플릿만 (B-H1 비용 상한) */
   regen?: number;
-  /** v4.15: 사례 블록의 무대 이름(집·길·사람·몸·돈·쉼·말·물건). 다음 7일은 이 무대를 피한다. 템플릿·옛 캐시엔 없다 */
+  /** v4.15: 사례 블록의 무대 이름(집·길·사람·몸·돈·쉼·말·물건). v4.16부터는 쓰지 않는다(옛 캐시 호환) */
   stage?: string;
+  /** v4.16: 의미 태그(주제·감정·상황·영역·장면·권장·피할·제목뜻). 다음 7일(제목뜻 14일)은 이와 뜻이 같은 글을 피한다. 템플릿·옛 캐시엔 없다 */
+  tags?: { 주제: string; 감정: string; 상황: string; 영역: string; 장면: string; 권장: string; 피할: string; 제목뜻: string };
+  /** v4.16: 모델이 글보다 먼저 정한 판단(후보·핵심·이유·구조·둘째 기운·운 맥락). 검수·기록용 */
+  judge?: { 후보: string[]; 핵심: string; 이유: string; 구조: string; 둘째기운: string; 운맥락: string };
   /** v3 재료. v4 캐시에는 없다 */
   base?: Omit<BaseFortune, "score"> & { score: number };
   /** v4 재료 */

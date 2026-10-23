@@ -42,9 +42,9 @@ const fakeClient = (answers: (ModelText | string)[]) => {
 
 describe("v4.10 뼈대 한 줄", () => {
   test("스키마의 첫 칸이 핵심이고 필수. 프롬프트에 [뼈대] 블록", () => {
-    expect(Object.keys(OUTPUT_SCHEMA.properties)[0]).toBe("핵심");
-    expect(OUTPUT_SCHEMA.required[0]).toBe("핵심");
-    expect(SYSTEM).toContain("[뼈대 — 글을 쓰기 전에 먼저 정합니다]");
+    expect(Object.keys(OUTPUT_SCHEMA.properties)[0]).toBe("판단");   // v4.16: 뼈대 한 줄은 판단.핵심으로
+    expect(OUTPUT_SCHEMA.required[0]).toBe("판단");
+    expect(SYSTEM).toContain("[쓰는 순서 — JSON 칸 순서대로, 글보다 먼저 정합니다]");
     expect(SYSTEM).toContain("아무 날에나 맞는 말은 쓰지 않습니다");
   });
   test("핵심은 화면 글(text)에 들어가지 않고 result.core로만 남는다", async () => {

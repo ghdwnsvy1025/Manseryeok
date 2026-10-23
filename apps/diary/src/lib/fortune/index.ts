@@ -3,7 +3,7 @@
 // 2) 없으면 코어 판정(v4: core.ts) → 10점 환산 → 내 기록 보정 → 글(3단계 llm.ts: 모델 → 검사 → 재작성 1회 → 템플릿) → 캐시에 쓴다.
 // v3의 computeBaseFortune(base.ts)은 더 쓰지 않는다 (백테스트·테스트가 참조하므로 파일은 둔다).
 import { visibleAreas } from "./visible";
-import { recentFromRows, type RecentFortune } from "./brief";
+import { recentFromRows, type RecentFortune, daySeed } from "./brief";
 import "server-only";
 import { createHash } from "node:crypto";
 import { ENGINE_VERSION } from "@saju/engine";
@@ -21,7 +21,7 @@ import { dailyCap, regenPolicy, retryAfterFor, usableCachedContent } from "./pol
 export { REGEN_LIMIT, TRANSIENT_RETRY_MS, dailyCap, regenCountOf, regenPolicy, retryAfterFor, usableCachedContent } from "./policy";
 
 /** 캐시 지문에 들어간다. 올리면 기존 캐시가 전부 무효 */
-export const FORTUNE_VERSION = "v4.15";
+export const FORTUNE_VERSION = "v4.16";
 
 export type FortuneOwner = { userId: string; guestKey?: undefined } | { guestKey: string; userId?: undefined };
 
@@ -111,11 +111,11 @@ async function getTodayFortuneUncached(req: FortuneRequest): Promise<FortuneCont
       .from("night_fortunes")
       .select("fortune_date, content")
       .eq(col, val)
-      .gte("fortune_date", addDays(req.date, -7))
+      .gte("fortune_date", addDays(req.date, -14))
       .lt("fortune_date", req.date)
       .order("fortune_date", { ascending: false })
-      .limit(7);
-    recent = recentFromRows((data ?? []) as { fortune_date: string; content: { headline?: string; body?: string; stage?: string } | null }[]);
+      .limit(14);   // v4.16: 태그 7일·제목 14일
+    recent = recentFromRows((data ?? []) as { fortune_date: string; content: { headline?: string; body?: string; stage?: string; tags?: FortuneContent["tags"] } | null }[]);
     // v4.9: 그날 누른 "맞아요/아니에요"를 붙인다 (로그인 사용자만)
     if (recent.length && req.owner.userId) {
       const { data: votes } = await sb
@@ -185,7 +185,7 @@ export async function computeFortune(req: Omit<FortuneRequest, "owner"> & { rece
   const todayInfo = { ko: today.ko, hanja: today.hanja, stemKo: today.stemKo, branchKo: today.branchKo };
   const weekday = WEEKDAYS[new Date(Date.UTC(p.year, p.month - 1, p.day)).getUTCDay()]!;
 
-  const tmplInput = templateInputFromCore(core);
+  const tmplInput = { ...templateInputFromCore(core), seed: daySeed(req.date) };
   const fallback = templateText(tmplInput, personal, todayInfo);
   const band = bandOf(score10);
   let text = fallback;
@@ -195,6 +195,8 @@ export async function computeFortune(req: Omit<FortuneRequest, "owner"> & { rece
   let usage: FortuneContent["usage"];
   let transient: FortuneContent["transient"];
   let stage: string | undefined;
+  let tags: FortuneContent["tags"];
+  let judge: FortuneContent["judge"];
   const useModel = opts.useModel ?? Boolean(process.env.ANTHROPIC_API_KEY);
   if (useModel) {
     try {
@@ -206,6 +208,8 @@ export async function computeFortune(req: Omit<FortuneRequest, "owner"> & { rece
       if (r.attempts > 0) usage = r.usage;
       transient = r.transient;
       stage = r.stage;
+      tags = r.tags;
+      judge = r.judge;
     } catch (e) {
       console.warn("운세 글 생성 실패, 템플릿 사용:", e instanceof Error ? e.message : e);
       transient = "api";
@@ -223,13 +227,15 @@ export async function computeFortune(req: Omit<FortuneRequest, "owner"> & { rece
     body: text.body,
     do: text.do,
     dont: text.dont,
-    ...(text.areas ? { areas: visibleAreas(text.areas, core.facts) } : {}),
+    ...(text.areas ? { areas: visibleAreas(text.areas, core.facts, { all: source === "llm" }) } : {}),
     source,
     attempts,
     ...(model ? { model } : {}),
     ...(usage ? { usage } : {}),
     ...(transient ? { transient } : {}),
     ...(stage ? { stage } : {}),
+    ...(tags ? { tags } : {}),
+    ...(judge ? { judge } : {}),
     core,
     personal,
     fitPercent: fitPercent(req.entries.length),
