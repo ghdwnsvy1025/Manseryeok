@@ -499,7 +499,7 @@ describe("템플릿 문장", () => {
     const t = templateText(ti, NONE, { ko: "갑자", stemKo: "갑", branchKo: "자" });
     expect(t.headline).toBe("혼자 생각이 길어지기 쉬운 날이에요");
     expect(t.do).toBe("혼자 끙끙대기보다 한마디 묻고 넘어가요.");
-    expect(t.body).toContain("이달 무술월은 수월한 편이에요.");
+    expect(t.body).not.toContain("이달 무술월");   // v4.15: 이달 한 줄은 영역의 이달 줄로
     expect(t.body).toContain("오늘은 편인(혼자 생각)과 정관(약속과 역할)이 함께 오는 날이에요.");
     expect(t.body).toContain("지금 나와 맞지 않는 쪽이라 오래 붙들면 지쳐요.");
     expect(t.body).not.toContain("이미 많은 쪽"); // 옛 text.ts:149-150은 '구'를 '기신' 줄("이미 많은 쪽이 더해지는")로 보냈다
@@ -561,9 +561,9 @@ describe("3단계 brief", () => {
     expect(b.today).toMatchObject({ tenGods: "편재", elements: "경=금, 신=금", fit: "맞는 편" });
     expect(b.me.need).toBe("금(재성) · 실속을 챙기는 힘");
     expect(b.month).toEqual({ ganji: "갑오월", elements: "갑=목, 오=화", verdict: "힘이 드는 편", line: "이달 갑오월은 힘이 드는 편이에요." });
-    expect(b.rules.body).toContain("이달 한 줄");
+    expect(b.rules.body).toContain("blocks 네 개");   // v4.15
     expect(b.rules.terms).toContain("편재");
-    expect(b.rules.context).toContain("매일");
+    expect(b.rules.context).toContain("areas의 이달 줄");   // v4.15
     // brief 재료 자체가 추상어·생극 금칙을 쓰지 않는다
     const all = [...b.facts, ...b.areas.map((a) => a.why), ...b.caveats].join(" ");
     expect(all).not.toMatch(ABSTRACT_RE);
@@ -690,8 +690,8 @@ describe("3단계 검사 (validate)", () => {
     expect(validateFortuneText({ ...OK, dont: "문제가 발생해도 버튼을 눌러요." }, brief)).toEqual([]);
     // 이름을 빼면 "이름 없음"과, 홀로 남은 성격 이름("기회와 확장")의 추상 검사가 같이 걸린다
     expect(validateFortuneText({ ...OK, body: OK.body.replace("편재가", "그 성격이") }, brief)).toEqual(['오늘 기운 이름(편재)이 본문에 없음 (이름 한 번 + 뜻 한 줄 + 맞는지 한 문장)', expect.stringContaining('추상 이름 "기회와 확장"')]);
-    expect(validateFortuneText({ ...OK, body: OK.body.replace("편재가", "편재가 편재답게 편재로") }, brief)).toEqual(['이름 "편재"이 3번 (용어는 한 번, 바로 뒤에 뜻 한 줄)']);
-    expect(validateFortuneText({ ...OK, body: OK.body.replace("이달 갑오월은 내게 조심할 편이지만, ", "") }, brief)).toEqual([expect.stringContaining("이달 한 줄 없음")]);
+    expect(validateFortuneText({ ...OK, body: OK.body.replace("편재가", "편재가 편재답게 편재로 편재처럼") }, brief)).toEqual(['이름 "편재"이 4번 (용어는 한 번, 바로 뒤에 뜻 한 줄)']);   // v4.15: TERM_MAX 3
+    expect(validateFortuneText({ ...OK, body: OK.body.replace("이달 갑오월은 내게 조심할 편이지만, ", "") }, brief)).toEqual([]);   // v4.15: 이달 한 줄은 더 이상 필수가 아니다
     // 성격 이름("기회와 확장")은 기운 이름 바로 뒤의 뜻으로는 쓸 수 있고(OK가 그렇다), 이름 없는 문장에 홀로 오면 추상
     expect(validateFortuneText({ ...OK, body: OK.body + " 기회와 확장이 눈에 들어와요." }, brief)).toEqual([expect.stringContaining('추상 이름 "기회와 확장"')]);
     // 10-b: 주의인 날이어도 이달 한 줄의 "수월한 편"은 반전 말로 보지 않는다. 오늘 문장의 "수월"은 그대로 걸린다

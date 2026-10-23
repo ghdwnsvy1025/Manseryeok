@@ -21,7 +21,7 @@ import { dailyCap, regenPolicy, retryAfterFor, usableCachedContent } from "./pol
 export { REGEN_LIMIT, TRANSIENT_RETRY_MS, dailyCap, regenCountOf, regenPolicy, retryAfterFor, usableCachedContent } from "./policy";
 
 /** 캐시 지문에 들어간다. 올리면 기존 캐시가 전부 무효 */
-export const FORTUNE_VERSION = "v4.12";
+export const FORTUNE_VERSION = "v4.15";
 
 export type FortuneOwner = { userId: string; guestKey?: undefined } | { guestKey: string; userId?: undefined };
 
@@ -103,18 +103,19 @@ async function getTodayFortuneUncached(req: FortuneRequest): Promise<FortuneCont
   }
   const regenerating = Boolean(cached && cached.profile_fingerprint !== fp);
 
-  // v4.8 기억(2층): 최근 3일 이 사람의 운세 헤드라인·첫 두 문장. 모델이 같은 말을 되풀이하지 않게 (없거나 실패하면 빈 배열)
+  // v4.8 기억(2층): 최근 운세 헤드라인·첫 두 문장. 모델이 같은 말을 되풀이하지 않게 (없거나 실패하면 빈 배열).
+  // v4.15: 7일을 읽는다 — 글 겹침 검사·프롬프트에는 brief가 최근 3일만 쓰고, 사례 무대(stage)는 7일치를 피한다
   let recent: RecentFortune[] = [];
   try {
     const { data } = await sb
       .from("night_fortunes")
       .select("fortune_date, content")
       .eq(col, val)
-      .gte("fortune_date", addDays(req.date, -3))
+      .gte("fortune_date", addDays(req.date, -7))
       .lt("fortune_date", req.date)
       .order("fortune_date", { ascending: false })
-      .limit(3);
-    recent = recentFromRows((data ?? []) as { fortune_date: string; content: { headline?: string; body?: string } | null }[]);
+      .limit(7);
+    recent = recentFromRows((data ?? []) as { fortune_date: string; content: { headline?: string; body?: string; stage?: string } | null }[]);
     // v4.9: 그날 누른 "맞아요/아니에요"를 붙인다 (로그인 사용자만)
     if (recent.length && req.owner.userId) {
       const { data: votes } = await sb
@@ -193,6 +194,7 @@ export async function computeFortune(req: Omit<FortuneRequest, "owner"> & { rece
   let model: string | undefined;
   let usage: FortuneContent["usage"];
   let transient: FortuneContent["transient"];
+  let stage: string | undefined;
   const useModel = opts.useModel ?? Boolean(process.env.ANTHROPIC_API_KEY);
   if (useModel) {
     try {
@@ -203,6 +205,7 @@ export async function computeFortune(req: Omit<FortuneRequest, "owner"> & { rece
       if (r.model) model = r.model;
       if (r.attempts > 0) usage = r.usage;
       transient = r.transient;
+      stage = r.stage;
     } catch (e) {
       console.warn("운세 글 생성 실패, 템플릿 사용:", e instanceof Error ? e.message : e);
       transient = "api";
@@ -226,6 +229,7 @@ export async function computeFortune(req: Omit<FortuneRequest, "owner"> & { rece
     ...(model ? { model } : {}),
     ...(usage ? { usage } : {}),
     ...(transient ? { transient } : {}),
+    ...(stage ? { stage } : {}),
     core,
     personal,
     fitPercent: fitPercent(req.entries.length),

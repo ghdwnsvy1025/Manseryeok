@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildBrief, ABSTRACT_LABELS } from "@/lib/fortune/brief";
+import { buildBrief, ABSTRACT_LABELS, STAGES } from "@/lib/fortune/brief";
 import { computeCoreFortune, toScore01 } from "@/lib/fortune/core";
 import { SYSTEM, SYSTEM_EXAMPLES } from "@/lib/fortune/llm";
 import { adjustWithEntries, bandOf, toTenPoint } from "@/lib/fortune/personal";
@@ -50,9 +50,11 @@ describe("v4.5 SYSTEM 예시", () => {
     for (const e of SYSTEM_EXAMPLES) {
       // v4.13: 예시는 각자 가정한 오늘 기운 이름(e.tenGods)으로 검사한다 — 이름·뜻·판정·이달 한 줄·추상어·생극 검사까지 통과
       const b0 = briefFor("2026-10-10", e.band);
-      const b = { ...b0, areas: [], today: { ...b0.today, tenGods: e.tenGods } };
+      // v4.15: 예시의 사례 무대(e.stage)도 brief에 넣는다 — 무대 낱말 검사까지 통과
+      const b = { ...b0, areas: [], today: { ...b0.today, tenGods: e.tenGods }, stage: STAGES.find((s) => s.name === e.stage)! };
       expect(validateFortuneText(e.text, b).filter((i) => !i.startsWith("예시")), e.band).toEqual([]);
-      expect(e.text.body, e.band).toMatch(/^이달 /);
+      expect(e.text.body, e.band).not.toMatch(/이달/);   // v4.15: 이달은 areas의 이달 줄로
+      expect(e.text.blocks.map((x) => x.kind).filter((k) => k !== "원리" && k !== "성향").sort(), e.band).toEqual(["근거", "사례", "처방"]);
       expect(e.text.body, e.band).toMatch(/맞는 날|맞는 편|안 맞는 날|보통 날/);
       expect(e.text.body, e.band).not.toMatch(/모자랐던 부분|넘치는 힘|부족한 쪽/);
       expect(validateFortuneText(e.text, b).some((i) => i.startsWith("예시 headline")), "예시를 그대로 쓰면 걸린다").toBe(true);
@@ -95,9 +97,9 @@ describe("v4.5 검사 항목", () => {
 describe("v4.5 이달·올해 줄은 그 운 문장이 있는 날만", () => {
   it("visibleAreas", () => {
     const areas = [{ period: "오늘" as const }, { period: "이달" as const }, { period: "올해" as const }];
-    expect(visibleAreas(areas, []).map((a) => a.period)).toEqual(["오늘"]);
+    expect(visibleAreas(areas, []).map((a) => a.period)).toEqual(["오늘", "이달"]);   // v4.15: 이달 줄은 매일
     expect(visibleAreas(areas, ["이달 운 戊戌은 힘이 드는 편이에요."]).map((a) => a.period)).toEqual(["오늘", "이달"]);
-    expect(visibleAreas(areas, ["올해 운 丙午은 보통이에요."]).map((a) => a.period)).toEqual(["오늘", "올해"]);
+    expect(visibleAreas(areas, ["올해 운 丙午은 보통이에요."]).map((a) => a.period)).toEqual(["오늘", "이달", "올해"]);
   });
 });
 

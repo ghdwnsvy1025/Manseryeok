@@ -33,7 +33,11 @@ const PROFILES: { name: string; p: BirthProfile }[] = [
   { name: "A-1990-01-01", p: { gender: "male", calendar: "solar", isLeapMonth: false, birthYear: 1990, birthMonth: 1, birthDay: 1, birthHour: 12, birthMinute: 0, city: "seoul" } },
   { name: "B-1995-05-15", p: { gender: "female", calendar: "solar", isLeapMonth: false, birthYear: 1995, birthMonth: 5, birthDay: 15, birthHour: 9, birthMinute: 0, city: "seoul" } },
   { name: "C-1984-11-03", p: { gender: "female", calendar: "solar", isLeapMonth: false, birthYear: 1984, birthMonth: 11, birthDay: 3, birthHour: 7, birthMinute: 30, city: "busan" } },
+  // v4.15 (2026-10-23): 사용자가 고른 30일 모의 생성 사주
+  { name: "D-1994-01-28", p: { gender: "female", calendar: "solar", isLeapMonth: false, birthYear: 1994, birthMonth: 1, birthDay: 28, birthHour: 12, birthMinute: 0, city: "seoul" } },
 ];
+/** 환경변수 CORPUS_PROFILES="D" 또는 "A,B"로 사주를 고른다(이름의 첫 글자). 비우면 A·B·C */
+const pickProfiles = (): typeof PROFILES => { const want = (process.env.CORPUS_PROFILES ?? "A,B,C").split(",").map((x) => x.trim()); return PROFILES.filter((x) => want.includes(x.name[0]!)); };
 const addDays = (d: string, n: number) => { const [y, m, dd] = d.split("-").map(Number) as [number, number, number]; const t = new Date(Date.UTC(y, m - 1, dd + n)); return t.toISOString().slice(0, 10); };
 
 test("fortune corpus: 사주 3 × 날짜 N", async () => {
@@ -44,9 +48,9 @@ test("fortune corpus: 사주 3 × 날짜 N", async () => {
   const out = process.env.CORPUS_OUT ?? path.join(ROOT, "..", "..", "..", "..", "문서", `운세말뭉치_${START}.json`);   // apps/diary → Manseryeok → 사주 일기 → 사주 앱/문서
   const corpus: { id: string; 칸: Record<string, string>; meta: Record<string, unknown> }[] = [];
   let usage = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, templates = 0;
-  for (const { name, p } of PROFILES) {
+  for (const { name, p } of pickProfiles()) {
     const prof = computeProfile({ ...p, name: "x" }); if (!prof.ok) throw new Error(prof.error);
-    const rows: { fortune_date: string; content: { headline?: string; body?: string } | null }[] = [];
+    const rows: { fortune_date: string; content: { headline?: string; body?: string; stage?: string } | null }[] = [];
     for (let k = 0; k < DAYS; k++) {
       const date = addDays(START, k); const [y, m, d] = date.split("-").map(Number) as [number, number, number];
       const weekday = WEEKDAYS[new Date(Date.UTC(y, m - 1, d)).getUTCDay()]!;
@@ -54,18 +58,18 @@ test("fortune corpus: 사주 3 × 날짜 N", async () => {
       const core = computeCoreFortune({ pillars: prof.value.pillars, profile: p, date, todayHanja: today.hanja });
       const personal = adjustWithEntries(core.parts.score01, [], { index: today.index, stemKo: today.stemKo, branchKo: today.branchKo });
       const score10 = toTenPoint(personal.score), band = bandOf(score10);
-      const recent = recentFromRows(rows.slice(-3));
+      const recent = recentFromRows(rows.slice(-7));   // v4.15: 무대는 7일을 피하고 글 겹침은 brief가 3일만 쓴다
       const input = { core, personal, today: todayInfo, date, weekday, score10, band, recent };
       const fallback = templateText(templateInputFromCore(core), personal, todayInfo);
       const r = await generateFortuneText(input, fallback, { maxAttempts: 2, client });   // 서비스용 클라이언트는 8초 타임아웃(전체검토 A-2)이라 말뭉치 생성에는 넉넉한 것을 따로 씀
       usage.input += r.usage.input; usage.output += r.usage.output; usage.cacheRead += r.usage.cacheRead; usage.cacheWrite += r.usage.cacheWrite; if (r.source === "template") templates++;
       const t = r.text;
       corpus.push({ id: `${name}_${date}`, 칸: { headline: t.headline, body: t.body, do: t.do, dont: t.dont, ...(t.areas?.length ? { areas: t.areas.map((a) => a.line).join(" ") } : {}) },
-        meta: { source: r.source, attempts: r.attempts, patches: r.patches, band, angle: buildBrief(input).angle, core: r.core ?? null, review: r.review ?? null, issues: r.issues, ...(r.source === "template" && r.lastModelText ? { lastModelText: r.lastModelText } : {}) } });   // v4.14: 템플릿으로 떨어진 편은 마지막 탈락 초고를 남겨 검사기를 고친 뒤 오프라인 재검사할 수 있게
-      rows.push({ fortune_date: date, content: { headline: t.headline, body: t.body } });
+        meta: { source: r.source, attempts: r.attempts, patches: r.patches, band, angle: buildBrief(input).angle, stage: r.stage ?? null, blocks: r.lastModelText?.blocks?.map((x) => x.kind).join("→") ?? null, core: r.core ?? null, review: r.review ?? null, issues: r.issues, ...(r.source === "template" && r.lastModelText ? { lastModelText: r.lastModelText } : {}) } });   // v4.14: 템플릿으로 떨어진 편은 마지막 탈락 초고를 남겨 검사기를 고친 뒤 오프라인 재검사할 수 있게
+      rows.push({ fortune_date: date, content: { headline: t.headline, body: t.body, ...(r.stage ? { stage: r.stage } : {}) } });
       console.log(`${name} ${date} ${band} ${r.source} attempts=${r.attempts}${r.patches ? ` patches=${r.patches}` : ""}${r.review ? ` review=${r.review.status}` : ""} :: ${t.headline}${r.source === "template" ? ` [사유: ${r.issues.map((x) => x.join(" / ")).join(" | ")}]` : ""}`);
     }
   }
   writeFileSync(out, JSON.stringify(corpus, null, 1), "utf8");
   console.log(`저장 ${out} · ${corpus.length}편 · 템플릿 ${templates} · 토큰 입력 ${usage.input} 출력 ${usage.output} 캐시읽기 ${usage.cacheRead} 캐시쓰기 ${usage.cacheWrite}`);
-}, 600_000);
+}, 1_800_000);   // v4.15: 30일 × 최대 3회 호출이면 10분을 넘는다

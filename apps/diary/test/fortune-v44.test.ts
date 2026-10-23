@@ -179,7 +179,7 @@ describe("v4.4 brief·SYSTEM·검사 — 요일·절기 재료, 금지어, 맥�
     expect(hasContextFact(termDay.facts)).toBe(true);
     expect(plain.rules.context).toContain("말하지 않기");
     expect(termDay.rules.context).toContain("있는 날");
-    expect(plain.rules.body).toContain("이달 한 줄");
+    expect(plain.rules.body).toContain("blocks 네 개");   // v4.15
     expect(plain.rules.body).not.toMatch(/10년|올해/);
     // 맥락 문장이 없는 날 facts에 "10년"이 없고, 절기 라벨은 숫자를 더하지 않는다 (7·10·2026은 날짜)
     expect(plain.allowedNumbers).toEqual([7, 10, 2026]);
@@ -201,7 +201,7 @@ describe("v4.4 brief·SYSTEM·검사 — 요일·절기 재료, 금지어, 맥�
   test("SYSTEM: 요일·절기 한 번 규칙과 금지어가 있고, '올해·이달·지금 10년 단위의 운과 어떻게 겹치는지' 요구는 없다", () => {
     expect(SYSTEM).toContain("brief.today.solarTerm");
     expect(SYSTEM).toContain("절기 첫날");
-    expect(SYSTEM).toContain("이달 기운·오늘 기운 이름과 판정·장면·내 기록");
+    expect(SYSTEM).toContain("brief.sheet(사실표");   // v4.15
     expect(SYSTEM).toContain("용어는 한 번, 바로 뒤에 뜻 한 줄");
     expect(SYSTEM).toContain("생·극 설명을 하지 않습니다");
     expect(SYSTEM).not.toContain("근거는 화면이 따로 보여 주므로");

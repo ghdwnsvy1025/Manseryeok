@@ -6,7 +6,7 @@
 //           · v4.14 (10-c): 사유가 한 칸(areas[i]·do·dont)에만 있으면 slotIssues()가 그 칸을 돌려주고, llm.ts는 글 전체 대신 그 칸만 다시 쓰게 한다(통과한 본문을 버리지 않는다).
 import type { FortuneBrief } from "./brief";
 import { ABSTRACT_LABELS, hasContextFact, NUMBER_RE, TEN_GOD_NAMES } from "./brief";
-import { FORTUNE_EXAMPLES } from "./examples";
+import { FORTUNE_EXAMPLES, joinBlocks, type FortuneBlock } from "./examples";
 import type { AreaName, AreaPeriod } from "./types";
 
 /** 모델이 돌려주는 JSON */
@@ -14,6 +14,8 @@ export interface ModelText {
   /** v4.10: 뼈대 한 줄 — 모델이 글을 쓰기 전에 먼저 정하는 "오늘 들어오는 성격 → 나와의 관계 → 그래서 생기는 마음·행동". 화면에는 안 나가고 검수와 기록에만 쓴다 */
   핵심?: string;
   headline: string;
+  /** v4.15: 본문 블록 4개(근거·원리/성향·사례·처방). 모델은 이것만 돌려주고 body는 joinBlocks로 만든다. 옛 꼴(블록 없음)도 검사기는 받는다 */
+  blocks?: FortuneBlock[];
   body: string;
   /** v4.2: period는 brief.areas와 같은 순서로 돌려받는다 (빠지면 brief 것으로 본다) */
   areas: { period?: AreaPeriod; area: AreaName; line: string }[];
@@ -28,7 +30,108 @@ export const LIMITS = {
   bodyMax: 480,
   areaLineMax: 70,
   doDontMax: 45,
+  /** v4.15 (코어 블록 규칙 8): 한 문장 20~70자, 80자를 넘기지 않는다. 블록 하나는 1~2문장 */
+  sentenceMin: 20,
+  sentenceMax: 80,
+  blockSentences: 2,
+  /** v4.15: 같은 낱말(어절)은 본문에서 세 번까지 */
+  wordMax: 3,
 } as const;
+
+// ---- v4.15 블록 검사 (사주 코어 블록.ts V71~V77의 하루 운세판) ----
+/** 되받기: 앞 글을 가리키는 말 (V71) */
+export const BACKREF_RE = /앞에서 본|앞서 본|앞서 말한|앞에서 말한|앞 블록|아까 본|아까 말한|앞 이야기에서/;
+/** 결과 약속 (V72): "그러면 ~해져요" 머리, 처방 뒤의 "~면 … 나아져요" 꼬리 */
+export const PROMISE_HEAD_RE = /^(그러면|그럼|그렇게 하면|그리하면|그래야|그래서 결국)\s/;
+export const PROMISE_TAIL_RE = /(면|으면)\s[^.!?]{0,40}(나아져요|편해져요|가벼워져요|또렷해져요|살아나요|풀려요|차올라요|돌아와요|쌓여요|이어져요|열려요|달라져요|바뀌어요|해져요|돼요)[.!?]?$/;
+/** 내부 말투 (V73): 속으로 쓰는 말 */
+export const INTERNAL_WORDS = ["판정", "원국", "으로 나와요", "로 나와요", "사실표", "이 풀이는", "이 글은", "설계도", "근거 목록", "코어", "무대", "블록"] as const;
+/** 비유 낱말 (V74): 사물 그림으로 이유를 대는 말 */
+export const METAPHOR_WORDS = ["손을 움직", "손으로 만든", "내 손에 있", "손수 ", "한낮의 해", "볕", "바위", "등불", "큰 산", "기름진 밭", "큰 강", "이슬", "덩굴", "큰 나무", "물통", "개울", "숲이", "두터운 흙", "열기가", "열기를", "빛을 품", "빛이 속", "불씨", "불꽃", "타오르", "따뜻한 볕", "불이 밖"] as const;
+/** 정의문 (V77): "A와 B를 합쳐 C라 해요" */
+export const DEFINITION_RE = /(와|과)\s?[가-힣]{2,3}(을|를)\s?(합쳐|묶어|아울러)\s?[가-힣]{2,3}(이라|라)\s?(해요|하는데|부르|불러)|합쳐 부르는 말|묶어 부르는 말/;
+/** 넘겨짚기 (코어 규칙 10): 사례에서 독자의 경험을 단정하는 꼴 */
+export const PRESUME_RE = /있을 거예요|있으시죠|있으실 거예요|있잖아요|겪어 보셨/;
+/** 같은 낱말 세기에서 빼는 어간(앞 두 글자): 글마다 늘 나오는 말 */
+const WORD_STOP = new Set(["오늘", "내게", "내가", "나에", "그래", "그런", "그렇", "다만", "조금", "한번", "평소", "이에", "에요", "해요"]);
+/** v4.15: 본문(블록 글)에서 세 번 넘게 나온 낱말. 조사가 붙어 어절이 달라도("마음이·마음을") 앞 두 글자가 같으면 같은 낱말로 센다. extraStop = 오늘 꼭 써야 하는 말(기운 이름·뜻 — 2차 말뭉치에서 "혼자 생각"의 '생각'이 걸렸다) */
+export function overusedWords(text: string, max: number = LIMITS.wordMax, extraStop: Iterable<string> = []): string[] {
+  const stop = new Set([...WORD_STOP, ...extraStop]);
+  const counts = new Map<string, number>();
+  for (const w of text.replace(/[.,!?'"()\n]/g, " ").split(/\s+/)) {
+    if (w.length < 2) continue;
+    const stem = w.slice(0, 2);
+    if (stop.has(stem)) continue;
+    counts.set(stem, (counts.get(stem) ?? 0) + 1);
+  }
+  return [...counts.entries()].filter(([, n]) => n > max).map(([w, n]) => `${w}…×${n}`);
+}
+/**
+ * v4.15 2차: 오늘 꼭 나와야 하는 말(기운 이름·그 뜻·내게 필요한 기운)의 어간. 최근 글과의 겹침은 이 말들을 뺀 나머지로 잰다 —
+ * 같은 십신이 사흘 안에 다시 오면 근거 문장이 정당하게 비슷해지는데, 그것까지 "겹침"으로 떨어뜨려 템플릿이 됐다(2차 말뭉치 템플릿 12편 중 8편)
+ */
+export function mandatedStems(b: Partial<Pick<FortuneBrief, "sheet" | "today" | "me">>): Set<string> {
+  const src = [b.sheet?.today ?? "", b.sheet?.me ?? "", b.today?.tenGods ?? "", b.me?.need ?? ""].join(" ");
+  const out = new Set<string>(["오늘", "오늘은", "내게", "이라", "날이", "편이", "쪽이", "힘을", "힘이", "함께", "와요", "뜻하", "뜻하는"]);
+  for (const w of src.replace(/[=(),·.]/g, " ").split(/\s+/)) if (w.length >= 2) out.add(w.slice(0, 2));
+  return out;
+}
+/** 꼭 써야 하는 말을 뺀 토큰 겹침 비율 (a의 남은 토큰 가운데 b에도 있는 비율). 남은 토큰이 3개 미만이면 0 */
+export function freeOverlap(a: string, b: string, mandated: Set<string>): number {
+  const strip = (s: string) => tokensOf(s).filter((t) => !mandated.has(t.slice(0, 2)));
+  const ta = strip(a), tb = new Set(strip(b));
+  if (ta.length < 3) return 0;
+  return ta.filter((t) => tb.has(t)).length / ta.length;
+}
+
+/**
+ * v4.15 블록 검사. blocks가 없는 옛 꼴은 건너뛴다(테스트의 v4.5~v4.14 글).
+ * 본다: 4개·종류 집합·처방이 첫 블록이 아님·블록당 1~2문장·사례 "예를 들면" + 무대 낱말·결과 약속·되받기·정의문·비유·내부 말투·문장 길이·같은 낱말·이달 언급.
+ */
+export function validateBlocks(blocks: FortuneBlock[] | undefined, b: Pick<FortuneBrief, "stage"> & Partial<Pick<FortuneBrief, "recent" | "sheet" | "today" | "me">>): string[] {
+  const issues: string[] = [];
+  if (!blocks) return issues;
+  const add = (s: string) => issues.push(s);
+  if (!Array.isArray(blocks) || blocks.length !== 4) return [`blocks가 ${Array.isArray(blocks) ? blocks.length : 0}개 (근거 1 · 원리 또는 성향 1 · 사례 1 · 처방 1 = 4개)`];
+  const kinds = blocks.map((x) => x?.kind);
+  const count = (k: string) => kinds.filter((x) => x === k).length;
+  if (count("근거") !== 1 || count("사례") !== 1 || count("처방") !== 1 || count("원리") + count("성향") !== 1) add(`블록 종류가 [${kinds.join("·")}] — 근거 1 · 원리 또는 성향 1 · 사례 1 · 처방 1이어야 함`);
+  if (kinds[0] === "처방") add("처방이 첫 블록 (처방은 근거·원리·사례 뒤에)");
+  blocks.forEach((blk, i) => {
+    const at = `blocks[${i}](${blk?.kind})`;
+    const text = String(blk?.text ?? "").trim();
+    if (!text) { add(`${at} 글이 비어 있음`); return; }
+    const ss = splitSentences(text);
+    if (ss.length > LIMITS.blockSentences) add(`${at} ${ss.length}문장 — 블록 하나는 1~${LIMITS.blockSentences}문장`);
+    for (const s of ss) {
+      if (s.length > LIMITS.sentenceMax) add(`${at} 문장 ${s.length}자 "${s.slice(0, 20)}…" (${LIMITS.sentenceMax}자 안)`);
+      else if (s.length < LIMITS.sentenceMin) add(`${at} 문장 ${s.length}자 "${s}" (${LIMITS.sentenceMin}자 이상 — 뜻과 이유를 한 문장에)`);
+      if (PROMISE_HEAD_RE.test(s)) add(`${at} 결과를 약속하는 문장 "${s.slice(0, 30)}…" ('그러면 ~해져요' 꼴은 쓰지 않음)`);
+      else if (blk.kind === "처방" && PROMISE_TAIL_RE.test(s)) add(`${at} 처방 뒤의 결과 약속 "${s.slice(0, 30)}…" (처방은 '언제 + 무엇' 한 문장까지)`);
+    }
+    const back = text.match(BACKREF_RE); if (back) add(`${at} 되받는 말 "${back[0]}"`);
+    const def = text.match(DEFINITION_RE); if (def) add(`${at} 정의문 "${def[0]}" ('○○은 ~하는 힘이라'처럼 뜻과 이유를 한 문장에)`);
+    const inner = INTERNAL_WORDS.find((w) => text.includes(w)); if (inner) add(`${at} 속으로 쓰는 말 "${inner}"`);
+    const meta = METAPHOR_WORDS.find((w) => text.includes(w)); if (meta) add(`${at} 비유 낱말 "${meta}" (사물 그림으로 이유를 대지 않음)`);
+    if (blk.kind === "사례") {
+      if (!/^예를 들면/.test(text)) add(`${at} "예를 들면"으로 시작하지 않음`);
+      const pres = text.match(PRESUME_RE); if (pres) add(`${at} 넘겨짚는 말 "${pres[0]}"`);
+      if (b.stage && !b.stage.hints.some((h) => text.includes(h))) add(`${at} 무대 "${b.stage.name}" 낱말이 없음 (${b.stage.hints.join("·")} 가운데 하나)`);
+    }
+  });
+  const joined = blocks.map((x) => String(x?.text ?? "")).join(" ");
+  if (/이달|이번 달/.test(joined)) add("본문에 이달 운 (이달은 areas의 이달 줄에서만)");
+  // v4.15: 최근 3일 본문 문장과 겹치는 블록 문장 — 공식 문장이 날마다 박히지 않게 (한 편에 하나만 보고한다). 2차: 오늘 꼭 쓰는 말은 빼고 잰다
+  const mandated = mandatedStems(b);
+  outer: for (const r of b.recent ?? []) {
+    for (const line of r.lines ?? []) for (const s of splitSentences(joined)) {
+      if (freeOverlap(s, line, mandated) >= RECENT_LINE_OVERLAP_MAX) { add(`최근(${r.date}) 문장과 겹침 "${s.slice(0, 24)}…" (같은 뜻을 다른 꼴로 — brief.sheet.say)`); break outer; }
+    }
+  }
+  const over = overusedWords(joined, LIMITS.wordMax, mandated);
+  if (over.length) add(`같은 낱말 되풀이 ${over.join(", ")} (본문에서 ${LIMITS.wordMax}번까지)`);
+  return issues;
+}
 
 const EMOJI_RE = /[\p{Extended_Pictographic}\u{1F000}-\u{1FAFF}]/u;
 const HANJA_RE = /[㐀-鿿]/;
@@ -53,8 +156,10 @@ export const MONTH_MENTION_RE = /(이달|이번 달)\s*(의\s*)?운/;
 export const ABSTRACT_RE = /(아쉽던|아쉬웠던|부족한|부족했던|모자란|모자랐던|넘치는|넘쳤던) (쪽|부분|자리)|넘치는 힘|힘이 (한곳|한 곳)(에|으로|로) 모이|(?<![을를] (?:\S+ )?)(채워|거들어|받쳐) 주는 (쪽|힘)|쪽으로 (작용|쓰이)|박자가 (안 맞|달라)/;
 /** v4.13: 생·극 설명 ("내 기운이 어느 기운을 누른다") — 사용자 결정: 기운 이름을 한 번 대고 맞는지만. "발생해·탄생해"처럼 앞에 글자가 붙은 것은 일상어 */
 export const SHENG_KE_RE = /누르|눌리|눌려|(?<![가-힣])[생극](하|해)|상생|상극/;
-/** v4.13: 같은 기운 이름은 글 전체에서 이만큼까지 (한 번 대고 뜻 한 줄 — 되풀이하면 용어 나열) */
-export const TERM_MAX = 2;
+/** v4.13: 같은 기운 이름은 글 전체에서 이만큼까지 (한 번 대고 뜻 한 줄 — 되풀이하면 용어 나열). v4.15: 근거에서 대고 원리에서 "정관은 ~하는 힘이라"로 받는 꼴이 정당해 2 → 3 */
+export const TERM_MAX = 3;
+/** v4.15: 블록 문장이 최근 3일 본문 문장과 이만큼 겹치면 탈락 — 같은 공식 문장("내게 모자란 토, 그러니까 …")이 날마다 박히던 것 */
+export const RECENT_LINE_OVERLAP_MAX = 0.6;
 /** v4.2: 영역 줄이 본문 첫 문장을 되풀이하면 탈락 — 토큰(띄어쓰기 단위, 문장부호 제거) 겹침 비율 */
 export const AREA_OVERLAP_MAX = 0.6;
 const tokensOf = (s: string): string[] => s.replace(/[.,!?'"()]/g, " ").split(/\s+/).map((t) => t.trim()).filter((t) => t.length >= 2);
@@ -169,9 +274,10 @@ export function validateFortuneText(t: ModelText | null | undefined, b: FortuneB
     for (const n of inBody) if (!todayNames.includes(n)) add(`오늘 기운이 아닌 이름 "${n}" (brief.today.tenGods에 있는 것만)`);
     for (const n of inBody) { const c = plain.split(n).length - 1; if (c > TERM_MAX) add(`이름 "${n}"이 ${c}번 (용어는 한 번, 바로 뒤에 뜻 한 줄)`); }
   }
-  // v4.13: 이달 한 줄은 매일 — month가 있는 날 본문에 "이달"이 없으면 탈락
-  if (b.month && !/이달|이번 달/.test(t.body)) add(`이달 한 줄 없음 (brief.month.line "${b.month.line}"을 본문 첫 문장에)`);
+  // v4.15: 이달 한 줄은 본문에서 빠졌다(areas의 이달 줄이 매일). month가 없는 날 이달 운을 말하면 여전히 탈락
   if (!b.month && MONTH_MENTION_RE.test([t.headline, t.body, t.do, t.dont].join(" "))) add("이달 운 재료(brief.month)가 없는데 이달 운을 말함");
+  // v4.15: 블록 검사 (blocks가 있을 때만)
+  for (const s of validateBlocks(t.blocks, b)) add(s);
 
   // 구조 서술 (headline은 제외: 본문·영역 줄·하면·피해요)
   const prose = [t.body, ...areaLines, t.do, t.dont].join(" ");
@@ -199,7 +305,7 @@ export function validateFortuneText(t: ModelText | null | undefined, b: FortuneB
   if (b.today && b.today.useSolarTerm === false && b.today.solarTermName && everything.includes(b.today.solarTermName)) add(`절기 이름 "${b.today.solarTermName}" (절기 첫날에만)`);
 
   // v4.5: 예시 베낌 — 예시 headline·do·dont와 같거나, 본문 문장이 예시 문장과 80% 이상 겹치면
-  const exSentences = FORTUNE_EXAMPLES.flatMap((e) => splitSentences(e.text.body));
+  const exSentences = FORTUNE_EXAMPLES.flatMap((e) => splitSentences(joinBlocks(e.text.blocks)));
   for (const e of FORTUNE_EXAMPLES) {
     if (t.headline.trim() === e.text.headline) add(`예시 headline을 그대로 씀 "${e.text.headline}"`);
     if (t.do.trim() === e.text.do || t.dont.trim() === e.text.dont) add("예시 do·dont를 그대로 씀");
@@ -210,9 +316,10 @@ export function validateFortuneText(t: ModelText | null | undefined, b: FortuneB
 
   // v4.8 기억: 최근 3일 헤드라인과 같거나 많이 겹치면, 첫 두 문장이 최근 첫 두 문장과 50% 이상 겹치면 탈락
   const startNow = splitSentences(t.body.replace(/\n+/g, " ")).slice(0, 2).join(" ");
+  const mandatedForStart = t.blocks ? mandatedStems(b) : null;   // v4.15 2차: 블록 글은 꼭 쓰는 말(이름·뜻)을 빼고 잰다 — 근거가 첫 블록인 날 이름 문장끼리 "겹침"이 되던 것
   for (const r of b.recent ?? []) {
     if (t.headline.trim() === r.headline.trim() || tokenOverlap(t.headline, r.headline) >= 0.6) add(`최근(${r.date}) 헤드라인과 겹침 "${r.headline}"`);
-    if (tokenOverlap(startNow, r.start) >= 0.5) add(`최근(${r.date}) 운세 첫 문장과 겹침`);
+    if ((mandatedForStart ? freeOverlap(startNow, r.start, mandatedForStart) : tokenOverlap(startNow, r.start)) >= 0.5) add(`최근(${r.date}) 운세 첫 문장과 겹침`);
     // v4.11: 이달·올해 영역 줄은 신호가 한 달·한 해 내내 같아 날마다 같은 문장이 되던 것(되풀이 검토 2026-10-14) — 뜻은 같아도 문장은 바꿔 쓰게
     for (const line of r.areas ?? []) t.areas.forEach((a, i) => {
       if (a?.period && a.period !== "오늘" && (String(a.line).trim() === line.trim() || tokenOverlap(String(a.line), line) >= 0.6)) add(`areas[${i}] ${a.period} 줄이 최근(${r.date}) 줄과 겹침 "${line.slice(0, 18)}…" (같은 뜻을 다른 장면·다른 말로)`);
@@ -233,6 +340,10 @@ export function validateFortuneText(t: ModelText | null | undefined, b: FortuneB
   if (badEnd.length) add(`명령조·반말·"~니다" 어미: "${badEnd[0]}"`);
   const good = sentences.filter((s) => GOOD_ENDING_RE.test(s)).length;
   if (sentences.length && good / sentences.length < 0.8) add(`"~어요" 어미 비율 ${good}/${sentences.length}`);
+  // v4.15: do·dont·영역 줄은 한 문장이라 끝이 "~요"가 아니면 바로 탈락 — 1차 말뭉치에서 "않아요.eta", "아요.」" 같은 꼬리가 비율 검사를 빠져나갔다
+  for (const [k, v] of [["do", t.do], ["dont", t.dont], ...areaLines.map((l, i) => [`areas[${i}]`, l] as [string, string])] as [string, string][]) {
+    if (v.trim() && !GOOD_ENDING_RE.test(v.trim())) add(`${k}가 "~요"로 끝나지 않음 "${v.trim().slice(-8)}"`);
+  }
 
   // 분량
   if (t.headline.length > LIMITS.headlineMax) add(`headline ${t.headline.length}자 (${LIMITS.headlineMax}자 안)`);

@@ -203,7 +203,7 @@ export function templateText(
   const reversed = role === "구" || role === "기";
   const t = (reversed ? BY_TEN_GOD_REVERSED : BY_TEN_GOD)[base.tenGod];
   const lines: string[] = [];
-  if (base.names?.month) lines.push(base.names.month.line);
+  // v4.15: 이달 한 줄은 본문에 넣지 않는다 — 영역의 이달 줄이 매일 보인다(visible.ts)
   if (base.names) lines.push(nameLine(base.names));
   lines.push(t.lead);
   if (role) lines.push(fitLine(role, base.names?.need ?? null));

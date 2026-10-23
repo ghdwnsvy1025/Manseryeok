@@ -150,6 +150,8 @@ export interface FortuneContent {
   retryAfter?: string;
   /** 같은 날 프로필을 고쳐 다시 만든 횟수. 상한(REGEN_LIMIT)을 넘으면 모델 없이 템플릿만 (B-H1 비용 상한) */
   regen?: number;
+  /** v4.15: 사례 블록의 무대 이름(집·길·사람·몸·돈·쉼·말·물건). 다음 7일은 이 무대를 피한다. 템플릿·옛 캐시엔 없다 */
+  stage?: string;
   /** v3 재료. v4 캐시에는 없다 */
   base?: Omit<BaseFortune, "score"> & { score: number };
   /** v4 재료 */
