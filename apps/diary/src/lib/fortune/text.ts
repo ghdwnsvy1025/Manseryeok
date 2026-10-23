@@ -199,22 +199,28 @@ export function nameLine(names: FortuneNames): string {
 
 export function templateText(
   base: TemplateInput,
-  personal: PersonalAdjustment,
-  today: { ko: string; stemKo: string; branchKo: string },
+  // v4.17: 기록 숫자·오늘 간지는 더 쓰지 않지만 호출 꼴은 그대로 둔다 (index.ts·테스트)
+  _personal: PersonalAdjustment,
+  _today: { ko: string; stemKo: string; branchKo: string },
 ): TemplateText {
   const role = base.role ?? (base.yongsin === "용신" ? "용" : base.yongsin === "기신" ? "기" : undefined);
   const reversed = role === "구" || role === "기";
   const t = (reversed ? BY_TEN_GOD_REVERSED : BY_TEN_GOD)[base.tenGod];
   const lines: string[] = [];
-  // v4.16: 템플릿도 사주 용어를 말하지 않는다 — 이름 문장 대신 생활 표현 후보(expressions.ts)에서 날짜로 하나
+  // v4.16: 템플릿도 사주 용어를 말하지 않는다 — 이름 문장 대신 생활 표현 후보(expressions.ts)에서 날짜로 둘.
+  // 2026-10-24 사용자 지적: 모델이 떨어진 날 본문이 두 문장뿐이었다 → 표현 둘 + 성향 + 조언으로 네 문장 이상, 두 문단
   const pool = TEN_GOD_EXPRESSIONS[base.tenGod];
   const seed = base.seed ?? 0;
-  lines.push(pickExpression(reversed ? [...pool.과할때, ...pool.경향] : role === "용" || role === "희" ? [...pool.활용, ...pool.경향] : pool.경향, seed) + ".");
+  const list = reversed ? [...pool.과할때, ...pool.경향] : role === "용" || role === "희" ? [...pool.활용, ...pool.경향] : pool.경향;
+  const first = pickExpression(list, seed);
+  const second = pickExpression(list, seed + 1, [first]);
+  lines.push(first + ".");
   lines.push(t.lead);
+  lines.push(second + ".");
+  lines.push(reversed ? "오늘은 새로 벌이기보다 하던 것을 지키는 쪽이 편해요." : "오늘은 손에 든 일부터 하나씩 끝내는 쪽이 편해요.");
   // v4.16: 맞는지 판정 문장(fitLine)·이름 문장(nameLine)은 본문에 넣지 않는다 (이론은 내부 판단). 관계 줄은 결과만 말하는 문장이라 남긴다
   if (base.relation) lines.push(RELATION_LINE[base.relation]);
-  const mine = personalLine(personal, today.ko, today.stemKo, today.branchKo);
-  if (mine) lines.push(mine);
+  // v4.17: 내 기록 숫자 문장(personalLine)은 넣지 않는다 — 카드의 "운세 / 내 기록" 막대가 보여 준다
   if (base.fitNote) lines.push(base.fitNote);
   const seen = new Map<string, number>();
   const areas = (base.areas ?? []).map((a) => {
@@ -223,7 +229,9 @@ export function templateText(
     seen.set(key, n + 1);
     return { period: a.period ?? "오늘", area: a.area, signal: a.signal, line: AREA_LINE[a.area][a.signal][Math.min(n, 1)]! };
   });
-  return { headline: t.headline, body: lines.join(" "), do: t.do, dont: t.dont, ...(areas.length ? { areas } : {}) };
+  // 두 문단: 앞 둘(표현·성향) / 뒤(표현·조언·관계)
+  const body = `${lines.slice(0, 2).join(" ")}\n\n${lines.slice(2).join(" ")}`;
+  return { headline: t.headline, body, do: t.do, dont: t.dont, ...(areas.length ? { areas } : {}) };
 }
 
 /** v4 core → 템플릿 재료. 관계는 태어난 날 글자(일지)와의 것만, 용신 표시는 합계 방향으로. v4.13: 라벨(role)과 이름 재료(names)도 */

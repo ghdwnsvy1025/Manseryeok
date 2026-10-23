@@ -141,16 +141,23 @@ export function SaveBurst({ ganjiKo, ganjiHanja, cardSrc, characterSrc, happines
   useEffect(() => {
     if (phase !== "closing") return;
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    // 닫히면 /? 의 saved 꼬리를 떼고 오늘 화면만 남긴다 (톤 v3.6 "닫히면 /")
+    // 닫히면 주소에서 saved·at 꼬리만 뗀다 (톤 v3.6 "닫히면 /"). 2026-10-24: 팡은 나 탭(/me?d=날짜&saved=…)에서 뜨므로 달력 선택(d·m)은 남긴다
     const t = window.setTimeout(() => {
       setPhase("hidden");
       try {
-        if (window.location.search) window.history.replaceState(null, "", "/");
+        const url = new URL(window.location.href);
+        url.searchParams.delete("saved");
+        url.searchParams.delete("at");
+        window.history.replaceState(null, "", url.pathname + url.search);
       } catch {
         /* 주소를 못 고쳐도 화면은 닫힌다 */
       }
-      // v3.15 Q6 = A: 하루를 쓴 직후가 "오늘과 맞았어요?"에 답하기 가장 좋은 때 — 운세 카드의 투표로 내려 준다 (없으면 그대로)
-      if (!reveal) document.getElementById("fortune-vote")?.scrollIntoView({ behavior: reduced ? "auto" : "smooth", block: "center" });
+      if (!reveal) {
+        // 2026-10-24: 나 탭이면 달력·그래프 묶음(#me-records)을 위로. (오늘 화면에서 뜨던 때는 운세 투표 #fortune-vote로 — v3.15 Q6 = A)
+        const records = document.getElementById("me-records");
+        const target = records ?? document.getElementById("fortune-vote");
+        target?.scrollIntoView({ behavior: reduced ? "auto" : "smooth", block: records ? "start" : "center" });
+      }
     }, reduced ? 0 : 200);
     return () => window.clearTimeout(t);
   }, [phase, reveal]);

@@ -2,16 +2,12 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { after } from "next/server";
 import { Booting } from "@/components/Booting";
-import { BurstPreload } from "@/components/BurstPreload";
 import { FortuneCard } from "@/components/FortuneCard";
 import { FortunePending } from "@/components/FortunePending";
 import { LinkPromptCard } from "@/components/LinkPromptCard";
-import { SaveBurst } from "@/components/SaveBurst";
-import { SavedPastNotice } from "@/components/SavedPastNotice";
 import { TodayEntryCard } from "@/components/TodayEntryCard";
-import { TrackOnMount } from "@/components/track/TrackOnMount";
 import { getUser } from "@/lib/supabase/server";
-import { birthProfileOf, getEntry, getFortuneVote, getLinkPromptState, getSajuProfile, listEntries, listEntriesForStats, readFortuneCacheRow } from "@/lib/db";
+import { birthProfileOf, getEntry, getFortuneVote, getLinkPromptState, getSajuProfile, listEntriesForStats, readFortuneCacheRow } from "@/lib/db";
 import { characterOf, characterOfGanji } from "@/lib/character";
 import { cachedFortuneContent, fingerprint, getTodayFortune, type FortuneRequest } from "@/lib/fortune";
 import { withLivePersonal } from "@/lib/fortune/live";
@@ -34,7 +30,7 @@ function HanjaByElement({ hanja, label }: { hanja: string; label: string }) {
 import { shouldShowLinkPrompt } from "@/lib/linkPrompt";
 import { pointStats, streakOf } from "@/lib/stats/extra";
 import { nightCarryDate } from "@/lib/writeNav";
-import { addDays, formatKoreanDate, hourKST, parseYmd, todayKST } from "@/lib/time";
+import { addDays, formatKoreanDate, hourKST, todayKST } from "@/lib/time";
 
 export const dynamic = "force-dynamic";
 /** 운세 생성(모델 호출 20초 타임아웃 × 최대 3회, 전체 40초 기한)이 응답 뒤(after)에도 끊기지 않게 함수 수명을 늘린다. SDK 옵션은 fortune/llm.ts CLIENT_OPTIONS (A-2) */
@@ -61,8 +57,8 @@ function startFortune(req: FortuneRequest): void {
   after(() => running);
 }
 
-export default async function TodayPage({ searchParams }: { searchParams: Promise<{ saved?: string; at?: string }> }) {
-  const { saved, at } = await searchParams;
+/** 2026-10-24: 저장 뒤 팡·"저장했어요"는 나 탭(me/page.tsx)으로 옮겼다 — 저장하면 거기 달력·그래프로 간다. 이 화면은 ?saved를 더 받지 않는다 */
+export default async function TodayPage() {
   const today = todayKST();
   const ganji = dayGanji(today);
   const hour = hourKST();
@@ -74,17 +70,13 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
   if (!user) return <Booting title={formatKoreanDate(today)} cards={2} />;
 
   // 한 단계에 전부 읽는다 — 운세 캐시 행·투표도 여기서. 캐시가 맞으면 Suspense 없이 바로 그린다 (전수조사 A-2·3)
-  // 방금 저장한 날짜 (오늘·어젯밤·지난 날 모두). 오늘이 아니면 그날 기록을 따로 읽어 팡에 쓴다
-  const savedDate = saved && parseYmd(saved) ? saved : null;
-  const [profile, entry, entries, linkState, recent, cachedRow, vote, savedOtherEntry] = await Promise.all([
+  const [profile, entry, entries, linkState, cachedRow, vote] = await Promise.all([
     getSajuProfile(supabase, user.id),
     getEntry(supabase, user.id, today),
     listEntriesForStats(supabase, user.id),
     getLinkPromptState(supabase, user.id),
-    listEntries(supabase, user.id, 8),
     readFortuneCacheRow(supabase, user.id, today),
     getFortuneVote(supabase, user.id, today),
-    savedDate && savedDate !== today ? getEntry(supabase, user.id, savedDate) : Promise.resolve(null),
   ]);
   // 생년월일이 없으면 먼저 받는다 — /write·/me와 같은 규칙 (B1). 오늘 화면 안에서 폼을 그리지 않는다
   if (!profile) redirect("/onboarding?next=/");
@@ -93,21 +85,15 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
   const myCharacter = characterOf(profile.pillars);
   /** 내 일주 한자 ("己丑") — 머리 캐릭터 라벨 (v3.10: 한자만) */
   const myHanja = `${profile.pillars.day.stem}${profile.pillars.day.branch}`;
-  // 오늘 일진 캐릭터 — 머리의 두 번째 메달 (v3.6). 팡 카드도 같은 것을 쓴다
+  // 오늘 일진 캐릭터 — 머리의 두 번째 메달 (v3.6)
   const todayCharacter = characterOfGanji(ganji.ko);
-  // 팡 (2026-10-15: 어떤 날짜든 저장하면 무조건 뜬다 — 전엔 오늘만). 카드는 저장한 날의 일진
-  const burstEntry = savedDate === today ? entry : savedOtherEntry;
-  const burstGanji = savedDate ? dayGanji(savedDate) : ganji;
-  const burstCharacter = characterOfGanji(burstGanji.ko);
-  // 팡 카드 아래 지난 도장들: 최근 7개 기록의 행복도 (저장한 날 제외, 최신순)
-  const recentHappiness = recent.filter((e) => e.entry_date !== savedDate).slice(0, 7).map((e) => e.happiness);
 
   const showLinkPrompt =
     Boolean(entry) && shouldShowLinkPrompt({ isAnonymous: Boolean(user.is_anonymous), entryCount: entries.length, promptCount: linkState.promptCount });
 
   const fortuneDateLabel = formatKoreanDate(today).replace(/\s*\S+요일$/, "");
-  // 밤에 저장하고 막 돌아온 순간(?saved)은 접지 않는다 — 팡 뒤에 바로 운세를 본다 (전수조사 C)
-  const defaultOpen = !night || entries.length === 0 || Boolean(saved);
+
+  const defaultOpen = !night || entries.length === 0;
   // 캐시 히트: 기다릴 것이 없으니 바로 카드. 미스(또는 지문 불일치): 생성은 응답 뒤에 돌리고(startFortune) 자리엔 로딩 카드
   // B5: 캐시는 날짜 단위라 오늘 저장한 기록이 "내 기록으로 본 오늘"에 없다. 내 기록 블록·맞춤도만 현재 기록으로 다시 센다 (점수·글은 캐시 그대로)
   const birth = birthProfileOf(profile);
@@ -121,11 +107,6 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
     // 지문을 넘겨 "지금 원국·입력으로 만든 행"이 생겼을 때만 준비됐다고 본다 (옛 지문 행은 아직 아님)
     fortuneCard = <FortunePending character={myCharacter.characterSrc} date={today} fingerprint={fingerprint(profile.pillars, birth)} />;
   }
-
-  // B8: 과거 날짜를 저장하고 돌아온 경우 — 팡은 오늘만, 과거는 제목 아래 작은 한지 띠 한 번
-  const savedPast = saved && saved !== today && parseYmd(saved) ? saved : null;
-  const savedPastLabel = savedPast ? formatKoreanDate(savedPast).replace(/\s*\S+요일$/, "") : "";
-  const burstWhen = !savedPast ? "오늘" : savedPast === addDays(today, -1) ? "어제" : savedPastLabel;
 
   // 새벽 4시 전이고 어제 기록이 없으면 "어젯밤" — 쓰기 화면도 같은 규칙으로 어제를 연다 (writeNav.nightCarryDate)
   const carry = nightCarryDate(today, hour, entries.some((e) => e.entry_date === addDays(today, -1)));
@@ -143,7 +124,7 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
       metCards={metCards}
       streak={streak.current}
       points={points.answered ? { kept: points.kept, answered: points.answered } : null}
-      justSaved={saved === today}
+      justSaved={false}
     />
   ) : (
     <section className={card}>
@@ -160,30 +141,11 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
 
   return (
     <main className="flex flex-col gap-5">
-      {/* 저장 완료 "팡" — 방금 저장하고 돌아왔을 때 한 번 (톤 v3.1). 카드는 오늘 일진 캐릭터 + char-frame 틀 (05 v3.5) */}
-      {burstEntry && <BurstPreload cardSrc={burstCharacter.cardSrc} />}
-      {/* 저장 성공은 여기서 센다 (쓰기 폼은 redirect로 끝나 성공을 모른다). at로 한 번만 — 새로고침에 다시 안 센다 */}
-      {burstEntry && savedDate && (
-        <TrackOnMount event="diary_saved" props={{ when: savedDate === today ? "today" : savedDate === addDays(today, -1) ? "yesterday" : "past" }} once={`saved:${savedDate}|${at ?? ""}`} />
-      )}
-      {burstEntry && savedDate && (
-        <SaveBurst
-          ganjiKo={burstGanji.ko}
-          ganjiHanja={burstGanji.hanja}
-          cardSrc={burstCharacter.cardSrc}
-          recentHappiness={recentHappiness}
-          happiness={burstEntry.happiness}
-          kept={burstEntry.promise === "kept"}
-          when={burstWhen}
-          signature={`${savedDate}|${at ?? ""}|${burstEntry.happiness}|${burstEntry.moods.join(",")}|${burstEntry.note ?? ""}|${burstEntry.promise ?? ""}`}
-        />
-      )}
       {/* 머리 (v3.9): 가운데 축. 제목(날짜·간지) → 한 줄 → 두 캐릭터 "나 × 오늘"을 가운데에 크게(각 108px).
           그림은 이 한 쌍이 전부. v3.27: 얼굴 그림(faces)을 달창(moon-window) 창틀 안에 — 내 쪽 금빛 창틀, 오늘 쪽 녹갈 창틀. 색으로 길흉을 말하지 않는다 */}
       <header className="flex flex-col items-center text-center">
         {/* v3.10: 날짜는 위 한 줄(작게). 간지는 캐릭터 라벨이 말한다. 순번·기록 일수 줄은 뺐다(기록 일수는 나 화면 머리로) */}
         <h1 className="today-date">{formatKoreanDate(today)}</h1>
-        {savedPast && <SavedPastNotice date={savedPast} label={savedPastLabel} />}
         <div className="medal-pair" aria-label={`나 ${myCharacter.ganjiKo} × 오늘 ${ganji.ko}`}>
           <span className="medal-pair__item">
             <span className="medal medal--me" title={`내 일주 캐릭터 ${myCharacter.ganjiKo}(${myCharacter.animal})`}>

@@ -1,5 +1,5 @@
 // 3단계 — 출력 검사기. "brief에 없는 것은 글에 나올 수 없다"를 기계로 확인한다. 사유가 하나라도 있으면 그 글은 쓰지 않는다(재작성 → 템플릿).
-// 검사 항목: 금지어 · 전문용어 · 한자 · 이모지 · 숫자 날조 · 어미(~어요) · 명령조 · 기간 약속 · 문장 수 · 영역 부분집합 · 길이 상한 · 내 숫자 문장 · 구조 서술(v4.1) · 맥락 없는 운 언급(v4.4)
+// 검사 항목: 금지어 · 전문용어 · 한자 · 이모지 · 숫자 날조 · 어미(~어요) · 명령조 · 기간 약속 · 문장 수 · 영역 부분집합 · 길이 상한 · 기록·평균 금지(v4.17) · 구조 서술(v4.1) · 맥락 없는 운 언급(v4.4)
 //           · 점수 숫자(v4.2) · 영역 줄이 본문 첫 문장과 60% 이상 겹침(v4.2) · 칸 되풀이(v4.9) · 이음말(v4.10) · 칸만 다시 쓰기(v4.14)
 //           · v4.16 (2026-10-24, 사용자 수정 방향): 본문에 십신·오행 이름과 판정 문장("맞는 편·모자란·넉넉한·실속·기운이 거든다")이 나오면 탈락 — 이론은 내부 판단으로만.
 //             비유("손에 붙어요·흐름이 열려요") 탈락. 판단(후보 3~5·핵심·구조 A~E)과 태그 8칸이 있어야 하고, 최근 7일 태그와 2칸 이상 뜻이 같으면 탈락(제목뜻은 14일). areas는 입력의 부분집합 0~3개.
@@ -463,15 +463,10 @@ export function validateFortuneText(t: ModelText | null | undefined, b: FortuneB
   const connectiveStarts = bodySents.filter((s) => /^(그래서|그러니|그러니까|그런데|그래도|그러다 보니|하지만)/.test(s)).length;
   if (bodySents.length >= 4 && connectiveStarts >= 3) add(`이음말로 시작하는 문장이 ${connectiveStarts}개`);
 
-  // 내 숫자 문장
-  const bodyNums = new Set((t.body.match(NUMBER_RE) ?? []).map(Number));
-  if (b.personal) {
-    const count = b.personal.sameGanjiCount > 0 && b.personal.sameGanjiMean !== null ? b.personal.sameGanjiCount : b.personal.n;
-    const mean = b.personal.sameGanjiCount > 0 && b.personal.sameGanjiMean !== null ? b.personal.sameGanjiMean : b.personal.mean;
-    if (!bodyNums.has(count) || !bodyNums.has(mean)) add(`내 숫자 문장 없음 (횟수 ${count}, 평균 ${mean}이 본문에 있어야 함)`);
-  } else if (/기록(했|이|을|한)|평균/.test(t.body)) {
-    add("기록이 없는데 기록·평균을 말함");
-  }
+  // v4.17: 내 기록 숫자 문장 금지 — 어느 칸에도 "기록했·평균·N번·N점"이 없어야 한다 (v4.2~4.16은 기록이 있으면 꼭 넣게 했다.
+  // 2026-10-24 실제 사용자 글에 "신이나 미가 든 날엔 2번 기록했는데 평균 7.5점"으로 지지 이름·점수가 새어 나옴. 내 기록 숫자는 카드가 보여 준다)
+  const everyField = [t.headline, t.body, t.do, t.dont, ...t.areas.map((a) => String(a?.line ?? ""))].join(" ");
+  if (/기록(했|이|을|한)|평균|\d+\s*번\s*(기록|썼|적)/.test(everyField)) add("기록·평균 이야기 (내 기록 숫자는 카드가 보여 준다 — 글에 쓰지 않기)");
 
   return issues;
 }

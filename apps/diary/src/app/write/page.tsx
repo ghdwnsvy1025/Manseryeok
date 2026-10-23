@@ -9,6 +9,7 @@ import { dayGanji } from "@/lib/ganji";
 import { addDays, formatKoreanDate, hourKST, todayKST } from "@/lib/time";
 import { NIGHT_CUTOFF_HOUR, nightCarryDate, resolveWriteDate, writeDateLinks } from "@/lib/writeNav";
 import { WritePreload } from "@/components/WritePreload";
+import { NightCarryDialog } from "@/components/NightCarryDialog";
 import { EntryForm } from "./EntryForm";
 
 export const dynamic = "force-dynamic";
@@ -56,6 +57,8 @@ export default async function WritePage({ searchParams }: { searchParams: Promis
 
   return (
     <main>
+      {/* 2026-10-24: 새벽 0~4시 어제로 열렸으면 "어제 일기를 쓸까요?" 한 번 묻는다 (어제 그대로 / 오늘로). 아래 .night-carry 띠는 그대로 남는다 */}
+      {carried && <NightCarryDialog date={date} label={dateLabel} todayHref={`/write?date=${today}`} />}
       <header className="mb-5">
         {existing && <p className="text-sm text-muted">기록 고치기</p>}
         {adjusted && <p className="text-sm text-muted">그 날짜는 쓸 수 없어 오늘 날짜로 열었어요</p>}

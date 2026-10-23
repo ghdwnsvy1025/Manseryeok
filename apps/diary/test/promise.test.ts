@@ -91,7 +91,7 @@ const upserts = () => ops.filter((o) => o.table === "night_entries" && o.op === 
 describe("saveEntryAction — 약속 저장", () => {
   test("promise·promise_text를 함께 upsert한다", async () => {
     const f = form({ entryDate: "2026-10-06", happiness: "7", promise: "kept", promise_text: "저녁에 지출과 약속을 다시 확인해요" });
-    await expect(saveEntryAction({ error: null }, f)).rejects.toThrow("REDIRECT:/?saved=2026-10-06");
+    await expect(saveEntryAction({ error: null }, f)).rejects.toThrow("REDIRECT:/me?d=2026-10-06&saved=2026-10-06");
     expect(upserts()).toHaveLength(1);
     expect(upserts()[0]!.row).toMatchObject({ user_id: "user-1", happiness: 7, promise: "kept", promise_text: "저녁에 지출과 약속을 다시 확인해요" });
   });
@@ -114,7 +114,7 @@ describe("컬럼이 아직 없을 때 (0003_promise.sql 적용 전)", () => {
   test("42703이면 약속 없이 다시 저장한다 — 500이 나지 않는다", async () => {
     firstUpsertError = { code: "42703", message: 'column "promise" of relation "night_entries" does not exist' };
     const f = form({ entryDate: "2026-10-06", happiness: "8", promise: "kept", promise_text: "하나만 골라 끝까지 밀어붙여요" });
-    await expect(saveEntryAction({ error: null }, f)).rejects.toThrow("REDIRECT:/?saved=2026-10-06");
+    await expect(saveEntryAction({ error: null }, f)).rejects.toThrow("REDIRECT:/me?d=2026-10-06&saved=2026-10-06");
     const u = upserts();
     expect(u).toHaveLength(2);
     expect(u[0]!.row).toHaveProperty("promise", "kept");

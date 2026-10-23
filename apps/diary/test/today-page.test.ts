@@ -61,19 +61,19 @@ function fortuneSlot(main: { props: { children: unknown[] } }) {
 
 describe("오늘 화면 첫 흐름", () => {
   test("세션은 있는데 프로필이 없으면 /onboarding?next=/ 로 보낸다 (폼을 안에 그리지 않는다)", async () => {
-    await expect(TodayPage({ searchParams: Promise.resolve({}) })).rejects.toThrow("REDIRECT:/onboarding?next=/");
+    await expect(TodayPage()).rejects.toThrow("REDIRECT:/onboarding?next=/");
   });
 
   test("세션이 없으면 리디렉트하지 않고 Booting(뼈대 두 장)을 돌려준다", async () => {
     currentUser = null;
-    const el = await TodayPage({ searchParams: Promise.resolve({}) });
+    const el = await TodayPage();
     expect(el.type).toBe(Booting);
     expect(el.props.cards).toBe(2);
   });
 
   test("캐시 미스: 화면은 기다리지 않고 바로 그리고(운세 자리는 FortunePending), 생성은 응답 뒤(after)에 돌린다", async () => {
     profile = PROFILE;
-    const el = await TodayPage({ searchParams: Promise.resolve({}) });
+    const el = await TodayPage();
     expect(el.type).toBe("main");
     const slot = fortuneSlot(el);
     expect(slot?.type).toBe(FortunePending);
@@ -87,7 +87,7 @@ describe("오늘 화면 첫 흐름", () => {
   test("운세 캐시가 맞으면 로딩 카드 없이 바로 FortuneCard를 그리고 생성을 시작하지 않는다 (전수조사 A-2·3)", async () => {
     profile = PROFILE;
     cachedFortune = { version: "v4", score: 7, band: "good", headline: "h", body: "b", do: "d", dont: "x", source: "template" };
-    const el = await TodayPage({ searchParams: Promise.resolve({}) });
+    const el = await TodayPage();
     expect(el.type).toBe("main");
     expect(fortuneSlot(el)?.type).toBe(FortuneCard);
     expect(getTodayFortune).not.toHaveBeenCalled();

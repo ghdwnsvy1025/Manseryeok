@@ -86,9 +86,9 @@ function form(entries: Record<string, string | string[]>): FormData {
 }
 
 describe("익명 세션에서 저장", () => {
-  test("saveEntryAction은 익명 user_id로 기록을 저장하고 오늘 화면으로 간다", async () => {
+  test("saveEntryAction은 익명 user_id로 기록을 저장하고 나 탭 달력으로 간다", async () => {
     const f = form({ entryDate: "2026-10-06", happiness: "7", moods: ["기쁨"], note: "한 줄" });
-    await expect(saveEntryAction({ error: null }, f)).rejects.toThrow("REDIRECT:/?saved=2026-10-06");
+    await expect(saveEntryAction({ error: null }, f)).rejects.toThrow("REDIRECT:/me?d=2026-10-06&saved=2026-10-06");
     const row = saved.find((r) => r.table === "night_entries");
     expect(row).toBeTruthy();
     expect(row!.user_id).toBe("anon-1");

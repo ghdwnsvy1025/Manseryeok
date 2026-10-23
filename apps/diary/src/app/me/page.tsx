@@ -3,16 +3,18 @@ import { redirect } from "next/navigation";
 import { BRANCH_META, ELEMENT_KO_TO_EN, ELEMENT_ORDER, STEM_META, calculateElementDistribution, calculateHiddenStems, getTenGod, type Element, type ElementKo, type StemHanja } from "@saju/engine";
 import { getUser } from "@/lib/supabase/server";
 import { GanjiGrid } from "@/components/GanjiGrid";
+import { BurstPreload } from "@/components/BurstPreload";
+import { SaveBurst } from "@/components/SaveBurst";
 import { Booting } from "@/components/Booting";
 import { characterOf, characterOfGanji } from "@/lib/character";
 import { StatsSummary } from "@/components/StatsSummary";
 import { TrackOnMount } from "@/components/track/TrackOnMount";
-import { countEntries, getSajuProfile, listEntriesInMonth, listEntriesForStats, listFortuneScores } from "@/lib/db";
+import { countEntries, getEntry, getSajuProfile, listEntries, listEntriesInMonth, listEntriesForStats, listFortuneScores } from "@/lib/db";
 import { growingSeries, habitOf, happinessSeries, moodTop, pointStats, streakOf } from "@/lib/stats/extra";
 import { HappinessChart } from "@/components/HappinessChart";
 import { MonthCalendar, type DayInfo } from "@/components/MonthCalendar";
 import { buildMonth, resolveMonth } from "@/lib/calendar";
-import { addDays } from "@/lib/time";
+import { addDays, formatKoreanDate, parseYmd } from "@/lib/time";
 import { fitPercent } from "@/lib/fortune/personal";
 import { dayGanji } from "@/lib/ganji";
 import { byBranch, byElement, byStem, ganjiGrid, highlights } from "@/lib/stats/ganji";
@@ -125,8 +127,8 @@ function ElementDetails({ rows }: { rows: { el: ElementKo; pct: number }[] }) {
   );
 }
 
-export default async function MePage({ searchParams }: { searchParams: Promise<{ cell?: string; view?: string; m?: string; d?: string }> }) {
-  const { cell, view, m, d } = await searchParams;
+export default async function MePage({ searchParams }: { searchParams: Promise<{ cell?: string; view?: string; m?: string; d?: string; saved?: string; at?: string }> }) {
+  const { cell, view, m, d, saved, at } = await searchParams;
   const { supabase, user } = await getUser();
   // 세션이 아직 없는 첫 요청: 리디렉트하지 않고 뼈대만 그린다. AnonBoot가 곧 새로 그린다 (docs/ANON_START.md 1절, B2)
   if (!user) return <Booting title="나" cards={3} />;
@@ -134,16 +136,26 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
   // 달력: 보여 줄 달(?d가 있으면 그 달). 그 달 기록을 한 번에 받아 날짜 상세를 클라이언트에서 바로 그린다 (v3.15)
   const dParam = d && /^\d{4}-\d{2}-\d{2}$/.test(d) && d <= today ? d : null;
   const calYm = resolveMonth(dParam ? dParam.slice(0, 7) : m, today);
-  const [profile, total, all, fortuneScores, monthEntries] = await Promise.all([
+  // 2026-10-24: 저장하면 쓰기 폼이 여기로 온다 (/me?d=날짜&saved=날짜&at=시각, actions.ts). 팡은 저장한 날의 기록으로 — 오늘 화면에서 옮겨 왔다
+  const savedDate = saved && parseYmd(saved) && saved <= today ? saved : null;
+  const [profile, total, all, fortuneScores, monthEntries, savedEntry, recent] = await Promise.all([
     getSajuProfile(supabase, user.id),
     countEntries(supabase, user.id),
     listEntriesForStats(supabase, user.id),
     listFortuneScores(supabase, user.id, addDays(today, -29)),
     listEntriesInMonth(supabase, user.id, calYm),
+    savedDate ? getEntry(supabase, user.id, savedDate) : Promise.resolve(null),
+    savedDate ? listEntries(supabase, user.id, 8) : Promise.resolve([]),
   ]);
   // 생년월일이 없으면 먼저 받는다 (로그인 사용자와 같은 규칙)
   if (!profile) redirect("/onboarding?next=/me");
   const me = characterOf(profile.pillars);
+  // 팡 재료: 저장한 날의 일진 카드 + 그날 행복도 도장 + 지난 도장(최근 7개, 그날 제외)
+  const burstEntry = savedDate ? savedEntry : null;
+  const burstGanji = dayGanji(savedDate ?? today);
+  const burstCharacter = characterOfGanji(burstGanji.ko);
+  const burstWhen = !savedDate || savedDate === today ? "오늘" : savedDate === addDays(today, -1) ? "어제" : formatKoreanDate(savedDate).replace(/\s*\S+요일$/, "");
+  const recentHappiness = recent.filter((e) => e.entry_date !== savedDate).slice(0, 7).map((e) => e.happiness);
   const h = highlights(all);
   const selected = cell !== undefined && /^\d{1,2}$/.test(cell) && Number(cell) < 60 ? Number(cell) : null;
   const todayIndex = dayGanji(today).index;
@@ -178,6 +190,25 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
   return (
     <main className="flex flex-col gap-6">
       <TrackOnMount event="stats_view" props={{ view: isCal ? "calendar" : "grid" }} />
+      {/* 저장 완료 "팡" — 방금 저장하고 온 한 번 (톤 v3.1, 카드는 저장한 날 일진 + char-frame 틀, 05 v3.5). 2026-10-24 오늘 화면에서 여기로.
+          닫히면 아래 #me-records(달력·그래프)로 내려간다 (SaveBurst) */}
+      {burstEntry && savedDate && <BurstPreload cardSrc={burstCharacter.cardSrc} />}
+      {/* 저장 성공은 여기서 센다 (쓰기 폼은 redirect로 끝나 성공을 모른다). at로 한 번만 — 새로고침에 다시 안 센다 */}
+      {burstEntry && savedDate && (
+        <TrackOnMount event="diary_saved" props={{ when: savedDate === today ? "today" : savedDate === addDays(today, -1) ? "yesterday" : "past" }} once={`saved:${savedDate}|${at ?? ""}`} />
+      )}
+      {burstEntry && savedDate && (
+        <SaveBurst
+          ganjiKo={burstGanji.ko}
+          ganjiHanja={burstGanji.hanja}
+          cardSrc={burstCharacter.cardSrc}
+          recentHappiness={recentHappiness}
+          happiness={burstEntry.happiness}
+          kept={burstEntry.promise === "kept"}
+          when={burstWhen}
+          signature={`${savedDate}|${at ?? ""}|${burstEntry.happiness}|${burstEntry.moods.join(",")}|${burstEntry.note ?? ""}|${burstEntry.promise ?? ""}`}
+        />
+      )}
       <header className="relative flex flex-col items-center pt-2">
         {/* 설정은 한곳에 모았다 (docs/ANON_START.md 3절): Google 연결 · 알림 · 생년월일 · 앱으로 두기 · 로그아웃 */}
         <Link href="/settings" prefetch={true} className="tap absolute -top-3 right-0 text-sm text-muted underline underline-offset-4">
@@ -208,7 +239,7 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
       </header>
 
 
-      <section className="me-sep me-sep--wide flex flex-col gap-4">
+      <section id="me-records" className="me-sep me-sep--wide flex flex-col gap-4">
         <div>
           {/* v3.22: 머리표·설명 문장 없음 — 달력은 보면 안다. v3.13 Q6 = B: 같은 자리에서 60갑자 / 달력 전환 (링크, JS 없음). 모양은 디자이너(.view-switch) */}
           <nav className="view-switch" aria-label="보기">

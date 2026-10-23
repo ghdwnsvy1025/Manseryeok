@@ -3170,3 +3170,42 @@ a[aria-current="page"] > .nav-label::after {
   --stamp-face: color-mix(in srgb, var(--color-sky) 82%, var(--color-paper-2));
   --stamp-num: var(--color-paper-2);
 }
+
+/* 새벽 "어제 일기를 쓸까요?" (2026-10-24, NightCarryDialog). 한지 카드 한 장이 가운데, 뒤는 먹빛 반투명. 경고색 없음 */
+.night-ask {
+  margin: auto;
+  width: min(100% - 32px, 360px);
+  max-width: none;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-ink);
+}
+.night-ask::backdrop {
+  background: rgb(43 36 23 / 0.45);
+}
+.night-ask__card {
+  padding: 22px 20px 16px;
+}
+.night-ask[open] {
+  animation: night-ask-in 220ms ease-out both;
+}
+@keyframes night-ask-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+/* 저장 팡이 닫히며 내려오는 자리 (SaveBurst → #me-records) */
+#me-records {
+  scroll-margin-top: 12px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .night-ask[open] {
+    animation: none;
+  }
+}

@@ -213,26 +213,22 @@ function sharesMeaning(expr: string, tagText: string, min = 2): boolean {
 }
 
 export function buildBrief(input: BriefInput): FortuneBrief {
-  const { core, personal, today } = input;
+  const { core, today } = input;
   const seed = daySeed(input.date);
   const facts = core.facts.map(plainFact);
   const caveats = core.caveats.map(hanjaToKo);
   const areas = core.areas.map((a) => ({ period: a.period, area: a.area, word: AREA_WORD[a.area], signal: a.signal, why: plainFact(a.why) }));
 
-  let mine: string | null = null;
-  let personalOut: FortuneBrief["personal"] = null;
-  if (personal.n > 0 && personal.mean !== null) {
-    personalOut = { n: personal.n, mean: personal.mean, sameGanjiCount: personal.sameGanjiCount, sameGanjiMean: personal.sameGanjiMean };
-    mine =
-      personal.sameGanjiCount > 0 && personal.sameGanjiMean !== null
-        ? `지난 ${today.ko}일에 ${personal.sameGanjiCount}번 기록했고 평균 ${personal.sameGanjiMean}점이었어요`
-        : `${today.stemKo}${batchim(today.stemKo) ? "이나" : "나"} ${today.branchKo}${batchim(today.branchKo) ? "이" : "가"} 든 날에 ${personal.n}번 기록했고 평균 ${personal.mean}점이었어요`;
-  }
+  // v4.17 (2026-10-24): 내 기록 숫자(횟수·평균)는 글에 넣지 않는다 — 카드의 "운세 / 내 기록" 막대가 따로 보여 준다.
+  // v4.2~4.16은 기록이 있으면 "N번 기록했고 평균 M점" 문장을 꼭 넣게 했는데, 실제 사용자 글에 "신이나 미가 든 날엔 2번 기록했는데 평균 7.5점"
+  // 꼴로 지지 이름·점수가 새어 나왔다(v4.16 '사주 용어·점수 숫자 없음'과 정면충돌). mine·personal은 호환용으로 남기되 늘 null
+  const mine: string | null = null;
+  const personalOut: FortuneBrief["personal"] = null;
 
   const [y, m, d] = input.date.split("-").map(Number) as [number, number, number];
   const term = solarTermOf(input.date);
   const solarTerm = term.label;
-  const allowedNumbers = extractNumbers([...facts, ...caveats, ...areas.map((a) => a.why), ...(mine ? [mine] : []), solarTerm, String(y), String(m), String(d)]);
+  const allowedNumbers = extractNumbers([...facts, ...caveats, ...areas.map((a) => a.why), solarTerm, String(y), String(m), String(d)]);
   const withContext = hasContextFact(facts);
   const ang = angleOf(core, input.band);
   const names = namesFromCore(core);
@@ -307,9 +303,7 @@ export function buildBrief(input: BriefInput): FortuneBrief {
         : "areas는 빈 배열 []",
       doDont: "do(하면)와 dont(피해요)는 각각 1문장, 구체적 행동. 본문 문장을 되풀이하지 않기. '~해요/~않아요' 꼴",
       numbers: "숫자는 allowedNumbers에 있는 것만. 사실에 없는 숫자·사건·시간·금액을 만들지 않기. 점수는 화면에 있으니 글에 쓰지 않기 (\"N점\", \"N점 만점\" 금지)",
-      mine: mine
-        ? `본문 어딘가에 내 숫자 한 문장을 꼭 넣기 (재료: "${mine}"). 숫자는 그대로 쓰기`
-        : "기록이 없으니 내 기록 이야기를 하지 않기 (기록했다는 말, 평균, 횟수 모두 금지)",
+      mine: "내 기록 이야기를 하지 않기 (기록했다는 말, 평균, 횟수, 'N번·N점' 모두 금지 — 내 기록 숫자는 카드가 따로 보여 준다)",
       scene: term.isTermDay
         ? `오늘은 ${input.weekday}, ${term.name}${batchim(term.name) ? "이" : "가"} 시작하는 날. 절기 이름은 한 번만 써도 되고, 요일도 한 번만. 직장·회사 장면(거래처·제안서·회의·출근·상사)은 쓰지 않기. "특별한·남다른·다른 날과 달리·차별" 금지. avoid.scenes(최근 7일 장면)는 쓰지 않기`
         : `오늘은 ${input.weekday}. 절기 이름(${term.name})은 쓰지 않기. 요일은 꼭 필요할 때만 한 번. 직장·회사 장면(거래처·제안서·회의·출근·상사)은 쓰지 않기. "특별한·남다른·다른 날과 달리·차별" 금지. avoid.scenes(최근 7일 장면)는 쓰지 않기`,

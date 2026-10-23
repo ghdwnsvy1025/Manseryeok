@@ -540,9 +540,9 @@ describe("템플릿 문장", () => {
     expect(t.areas!.map((a) => a.area)).toEqual(r.areas.map((a) => a.area));
   });
 
-  test("기록이 있으면 본문에 내 기록 문장이 들어간다", () => {
+  test("v4.17: 기록이 있어도 본문에 내 기록 숫자 문장을 넣지 않는다", () => {
     const t = templateText({ tenGod: "정재", relation: "육합", yongsin: null }, { n: 2, mean: 6.5, sameGanjiCount: 0, sameGanjiMean: null, weight: 0.29, score: 0.6 }, todayKo);
-    expect(t.body).toContain("2번 기록");
+    expect(t.body).not.toMatch(/기록했|평균/);
   });
 });
 
@@ -593,14 +593,15 @@ describe("3단계 brief", () => {
     expect(b.rules.mine).toContain("하지 않기");
   });
 
-  test("기록이 있으면 내 숫자 한 문장 재료가 들어가고 그 숫자가 허용된다 (같은 60갑자 우선)", () => {
+  test("v4.17: 기록이 있어도 내 숫자 문장 재료를 주지 않고 그 숫자도 허용하지 않는다 (지지 이름·점수가 본문에 새던 문제)", () => {
     const b = buildBrief(base({ n: 12, mean: 6.8, sameGanjiCount: 2, sameGanjiMean: 7.5, weight: 0.71, score: 0.6 }));
-    expect(b.mine).toBe("지난 경신일에 2번 기록했고 평균 7.5점이었어요");
-    expect(b.rules.mine).toContain("꼭 넣기");
-    expect(b.allowedNumbers).toEqual(expect.arrayContaining([2, 7.5]));
+    expect(b.mine).toBeNull();
+    expect(b.personal).toBeNull();
+    expect(b.rules.mine).toContain("하지 않기");
+    expect(b.allowedNumbers).not.toContain(7.5);
     const b2 = buildBrief(base({ n: 5, mean: 8, sameGanjiCount: 0, sameGanjiMean: null, weight: 0.5, score: 0.6 }));
-    expect(b2.mine).toBe("경이나 신이 든 날에 5번 기록했고 평균 8점이었어요");
-    expect(b2.allowedNumbers).toEqual(expect.arrayContaining([5, 8]));
+    expect(b2.mine).toBeNull();
+    expect(JSON.stringify(b2)).not.toContain("기록했고");
     expect(JSON.stringify(b2).length).toBeLessThan(4000);
   });
 });
@@ -613,7 +614,7 @@ describe("3단계 검사 (validate)", () => {
   const brief = briefOf({ n: 5, mean: 8, sameGanjiCount: 0, sameGanjiMean: null, weight: 0.5, score: 0.6 });
   const OK: ModelText = {
     headline: "제안이 눈에 들어오는 월요일",
-    body: "아침에 메일함을 열면 미뤄 둔 제안 하나가 다시 눈에 들어와요. 이달 갑오월은 내게 조심할 편이지만, 오늘 경신일은 기회와 확장을 뜻하는 편재가 아주 센 날이고 내게 모자란 금을 채우는 쪽이라 평소보다 힘이 덜 들어요. 경이나 신이 든 날에 5번 기록했고 평균 8점이었어요. 다만 예정이 한 번쯤 틀어지기 쉬운 날이라 여유를 두는 게 좋아요. 저녁엔 들어온 제안을 적어 두고 하루 묵히는 쪽이 편해요.",
+    body: "아침에 메일함을 열면 미뤄 둔 제안 하나가 다시 눈에 들어와요. 이달 갑오월은 내게 조심할 편이지만, 오늘 경신일은 기회와 확장을 뜻하는 편재가 아주 센 날이고 내게 모자란 금을 채우는 쪽이라 평소보다 힘이 덜 들어요. 다만 예정이 한 번쯤 틀어지기 쉬운 날이라 여유를 두는 게 좋아요. 저녁엔 들어온 제안을 적어 두고 하루 묵히는 쪽이 편해요.",
     areas: [
       { period: "오늘", area: "재물", line: "돈 쓰는 일은 계획대로 가요." },
       { period: "오늘", area: "연애", line: "가까운 사람에게 마음을 보이기 좋아요." },
@@ -701,11 +702,12 @@ describe("3단계 검사 (validate)", () => {
     expect(validateFortuneText({ ...careText, body: careText.body.replace("하루 묵히는 쪽이 편해요", "일이 수월하게 가요") }, care).filter((x) => x.includes("반전 말"))).toEqual(['주의인 날 본문에 반전 말 "수월"']);
   });
 
-  test("숫자 날조: brief에 없는 숫자 / 내 숫자 문장 빠짐", () => {
+  test("숫자 날조: brief에 없는 숫자 / v4.17 내 기록 숫자 문장이 있으면 탈락", () => {
     const r = validateFortuneText({ ...OK, do: "30분만 혼자 있는 시간을 만들어요." }, brief);
     expect(r).toEqual(expect.arrayContaining([expect.stringContaining("사실에 없는 숫자 30")]));
-    const r2 = validateFortuneText({ ...OK, body: OK.body.replace("경이나 신이 든 날에 5번 기록했고 평균 8점이었어요. ", "") }, brief);
-    expect(r2.some((x) => x.includes("내 숫자 문장 없음"))).toBe(true);
+    const r2 = validateFortuneText({ ...OK, body: OK.body.replace("다만 예정이", "경이나 신이 든 날에 5번 기록했고 평균 8점이었어요. 다만 예정이") }, brief);
+    expect(r2.some((x) => x.includes("기록·평균 이야기"))).toBe(true);
+    expect(validateFortuneText({ ...OK, dont: "지난 3번 기록처럼 혼자 결정하지 않아요." }, brief).some((x) => x.includes("기록·평균 이야기"))).toBe(true);
   });
 
   test("영역 불일치: 개수·순서·줄 문장 수 · v4.2 period 불일치 · 본문 첫 문장과 겹침", () => {
@@ -733,15 +735,15 @@ describe("3단계 검사 (validate)", () => {
   test("문장 수: 본문 3문장 또는 7문장은 탈락", () => {
     const three = "아침에 메일함을 열어요. 경이나 신이 든 날에 5번 기록했고 평균 8점이었어요. 저녁엔 제안을 묵혀요.";
     expect(validateFortuneText({ ...OK, body: three }, brief)).toEqual(expect.arrayContaining([expect.stringContaining("본문 3문장")]));
-    const seven = OK.body + " 하나 더요. 또 하나 더요.";
+    const seven = OK.body + " 하나 더요. 또 하나 더요. 셋째도 더요.";
     expect(validateFortuneText({ ...OK, body: seven }, brief)).toEqual(expect.arrayContaining([expect.stringContaining("본문 7문장")]));
   });
 
   test("기간 약속 · 기록 없는데 기록 언급 · 한자", () => {
     expect(validateFortuneText({ ...OK, dont: "3일 더 쓰면 달라져요." }, brief).some((x) => x.includes("기간 약속"))).toBe(true);
     expect(validateFortuneText({ ...OK, headline: "庚申의 아침" }, brief).some((x) => x.includes("한자"))).toBe(true);
-    const r = validateFortuneText(OK, briefOf(NONE));
-    expect(r.some((x) => x.includes("기록이 없는데"))).toBe(true);
+    const r = validateFortuneText({ ...OK, body: OK.body.replace("다만 예정이", "경이나 신이 든 날에 5번 기록했고 평균 8점이었어요. 다만 예정이") }, briefOf(NONE));
+    expect(r.some((x) => x.includes("기록·평균 이야기"))).toBe(true);
     expect(r.some((x) => x.includes("사실에 없는 숫자"))).toBe(true);
   });
 
