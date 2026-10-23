@@ -22,6 +22,18 @@ export const metadata: Metadata = {
   manifest: "/manifest.webmanifest",
   appleWebApp: { capable: true, statusBarStyle: "default", title: "사주읽는밤" },
   icons: { icon: "/icons/favicon-48.png", apple: "/icons/apple-touch-icon.png" },
+  // 링크 미리보기(카톡·스레드·인스타): scripts/build-og.mjs가 만든 public/og.jpg — 앱 아이콘과 같은 붓 초승달.
+  // 절대 주소는 metadataBase: NEXT_PUBLIC_SITE_URL이 있으면 그것, 없으면 Vercel이 넣는 VERCEL_PROJECT_PRODUCTION_URL(Next 15 기본)
+  ...(process.env.NEXT_PUBLIC_SITE_URL ? { metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL) } : {}),
+  openGraph: {
+    type: "website",
+    locale: "ko_KR",
+    siteName: "사주읽는밤 일기",
+    title: "사주읽는밤 일기",
+    description: "밤에 한 줄 쓰면, 내 기록으로 운세가 점점 내 것이 됩니다.",
+    images: [{ url: "/og.jpg", width: 1200, height: 630, alt: "사주읽는밤 일기 — 한지 위 붓 한 획 초승달" }],
+  },
+  twitter: { card: "summary_large_image", title: "사주읽는밤 일기", description: "밤에 한 줄 쓰면, 내 기록으로 운세가 점점 내 것이 됩니다.", images: ["/og.jpg"] },
 };
 
 export const viewport: Viewport = {
