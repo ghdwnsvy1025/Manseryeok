@@ -362,32 +362,49 @@ input:focus-visible + .seg__cell,
     opacity: 0;
   }
 }
-/* 운세 카드 자리 로딩 — 닫힌 운세 카드와 같은 높이 (summary p-5 + 밴드 단어 44px) */
+/* 운세 카드 자리 로딩 — 닫힌 운세 카드와 같은 높이. v3.30에서 다시 잼(375px, details 닫힘 + 밴드 단어 44px + 영역 칩 한 줄): 171px */
 .fortune-loading {
-  min-height: 116px; /* 닫힌 운세 카드와 같은 높이 — 로딩→카드 전환 때 튀지 않게 */
+  min-height: 171px; /* 닫힌 운세 카드와 같은 높이 — 로딩→카드 전환 때 튀지 않게 */
 }
-/* v3.29 (명세 28) 진척 붓 막대: 트랙 바탕 없음(한지 그대로). fill = 금색 면(키트 gold-wash) + 붓 가로획 마스크(brush-stroke, 나 화면 오행 막대와 같은 것).
-   마스크는 최소 56px·오른쪽 정렬이라 막 시작한 짧은 막대도 붓 끝이 갈라진다. width가 300ms 간격으로 갱신되고 전환도 300ms라 이어져 차오른다.
-   반복 쓸기 아님 — 한 번 차오르고 92%에서 멈춘다(컴포넌트가 계산). 금색은 면이므로 v3.26 원칙 안 */
-.fortune-loading__bar {
+/* v3.30 (명세 29) 먹 달이 차오른다: 키트 moon-ink-disc(붓 먹 보름달 원판, 알파 지름 82.6%) 한 장을 64px 상자에 contain으로 놓고,
+   원판과 같은 지름의 가림 원 하나를 뺀 마스크(radial-gradient 구멍)로 깎는다 — 앱 아이콘과 같은 "원 빼기 원" 초승달.
+   구멍 중심은 상자 가운데에서 --moon-p(0~1)에 따라 오른쪽으로 빠져나간다: p=0 지름의 10%(얇은 초승달) → p=1 지름+4px(보름달).
+   마스크 층(256px, 구멍은 층 가운데 128px)을 mask-position으로 옮기므로 300ms 전환 하나로 이어져 차오른다(갱신 간격과 같다).
+   가려진 쪽엔 아무것도 없다(한지 그대로) — 윤곽·점선·후광 없음. 막대·퍼센트 없음 */
+.fortune-loading__row {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+  min-width: 0;
+}
+.fortune-loading__moon {
+  --moon-d: 52.9px; /* 64px 상자 안 원판 지름 (512 webp 알파 bbox 46~468) */
+  --moon-r: calc(var(--moon-d) / 2);
+  --moon-x: calc(32px + var(--moon-d) * 0.1 + var(--moon-p, 0) * (var(--moon-d) * 0.9 + 4px)); /* 가림 원 중심(상자 기준) */
+  flex: none;
   display: block;
-  width: 100%;
-  height: 12px;
+  width: 64px;
+  height: 64px;
+  background: url("/ui/moon-ink-disc-512.webp") center / contain no-repeat;
+  -webkit-mask-image: radial-gradient(circle var(--moon-r) at 128px 50%, transparent calc(var(--moon-r) - 0.5px), #000 calc(var(--moon-r) + 0.5px));
+  mask-image: radial-gradient(circle var(--moon-r) at 128px 50%, transparent calc(var(--moon-r) - 0.5px), #000 calc(var(--moon-r) + 0.5px));
+  -webkit-mask-size: 256px 64px;
+  mask-size: 256px 64px;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: calc(var(--moon-x) - 128px) 0;
+  mask-position: calc(var(--moon-x) - 128px) 0;
+  transition: mask-position 300ms linear, -webkit-mask-position 300ms linear;
 }
-.fortune-loading__fill {
-  display: block;
-  height: 100%;
-  background: var(--color-gold) url("/ui/gold-wash.webp") center / 512px 512px;
-  -webkit-mask: url("/ui/brush-stroke.webp") no-repeat right center / max(100%, 56px) 100%;
-  mask: url("/ui/brush-stroke.webp") no-repeat right center / max(100%, 56px) 100%;
-  transition: width 300ms linear;
-}
-/* ready: 남은 만큼을 300ms ease-out으로 꽉 채운다 */
-.fortune-loading__bar[data-ready] > .fortune-loading__fill {
-  transition: width 300ms cubic-bezier(0.3, 0.7, 0.3, 1);
+/* ready: 남은 만큼을 300ms ease-out으로 보름달까지 */
+.fortune-loading__moon[data-ready] {
+  transition: mask-position 300ms cubic-bezier(0.3, 0.7, 0.3, 1), -webkit-mask-position 300ms cubic-bezier(0.3, 0.7, 0.3, 1);
 }
 /* 진행 말: 단계가 바뀌면 새 글자가 120ms 페이드로 들어온다(슬라이드·타이핑 없음). 한 줄 넘침은 말줄임 */
 .fortune-loading__text {
+  min-width: 0;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
@@ -402,9 +419,9 @@ input:focus-visible + .seg__cell,
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  /* 전환 없이 값만 바뀐다 — 막대는 300ms마다 툭툭, 문구는 바로 교체 */
-  .fortune-loading__fill,
-  .fortune-loading__bar[data-ready] > .fortune-loading__fill {
+  /* 전환 없이 값만 바뀐다 — 달은 단계별로 툭툭 차오르고, 문구는 바로 교체 */
+  .fortune-loading__moon,
+  .fortune-loading__moon[data-ready] {
     transition: none;
   }
   .fortune-loading__text {

@@ -1,20 +1,21 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 
 /**
  * 운세 카드 자리 — 운세가 캐시에 없는 날, 뒤에서 만드는 5~25초 동안 보인다 (FortunePending이 그린다).
- * 디자인 명세 28 (톤 v3.29): 열린 운세 카드와 같은 틀(card-gold card-paper) 안에
- *   1. 진척 붓 막대 — 금색 면(gold-wash)을 붓 가로획(brush-stroke)으로 마스크. 왼→오로 한 번 차오른다(반복 쓸기 아님).
- *   2. 진행 말 한 줄 — 단계가 바뀔 때 글자만 바뀐다(페이드 120ms).
- * 서버는 진행률을 모르므로 마운트 뒤 경과 시간으로 추정한다(아래 표). 퍼센트 숫자는 보이지 않는다.
- * 캐릭터 그림·스피너·점 세 개·돌아가는 문구 없음. 높이는 닫힌 운세 카드와 같다(.fortune-loading min-height) — 카드가 와도 화면이 튀지 않는다.
+ * 디자인 명세 29 (톤 v3.30): 열린 운세 카드와 같은 틀(card-gold card-paper) 안에
+ *   1. 먹 달 64px — 키트의 붓 먹 보름달 원판(moon-ink-disc) 한 장을 마스크로 가려 초승달을 만든다.
+ *      진척이 오르면 가림 원이 오른쪽으로 빠져나가 달이 차오른다(초승달 → 반달 → 보름달). 모양이 곧 진행이라 막대·퍼센트가 없다.
+ *   2. 진행 말 한 줄 — 달 오른쪽. 단계가 바뀔 때 글자만 바뀐다(페이드 120ms).
+ * 서버는 진행률을 모르므로 마운트 뒤 경과 시간으로 추정한다(아래 표). 퍼센트 숫자는 보조 기술에만 있다.
+ * 막대·캐릭터·스피너·점 세 개·돌아가는 문구 없음. 높이는 닫힌 운세 카드와 같다(.fortune-loading min-height) — 카드가 와도 화면이 튀지 않는다.
  *
  * `character`는 page.tsx가 아직 넘기지만 v3.29부터 쓰지 않는다(prop 서명만 유지).
- * `ready`: 캐시가 생겨 refresh 직전(수백 ms) — 막대를 100%로 채우고 "다 됐어요".
+ * `ready`: 캐시가 생겨 refresh 직전(수백 ms) — 보름달로 채우고 "다 됐어요".
  */
 
-/** 경과 구간 → 막대 범위(%)와 진행 말. 파이프라인: 사주 계산(<1초) → 모델이 글 씀(5~20초) → 검사·다시 씀 → 검수 */
+/** 경과 구간 → 차오름 범위(%)와 진행 말. 파이프라인: 사주 계산(<1초) → 모델이 글 씀(5~20초) → 검사·다시 씀 → 검수 */
 const STAGES = [
   { until: 1.5, from: 0, to: 12, text: "사주를 펼치고 있어요" },
   { until: 5, from: 12, to: 30, text: "오늘 간지와 맞춰 보고 있어요" },
@@ -23,7 +24,7 @@ const STAGES = [
 /** 18초 뒤: 75%에서 92%로 ease-out, 92를 넘지 않는다 */
 const TAIL = { from: 75, to: 92, text: "글을 다듬고 있어요", tau: 8 };
 const READY_TEXT = "다 됐어요";
-/** 상태 갱신 간격 — 막대 width 전환도 같은 길이라 눈에는 이어져 보인다 */
+/** 상태 갱신 간격 — 가림 원 이동 전환도 같은 길이라 눈에는 이어져 차오른다 */
 const TICK_MS = 300;
 
 /** 경과 초 → 추정 진척(%)과 단계 번호 */
@@ -58,25 +59,27 @@ export function FortuneLoading({ character, ready = false }: { character?: strin
   const text = ready ? READY_TEXT : est.text;
 
   return (
-    <section className="fortune-loading card-gold card-paper flex flex-col justify-center p-5" aria-busy={!ready} aria-live="polite">
+    <section className="fortune-loading card-gold card-paper flex flex-col p-5" aria-busy={!ready} aria-live="polite">
       <h2 className="text-[15px] text-muted">오늘의 운세</h2>
-      {/* 진척 붓 막대: 트랙 없음(한지 그대로), fill = 금색 면 + 붓 가로획 마스크. 숫자는 보조 기술에만 */}
-      <div
-        className="fortune-loading__bar mt-3"
-        role="progressbar"
-        aria-label="운세 준비"
-        aria-valuemin={0}
-        aria-valuemax={100}
-        aria-valuenow={Math.round(pct)}
-        aria-valuetext={text}
-        data-ready={ready ? "" : undefined}
-      >
-        <span className="fortune-loading__fill" style={{ width: `${pct}%` }} />
+      <div className="fortune-loading__row">
+        {/* 먹 달: 원판 그림을 가림 원(마스크)으로 깎는다. 진척(--moon-p 0~1)에 따라 가림 원이 오른쪽으로 빠져나간다 — 모양은 globals.css.
+            숫자는 보조 기술에만 (role=progressbar) */}
+        <span
+          className="fortune-loading__moon"
+          role="progressbar"
+          aria-label="운세 준비"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={Math.round(pct)}
+          aria-valuetext={text}
+          data-ready={ready ? "" : undefined}
+          style={{ "--moon-p": (pct / 100).toFixed(3) } as CSSProperties}
+        />
+        {/* 진행 말: 단계가 바뀔 때만 글자가 바뀐다 — key로 다시 그려 120ms 페이드 한 번 */}
+        <p key={stage} className="fortune-loading__text text-[15px] text-muted">
+          {text}
+        </p>
       </div>
-      {/* 진행 말: 단계가 바뀔 때만 글자가 바뀐다 — key로 다시 그려 120ms 페이드 한 번 */}
-      <p key={stage} className="fortune-loading__text mt-2 text-[15px] text-muted">
-        {text}
-      </p>
     </section>
   );
 }
