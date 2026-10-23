@@ -366,6 +366,51 @@ input:focus-visible + .seg__cell,
 .fortune-loading {
   min-height: 116px; /* 닫힌 운세 카드와 같은 높이 — 로딩→카드 전환 때 튀지 않게 */
 }
+/* v3.29 (명세 28) 진척 붓 막대: 트랙 바탕 없음(한지 그대로). fill = 금색 면(키트 gold-wash) + 붓 가로획 마스크(brush-stroke, 나 화면 오행 막대와 같은 것).
+   마스크는 최소 56px·오른쪽 정렬이라 막 시작한 짧은 막대도 붓 끝이 갈라진다. width가 300ms 간격으로 갱신되고 전환도 300ms라 이어져 차오른다.
+   반복 쓸기 아님 — 한 번 차오르고 92%에서 멈춘다(컴포넌트가 계산). 금색은 면이므로 v3.26 원칙 안 */
+.fortune-loading__bar {
+  display: block;
+  width: 100%;
+  height: 12px;
+}
+.fortune-loading__fill {
+  display: block;
+  height: 100%;
+  background: var(--color-gold) url("/ui/gold-wash.webp") center / 512px 512px;
+  -webkit-mask: url("/ui/brush-stroke.webp") no-repeat right center / max(100%, 56px) 100%;
+  mask: url("/ui/brush-stroke.webp") no-repeat right center / max(100%, 56px) 100%;
+  transition: width 300ms linear;
+}
+/* ready: 남은 만큼을 300ms ease-out으로 꽉 채운다 */
+.fortune-loading__bar[data-ready] > .fortune-loading__fill {
+  transition: width 300ms cubic-bezier(0.3, 0.7, 0.3, 1);
+}
+/* 진행 말: 단계가 바뀌면 새 글자가 120ms 페이드로 들어온다(슬라이드·타이핑 없음). 한 줄 넘침은 말줄임 */
+.fortune-loading__text {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  animation: fortune-loading-fade 120ms ease-out both;
+}
+@keyframes fortune-loading-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  /* 전환 없이 값만 바뀐다 — 막대는 300ms마다 툭툭, 문구는 바로 교체 */
+  .fortune-loading__fill,
+  .fortune-loading__bar[data-ready] > .fortune-loading__fill {
+    transition: none;
+  }
+  .fortune-loading__text {
+    animation: none;
+  }
+}
 
 /* 화면 뼈대 (v3.2): 제목 자리는 한지보다 한 단계 어두운 네모(4px), 카드 틀은 빈 카드. 정지 상태, 깜빡임 없음 */
 .page-skeleton__title {
