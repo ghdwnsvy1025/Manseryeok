@@ -12,12 +12,16 @@ import {
   ensureUserRow,
   getSajuProfile,
   markLinkPrompted,
+  readFortuneCacheRow,
   saveEntry,
   saveFortuneVote,
   saveName,
   saveNotificationSettings,
   saveSajuProfile,
 } from "@/lib/db";
+// fortune/index가 아니라 policy에서 — index는 모델·관리자 클라이언트까지 끌어와 서버 액션 묶음이 무거워지고, 쓰기 화면 테스트의 모의 순서와도 얽힌다
+import { usableCachedContent } from "@/lib/fortune/policy";
+import { parseYmd } from "@/lib/time";
 import { isAllowedRemindHour } from "@/lib/remind";
 import { validatePushSubscription } from "@/lib/pushSubscription";
 import { validateEntry, validateEntryDate } from "@/lib/entry";
@@ -42,6 +46,20 @@ export async function bootAnonAction(): Promise<void> {
   } catch (e) {
     console.error(e);
   }
+}
+
+/**
+ * 오늘 운세가 캐시에 생겼는지 — FortunePending이 몇 초마다 묻는다. 읽기 한 번뿐, 모델은 부르지 않는다
+ * (생성은 오늘 화면이 응답 뒤에 돌린다). 지문은 화면이 계산해 넘긴 값 — 지금 원국·입력으로 만든 행일 때만 "ready".
+ * API 장애 템플릿(transient=api)은 retryAfter 전까지는 쓸 수 있는 행이므로 그대로 "ready" — 화면이 템플릿 글을 보인다
+ */
+export async function fortuneReadyAction(date: string, fingerprint: string): Promise<"ready" | "pending"> {
+  if (!parseYmd(date) || !/^[0-9a-f]{24}$/.test(fingerprint)) return "pending";
+  const { supabase, user } = await getUser();
+  if (!user) return "pending";
+  const row = await readFortuneCacheRow(supabase, user.id, date);
+  if (!row || row.profile_fingerprint !== fingerprint) return "pending";
+  return usableCachedContent(row.content) ? "ready" : "pending";
 }
 
 export async function saveEntryAction(_prev: FormState, form: FormData): Promise<FormState> {

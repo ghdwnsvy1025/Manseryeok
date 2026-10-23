@@ -1,22 +1,20 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Suspense } from "react";
+import { after } from "next/server";
 import { Booting } from "@/components/Booting";
 import { BurstPreload } from "@/components/BurstPreload";
 import { FortuneCard } from "@/components/FortuneCard";
-import { FortuneLoading } from "@/components/FortuneLoading";
+import { FortunePending } from "@/components/FortunePending";
 import { LinkPromptCard } from "@/components/LinkPromptCard";
-import { RetryButton } from "@/components/RetryButton";
 import { SaveBurst } from "@/components/SaveBurst";
 import { SavedPastNotice } from "@/components/SavedPastNotice";
 import { TodayEntryCard } from "@/components/TodayEntryCard";
 import { TrackOnMount } from "@/components/track/TrackOnMount";
 import { getUser } from "@/lib/supabase/server";
-import { birthProfileOf, getEntry, getFortuneVote, getLinkPromptState, getSajuProfile, listEntries, listEntriesForStats, readFortuneCacheRow, type SajuProfileRow } from "@/lib/db";
+import { birthProfileOf, getEntry, getFortuneVote, getLinkPromptState, getSajuProfile, listEntries, listEntriesForStats, readFortuneCacheRow } from "@/lib/db";
 import { characterOf, characterOfGanji } from "@/lib/character";
-import { cachedFortuneContent, getTodayFortune, type FortuneCacheLookup } from "@/lib/fortune";
+import { cachedFortuneContent, fingerprint, getTodayFortune, type FortuneRequest } from "@/lib/fortune";
 import { withLivePersonal } from "@/lib/fortune/live";
-import type { EntryLike } from "@/lib/fortune/personal";
 import { dayGanji } from "@/lib/ganji";
 import { BRANCH_META, STEM_META, type StemHanja } from "@saju/engine";
 
@@ -39,7 +37,7 @@ import { nightCarryDate } from "@/lib/writeNav";
 import { addDays, formatKoreanDate, hourKST, parseYmd, todayKST } from "@/lib/time";
 
 export const dynamic = "force-dynamic";
-/** 운세 생성(모델 호출 20초 타임아웃 × 최대 3회, 전체 40초 기한)이 Vercel 기본 함수 상한(10~15초)에 끊기지 않게. SDK 옵션은 fortune/llm.ts CLIENT_OPTIONS (A-2) */
+/** 운세 생성(모델 호출 20초 타임아웃 × 최대 3회, 전체 40초 기한)이 응답 뒤(after)에도 끊기지 않게 함수 수명을 늘린다. SDK 옵션은 fortune/llm.ts CLIENT_OPTIONS (A-2) */
 export const maxDuration = 60;
 
 /** 한지 카드 공통 — 키트 테두리(card-frame) 위에 카드 종이(card-paper) */
@@ -48,52 +46,19 @@ const card = "card-frame card-light card-paper p-5";
 const goldButton = "gold-plate mt-5 flex h-14 items-center justify-center rounded-xl text-[17px] font-bold text-gold-ink";
 
 /**
- * 운세 카드 — 모델 호출(3~6초)을 기다리는 안쪽 층. 바깥 층은 기다리지 않고 먼저 그려진다 (docs/ANON_START.md 4절).
- * 캐시가 맞는 날은 여기까지 오지 않는다 — 바깥에서 바로 FortuneCard를 그린다. 투표는 바깥 Promise.all이 읽어 넘긴다.
- * 서버 컴포넌트 사이의 props라 직렬화되지 않는다.
+ * 캐시가 없는(또는 지문이 다른) 날의 운세 생성 — 응답 안에서 기다리지 않는다 (2026-10-23).
+ * 여기서 시작만 하고 `after()`로 응답이 끝난 뒤에도 함수가 살아 있게 둔다. 화면은 바로 내려가고,
+ * 그 자리의 FortunePending(클라이언트)이 몇 초마다 캐시가 생겼는지 물어 생기면 refresh → FortuneCard.
+ * 전엔 Suspense 스트리밍으로 같은 응답 안에서 기다렸다 — 모델이 느린 날(재시도·검수까지 40초)은 응답이
+ * 그만큼 열려 있어 첫 진입이 그 뒤로 밀리고, 중간에 끊기면 운세 자리가 빈 채 남았다.
+ * 같은 사람·같은 날 요청은 fortune/index.ts의 inFlight가 모델을 한 번만 부르게 묶는다.
  */
-async function FortuneSection({
-  userId,
-  profile,
-  entries,
-  today,
-  ganjiKo,
-  defaultOpen,
-  cached,
-  vote,
-}: {
-  userId: string;
-  profile: SajuProfileRow;
-  entries: EntryLike[];
-  today: string;
-  ganjiKo: string;
-  defaultOpen: boolean;
-  /** 바깥에서 읽어 둔 캐시 행(지문이 안 맞는 행) 또는 null(없음). undefined면 운세 쪽이 다시 조회 */
-  cached: FortuneCacheLookup | null | undefined;
-  vote: 1 | -1 | null;
-}) {
-  try {
-    const fortune = await getTodayFortune({ date: today, pillars: profile.pillars, profile: birthProfileOf(profile), entries, owner: { userId }, cached });
-    return (
-      <FortuneCard
-        fortune={fortune}
-        dateLabel={formatKoreanDate(today).replace(/\s*\S+요일$/, "")}
-        ganjiKo={ganjiKo}
-        canVote
-        vote={vote}
-        defaultOpen={defaultOpen}
-      />
-    );
-  } catch (e) {
-    console.error("오늘 운세", e);
-    return (
-      <section className={`${card} text-muted`}>
-        <h2 className="text-lg font-bold text-ink">오늘의 운세</h2>
-        <p className="mt-2 text-[15px]">운세를 불러오지 못했어요. 잠시 뒤 다시 열어 주세요.</p>
-        <RetryButton className="mt-1" />
-      </section>
-    );
-  }
+function startFortune(req: FortuneRequest): void {
+  const running = getTodayFortune(req).then(
+    () => undefined,
+    (e) => console.error("오늘 운세", e),
+  );
+  after(() => running);
 }
 
 export default async function TodayPage({ searchParams }: { searchParams: Promise<{ saved?: string; at?: string }> }) {
@@ -143,26 +108,19 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
   const fortuneDateLabel = formatKoreanDate(today).replace(/\s*\S+요일$/, "");
   // 밤에 저장하고 막 돌아온 순간(?saved)은 접지 않는다 — 팡 뒤에 바로 운세를 본다 (전수조사 C)
   const defaultOpen = !night || entries.length === 0 || Boolean(saved);
-  // 캐시 히트: 기다릴 것이 없으니 fallback 없이 바로 카드. 미스(또는 지문 불일치): 계산·모델 호출은 Suspense 안에서
+  // 캐시 히트: 기다릴 것이 없으니 바로 카드. 미스(또는 지문 불일치): 생성은 응답 뒤에 돌리고(startFortune) 자리엔 로딩 카드
   // B5: 캐시는 날짜 단위라 오늘 저장한 기록이 "내 기록으로 본 오늘"에 없다. 내 기록 블록·맞춤도만 현재 기록으로 다시 센다 (점수·글은 캐시 그대로)
-  const cachedRaw = cachedFortuneContent(cachedRow ?? null, profile.pillars, birthProfileOf(profile));
+  const birth = birthProfileOf(profile);
+  const cachedRaw = cachedFortuneContent(cachedRow ?? null, profile.pillars, birth);
   const cachedFortune = cachedRaw ? withLivePersonal(cachedRaw, entries, today) : null;
-  const fortuneCard = cachedFortune ? (
-    <FortuneCard fortune={cachedFortune} dateLabel={fortuneDateLabel} ganjiKo={ganji.ko} canVote vote={vote} defaultOpen={defaultOpen} />
-  ) : (
-    <Suspense fallback={<FortuneLoading character={myCharacter.characterSrc} />}>
-      <FortuneSection
-        userId={user.id}
-        profile={profile}
-        entries={entries}
-        today={today}
-        ganjiKo={ganji.ko}
-        defaultOpen={defaultOpen}
-        cached={cachedRow}
-        vote={vote}
-      />
-    </Suspense>
-  );
+  let fortuneCard;
+  if (cachedFortune) {
+    fortuneCard = <FortuneCard fortune={cachedFortune} dateLabel={fortuneDateLabel} ganjiKo={ganji.ko} canVote vote={vote} defaultOpen={defaultOpen} />;
+  } else {
+    startFortune({ date: today, pillars: profile.pillars, profile: birth, entries, owner: { userId: user.id }, cached: cachedRow });
+    // 지문을 넘겨 "지금 원국·입력으로 만든 행"이 생겼을 때만 준비됐다고 본다 (옛 지문 행은 아직 아님)
+    fortuneCard = <FortunePending character={myCharacter.characterSrc} date={today} fingerprint={fingerprint(profile.pillars, birth)} />;
+  }
 
   // B8: 과거 날짜를 저장하고 돌아온 경우 — 팡은 오늘만, 과거는 제목 아래 작은 한지 띠 한 번
   const savedPast = saved && saved !== today && parseYmd(saved) ? saved : null;

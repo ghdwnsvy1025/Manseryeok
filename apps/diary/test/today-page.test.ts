@@ -22,23 +22,30 @@ vi.mock("@/lib/db", () => ({
   birthProfileOf: () => ({}),
 }));
 let cachedFortune: Record<string, unknown> | null = null;
-vi.mock("@/lib/fortune", () => ({ getTodayFortune: vi.fn(), cachedFortuneContent: () => cachedFortune }));
+const getTodayFortune = vi.fn(async (_req: Record<string, unknown>) => ({}));
+vi.mock("@/lib/fortune", () => ({ getTodayFortune: (req: Record<string, unknown>) => getTodayFortune(req), cachedFortuneContent: () => cachedFortune, fingerprint: () => "f".repeat(24) }));
+vi.mock("@/app/actions", () => ({ fortuneReadyAction: vi.fn() }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
+const after = vi.fn();
+vi.mock("next/server", () => ({ after: (task: unknown) => after(task) }));
 vi.mock("next/navigation", () => ({
   redirect: (to: string) => {
     throw new Error(`REDIRECT:${to}`);
   },
+  useRouter: () => ({ refresh: vi.fn() }),
 }));
 
-import { Suspense } from "react";
 import TodayPage from "@/app/page";
 import { Booting } from "@/components/Booting";
 import { FortuneCard } from "@/components/FortuneCard";
+import { FortunePending } from "@/components/FortunePending";
 
 beforeEach(() => {
   currentUser = fakeUser;
   profile = null;
   cachedFortune = null;
+  getTodayFortune.mockClear();
+  after.mockClear();
 });
 
 const PROFILE = {
@@ -46,10 +53,10 @@ const PROFILE = {
   pillars: { year: { stem: "乙", branch: "亥", ko: "을해" }, month: { stem: "己", branch: "卯", ko: "기묘" }, day: { stem: "庚", branch: "戌", ko: "경술" }, hour: null },
 };
 
-/** <main> 자식 가운데 운세 카드 자리의 요소 타입 (Suspense면 아직 기다리는 것, FortuneCard면 캐시 히트) */
+/** <main> 자식 가운데 운세 카드 자리의 요소 (FortunePending이면 아직 만드는 중, FortuneCard면 캐시 히트) */
 function fortuneSlot(main: { props: { children: unknown[] } }) {
-  const kids = main.props.children.flat().filter(Boolean) as { type: unknown }[];
-  return kids.map((k) => k.type).find((t) => t === Suspense || t === FortuneCard);
+  const kids = main.props.children.flat().filter(Boolean) as { type: unknown; props: Record<string, unknown> }[];
+  return kids.find((k) => k.type === FortunePending || k.type === FortuneCard);
 }
 
 describe("오늘 화면 첫 흐름", () => {
@@ -64,18 +71,26 @@ describe("오늘 화면 첫 흐름", () => {
     expect(el.props.cards).toBe(2);
   });
 
-  test("프로필이 있으면 화면을 그린다 (캐시 미스: 운세는 Suspense 안이라 여기서 모델을 부르지 않는다)", async () => {
+  test("캐시 미스: 화면은 기다리지 않고 바로 그리고(운세 자리는 FortunePending), 생성은 응답 뒤(after)에 돌린다", async () => {
     profile = PROFILE;
     const el = await TodayPage({ searchParams: Promise.resolve({}) });
     expect(el.type).toBe("main");
-    expect(fortuneSlot(el)).toBe(Suspense);
+    const slot = fortuneSlot(el);
+    expect(slot?.type).toBe(FortunePending);
+    expect(slot?.props.fingerprint).toBe("f".repeat(24));
+    // 생성은 시작됐고(모델 호출은 getTodayFortune 안), 응답이 끝나도 after()가 끝까지 기다린다
+    expect(getTodayFortune).toHaveBeenCalledTimes(1);
+    expect(getTodayFortune.mock.calls[0][0]).toMatchObject({ owner: { userId: "anon-1" }, pillars: PROFILE.pillars });
+    expect(after).toHaveBeenCalledTimes(1);
   });
 
-  test("운세 캐시가 맞으면 Suspense(FortuneLoading) 없이 바로 FortuneCard를 그린다 (전수조사 A-2·3)", async () => {
+  test("운세 캐시가 맞으면 로딩 카드 없이 바로 FortuneCard를 그리고 생성을 시작하지 않는다 (전수조사 A-2·3)", async () => {
     profile = PROFILE;
     cachedFortune = { version: "v4", score: 7, band: "good", headline: "h", body: "b", do: "d", dont: "x", source: "template" };
     const el = await TodayPage({ searchParams: Promise.resolve({}) });
     expect(el.type).toBe("main");
-    expect(fortuneSlot(el)).toBe(FortuneCard);
+    expect(fortuneSlot(el)?.type).toBe(FortuneCard);
+    expect(getTodayFortune).not.toHaveBeenCalled();
+    expect(after).not.toHaveBeenCalled();
   });
 });
