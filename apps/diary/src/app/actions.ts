@@ -32,6 +32,8 @@ export interface FormState {
   error: string | null;
   /** 생년월일 폼: 어느 입력 묶음에서 걸렸는지 (B3). 없으면 폼 아래 한 줄로만 보인다 */
   field?: ProfileField;
+  /** 생년월일 폼: 저장을 마쳤고 이어서 Google 연결로 간다 (첫 화면 "Google로 기록 지키며 시작", ANON_START.md 7절) */
+  then?: "google";
 }
 
 /** 익명 세션이 아직 안 만들어졌을 때 (첫 요청 직후). AnonBoot가 곧 세션을 만들고 화면을 새로 그린다 */
@@ -137,6 +139,9 @@ export async function saveProfileAction(_prev: FormState, form: FormData): Promi
     console.error(e);
     return { error: "저장하지 못했어요. 잠시 뒤 다시 눌러 주세요." };
   }
+  // 첫 화면의 Google 버튼(익명만): 이동하지 않고 돌아가 폼이 Google 연결을 시작한다. revalidatePath도 하지 않는다 —
+  // 하면 지금 온보딩 화면이 "고치기"로 다시 그려져 연결을 시작할 버튼이 사라진다. 다음 화면(/welcome)은 어차피 새로 읽는다
+  if (form.get("then") === "google" && user.is_anonymous) return { error: null, then: "google" };
   revalidatePath("/", "layout");
   redirect("/welcome");
 }

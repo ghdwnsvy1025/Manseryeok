@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { LinkReturnNote, useLinkReturn } from "@/components/LinkGoogleButton";
 import { track } from "@/lib/analytics";
+import { anonymousNow, callbackHref, clearLinkPending, markLinkPending } from "@/lib/googleLink";
 import { createClient } from "@/lib/supabase/client";
 import { loginButtons, type LoginMode } from "@/lib/linkPrompt";
 import { safeNext } from "@/lib/safeNext";
@@ -15,11 +17,8 @@ interface Props {
 /** 첫 누름 뒤 이 시간 안에 다시 눌러야 실행. 지나면 처음으로 (ClearAllButton과 같은 방식) */
 export const CONFIRM_WINDOW_MS = 5000;
 
-function callbackUrl(next?: string): string {
-  const callback = new URL("/auth/callback", window.location.origin);
-  const n = safeNext(next, "");
-  if (n) callback.searchParams.set("next", n);
-  return callback.toString();
+function callbackUrl(mode: LoginMode, next?: string): string {
+  return callbackHref(window.location.origin, mode === "link" ? "link" : "fresh", safeNext(next, ""));
 }
 
 const PRIMARY = "flex h-14 items-center justify-center gap-3 rounded-2xl bg-gold text-[17px] font-bold text-gold-ink disabled:opacity-60";
@@ -39,12 +38,19 @@ export function GoogleButton({ next, entryCount = 0 }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [session, setSession] = useState<{ isAnonymous: boolean } | null | undefined>(undefined);
   const [armed, setArmed] = useState(false);
+  // 연결 버튼을 누르고 돌아왔으면 토큰을 갱신해 연결됐는지 확인한다 (docs/ANON_START.md 6절)
+  const linkReturn = useLinkReturn(useCallback(() => setBusy(false), []));
 
   useEffect(() => {
     createClient()
       .auth.getSession()
       .then(({ data }) => setSession(data.session ? { isAnonymous: Boolean(data.session.user.is_anonymous) } : null));
   }, []);
+
+  // 돌아와서 연결이 확인되면 버튼 대신 "이미 Google로 들어와 있어요"
+  useEffect(() => {
+    if (linkReturn.status === "linked") setSession({ isAnonymous: false });
+  }, [linkReturn.status]);
 
   useEffect(() => {
     if (!armed) return;
@@ -60,11 +66,19 @@ export function GoogleButton({ next, entryCount = 0 }: Props) {
     setArmed(false);
     setBusy(true);
     setError(null);
-    track("login_start", { provider: "google", mode, from: "login" });
     const supabase = createClient();
-    const options = { redirectTo: callbackUrl(next) };
+    if (mode === "link" && (await anonymousNow(supabase.auth)) === false) {
+      // 토큰을 갱신해 보니 연결이 이미 끝나 있었다 — Google로 다시 가면 "이미 연결됨"으로 헛돈다 (2026-10-25)
+      clearLinkPending();
+      setSession({ isAnonymous: false });
+      setBusy(false);
+      return;
+    }
+    track("login_start", { provider: "google", mode, from: "login" });
+    const options = { redirectTo: callbackUrl(mode, next) };
     let result: { error: { message: string } | null };
     if (mode === "link") {
+      markLinkPending();
       result = await supabase.auth.linkIdentity({ provider: "google", options });
     } else {
       result = await supabase.auth.signInWithOAuth({ provider: "google", options });
@@ -72,6 +86,7 @@ export function GoogleButton({ next, entryCount = 0 }: Props) {
     // 성공하면 Google 화면으로 넘어가므로 여기까지 오면 실패한 것
     if (result.error) {
       console.error("Google 로그인", result.error);
+      clearLinkPending();
       setError("Google 로그인 창을 열지 못했어요. 다시 눌러 주세요.");
       setBusy(false);
     }
@@ -103,6 +118,7 @@ export function GoogleButton({ next, entryCount = 0 }: Props) {
           )}
         </div>
       ))}
+      <LinkReturnNote status={linkReturn.status} recheck={linkReturn.recheck} />
       {error && (
         <p role="alert" className="text-[15px] text-danger">
           {error}

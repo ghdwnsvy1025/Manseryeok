@@ -21,7 +21,8 @@ export function AnonBoot() {
   const running = useRef(false);
 
   useEffect(() => {
-    if (running.current) return;
+    // /auth/done은 앱 밖 창(iOS 홈 화면 앱의 Google 화면)에서 열리는 안내라 그 창에 계정을 새로 만들지 않는다 (ANON_START.md 6절)
+    if (running.current || pathname.startsWith("/auth/")) return;
     running.current = true;
     const supabase = createClient();
     (async () => {

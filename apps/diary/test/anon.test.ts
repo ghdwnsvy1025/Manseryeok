@@ -110,6 +110,12 @@ describe("익명 세션에서 저장", () => {
     expect(row!.name).toBe("손님");
     expect(row!.user_id).toBe("anon-1");
   });
+
+  test("첫 화면의 Google 버튼(then=google)이면 저장만 하고 이동하지 않는다 — 폼이 이어서 Google 연결을 시작", async () => {
+    const f = form({ gender: "female", calendar: "solar", birthYear: "1995", birthMonth: "3", birthDay: "14", timeUnknown: "on", city: "seoul", next: "/", then: "google" });
+    await expect(saveProfileAction({ error: null }, f)).resolves.toEqual({ error: null, then: "google" });
+    expect(saved.find((r) => r.table === "night_saju_profiles")!.user_id).toBe("anon-1");
+  });
 });
 
 describe("로그아웃 / 기록 모두 지우기 (2026-10-07 버그: 로그아웃 뒤 '준비하고 있어요'에 멈춤)", () => {

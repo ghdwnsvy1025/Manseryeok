@@ -32,6 +32,7 @@ export default async function OnboardingPage({ searchParams }: { searchParams: P
         next={safeNext}
         askName={askName}
         submitLabel={existing ? "저장" : "내 카드 보기"}
+        offerGoogle={!existing && Boolean(user.is_anonymous)}
         initial={
           existing
             ? {

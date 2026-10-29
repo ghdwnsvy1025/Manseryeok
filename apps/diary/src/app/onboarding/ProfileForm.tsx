@@ -6,6 +6,7 @@ import { track } from "@/lib/analytics";
 import { ONBOARDING_FLAG } from "@/lib/analytics/core";
 import { CITIES } from "@/lib/cities";
 import type { ProfileField } from "@/lib/profile";
+import { GOOGLE_SUBMIT, GoogleStart } from "./GoogleStart";
 
 export interface ProfileFormValues {
   name: string;
@@ -55,6 +56,8 @@ interface ProfileFormProps {
   /** 익명 사용자는 이름을 받지 않는다 (서버가 "손님"으로 저장) */
   askName?: boolean;
   submitLabel?: string;
+  /** 익명 첫 온보딩만: 금색 버튼 아래 "Google로 기록 지키며 시작" (저장 뒤 Google 연결, GoogleStart) */
+  offerGoogle?: boolean;
 }
 
 /**
@@ -65,7 +68,7 @@ interface ProfileFormProps {
  * name=·value=·서버 액션·검증 문구는 기능 쪽 그대로. 카드 틀(card-frame card-paper)은 부모(온보딩 페이지)가 두른다.
  * v3.6: 연→월→일→시→분 자동 포커스 이동(자릿수가 차면 다음, 백스페이스로 비면 이전). 시·도 목록은 CITIES 그대로.
  */
-export function ProfileForm({ next, initial, serverAction = saveProfileAction, askName = true, submitLabel = "저장" }: ProfileFormProps) {
+export function ProfileForm({ next, initial, serverAction = saveProfileAction, askName = true, submitLabel = "저장", offerGoogle = false }: ProfileFormProps) {
   const [state, action, pending] = useActionState<FormState, FormData>(serverAction, { error: null });
   const [gender, setGender] = useState<"male" | "female" | null>(initial?.gender ?? null);
   const [calendar, setCalendar] = useState<"solar" | "lunar">(initial?.calendar ?? "solar");
@@ -135,6 +138,9 @@ export function ProfileForm({ next, initial, serverAction = saveProfileAction, a
   function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const data = new FormData(e.currentTarget);
+    // 어느 제출 버튼인지 — Google 버튼이면 저장 뒤 이동하지 않고 돌아와 연결을 시작한다 (엔터는 첫 버튼인 금색)
+    const viaGoogle = offerGoogle && (e.nativeEvent as SubmitEvent).submitter?.dataset.then === GOOGLE_SUBMIT;
+    if (viaGoogle) data.set("then", "google");
     track("onboarding_submit", { mode, time_known: !timeUnknown, calendar });
     // 성공하면 서버 액션이 /welcome으로 보낸다 — 거기서 이 표를 읽어 onboarding_done을 보낸다 (OnboardingDoneTrack)
     try {
@@ -256,6 +262,7 @@ export function ProfileForm({ next, initial, serverAction = saveProfileAction, a
       <button type="submit" disabled={pending} className="gold-plate h-14 rounded-xl text-[17px] font-bold text-gold-ink disabled:opacity-50">
         {pending ? "계산하는 중…" : submitLabel}
       </button>
+      {offerGoogle && <GoogleStart disabled={pending} saved={state.then === "google" ? state : null} />}
     </form>
   );
 }
