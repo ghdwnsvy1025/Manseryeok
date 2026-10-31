@@ -22,7 +22,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
   }
   return (
     <main className="flex flex-1 flex-col justify-center">
-      <p className="text-sm text-muted">사주읽는밤 일기</p>
+      <p className="text-sm text-muted">사주카우 일기</p>
       <h1 className="mt-2 font-serif text-[30px] leading-snug text-ink">
         이미 Google로 쓰던 분은
         <br />

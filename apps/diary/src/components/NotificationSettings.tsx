@@ -141,7 +141,7 @@ export function NotificationSettings({ enabled, remindHour, kakaoChannelUrl }: P
         <p className="text-[15px] font-bold">카카오 채널</p>
         <p className="mt-0.5 text-sm text-muted">앱 알림이 어려우면 채널 추가로 소식을 받을 수 있어요.</p>
         <a href={kakaoChannelUrl} target="_blank" rel="noreferrer" onClick={() => track("kakao_channel_click")} className="tap mt-1 text-sm text-muted underline underline-offset-4">
-          사주읽는밤 채널 추가
+          사주카우 채널 추가
         </a>
       </div>
     </div>

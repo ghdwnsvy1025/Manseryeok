@@ -47,7 +47,7 @@ export default async function AuthDonePage({ searchParams }: { searchParams: Pro
   );
 }
 
-const BACK = "이 창은 닫고 홈 화면의 '사주읽는밤' 앱으로 돌아가 주세요.";
+const BACK = "이 창은 닫고 홈 화면의 '사주카우' 앱으로 돌아가 주세요.";
 
 const COPY: Record<LinkDoneStatus, { title: string; body: string[] }> = {
   linked: {

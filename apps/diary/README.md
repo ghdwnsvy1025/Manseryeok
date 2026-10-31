@@ -1,4 +1,4 @@
-# 사주읽는밤 일기 (apps/diary)
+# 사주카우 일기 (apps/diary)
 
 이 저장소의 **살아 있는 앱**이다. 루트(`src/` 등)는 동결된 레거시라 루트에서 `npm` 명령을 돌리지 않는다. 결정과 단계는 `../../docs/REBUILD_PLAN.md`, 운세는 `../../docs/FORTUNE_V4.md`, 익명 시작은 `../../docs/ANON_START.md`, 화면 디자인은 `docs/design/00-톤.md`.
 

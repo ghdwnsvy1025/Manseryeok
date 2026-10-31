@@ -23,7 +23,7 @@ async function paper(W, H) {
   return sharp({ create: { width: W, height: H, channels: 3, background: PAPER } });
 }
 
-const TITLE = "사주읽는밤 일기";
+const TITLE = "사주카우 일기";
 const SUB = ["밤에 한 줄 쓰면,", "내 기록으로 운세가 점점 내 것이 돼요"];
 
 /** 1200×630: 왼쪽 초승달(높이 76%), 오른쪽 글 — 왼맞춤, 제목 아래 녹갈 괘선 한 줄 */

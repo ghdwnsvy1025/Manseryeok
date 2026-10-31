@@ -1,6 +1,6 @@
 {
-  "name": "사주읽는밤 일기",
-  "short_name": "사주읽는밤",
+  "name": "사주카우 일기",
+  "short_name": "사주카우",
   "description": "밤에 한 줄 쓰면, 내 기록으로 운세가 점점 내 것이 돼요.",
   "lang": "ko",
   "start_url": "/?source=pwa",
