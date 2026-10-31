@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { supabaseEnv } from "@/lib/supabase/env";
+import { reissueAuthCookies } from "@/lib/supabase/reissue";
 
 /**
  * 세션 쿠키 갱신만 한다 (@supabase/ssr 권장 방식).
@@ -23,6 +24,8 @@ export async function middleware(request: NextRequest) {
   });
   // 토큰이 만료됐으면 여기서 갱신돼 응답 쿠키에 실린다
   await supabase.auth.getUser();
+  // 하루 한 번 세션 쿠키를 서버 쿠키로 다시 — Safari 7일 상한으로 세션이 사라지던 것 (ANON_START.md 8절)
+  reissueAuthCookies(request, response);
 
   return response;
 }
