@@ -11,7 +11,7 @@ import { TodayEntryCard } from "@/components/TodayEntryCard";
 import { getUser } from "@/lib/supabase/server";
 import { birthProfileOf, getEntry, getFortuneVote, getLinkPromptState, getSajuProfile, listEntriesForStats, readFortuneCacheRow } from "@/lib/db";
 import { characterOf, characterOfGanji } from "@/lib/character";
-import { cachedFortuneContent, fingerprint, getTodayFortune, type FortuneRequest } from "@/lib/fortune";
+import { FORTUNE_VERSION, cachedFortuneContent, fingerprint, getTodayFortune, type FortuneRequest } from "@/lib/fortune";
 import { withLivePersonal } from "@/lib/fortune/live";
 import { dayGanji } from "@/lib/ganji";
 import { BRANCH_META, STEM_META, type StemHanja } from "@saju/engine";
@@ -105,7 +105,7 @@ export default async function TodayPage() {
   const cachedFortune = cachedRaw ? withLivePersonal(cachedRaw, entries, today) : null;
   let fortuneCard;
   if (cachedFortune) {
-    fortuneCard = <FortuneCard fortune={cachedFortune} dateLabel={fortuneDateLabel} ganjiKo={ganji.ko} canVote vote={vote} defaultOpen={defaultOpen} />;
+    fortuneCard = <FortuneCard fortune={cachedFortune} dateLabel={fortuneDateLabel} ganjiKo={ganji.ko} canVote vote={vote} defaultOpen={defaultOpen} version={FORTUNE_VERSION} />;
   } else {
     startFortune({ date: today, pillars: profile.pillars, profile: birth, entries, owner: { userId: user.id }, cached: cachedRow });
     // 지문을 넘겨 "지금 원국·입력으로 만든 행"이 생겼을 때만 준비됐다고 본다 (옛 지문 행은 아직 아님)

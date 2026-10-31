@@ -44,16 +44,40 @@ export function bridgedPaths(values: (number | null)[]): { solid: string; gap: s
 
 type View = "all" | AreaKey;
 
-export function HappinessChart({ series, emptyArt }: { series: SeriesPoint[]; emptyArt?: string }) {
+export function HappinessChart({ series: monthSeries, yearSeries, emptyArt }: { series: SeriesPoint[]; yearSeries?: SeriesPoint[]; emptyArt?: string }) {
   const [view, setView] = useState<View>("all");
+  // 2026-10-31 사용자: 한 달 / 1년 보기. 1년은 최근 12달의 월별 평균(monthlySeries) — 점 하나가 한 달
+  const [range, setRange] = useState<"month" | "year">("month");
+  const year = range === "year" && yearSeries ? yearSeries : null;
+  const series = year ?? monthSeries;
+  const unit = year ? "달" : "일";
   const recorded = series.filter((p) => p.happiness10 !== null).length;
+  const rangeSwitch = yearSeries ? (
+    <div className="hchart__range mb-2 flex gap-1" role="radiogroup" aria-label="기간">
+      {(
+        [
+          ["month", "한 달"],
+          ["year", "1년"],
+        ] as const
+      ).map(([k, label]) => (
+        <button key={k} type="button" role="radio" aria-checked={range === k} data-on={range === k ? "" : undefined} onClick={() => setRange(k)} className="hchart__chip hchart__chip--range">
+          {label}
+        </button>
+      ))}
+    </div>
+  ) : null;
   if (recorded < 2) {
     // v3.20 Q3 = C: 빈 화면도 비어 보이지 않게 — 흐린 내 캐릭터 + 한 줄. 모양은 디자이너(.empty-art)
     return (
-      <div className="empty-art">
-        {emptyArt && <img src={emptyArt} alt="" width={96} height={96} className="empty-art__img" />}
-        <p className="hchart__empty text-[15px] text-muted">기록이 2일 쌓이면 그래프가 그려져요. 하루씩 늘어나 30일까지 자라요.</p>
-      </div>
+      <>
+        {year && rangeSwitch}
+        <div className="empty-art">
+          {emptyArt && <img src={emptyArt} alt="" width={96} height={96} className="empty-art__img" />}
+          <p className="hchart__empty text-[15px] text-muted">
+            {year ? "기록이 두 달에 걸쳐 쌓이면 1년 그래프가 그려져요." : "기록이 2일 쌓이면 그래프가 그려져요. 하루씩 늘어나 30일까지 자라요."}
+          </p>
+        </div>
+      </>
     );
   }
   const n = series.length;
@@ -67,11 +91,13 @@ export function HappinessChart({ series, emptyArt }: { series: SeriesPoint[]; em
         });
   const line = bridgedPaths(values);
   const fortune = view === "all" ? bridgedPaths(series.map((p) => p.fortune)) : { solid: "", gap: "" };
-  const first = series[0]!.date.slice(5).replace("-", ".");
-  const last = series[n - 1]!.date.slice(5).replace("-", ".");
+  const label = (d: string) => (year ? `${Number(d.slice(5, 7))}월` : d.slice(5).replace("-", "."));
+  const first = label(series[0]!.date);
+  const last = label(series[n - 1]!.date);
   const viewLabel = view === "all" ? "행복도" : (AREAS.find((a) => a.key === view)?.label ?? "");
   return (
     <figure className="hchart">
+      {rangeSwitch}
       {areaChips.length > 0 && (
         <div className="hchart__chips mb-2 flex flex-wrap gap-1.5" role="radiogroup" aria-label="그래프에서 볼 것">
           {[{ key: "all" as View, label: "전체" }, ...areaChips.map((a) => ({ key: a.key as View, label: a.label }))].map((c) => (
@@ -89,7 +115,7 @@ export function HappinessChart({ series, emptyArt }: { series: SeriesPoint[]; em
           ))}
         </div>
       )}
-      <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`${n}일 ${viewLabel} 그래프. 기록 ${values.filter((v) => v !== null).length}일`} className="hchart__svg block h-auto w-full">
+      <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`${n}${unit} ${viewLabel} 그래프. 기록 ${values.filter((v) => v !== null).length}${unit}`} className="hchart__svg block h-auto w-full">
         {/* 눈금: 0 · 5 · 10 */}
         {[0, 5, 10].map((v) => (
           <g key={v}>
@@ -114,9 +140,9 @@ export function HappinessChart({ series, emptyArt }: { series: SeriesPoint[]; em
         </text>
       </svg>
       <figcaption className="hchart__legend mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[13px] text-muted">
-        <span className="hchart__key hchart__key--dot">{view === "all" ? "내 행복도" : viewLabel}</span>
+        <span className="hchart__key hchart__key--dot">{view === "all" ? `내 행복도${year ? " (월 평균)" : ""}` : viewLabel}</span>
         {view === "all" && <span className="hchart__key hchart__key--fortune">운세 점수</span>}
-        <span className="hchart__key hchart__key--gap">옅은 선 = 기록 없는 날을 건넘</span>
+        <span className="hchart__key hchart__key--gap">옅은 선 = 기록 없는 {year ? "달" : "날"}을 건넘</span>
       </figcaption>
     </figure>
   );

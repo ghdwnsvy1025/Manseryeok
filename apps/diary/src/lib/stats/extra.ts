@@ -222,3 +222,38 @@ export function bestWorstDays(entries: StatEntry[], month?: string): { best: Pic
   const day = (e: StatEntry): PickedDay => ({ date: e.entry_date, happiness: e.happiness, moods: e.moods ?? [] });
   return { best: day(best), worst: worst.happiness < best.happiness ? day(worst) : null };
 }
+
+/**
+ * 1년 보기 (2026-10-31 사용자 결정 Q2 = a): 최근 12달의 월별 평균. date는 "YYYY-MM".
+ * 행복도·운세 점수·영역(단계 평균, 소수)을 달마다 평균 낸다. 기록이 없는 달은 null — 그래프는 옅은 선으로 건넌다.
+ * 첫 기록 달 앞은 growingSeries로 잘린다(한 달 보기와 같은 규칙).
+ */
+export function monthlySeries(entries: StatEntry[], fortunes: { fortune_date: string; score: number }[], today: string, months = 12): SeriesPoint[] {
+  const ym0 = today.slice(0, 7);
+  const shiftYm = (ym: string, d: number) => {
+    const [y, m] = ym.split("-").map(Number) as [number, number];
+    const t = y * 12 + (m - 1) + d;
+    return `${Math.floor(t / 12)}-${String((t % 12) + 1).padStart(2, "0")}`;
+  };
+  const out: SeriesPoint[] = [];
+  for (let i = months - 1; i >= 0; i--) {
+    const ym = shiftYm(ym0, -i);
+    const es = entries.filter((e) => e.entry_date.startsWith(ym));
+    const fs = fortunes.filter((f) => f.fortune_date.startsWith(ym)).map((f) => Number(f.score));
+    const h = mean(es.map((e) => e.happiness));
+    const areas: Areas = {};
+    for (const a of AREAS) {
+      const v = mean(es.map((e) => e.areas?.[a.key]).filter((x): x is number => typeof x === "number"));
+      if (v !== null) areas[a.key] = v;
+    }
+    out.push({
+      date: ym,
+      happiness: h,
+      happiness10: h === null ? null : happinessTo10(h),
+      avg7: null,
+      fortune: mean(fs),
+      areas: Object.keys(areas).length ? areas : null,
+    });
+  }
+  return out;
+}

@@ -14,7 +14,7 @@ import { sajuChart } from "@/lib/saju/chart";
 import { paidReadingOpen } from "@/lib/sajucow";
 import { SajuChartPanel } from "@/components/SajuChartPanel";
 import { FoldButton } from "@/components/FoldButton";
-import { areaAverages, bestWorstDays, growingSeries, habitOf, happinessSeries, moodTop, streakOf, type PickedDay } from "@/lib/stats/extra";
+import { areaAverages, bestWorstDays, growingSeries, habitOf, happinessSeries, monthlySeries, moodTop, streakOf, type PickedDay } from "@/lib/stats/extra";
 import { BestWorstDays, type DayCard, type ForecastCard } from "@/components/BestWorstDays";
 import { forecastMonth, nextMonthOf, type ForecastDay } from "@/lib/stats/forecast";
 import { HappinessChart } from "@/components/HappinessChart";
@@ -54,7 +54,8 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
     getSajuProfile(supabase, user.id),
     countEntries(supabase, user.id),
     listEntriesForStats(supabase, user.id),
-    listFortuneScores(supabase, user.id, addDays(today, -29)),
+    // 1년 보기(월별 평균)까지 — 최근 12달 (2026-10-31)
+    listFortuneScores(supabase, user.id, `${addDays(today, -365).slice(0, 7)}-01`),
     listEntriesInMonth(supabase, user.id, calYm),
     savedDate ? getEntry(supabase, user.id, savedDate) : Promise.resolve(null),
     savedDate ? listEntries(supabase, user.id, 8) : Promise.resolve([]),
@@ -115,6 +116,7 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
   const moods = moodTop(all, 3);
   const streak = streakOf(all, today);
   const series = growingSeries(happinessSeries(all, fortuneScores, today, 30));
+  const yearSeries = growingSeries(monthlySeries(all, fortuneScores, today, 12));
   const cells = ganjiGrid(all);
   // 2026-10-31: 내 사주는 요약 카드, 누르면 그 아래에 만세력이 펼쳐진다 (SajuChartPanel)
   const chart = sajuChart(profile.pillars, birthProfileOf(profile), today);
@@ -192,7 +194,18 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
             )}
           </span>
         </span>
-        <dl className="kv">
+        {/* 2026-10-31 사용자 Q5: 오행을 그림으로 — 다섯 동그라미, 크기·채움이 분포율(--pct 0~1). 모양은 디자이너(.saju-summary__elements) */}
+        <ul className="saju-summary__elements" aria-label="오행 분포">
+          {chart.elements.map((e) => (
+            <li key={e.el} className="saju-summary__element" data-el={e.el} data-zero={e.pct === 0 ? "" : undefined} style={{ "--pct": e.pct / 100 } as React.CSSProperties} aria-label={`${e.ko} ${e.pct}%`}>
+              <span className="saju-summary__el-dot" aria-hidden />
+              <span className={`saju-summary__el-label font-serif ${ELEMENT_TEXT[e.el]}`}>{e.ko}</span>
+              <span className="saju-summary__el-pct text-[12px] tabular-nums text-muted">{e.pct}%</span>
+            </li>
+          ))}
+        </ul>
+        {/* 중심 기운 · 용신 · 희신 — 이름 열과 값 열을 맞춘 세 줄. 용신·희신 오행은 만세력 안과 같은 오행 도장(.saju-yongsin__el) */}
+        <dl className="kv saju-summary__rows">
           <div className="kv__row">
             <dt>중심 기운</dt>
             <dd>
@@ -200,13 +213,26 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
             </dd>
           </div>
           {chart.yongsin && (
-            <div className="kv__row">
-              <dt>용신</dt>
-              <dd>
-                <span className={ELEMENT_TEXT[chart.yongsin.use]}>{ELEMENT_KO[chart.yongsin.use]}</span>, 희신{" "}
-                <span className={ELEMENT_TEXT[chart.yongsin.hee]}>{ELEMENT_KO[chart.yongsin.hee]}</span>
-              </dd>
-            </div>
+            <>
+              <div className="kv__row">
+                <dt>용신</dt>
+                <dd>
+                  <span className="saju-yongsin__el" data-el={chart.yongsin.use} data-rank="use">
+                    {ELEMENT_KO[chart.yongsin.use]}
+                  </span>{" "}
+                  <span className="text-muted">{chart.yongsin.useGroup}</span>
+                </dd>
+              </div>
+              <div className="kv__row">
+                <dt>희신</dt>
+                <dd>
+                  <span className="saju-yongsin__el" data-el={chart.yongsin.hee} data-rank="hee">
+                    {ELEMENT_KO[chart.yongsin.hee]}
+                  </span>{" "}
+                  <span className="text-muted">{chart.yongsin.heeGroup}</span>
+                </dd>
+              </div>
+            </>
           )}
         </dl>
         <span className="saju-summary__more self-end text-sm text-muted">
@@ -252,7 +278,7 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
             pickedEntries={selected === null ? [] : all.filter((e) => e.day_ganji_index === selected)}
           />
         )}
-        <StatsSummary h={h} fitPercent={fitPercent(all.length)} stems={byStem(all)} branches={byBranch(all)} elements={byElement(all)} days={dayCards} areas={areaAvg} moods={moods} streak={streak} habit={habitOf(all, today)} chart={<HappinessChart series={series} emptyArt={me.characterSrc} />} />
+        <StatsSummary h={h} fitPercent={fitPercent(all.length)} stems={byStem(all)} branches={byBranch(all)} elements={byElement(all)} days={dayCards} areas={areaAvg} moods={moods} streak={streak} habit={habitOf(all, today)} chart={<HappinessChart series={series} yearSeries={yearSeries} emptyArt={me.characterSrc} />} />
       </section>
       {/* v3.16: "내 카드 공유" 섹션은 없앴다 — 공유는 오늘 화면 운세 카드의 "공유"(오늘의 운세 한 장)로 */}
 

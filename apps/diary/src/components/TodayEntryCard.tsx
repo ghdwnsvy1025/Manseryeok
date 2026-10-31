@@ -39,11 +39,17 @@ export function TodayEntryCard({ entry, today, ganjiKo, sameGanjiTimes, metCards
         </Link>
       </div>
 
-      <p className="mt-3 text-center font-serif leading-none">
-        <span className="text-[56px] tabular-nums text-ink">{entry.happiness}</span>
-        <span className="ml-1 font-sans text-[15px] text-muted">/10</span>
-        <span className="mt-1.5 block font-sans text-[11px] text-muted">행복도</span>
-      </p>
+      {/* 2026-10-31 사용자 Q3: 큰 숫자 대신 분홍 막대(10점 기준) + 옆에 작은 숫자. 쓰기 화면과 같은 .happy-bar */}
+      <div className="today-happy mt-3 flex items-center gap-3">
+        <span className="shrink-0 text-[13px] text-muted">행복도</span>
+        <span className="happy-bar flex-1" role="meter" aria-label="행복도" aria-valuemin={0} aria-valuemax={10} aria-valuenow={entry.happiness} style={{ "--h": entry.happiness / 10 } as React.CSSProperties}>
+          <span className="happy-bar__fill" />
+        </span>
+        <span className="today-happy__num shrink-0 font-serif text-[22px] tabular-nums text-ink">
+          {entry.happiness}
+          <span className="ml-0.5 font-sans text-[13px] text-muted">/10</span>
+        </span>
+      </div>
 
       {entry.moods.length > 0 && (
         <ul className="mt-3 flex flex-wrap justify-center gap-2" aria-label="기분">

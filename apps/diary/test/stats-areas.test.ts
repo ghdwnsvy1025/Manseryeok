@@ -1,6 +1,6 @@
 // 2026-10-31 나 탭 개편: 영역별 평균, 가장 행복한 날·힘든 날, 그래프 빈 날 잇기
 import { describe, expect, test } from "vitest";
-import { areaAverages, areaTo10, bestWorstDays, happinessSeries, type StatEntry } from "@/lib/stats/extra";
+import { areaAverages, areaTo10, bestWorstDays, happinessSeries, monthlySeries, type StatEntry } from "@/lib/stats/extra";
 import { bridgedPaths } from "@/components/HappinessChart";
 
 const e = (entry_date: string, happiness: number, areas: StatEntry["areas"] = null, moods: string[] = []): StatEntry => ({ entry_date, happiness, areas, moods });
@@ -41,5 +41,17 @@ describe("그래프: 기록 없는 날을 건너 잇기", () => {
     expect(s[1]!.areas).toEqual({ work: 4 });
     expect(s[0]!.areas).toBeNull();
     expect(areaTo10(4)).toBe(s[1]!.happiness10);
+  });
+});
+
+describe("1년 보기: 월별 평균", () => {
+  test("12달, 달마다 행복도·운세·영역 평균, 기록 없는 달은 null", () => {
+    const rows = [e("2026-10-01", 8, { work: 4 }), e("2026-10-20", 6, { work: 2 }), e("2026-08-05", 3)];
+    const s = monthlySeries(rows, [{ fortune_date: "2026-10-02", score: 7 }, { fortune_date: "2026-10-03", score: 5 }], "2026-10-31");
+    expect(s).toHaveLength(12);
+    expect(s[11]).toMatchObject({ date: "2026-10", happiness: 7, fortune: 6, areas: { work: 3 } });
+    expect(s[10]).toMatchObject({ date: "2026-09", happiness: null, areas: null });
+    expect(s[9]!.happiness).toBe(3);
+    expect(s[0]!.date).toBe("2025-11");
   });
 });

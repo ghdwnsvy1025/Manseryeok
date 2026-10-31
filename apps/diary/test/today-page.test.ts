@@ -23,7 +23,7 @@ vi.mock("@/lib/db", () => ({
 }));
 let cachedFortune: Record<string, unknown> | null = null;
 const getTodayFortune = vi.fn(async (_req: Record<string, unknown>) => ({}));
-vi.mock("@/lib/fortune", () => ({ getTodayFortune: (req: Record<string, unknown>) => getTodayFortune(req), cachedFortuneContent: () => cachedFortune, fingerprint: () => "f".repeat(24) }));
+vi.mock("@/lib/fortune", () => ({ getTodayFortune: (req: Record<string, unknown>) => getTodayFortune(req), cachedFortuneContent: () => cachedFortune, fingerprint: () => "f".repeat(24), FORTUNE_VERSION: "v-test" }));
 vi.mock("@/app/actions", () => ({ fortuneReadyAction: vi.fn() }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 const after = vi.fn();

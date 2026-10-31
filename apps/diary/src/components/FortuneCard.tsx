@@ -78,6 +78,8 @@ interface Props {
   vote: 1 | -1 | null;
   /** 기본으로 펼쳐 둘지 */
   defaultOpen: boolean;
+  /** 이 운세를 만든 계산 버전("v4.18") — 카드 맨 아래 작게. 판정이 바뀐 뒤 새로 만든 운세인지 사용자가 알 수 있게 (2026-10-31) */
+  version?: string;
 }
 
 /**
@@ -142,7 +144,7 @@ function PersonalCompare({ personal, fortune }: { personal: ReturnType<typeof pe
   );
 }
 
-export function FortuneCard({ fortune, ganjiKo, canVote, vote, defaultOpen }: Props) {
+export function FortuneCard({ fortune, ganjiKo, canVote, vote, defaultOpen, version }: Props) {
   const scoreText = fortune.score.toFixed(1);
   const paragraphs = splitParagraphs(fortune.body);
   /** 영역 줄 최대 4 (오늘 ≤2 · 이달 1 · 올해 1). period는 기능 쪽이 곧 넣는다 — 없으면 "오늘" */
@@ -283,6 +285,7 @@ export function FortuneCard({ fortune, ganjiKo, canVote, vote, defaultOpen }: Pr
 
             {/* v3.14: 누르는 즉시 바뀌고 카드가 접히지 않는다 (클라이언트 컴포넌트) */}
             {canVote && <VoteButtons date={fortune.date} initial={vote} />}
+            {version && <p className="fortune-version mt-3 text-right text-[12px] text-muted">운세 계산 {version}</p>}
 
           </div>
         </div>

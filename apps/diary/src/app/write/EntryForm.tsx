@@ -183,6 +183,12 @@ export function EntryForm({ date, when = "today", notePlaceholder, initial, warm
                   ? "영역을 하나 이상 골라 주세요"
                   : "오늘 있었던 영역만, 도장 하나씩"}
           </p>
+          {/* 2026-10-31 사용자 Q3: 행복도를 분홍 막대로 — 10점 기준으로 차오른다(--h 0~1). 모양은 디자이너(.happy-bar) */}
+          {happiness !== null && (
+            <span className="happy-bar mt-2" role="meter" aria-label="행복도" aria-valuemin={0} aria-valuemax={10} aria-valuenow={happiness} style={{ "--h": happiness / 10 } as React.CSSProperties}>
+              <span className="happy-bar__fill" />
+            </span>
+          )}
           <div className="entry-areas__rows mt-3 flex flex-col gap-2">
             {AREAS.map((a) => (
               <div key={a.key} className="entry-area" role="radiogroup" aria-label={a.label}>
