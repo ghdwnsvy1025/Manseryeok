@@ -1,9 +1,9 @@
 import Link from "next/link";
-import { moodTone, type Promise_ } from "@/lib/entry";
+import { moodTone } from "@/lib/entry";
 import { CelebrateOnMount } from "@/components/CelebrateOnMount";
 
 interface Props {
-  entry: { happiness: number; moods: string[]; note: string | null; promise?: Promise_ | null };
+  entry: { happiness: number; moods: string[]; note: string | null };
   /** 오늘 날짜 (고치기 링크) */
   today: string;
   /** 오늘 간지 한글 ("을묘") — 카드 획득 줄 */
@@ -14,29 +14,19 @@ interface Props {
   metCards: number;
   /** 연속 기록 일수 */
   streak: number;
-  /** "하면 좋아요" 해 본 날 / 답한 날 (v3.15). 답한 날이 없으면 null */
-  points: { kept: number; answered: number } | null;
   /** 방금 저장하고 돌아왔는지 — "저장했어요" 줄이 150ms 늦게 나타난다 */
   justSaved: boolean;
 }
-
-/** 오늘 포인트 줄 (v3.7 → 전수조사 C 문구): 글자 + 점. 해봤어요 = 인주 점, 못 했어요 = 먹 점, 해당 없음 = 점 없음 */
-const PROMISE_LINE: Record<Promise_, { word: string; dot: string | null }> = {
-  kept: { word: "해봤어요", dot: "bg-seal" },
-  missed: { word: "못 했어요", dot: "bg-ink-stamp" },
-  na: { word: "해당 없음", dot: null },
-};
 
 const ORDINAL = ["", "첫", "두", "세", "네", "다섯", "여섯", "일곱", "여덟", "아홉", "열"];
 
 /**
  * 오늘의 기록 — 일기장의 오늘 페이지 (톤 v3 → 02 v3.7 → v3.12).
  * 숫자가 주인공: 행복도 Song Myung 56px 가운데. 기분 띠지는 data-tone(긍정 금빛 · 무덤덤 · 부정 남색).
- * 메모는 괘선 두 줄 사이에 손글씨로 — 없으면 괘선째 생략. 포인트 줄은 있을 때만.
+ * 메모는 괘선 두 줄 사이에 손글씨로 — 없으면 괘선째 생략. (2026-10-31 "오늘 포인트" 줄·"하면 좋아요" 칩은 뺐다)
  * 맨 아래 두 줄 (2026-10-09 Q4 = C, 내일 간지 대신): 카드 획득 / 지표. 모양은 디자이너(.entry-news*).
  */
-export function TodayEntryCard({ entry, today, ganjiKo, sameGanjiTimes, metCards, streak, points, justSaved }: Props) {
-  const promise = entry.promise ? PROMISE_LINE[entry.promise] : null;
+export function TodayEntryCard({ entry, today, ganjiKo, sameGanjiTimes, metCards, streak, justSaved }: Props) {
   const nth = sameGanjiTimes <= 10 ? `${ORDINAL[sameGanjiTimes]} 번째` : `${sameGanjiTimes}번째`;
   const cardLine = sameGanjiTimes <= 1 ? `${ganjiKo} 카드를 처음 만났어요` : `${ganjiKo} 카드에 ${nth} 도장을 찍었어요`;
   return (
@@ -77,15 +67,6 @@ export function TodayEntryCard({ entry, today, ganjiKo, sameGanjiTimes, metCards
           {justSaved && sameGanjiTimes <= 1 && <CelebrateOnMount id={`first:${today}`} delay={900} />}
         </p>
         <dl className="kv mt-2">
-          {promise && (
-            <div className="kv__row">
-              <dt>오늘 포인트</dt>
-              <dd>
-                {promise.word}
-                {promise.dot && <span aria-hidden className={`ml-1.5 inline-block h-2 w-2 rounded-full ${promise.dot}`} />}
-              </dd>
-            </div>
-          )}
           <div className="kv__row">
             <dt>모은 카드</dt>
             <dd>
@@ -102,7 +83,6 @@ export function TodayEntryCard({ entry, today, ganjiKo, sameGanjiTimes, metCards
             {/* v3.20 보상 순간: 연속 7·30·100일 */}
             {justSaved && [7, 30, 100].includes(streak) && <CelebrateOnMount id={`streak:${today}:${streak}`} delay={1300} />}
           </li>
-          {points && <li className="chip">하면 좋아요 {points.kept}/{points.answered}</li>}
         </ul>
       </div>
     </section>

@@ -1,7 +1,7 @@
 // night_* 테이블 읽기·쓰기. 모두 로그인한 사용자의 Supabase 클라이언트로 부르며 RLS가 본인 행만 허용한다.
 // 스키마: supabase/migrations/0001_night_core.sql
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { EntryInput, Promise_ } from "./entry";
+import type { Areas, EntryInput, Promise_ } from "./entry";
 import type { DayGanji } from "./ganji";
 import { CITIES, type CityId } from "./cities";
 import { monthRange } from "./calendar";
@@ -20,6 +20,10 @@ export interface EntryRow {
   /** 오늘의 작은 약속 (0003_promise.sql). 컬럼 적용 전이면 undefined */
   promise?: Promise_ | null;
   promise_text?: string | null;
+  /** 영역별 5단계 (0005_entry_areas.sql). 이전 기록·열 적용 전이면 null/undefined */
+  areas?: Areas | null;
+  /** 내일의 나에게 쪽지 (0005) */
+  tomorrow_note?: string | null;
 }
 
 export interface SajuProfileRow {
@@ -56,7 +60,9 @@ export function birthProfileOf(row: SajuProfileRow): BirthProfile {
 
 const ENTRY_COLUMNS_LEGACY = "id, entry_date, happiness, moods, note, day_ganji_index, day_stem, day_branch";
 /** 0003_promise.sql 적용 뒤의 전체 컬럼. 적용 전이면 읽기·쓰기가 컬럼 없음으로 실패하므로 LEGACY로 한 번 더 시도한다 */
-const ENTRY_COLUMNS = `${ENTRY_COLUMNS_LEGACY}, promise, promise_text`;
+const ENTRY_COLUMNS_V3 = `${ENTRY_COLUMNS_LEGACY}, promise, promise_text`;
+/** 0005_entry_areas.sql 적용 뒤. 적용 전이면 V3 → LEGACY 순으로 다시 시도한다 */
+const ENTRY_COLUMNS = `${ENTRY_COLUMNS_V3}, areas, tomorrow_note`;
 const PROFILE_COLUMNS =
   "id, name, gender, calendar, is_leap_month, birth_year, birth_month, birth_day, birth_hour, birth_minute, city, pillars, engine_version";
 
@@ -218,6 +224,7 @@ export async function markLinkPrompted(sb: SupabaseClient, userId: string, nextC
 export async function getEntry(sb: SupabaseClient, userId: string, date: string): Promise<EntryRow | null> {
   const q = (cols: string) => sb.from("night_entries").select(cols).eq("user_id", userId).eq("entry_date", date).maybeSingle();
   let { data, error } = await q(ENTRY_COLUMNS);
+  if (error && isMissingColumnError(error)) ({ data, error } = await q(ENTRY_COLUMNS_V3));
   if (error && isMissingColumnError(error)) ({ data, error } = await q(ENTRY_COLUMNS_LEGACY));
   if (error) fail("기록 읽기", error);
   return data as unknown as EntryRow | null;
@@ -227,6 +234,7 @@ export async function listEntries(sb: SupabaseClient, userId: string, limit = 30
   const q = (cols: string) =>
     sb.from("night_entries").select(cols).eq("user_id", userId).order("entry_date", { ascending: false }).limit(limit);
   let { data, error } = await q(ENTRY_COLUMNS);
+  if (error && isMissingColumnError(error)) ({ data, error } = await q(ENTRY_COLUMNS_V3));
   if (error && isMissingColumnError(error)) ({ data, error } = await q(ENTRY_COLUMNS_LEGACY));
   if (error) fail("기록 목록 읽기", error);
   return (data ?? []) as unknown as EntryRow[];
@@ -238,6 +246,7 @@ export async function listEntriesInMonth(sb: SupabaseClient, userId: string, ym:
   const q = (cols: string) =>
     sb.from("night_entries").select(cols).eq("user_id", userId).gte("entry_date", from).lt("entry_date", toExclusive).order("entry_date", { ascending: true });
   let { data, error } = await q(ENTRY_COLUMNS);
+  if (error && isMissingColumnError(error)) ({ data, error } = await q(ENTRY_COLUMNS_V3));
   if (error && isMissingColumnError(error)) ({ data, error } = await q(ENTRY_COLUMNS_LEGACY));
   if (error) fail("한 달 기록 읽기", error);
   return (data ?? []) as unknown as EntryRow[];
@@ -265,12 +274,17 @@ export async function saveEntry(sb: SupabaseClient, userId: string, input: Entry
     day_branch: ganji.branchKo,
   };
   const upsert = (row: Record<string, unknown>) => sb.from("night_entries").upsert(row, { onConflict: "user_id,entry_date" });
-  const { error } = await upsert({ ...base, promise: input.promise, promise_text: input.promiseText });
+  // 약속은 폼이 보냈을 때만(2026-10-31부터 쓰기 화면에 없다) — 안 보냈으면 지난 값을 그대로 둔다
+  const promise = input.promise === undefined ? {} : { promise: input.promise, promise_text: input.promiseText ?? null };
+  const { error } = await upsert({ ...base, ...promise, areas: input.areas, tomorrow_note: input.tomorrowNote });
   if (!error) return;
-  // 0003_promise.sql 적용 전: 약속 컬럼을 빼고 다시 저장 (약속만 버려지고 기록은 남는다)
+  // 0005 적용 전: 영역·쪽지 열을 빼고, 0003 적용 전이면 약속 열까지 빼고 다시 저장 (그 값만 버려지고 기록은 남는다)
   if (isMissingColumnError(error)) {
-    const { error: e2 } = await upsert(base);
-    if (e2) fail("기록 저장", e2);
+    const { error: e2 } = await upsert({ ...base, ...promise });
+    if (!e2) return;
+    if (!isMissingColumnError(e2)) fail("기록 저장", e2);
+    const { error: e3 } = await upsert(base);
+    if (e3) fail("기록 저장", e3);
     return;
   }
   fail("기록 저장", error);
@@ -282,18 +296,21 @@ export async function deleteEntry(sb: SupabaseClient, userId: string, date: stri
   if (error) fail("기록 지우기", error);
 }
 
+export type StatsEntry = Pick<EntryRow, "entry_date" | "happiness" | "day_ganji_index" | "day_stem" | "day_branch" | "promise" | "moods" | "areas">;
+
 /** 운세 보정용: 전체 기록을 가볍게 (날짜 역순 제한 없음, 간지 통계에도 쓴다) */
 export async function listEntriesForStats(
   sb: SupabaseClient,
   userId: string,
-): Promise<Pick<EntryRow, "entry_date" | "happiness" | "day_ganji_index" | "day_stem" | "day_branch" | "promise" | "moods">[]> {
+): Promise<StatsEntry[]> {
   const legacy = "entry_date, happiness, moods, day_ganji_index, day_stem, day_branch";
   const q = (cols: string) =>
     sb.from("night_entries").select(cols).eq("user_id", userId).order("entry_date", { ascending: false }).limit(2000);
-  let { data, error } = await q(`${legacy}, promise`);
+  let { data, error } = await q(`${legacy}, promise, areas`);
+  if (error && isMissingColumnError(error)) ({ data, error } = await q(`${legacy}, promise`));
   if (error && isMissingColumnError(error)) ({ data, error } = await q(legacy));
   if (error) fail("기록 통계 읽기", error);
-  return (data ?? []) as unknown as Pick<EntryRow, "entry_date" | "happiness" | "day_ganji_index" | "day_stem" | "day_branch" | "promise" | "moods">[];
+  return (data ?? []) as unknown as StatsEntry[];
 }
 
 /** 행복도 그래프에 겹칠 운세 점수(10점). fromDate 이후. 운세를 안 연 날은 행이 없다 — 그래프에서 비운다 */

@@ -74,6 +74,17 @@
 - 파일: `src/app/onboarding/GoogleStart.tsx`, `ProfileForm.tsx`(`offerGoogle`, submitter), `actions.ts`(`FormState.then`), `lib/googleLink.ts`(`ONBOARDING_LINK_NEXT`, `providerErrorTarget`), `app/auth/done/page.tsx`. 테스트 `test/google-link.test.ts`·`test/anon.test.ts`.
 - 확인 못 한 것: 실제 Google 화면을 거치는 흐름(로컬에서 첫 화면을 열면 운영 DB에 익명 계정이 생겨 열지 않았다).
 
+## 8. "매번 생년월일 입력"— 세션을 잃으면 조용히 새 계정이 생기던 일 (2026-10-31)
+
+사용자 보고: 들어갈 때마다 생년월일 입력이 나온다. 프로필이 지워진 게 아니라 **세션 쿠키를 잃은 기기에서 AnonBoot가 아무 말 없이 새 익명 계정을 만들었다** — 새 계정엔 프로필이 없어 온보딩. 운영 DB(읽기만): 원래 계정 `1aa4bbd3…`은 프로필·기록 30건 그대로, 10-25 뒤 새 빈 익명 계정 2개(10-29 12:27·23:24, 프로필·기록 없음).
+
+세션을 잃는 길: ① 저장소가 다른 창(카톡 안 브라우저, 바이럴의 새 창 링크, iOS Safari↔홈 화면 앱) ② 토큰 갱신 실패 시 auth-js가 쿠키를 지움 ③ Safari가 스크립트로 만든 쿠키를 7일로 줄임(익명 세션은 브라우저에서 처음 만들어진다).
+
+- **쿠키 다시 내려 주기** (`lib/supabase/reissue.ts`, 미들웨어): 하루 한 번(표시 쿠키 `night_ck`) 세션 쿠키를 같은 값·같은 속성(@supabase/ssr 기본, 400일)의 Set-Cookie로 다시 내려 서버 쿠키로 만든다 → ③을 막는다. 이번 응답이 갱신으로 이미 쓴 쿠키는 건드리지 않는다.
+- **잃었을 때 묻기** (`lib/accountMemory.ts`, `components/RememberAccount.tsx`, `app/restore/`): 오늘 화면이 "이 기기에서 쓰던 계정"(id 앞 8자, 익명 여부)을 localStorage에 적는다. AnonBoot는 세션이 없는데 이 기록이 있으면 새로 만들지 않고 `/restore?next=…`로 — Google 계정이었으면 "Google로 기록 찾기"(기존 계정 로그인) + "새로 시작하기", 익명이었으면 되찾을 수 없다고 솔직히 말하고 "새로 시작하기"(설정에서 Google 연결 권함). 이벤트 `session_lost`(had), `session_lost_fresh`. ②는 이것으로 세어 볼 수 있다.
+- 못 막는 것: ①의 다른 저장소에는 기록도 없어 예전처럼 바로 시작한다(온보딩의 "이미 Google로 쓰던 분은 여기서 로그인"). iOS 홈 화면 앱 안에서 기존 Google 로그인이 끝나지 않는 것(6절 남은 것)은 그대로.
+- 테스트: `test/session-keep.test.ts`.
+
 ## 하지 않는 것
 - 익명 행 정리 크론(나중에. 30일 이상 기록 0건인 익명 계정 삭제).
 - 카카오 로그인.

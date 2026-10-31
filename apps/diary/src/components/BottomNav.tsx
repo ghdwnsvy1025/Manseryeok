@@ -38,7 +38,7 @@ export function BottomNav() {
     return () => window.clearTimeout(id);
   }, [path, router]);
 
-  if (path.startsWith("/login") || path.startsWith("/onboarding") || path.startsWith("/welcome")) return null;
+  if (path.startsWith("/login") || path.startsWith("/onboarding") || path.startsWith("/welcome") || path.startsWith("/restore")) return null;
 
   return (
     <nav

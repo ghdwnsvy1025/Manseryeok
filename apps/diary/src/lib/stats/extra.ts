@@ -1,12 +1,15 @@
 // 행복도 말고 보여 주는 지표 (2026-10-09 사용자 결정 Q4: 포인트 실행률 · 기분 분포 · 연속 기록) + 30일 그래프 데이터 (Q7).
 // 전부 이미 저장된 기록에서 읽을 때 계산한다. 행복도 자체는 바꾸지 않는다 (Q3: 사용자가 매긴 숫자 그대로).
 import { addDays } from "../time";
+import { AREAS, type AreaKey, type Areas } from "../entry";
 
 export interface StatEntry {
   entry_date: string;
   happiness: number;
   moods?: string[] | null;
   promise?: "kept" | "missed" | "na" | null;
+  /** 영역별 5단계 (2026-10-31). 이전 기록은 null */
+  areas?: Areas | null;
 }
 
 function round1(x: number): number {
@@ -128,8 +131,10 @@ export interface SeriesPoint {
   happiness10: number | null;
   /** 그날까지 7일 창 안 기록들의 평균(10점 척도). 창 안 기록이 2건 미만이면 null */
   avg7: number | null;
-  /** 그날 운세 점수(10점). 운세를 안 연 날은 null — 비워 둔다 (사용자 결정) */
+  /** 그날 운세 점수(10점). 운세를 안 연 날은 null */
   fortune: number | null;
+  /** 그날 영역별 5단계 (2026-10-31). 그래프 칩으로 영역 선을 볼 때 */
+  areas: Areas | null;
 }
 
 /**
@@ -144,6 +149,7 @@ export function growingSeries(series: SeriesPoint[]): SeriesPoint[] {
 /** 오늘 포함 최근 days일. 오래된 날 → 오늘 순 */
 export function happinessSeries(entries: StatEntry[], fortunes: { fortune_date: string; score: number }[], today: string, days = 30): SeriesPoint[] {
   const byDate = new Map(entries.map((e) => [e.entry_date, e.happiness]));
+  const areasByDate = new Map(entries.map((e) => [e.entry_date, e.areas ?? null]));
   const fByDate = new Map(fortunes.map((f) => [f.fortune_date, Number(f.score)]));
   const to10 = (h: number) => round1(((h - 1) / 9) * 10);
   const out: SeriesPoint[] = [];
@@ -161,7 +167,58 @@ export function happinessSeries(entries: StatEntry[], fortunes: { fortune_date: 
       happiness10: h === null ? null : to10(h),
       avg7: win.length >= 2 ? mean(win) : null,
       fortune: fByDate.has(date) ? round1(fByDate.get(date)!) : null,
+      areas: areasByDate.get(date) ?? null,
     });
   }
   return out;
+}
+
+/** 행복도(1~10)를 그래프의 10점 척도로 — happinessSeries와 같은 식 */
+export function happinessTo10(h: number): number {
+  return round1(((h - 1) / 9) * 10);
+}
+
+/** 영역 5단계 → 그래프 10점 척도. 하루 행복도와 같은 식(단계 × 2를 행복도로 본다) */
+export function areaTo10(level: number): number {
+  return happinessTo10(level * 2);
+}
+
+export interface AreaAverage {
+  key: AreaKey;
+  label: string;
+  /** 최근 days일 평균 단계(1~5, 소수 한 자리). 매긴 날이 없으면 null */
+  mean: number | null;
+  /** 매긴 날 수 */
+  n: number;
+}
+
+/** 최근 days일(오늘 포함) 영역별 평균 단계 (2026-10-31, 나 탭 영역 막대). 영역 순서는 AREAS 그대로 */
+export function areaAverages(entries: StatEntry[], today: string, days = 30): AreaAverage[] {
+  const from = addDays(today, -(days - 1));
+  const recent = entries.filter((e) => e.entry_date >= from && e.entry_date <= today && e.areas);
+  return AREAS.map((a) => {
+    const vals = recent.map((e) => e.areas?.[a.key]).filter((v): v is number => typeof v === "number");
+    return { key: a.key, label: a.label, mean: mean(vals), n: vals.length };
+  });
+}
+
+export interface PickedDay {
+  date: string;
+  happiness: number;
+  moods: string[];
+}
+
+/**
+ * 가장 행복한 날·가장 힘든 날 하루씩 (2026-10-31). 같은 점수면 최근 날. 기록이 하나뿐이거나 모두 같은 점수면 힘든 날은 없다.
+ * month("YYYY-MM")를 주면 그 달 기록에서만.
+ */
+export function bestWorstDays(entries: StatEntry[], month?: string): { best: PickedDay | null; worst: PickedDay | null } {
+  const list = month ? entries.filter((e) => e.entry_date.startsWith(month)) : entries;
+  if (list.length === 0) return { best: null, worst: null };
+  const pick = (better: (a: StatEntry, b: StatEntry) => boolean) =>
+    list.reduce((acc, e) => (better(e, acc) || (e.happiness === acc.happiness && e.entry_date > acc.entry_date) ? e : acc));
+  const best = pick((a, b) => a.happiness > b.happiness);
+  const worst = pick((a, b) => a.happiness < b.happiness);
+  const day = (e: StatEntry): PickedDay => ({ date: e.entry_date, happiness: e.happiness, moods: e.moods ?? [] });
+  return { best: day(best), worst: worst.happiness < best.happiness ? day(worst) : null };
 }

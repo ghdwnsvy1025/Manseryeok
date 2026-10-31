@@ -1,46 +1,66 @@
 // 기록 입력 규칙. 화면과 서버가 같은 함수를 쓴다.
 import { parseYmd, todayKST } from "./time";
 
-/** 레거시와 같은 13개 (이관한 기록의 기분이 그대로 맞도록) */
-export const MOODS = [
-  "기쁨",
-  "뿌듯함",
-  "설렘",
-  "평온",
-  "감사함",
-  "신남",
-  "홀가분함",
-  "든든함",
-  "무덤덤",
-  "피곤함",
-  "지침",
-  "외로움",
-  "긴장됨",
-  "답답함",
-  "짜증남",
-  "불안",
-  "분노",
-  "슬픔",
-  "우울함",
-  "후회스러움",
-] as const;
+/**
+ * 기분 (2026-10-31 사용자 결정: 개수 제한 없음, 세 무리로 나눠 늘림).
+ * 예전 20개는 이름 그대로 모두 남긴다 — 이관·지난 기록의 기분이 그대로 맞는다. 무리 순서가 곧 화면 순서.
+ */
+export const MOOD_GROUPS = {
+  pos: ["기쁨", "행복함", "즐거움", "설렘", "신남", "뿌듯함", "만족스러움", "감사함", "평온", "편안함", "여유로움", "홀가분함", "든든함", "재미있음", "자신감", "희망참", "따뜻함", "사랑받음"],
+  neutral: ["무덤덤", "무난함", "멍함", "심심함", "바쁨", "생각 많음", "그리움"],
+  neg: ["피곤함", "지침", "무기력함", "우울함", "슬픔", "외로움", "서운함", "불안", "걱정됨", "긴장됨", "스트레스", "답답함", "짜증남", "분노", "실망스러움", "후회스러움", "질투", "부끄러움", "아픔"],
+} as const;
+export const MOODS = [...MOOD_GROUPS.pos, ...MOOD_GROUPS.neutral, ...MOOD_GROUPS.neg] as const;
 export type Mood = (typeof MOODS)[number];
 
-/** 기분 색 구분 (2026-10-09 Q3): 긍정 = 금빛, 무덤덤 = 색 없음, 부정 = 차분한 남색. 빨강 없음. 화면은 data-tone으로 칠한다 */
+/** 기분 색 구분 (2026-10-09 Q3): 긍정 = 금빛, 그저 그런 = 색 없음, 부정 = 차분한 남색. 빨강 없음. 화면은 data-tone으로 칠한다 */
 export type MoodTone = "pos" | "neutral" | "neg";
-const POSITIVE_MOODS: readonly string[] = ["기쁨", "뿌듯함", "설렘", "평온", "감사함", "신남", "홀가분함", "든든함"];
 export function moodTone(m: string): MoodTone {
-  if (POSITIVE_MOODS.includes(m)) return "pos";
-  if (m === "무덤덤") return "neutral";
+  if ((MOOD_GROUPS.pos as readonly string[]).includes(m)) return "pos";
+  if ((MOOD_GROUPS.neutral as readonly string[]).includes(m)) return "neutral";
   return "neg";
 }
 
-export const MAX_MOODS = 3;
+/**
+ * 영역별 행복도 (2026-10-31 사용자 결정): 여섯 영역을 5단계 도장으로, 매긴 영역만. 하루 행복도 = 매긴 영역 평균 × 2 (1~10 반올림).
+ * 영역이 없는 기록(이전 기록)은 happiness만 있다.
+ */
+export const AREAS = [
+  { key: "work", label: "일·공부" },
+  { key: "money", label: "돈" },
+  { key: "health", label: "건강" },
+  { key: "family", label: "가족" },
+  { key: "love", label: "연애" },
+  { key: "people", label: "대인관계" },
+] as const;
+export type AreaKey = (typeof AREAS)[number]["key"];
+export type Areas = Partial<Record<AreaKey, number>>;
+/** 5단계 도장의 말 (1 = 아주 힘듦 … 5 = 아주 좋음) */
+export const AREA_LEVELS = ["아주 힘듦", "힘듦", "보통", "좋음", "아주 좋음"] as const;
+
+export function areaCount(a: Areas | null | undefined): number {
+  return a ? AREAS.filter((x) => typeof a[x.key] === "number").length : 0;
+}
+
+/** 매긴 영역 평균(1~5) × 2 → 1~10 반올림. 매긴 영역이 없으면 null */
+export function happinessFromAreas(a: Areas | null | undefined): number | null {
+  if (!a) return null;
+  const vals = AREAS.map((x) => a[x.key]).filter((v): v is number => typeof v === "number");
+  if (vals.length === 0) return null;
+  const avg = vals.reduce((s, v) => s + v, 0) / vals.length;
+  return Math.min(10, Math.max(1, Math.round(avg * 2)));
+}
+
 export const MAX_NOTE = 500;
+/** 내일의 나에게 쪽지 (2026-10-31, "오늘 해볼 일" 자리). 다음 날 오늘 화면 위에 펼쳐진다 */
+export const MAX_TOMORROW_NOTE = 100;
 /** 기록할 수 있는 가장 이른 날짜 (레거시 이관분 포함) */
 export const EARLIEST_ENTRY_DATE = "2020-01-01";
 
-/** 오늘의 작은 약속(톤 v3.2): 운세 "하면 좋아요" 한 줄을 지켰는지. 약속이 없던 날(운세 캐시 없음)은 null */
+/**
+ * 오늘의 작은 약속(톤 v3.2): 운세 "하면 좋아요" 한 줄을 지켰는지. 2026-10-31 쓰기 화면에서 뺐다(내일의 나에게 쪽지로).
+ * 지난 기록의 값은 DB에 남기고 읽는 규칙만 둔다 — 폼이 보내지 않으면(undefined) 저장할 때 건드리지 않는다
+ */
 export const PROMISES = ["kept", "missed", "na"] as const;
 export type Promise_ = (typeof PROMISES)[number];
 export const MAX_PROMISE_TEXT = 200;
@@ -50,9 +70,14 @@ export interface EntryInput {
   happiness: number;
   moods: Mood[];
   note: string | null;
-  promise: Promise_ | null;
+  /** 영역별 5단계. 매긴 영역이 없으면 null(이전 방식 기록) */
+  areas: Areas | null;
+  /** 내일의 나에게 쪽지 */
+  tomorrowNote: string | null;
+  /** undefined = 폼에 약속이 없었다 → 저장할 때 지난 값을 건드리지 않는다 */
+  promise?: Promise_ | null;
   /** 그날 약속한 문장(운세 do). 운세가 나중에 바뀌어도 무엇을 약속했는지 남는다 */
-  promiseText: string | null;
+  promiseText?: string | null;
 }
 
 export type Validation<T> = { ok: true; value: T } | { ok: false; error: string };
@@ -67,16 +92,40 @@ export function validateEntryDate(raw: unknown, today: string = todayKST()): Val
 }
 
 export function validateEntry(
-  raw: { entryDate: unknown; happiness: unknown; moods: unknown; note: unknown; promise?: unknown; promiseText?: unknown },
+  raw: {
+    entryDate: unknown;
+    /** 영역을 하나도 안 매겼을 때만 쓴다 — 이전 방식 기록을 고칠 때 그 행복도를 그대로 두는 길 */
+    happiness?: unknown;
+    moods: unknown;
+    note: unknown;
+    /** { work: "4", … } 영역 키 → 1~5. 빈 값은 안 매긴 것 */
+    areas?: unknown;
+    tomorrowNote?: unknown;
+    promise?: unknown;
+    promiseText?: unknown;
+  },
   today: string = todayKST(),
 ): Validation<EntryInput> {
   const dateChecked = validateEntryDate(raw.entryDate, today);
   if (!dateChecked.ok) return dateChecked;
   const entryDate = dateChecked.value;
 
-  const happiness = Number(raw.happiness);
+  const areas: Areas = {};
+  if (raw.areas && typeof raw.areas === "object") {
+    const src = raw.areas as Record<string, unknown>;
+    for (const k of Object.keys(src)) {
+      const v = src[k];
+      if (v === null || v === undefined || v === "") continue;
+      if (!AREAS.some((a) => a.key === k)) return { ok: false, error: "목록에 없는 영역이 들어 있어요." };
+      const n = Number(v);
+      if (!Number.isInteger(n) || n < 1 || n > 5) return { ok: false, error: "영역 점수가 올바르지 않아요." };
+      areas[k as AreaKey] = n;
+    }
+  }
+  const fromAreas = happinessFromAreas(areas);
+  const happiness = fromAreas ?? Number(raw.happiness);
   if (!Number.isInteger(happiness) || happiness < 1 || happiness > 10) {
-    return { ok: false, error: "오늘 행복도를 1부터 10 사이로 골라 주세요." };
+    return { ok: false, error: "영역을 하나 이상 골라 주세요." };
   }
 
   const list = Array.isArray(raw.moods) ? raw.moods : raw.moods == null ? [] : [raw.moods];
@@ -84,12 +133,16 @@ export function validateEntry(
   if (moods.some((m) => !(MOODS as readonly string[]).includes(m))) {
     return { ok: false, error: "목록에 없는 기분이 들어 있어요." };
   }
-  if (moods.length > MAX_MOODS) return { ok: false, error: `기분은 ${MAX_MOODS}개까지 고를 수 있어요.` };
 
   const text = typeof raw.note === "string" ? raw.note.trim() : "";
   if (text.length > MAX_NOTE) return { ok: false, error: `메모는 ${MAX_NOTE}자까지 쓸 수 있어요.` };
 
-  // 약속: 없거나 빈 값이면 null. 목록 밖의 값은 거부
+  const tomorrow = typeof raw.tomorrowNote === "string" ? raw.tomorrowNote.trim() : "";
+  if (tomorrow.length > MAX_TOMORROW_NOTE) return { ok: false, error: `내일의 나에게 쪽지는 ${MAX_TOMORROW_NOTE}자까지 쓸 수 있어요.` };
+
+  const value: EntryInput = { entryDate, happiness, moods: moods as Mood[], note: text || null, areas: fromAreas === null ? null : areas, tomorrowNote: tomorrow || null };
+  // 약속: 폼에 없으면(undefined) 건드리지 않는다. 빈 값이면 null. 목록 밖의 값은 거부
+  if (raw.promise === undefined) return { ok: true, value };
   const promiseRaw = typeof raw.promise === "string" ? raw.promise.trim() : "";
   if (promiseRaw && !(PROMISES as readonly string[]).includes(promiseRaw)) {
     return { ok: false, error: "약속 상태가 올바르지 않아요." };
@@ -99,7 +152,7 @@ export function validateEntry(
   // 약속 상태가 없으면 문장도 남기지 않는다
   const promiseText = promise && promiseTextRaw ? promiseTextRaw : null;
 
-  return { ok: true, value: { entryDate, happiness, moods: moods as Mood[], note: text || null, promise, promiseText } };
+  return { ok: true, value: { ...value, promise, promiseText } };
 }
 
 /** v3.22: 네 단계 — 8~10 초록(top) · 6~7 금(high) · 4~5 종이(mid) · 0~3 남색(low) */

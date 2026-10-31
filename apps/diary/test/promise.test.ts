@@ -7,6 +7,8 @@ type Op = { table: string; op: string; row?: Record<string, unknown>; cols?: str
 const ops: Op[] = [];
 /** night_entries upsert가 처음에 돌려줄 오류 (컬럼 없음 시뮬레이션). null이면 성공 */
 let firstUpsertError: { code?: string; message: string } | null = null;
+/** 위 오류를 몇 번 돌려줄지. 2 = 0005(영역)도 0003(약속)도 없는 DB */
+let upsertErrorTimes = 1;
 /** night_fortunes 캐시 행 */
 let fortuneRow: { content: unknown } | null = null;
 const fakeUser = { id: "user-1", is_anonymous: true, email: undefined };
@@ -18,7 +20,7 @@ function fakeSupabase() {
         upsert(row: Record<string, unknown>) {
           const nth = ops.filter((o) => o.table === table && o.op === "upsert").length;
           ops.push({ table, op: "upsert", row });
-          if (nth === 0 && firstUpsertError) return Promise.resolve({ error: firstUpsertError });
+          if (nth < upsertErrorTimes && firstUpsertError) return Promise.resolve({ error: firstUpsertError });
           return Promise.resolve({ error: null });
         },
         insert(row: Record<string, unknown>) {
@@ -76,6 +78,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 beforeEach(() => {
   ops.length = 0;
   firstUpsertError = null;
+  upsertErrorTimes = 1;
   fortuneRow = null;
   computeSpy.mockClear();
 });
@@ -96,10 +99,11 @@ describe("saveEntryAction — 약속 저장", () => {
     expect(upserts()[0]!.row).toMatchObject({ user_id: "user-1", happiness: 7, promise: "kept", promise_text: "저녁에 지출과 약속을 다시 확인해요" });
   });
 
-  test("약속 필드가 없으면(운세 캐시 없던 날) null로 저장한다", async () => {
+  test("약속 필드가 없으면(2026-10-31부터 쓰기 화면에 없다) 약속 열을 건드리지 않는다 — 지난 값이 남는다", async () => {
     const f = form({ entryDate: "2026-10-06", happiness: "5" });
     await expect(saveEntryAction({ error: null }, f)).rejects.toThrow("REDIRECT:");
-    expect(upserts()[0]!.row).toMatchObject({ promise: null, promise_text: null });
+    expect(upserts()[0]!.row).not.toHaveProperty("promise");
+    expect(upserts()[0]!.row).not.toHaveProperty("promise_text");
   });
 
   test("목록 밖의 값은 거부하고 저장하지 않는다", async () => {
@@ -113,26 +117,44 @@ describe("saveEntryAction — 약속 저장", () => {
 describe("컬럼이 아직 없을 때 (0003_promise.sql 적용 전)", () => {
   test("42703이면 약속 없이 다시 저장한다 — 500이 나지 않는다", async () => {
     firstUpsertError = { code: "42703", message: 'column "promise" of relation "night_entries" does not exist' };
+    upsertErrorTimes = 2;
     const f = form({ entryDate: "2026-10-06", happiness: "8", promise: "kept", promise_text: "하나만 골라 끝까지 밀어붙여요" });
     await expect(saveEntryAction({ error: null }, f)).rejects.toThrow("REDIRECT:/me?d=2026-10-06&saved=2026-10-06");
     const u = upserts();
-    expect(u).toHaveLength(2);
+    expect(u).toHaveLength(3);
     expect(u[0]!.row).toHaveProperty("promise", "kept");
-    expect(u[1]!.row).not.toHaveProperty("promise");
-    expect(u[1]!.row).not.toHaveProperty("promise_text");
-    expect(u[1]!.row).toMatchObject({ happiness: 8, entry_date: "2026-10-06" });
+    expect(u[1]!.row).toHaveProperty("promise", "kept");
+    expect(u[1]!.row).not.toHaveProperty("areas");
+    expect(u[2]!.row).not.toHaveProperty("promise");
+    expect(u[2]!.row).not.toHaveProperty("promise_text");
+    expect(u[2]!.row).toMatchObject({ happiness: 8, entry_date: "2026-10-06" });
   });
 
   test("PostgREST 스키마 캐시 오류(PGRST204)도 같은 폴백", async () => {
     firstUpsertError = { code: "PGRST204", message: "Could not find the 'promise' column of 'night_entries' in the schema cache" };
+    upsertErrorTimes = 2;
     await saveEntry(
       fakeSupabase() as unknown as SupabaseClient,
       "user-1",
-      { entryDate: "2026-10-06", happiness: 6, moods: [], note: null, promise: "na", promiseText: "x" },
+      { entryDate: "2026-10-06", happiness: 6, moods: [], note: null, areas: null, tomorrowNote: null, promise: "na", promiseText: "x" },
+      dayGanji("2026-10-06"),
+    );
+    expect(upserts()).toHaveLength(3);
+    expect(upserts()[2]!.row).not.toHaveProperty("promise");
+  });
+
+  test("0005(영역·쪽지)만 없으면 그 열만 빼고 약속은 남긴다", async () => {
+    firstUpsertError = { code: "42703", message: 'column "areas" of relation "night_entries" does not exist' };
+    await saveEntry(
+      fakeSupabase() as unknown as SupabaseClient,
+      "user-1",
+      { entryDate: "2026-10-06", happiness: 8, moods: [], note: null, areas: { work: 4 }, tomorrowNote: "x", promise: "kept", promiseText: "y" },
       dayGanji("2026-10-06"),
     );
     expect(upserts()).toHaveLength(2);
-    expect(upserts()[1]!.row).not.toHaveProperty("promise");
+    expect(upserts()[0]!.row).toMatchObject({ areas: { work: 4 }, tomorrow_note: "x" });
+    expect(upserts()[1]!.row).not.toHaveProperty("areas");
+    expect(upserts()[1]!.row).toHaveProperty("promise", "kept");
   });
 
   test("다른 오류는 그대로 던진다", async () => {
@@ -141,7 +163,7 @@ describe("컬럼이 아직 없을 때 (0003_promise.sql 적용 전)", () => {
       saveEntry(
         fakeSupabase() as unknown as SupabaseClient,
         "user-1",
-        { entryDate: "2026-10-06", happiness: 6, moods: [], note: null, promise: null, promiseText: null },
+        { entryDate: "2026-10-06", happiness: 6, moods: [], note: null, areas: null, tomorrowNote: null, promise: null, promiseText: null },
         dayGanji("2026-10-06"),
       ),
     ).rejects.toThrow("기록 저장");

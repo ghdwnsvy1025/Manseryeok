@@ -39,10 +39,10 @@ describe("happinessSeries", () => {
   it("기록·운세 없는 날은 null로 비운다", () => {
     const s = happinessSeries([e("2026-10-08", 10), e("2026-10-09", 1)], [{ fortune_date: "2026-10-09", score: 7.4 }], "2026-10-09", 3);
     expect(s.map((p) => p.date)).toEqual(["2026-10-07", "2026-10-08", "2026-10-09"]);
-    expect(s[0]).toEqual({ date: "2026-10-07", happiness: null, happiness10: null, avg7: null, fortune: null });
+    expect(s[0]).toEqual({ date: "2026-10-07", happiness: null, happiness10: null, avg7: null, fortune: null, areas: null });
     expect(s[1]!.happiness10).toBe(10);
     expect(s[1]!.avg7).toBeNull(); // 창 안 1건
-    expect(s[2]).toEqual({ date: "2026-10-09", happiness: 1, happiness10: 0, avg7: 5, fortune: 7.4 });
+    expect(s[2]).toEqual({ date: "2026-10-09", happiness: 1, happiness10: 0, avg7: 5, fortune: 7.4, areas: null });
   });
 });
 
@@ -75,7 +75,7 @@ describe("v3.22 행복도 색 네 단계", () => {
   });
   it("홀가분함·든든함은 긍정", async () => {
     const { MOODS, moodTone } = await import("@/lib/entry");
-    expect(MOODS).toHaveLength(20);
+    expect(MOODS).toHaveLength(44);
     expect(moodTone("홀가분함")).toBe("pos");
     expect(moodTone("든든함")).toBe("pos");
   });

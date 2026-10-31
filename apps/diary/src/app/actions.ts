@@ -24,7 +24,7 @@ import { usableCachedContent } from "@/lib/fortune/policy";
 import { parseYmd } from "@/lib/time";
 import { isAllowedRemindHour } from "@/lib/remind";
 import { validatePushSubscription } from "@/lib/pushSubscription";
-import { validateEntry, validateEntryDate } from "@/lib/entry";
+import { AREAS, validateEntry, validateEntryDate } from "@/lib/entry";
 import { dayGanji } from "@/lib/ganji";
 import { COMPUTE_ERROR, computeProfile, validateName, validateProfile, type ProfileField } from "@/lib/profile";
 
@@ -67,11 +67,15 @@ export async function fortuneReadyAction(date: string, fingerprint: string): Pro
 export async function saveEntryAction(_prev: FormState, form: FormData): Promise<FormState> {
   const checked = validateEntry({
     entryDate: form.get("entryDate"),
+    // 영역을 하나도 안 매겼을 때만 쓴다 (이전 방식 기록을 고칠 때 그 행복도를 그대로 — 폼의 hidden)
     happiness: form.get("happiness"),
     moods: form.getAll("moods"),
     note: form.get("note"),
-    // 오늘의 작은 약속 (톤 v3.2). 운세 캐시가 없던 날은 폼에 필드가 없다 → null
-    promise: form.get("promise"),
+    // 영역별 5단계 (2026-10-31). 안 매긴 영역은 폼에 없다
+    areas: Object.fromEntries(AREAS.map((a) => [a.key, form.get(`area_${a.key}`)])),
+    tomorrowNote: form.get("tomorrow_note"),
+    // 오늘의 작은 약속은 2026-10-31 쓰기 화면에서 뺐다 — 보내지 않으면(undefined) 지난 값을 건드리지 않는다
+    promise: form.has("promise") ? form.get("promise") : undefined,
     promiseText: form.get("promise_text"),
   });
   if (!checked.ok) return { error: checked.error };

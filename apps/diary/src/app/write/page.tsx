@@ -4,7 +4,7 @@ import { Booting } from "@/components/Booting";
 import { BURST_ASSETS } from "@/components/BurstPreload";
 import { characterOfGanji } from "@/lib/character";
 import { getUser } from "@/lib/supabase/server";
-import { getEntry, getSajuProfile, readCachedFortune } from "@/lib/db";
+import { getEntry, getSajuProfile } from "@/lib/db";
 import { dayGanji } from "@/lib/ganji";
 import { addDays, formatKoreanDate, hourKST, todayKST } from "@/lib/time";
 import { NIGHT_CUTOFF_HOUR, nightCarryDate, resolveWriteDate, writeDateLinks } from "@/lib/writeNav";
@@ -44,16 +44,10 @@ export default async function WritePage({ searchParams }: { searchParams: Promis
   // 날짜 앞뒤 이동 (B7): 어제로는 2020-01-01까지, 내일로는 오늘까지
   const nav = writeDateLinks(date, today);
 
-  // 운세 do 문장은 캐시에서만 읽는다 — 쓰기 화면이 운세 계산·모델 호출을 유발하면 안 된다. 캐시가 없으면 약속 블록 생략
-  const [existing, profile, cachedFortune] = await Promise.all([
-    getEntry(supabase, user.id, date),
-    getSajuProfile(supabase, user.id),
-    readCachedFortune(supabase, user.id, date),
-  ]);
+  // 2026-10-31: "오늘의 포인트"(운세 do) 블록을 뺐다 — 운세 캐시를 더 읽지 않는다
+  const [existing, profile] = await Promise.all([getEntry(supabase, user.id, date), getSajuProfile(supabase, user.id)]);
   // 생년월일이 없으면 먼저 받는다 (로그인 사용자와 같은 규칙)
   if (!profile) redirect(`/onboarding?next=${encodeURIComponent(`/write?date=${date}`)}`);
-  // 기존 기록에 약속 문장이 남아 있으면 그것이 그날의 약속 (운세가 뒤에 바뀌어도 약속은 그대로)
-  const promiseText = existing?.promise_text ?? cachedFortune?.doText ?? null;
 
   return (
     <main>
@@ -99,10 +93,9 @@ export default async function WritePage({ searchParams }: { searchParams: Promis
         when={isToday ? "today" : carried ? "last_night" : "past"}
         warmAssets={[characterOfGanji(ganji.ko).cardSrc, ...BURST_ASSETS]}
         notePlaceholder={isToday ? "오늘 기억하고 싶은 일 하나" : carried ? "어젯밤까지의 하루, 기억하고 싶은 일 하나" : "그날 기억하고 싶은 일 하나"}
-        promiseText={promiseText}
         initial={
           existing
-            ? { happiness: existing.happiness, moods: existing.moods, note: existing.note ?? "", promise: existing.promise ?? null }
+            ? { happiness: existing.happiness, areas: existing.areas ?? null, moods: existing.moods, note: existing.note ?? "", tomorrowNote: existing.tomorrow_note ?? "" }
             : null
         }
       />

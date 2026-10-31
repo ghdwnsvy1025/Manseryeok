@@ -46,9 +46,8 @@ export function GanjiGrid({ cells, selected, todayIndex, basePath, pickedEntries
               <Link
                 href={isSel ? basePath : `${basePath}${basePath.includes("?") ? "&" : "?"}cell=${c.index}`}
                 scroll={false}
-                aria-label={`${c.ko}일 ${c.n ? `${c.n}번, 평균 ${c.mean}${c.keptCount ? `, 지킨 약속 ${c.keptCount}` : ""}` : "기록 없음"}`}
+                aria-label={`${c.ko}일 ${c.n ? `${c.n}번, 평균 ${c.mean}` : "기록 없음"}`}
                 aria-current={isSel ? "true" : undefined}
-                data-kept={c.keptCount > 0 ? "" : undefined}
                 data-today={isToday ? "" : undefined}
                 data-el={el}
                 className={`flex aspect-square items-center justify-center rounded-[18%] ${c.n ? "album-cell" : "board-cell"} ${ring}`}
@@ -91,7 +90,6 @@ export function GanjiGrid({ cells, selected, todayIndex, basePath, pickedEntries
                         <span>{e.entry_date.replace(/-/g, ".")}</span>
                         <span className="font-serif tabular-nums">
                           행복도 {e.happiness}
-                          {e.promise === "kept" && <span className="ml-2 text-[13px] font-sans text-gold-ink">포인트 해냄</span>}
                         </span>
                       </Link>
                     </li>

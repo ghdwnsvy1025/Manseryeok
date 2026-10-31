@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { happinessTier } from "@/lib/entry";
+import { happinessTier, type Areas } from "@/lib/entry";
 import { useEffect, useState } from "react";
 import type { CalendarMonth } from "@/lib/calendar";
 import { CalendarDayDetail } from "@/components/CalendarDayDetail";
@@ -11,7 +11,7 @@ const DOW = ["일", "월", "화", "수", "목", "금", "토"];
 
 export interface DayInfo {
   ganjiKo: string;
-  entry: { happiness: number; moods: string[]; note: string | null } | null;
+  entry: { happiness: number; moods: string[]; note: string | null; areas?: Areas | null; tomorrowNote?: string | null } | null;
 }
 
 /** 행복도 세 단계 (2026-10-10 Q2 = A): 7~10 high(금빛) · 4~6 mid(옅은 녹갈) · 1~3 low(차분한 남색). 빨강 없음 */

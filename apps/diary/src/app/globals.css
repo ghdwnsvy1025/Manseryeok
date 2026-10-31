@@ -488,8 +488,7 @@ input:checked + .stamp {
 }
 /* 손가락이 닿는 순간 눌림 — JS와 무관하게 즉시 */
 .stamp:active,
-.tag:active,
-.promise-stamp:active > .promise-stamp__mark {
+.tag:active {
   transform: scale(0.94);
 }
 @keyframes stamp-press {
@@ -501,37 +500,7 @@ input:checked + .stamp {
   }
 }
 
-/* 오늘 약속 세그먼트 3칸 (v3.2): 한지 띠 하나를 셋으로 나눈다. 고른 칸은 남색 띠지(tag--on)와 같은 면.
-   라디오는 sr-only, 시각은 label 안의 span */
-.promise-seg {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 6px;
-}
-.promise-seg__cell {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 40px;
-  cursor: pointer;
-  font-size: 15px;
-  color: var(--color-ink);
-  background-color: var(--color-paper-2);
-  box-shadow: inset 0 0 0 1.5px var(--color-line);
-}
-input:checked + .promise-seg__cell {
-  font-weight: 700;
-  color: var(--color-paper-2);
-  background-color: var(--color-sky);
-  background-image: url("/ui/tag-strip-navy-clean.webp");
-  background-size: cover;
-  background-position: center;
-  box-shadow: none;
-}
-input:focus-visible + .promise-seg__cell {
-  outline: 2px solid var(--color-ink);
-  outline-offset: 2px;
-}
+/* (v3.2의 오늘 약속 세그먼트 .promise-seg*는 2026-10-31 "내일의 나에게" 쪽지로 바뀌며 마크업과 함께 지웠다) */
 
 /* 도장판 칸: 키트 stamp-board-cell. 빈 자리는 항상, 찍힘 테두리는 --ink(평균 행복도) 농도로 겹친다 */
 .board-cell {
@@ -549,7 +518,7 @@ input:focus-visible + .promise-seg__cell {
 
 /* 모은 칸 (v3.3): 캐릭터만(contain) + 금 테두리. 카드 틀·썸네일·인장 없음.
    테두리 농도 = 평균 행복도 --ink(0.35~1): 굵기 1px → 2px, 색 옅음 → 진함.
-   약속 지킨 날이 있는 칸(data-kept) = 두 겹: 금 2px + 안쪽 한지 1px + 금 1px */
+   (약속 지킨 날의 두 겹 테두리 data-kept는 약속 기능이 빠지며 지웠다, 2026-10-31) */
 .album-cell {
   position: relative;
   overflow: hidden;
@@ -570,20 +539,6 @@ input:focus-visible + .promise-seg__cell {
   border-radius: inherit;
   box-shadow: inset 0 0 0 calc(1px + var(--ink, 0) * 1px) color-mix(in srgb, var(--color-gold) calc(35% + var(--ink, 0) * 65%), var(--color-paper-2));
 }
-.album-cell[data-kept]::before {
-  box-shadow:
-    inset 0 0 0 2px var(--color-gold),
-    inset 0 0 0 3px var(--color-paper-2),
-    inset 0 0 0 4px var(--color-gold);
-}
-
-/* 선택 칸 상세의 큰 카드 (폭 60%) */
-.album-pick {
-  width: 60%;
-  height: auto;
-  display: block;
-}
-
 /* 오행 점(v3.2)은 v3.6에서 뺐다 — 나무패 한자 글자색(el-*)으로 대신한다 */
 
 /* 나무패: 키트 wood-tablet. 뾰족한 머리(위 140px)와 바닥(아래 80px)은 비율대로, 몸통만 늘인다 */
@@ -1055,60 +1010,23 @@ details[open] > .fortune-body {
   line-height: 1.2;
   color: var(--color-muted);
 }
+/* 쪽지 글 = 손글씨 (2026-10-31 v3.32: 쪽지에 담기는 글이 운세 문장에서 사용자 글 "내일의 나에게"로 바뀌었다).
+   메모와 같은 고운바탕 17px, 편지지 괘선 --lh 30px(.ruled과 같은 키트 ruled-paper, 선은 0.95lh) 한두 줄 위에 쓰인다 */
 .note-slip__text {
-  margin-top: 4px;
-  font-family: var(--font-serif);
-  font-size: 18px;
-  line-height: 1.45;
+  --lh: 30px;
+  margin-top: 2px;
+  padding: 0 2px;
+  font-family: var(--font-hand);
+  font-size: 17px;
+  line-height: var(--lh);
   word-break: keep-all;
+  background-image: url("/ui/ruled-paper-clean.webp");
+  background-repeat: repeat-y;
+  background-size: 100% calc(var(--lh) * 2);
+  background-position: 0 calc(var(--lh) * 0.45);
 }
 
-/* 도장 자리 3개 (쪽지 아래, 가로): 지켰어요 = 인주 도장, 못 지켰어요 = 먹 도장, 해당 없음 = 빈 자리.
-   라디오는 sr-only. 고르면 그 자리에 도장이 찍히고(120ms 눌림) 나머지 둘은 빈 자리로 */
-.promise-stamps {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-  margin-top: 12px;
-}
-.promise-stamp {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  cursor: pointer;
-  font-size: 13px;
-  line-height: 1.2;
-  color: var(--color-muted);
-}
-.promise-stamp__mark {
-  width: 56px;
-  height: 56px;
-  background: url("/ui/stamp-empty-clean.webp") center / contain no-repeat;
-}
-input:checked + .promise-stamp {
-  font-weight: 700;
-  color: var(--color-ink);
-}
-input:checked + .promise-stamp > .promise-stamp__mark {
-  animation: stamp-press 120ms ease-out;
-}
-input:checked + .promise-stamp > .promise-stamp__mark[data-kind="kept"] {
-  background-image: url("/ui/stamp-inked-red-clean.png");
-}
-input:checked + .promise-stamp > .promise-stamp__mark[data-kind="missed"] {
-  background-image: url("/ui/stamp-inked-ink-clean.png");
-}
-/* 해당 없음은 찍히는 도장이 없다 — 빈 자리에 녹갈 테두리 한 겹으로 "골랐다"만 */
-input:checked + .promise-stamp > .promise-stamp__mark[data-kind="na"] {
-  border-radius: 50%;
-  box-shadow: inset 0 0 0 1.5px var(--color-frame);
-}
-input:focus-visible + .promise-stamp > .promise-stamp__mark {
-  border-radius: 50%;
-  outline: 2px solid var(--color-ink);
-  outline-offset: 2px;
-}
+/* (v3.6 약속 도장 자리 .promise-stamp*는 2026-10-31 약속 블록이 빠지며 지웠다. 먹 도장 stamp-inked-ink는 public/ui에 남아 있다) */
 
 /* 팡 카드 설명 한 줄 + "확인" 금색 버튼 (v3.6): 글자와 같이 150ms 뒤 나타난다. 버튼으로만 닫힌다 */
 .burst-caption {
@@ -1294,15 +1212,7 @@ input:focus-visible + .promise-stamp > .promise-stamp__mark {
   outline-offset: 2px;
 }
 
-/* 나무패 안 (v3.9): 위 천간 십신 / 천간 / 지지 / 아래 지지 십신. 십신 글자는 패 위·아래 가장자리에서 10px 안쪽.
-   가장자리 = 키트 테두리(border-width 34/20px, 머리·바닥 그림)라 그 안쪽 4px + 글자 상자로 10px 안쪽이 된다. 패 156px */
-.pillar {
-  padding: 4px 0;
-}
-.pillar-god {
-  font-size: 12px;
-  line-height: 1;
-}
+/* (v3.9 나무패 안 .pillar·.pillar-god는 나 탭 "내 사주" 서랍이 만세력 화면(/me/saju)으로 옮겨 가며 지웠다, 2026-10-31. 나무패 재료 .wood-tablet은 만세력 표가 쓴다) */
 
 /* 오행 분포 막대 (나 · 자세히): 라벨 송명 16px 오행 색, 트랙 8px paper-3, fill 오행 색(bg-current), 값 14px. 처음 그려질 때만 0→값 300ms */
 .elements__fill {
@@ -2331,26 +2241,7 @@ button.cal__cell {
   }
 }
 
-/* 내 사주 접기: 한 줄 summary — 제목 / 여덟 글자 미리보기 / ▾ */
-.saju-fold__summary {
-  min-height: 44px;
-}
-.saju-fold__summary h2 {
-  flex: none;
-  margin: 0;
-  line-height: 1.2;
-}
-.saju-fold__preview {
-  display: flex;
-  gap: 8px;
-  margin-left: auto;
-  line-height: 1.2;
-  white-space: nowrap;
-}
-.saju-fold__pillar {
-  display: inline-flex;
-}
-.saju-fold__summary::after,
+/* (v3.15 내 사주 접기 .saju-fold*는 2026-10-31 요약 카드 .saju-summary → 만세력 화면으로 바뀌며 지웠다) */
 .more-stats__summary::after {
   content: "";
   flex: none;
@@ -2360,7 +2251,6 @@ button.cal__cell {
   -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 14' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 5.5l4 4 4-4'/%3E%3C/svg%3E") center / contain no-repeat;
   mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 14' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 5.5l4 4 4-4'/%3E%3C/svg%3E") center / contain no-repeat;
 }
-.saju-fold[open] > .saju-fold__summary::after,
 .more-stats[open] > .more-stats__summary::after {
   transform: rotate(180deg);
 }
@@ -2389,28 +2279,7 @@ button.cal__cell {
   outline-offset: 2px;
 }
 
-/* "하면 좋아요" 값 단위와 점 줄 — 금빛 찍힌 점 / 녹갈 빈 점 */
-.metric--points .metric__value small {
-  font-size: 13px;
-  color: var(--color-muted);
-}
-.metric__dots {
-  display: flex;
-  flex-wrap: nowrap;
-  gap: 3.5px; /* 7개 = 87px가 375px 칸 안쪽(86px)을 1px 넘어서 반 픽셀 줄였다 */
-  margin-top: 6px;
-}
-.metric__dot {
-  flex: none;
-  width: 9px;
-  height: 9px;
-  border-radius: 9999px;
-  box-shadow: inset 0 0 0 1px var(--color-frame);
-}
-.metric__dot[data-kept] {
-  background: var(--color-gold) url("/ui/gold-wash.webp") center / 64px 64px;
-  box-shadow: none;
-}
+/* (v3.15 "하면 좋아요" 점 줄 .metric--points·.metric__dot*는 2026-10-31 가장 행복한 날·힘든 날 카드로 바뀌며 지웠다) */
 
 /* v3.16 운세 카드 "공유" (명세 17): 글자 링크보다 조금 또렷한 녹갈 1px pill. 금색 면 금지(화면당 금 면 하나).
    보이는 높이 32px, 손가락 자리 44px는 ::after로 위아래 6px씩 늘린다(.tap의 min-height·음수 여백은 여기서 끈다). */
@@ -2843,9 +2712,6 @@ a[aria-current="page"] > .nav-label::after {
   color: var(--color-ink);
   white-space: nowrap;
 }
-.saju-fold__summary h2.sec-tag {
-  line-height: 1;
-}
 
 /* "자세한 통계" summary도 같은 띠지 머리표(꺾쇠는 띠지 안 오른쪽). 손가락 자리 44px는 summary, 띠지는 ::before 30px */
 .more-stats {
@@ -3047,33 +2913,21 @@ a[aria-current="page"] > .nav-label::after {
 .metrics--two .metric {
   padding: 12px 14px;
 }
-.metrics--two .metric__dots {
-  gap: 5px;
-}
 
 /* ── v3.23 나 탭: 접힌 서랍 두 개 · 연속 기록 점의 뜻 (명세 23 "v3.23 추가") ─────────────
    새 그림 없음, 새 모션 없음. .gaewoon__note는 마크업에서 빠져 CSS도 지웠다 */
 
-/* 1. 자세한 통계 + 내 사주 = 서랍 두 개. 붓선은 묶음 위(자세한 통계)에 한 번만.
-   두 서랍 모두 card-light 한 줄 틀, 접힌 높이 60px(위아래 8px + summary 44px), 머리표 띠지 30px 13px, 오른쪽 꺾쇠 14px muted */
-.more-stats,
-.saju-fold {
+/* 1. 자세한 통계 서랍(2026-10-31: 내 사주 서랍은 요약 카드 .saju-summary로 올라갔다). 붓선은 서랍 위에 한 번.
+   card-light 한 줄 틀, 접힌 높이 60px(위아래 8px + summary 44px), 머리표 띠지 30px 13px, 오른쪽 꺾쇠 14px muted */
+.more-stats {
   padding: 8px 20px;
 }
-.more-stats[open],
-.saju-fold[open] {
+.more-stats[open] {
   padding-bottom: 20px;
 }
 /* v3.21의 .more-stats { border-block: 0 }(틀 없는 줄)을 되돌려 card-light 한 줄 틀을 사방에 */
 .more-stats.card-light {
   border: 1px solid color-mix(in srgb, var(--color-frame) 55%, transparent);
-}
-/* 내 사주는 자세한 통계 바로 밑 8px(main gap 24px를 뺀다), 붓선 없음. 기록이 없어 자세한 통계가 없으면 원래 붓선 그대로 */
-.me-sep:has(.more-stats) + .saju-fold {
-  margin-top: -16px;
-}
-.me-sep:has(.more-stats) + .saju-fold::before {
-  content: none;
 }
 /* 자세한 통계 summary: 한 줄 전체가 손가락 자리. 띠지는 글자 칸(1열)만, 꺾쇠는 오른쪽 끝(3열) — 내 사주 summary와 같은 자리 */
 .more-stats > .more-stats__summary.tap {
@@ -3095,10 +2949,6 @@ a[aria-current="page"] > .nav-label::after {
   grid-row: 1;
   width: 14px;
   height: 14px;
-}
-/* 내 사주 머리표도 44px 줄 가운데(sec-tag 기본 align-self: flex-start를 덮는다) — 자세한 통계 띠지와 같은 높이 */
-.saju-fold__summary h2.sec-tag {
-  align-self: center;
 }
 /* 서랍 안의 통계는 카드 속 카드가 되지 않게 틀을 벗기고 녹갈 0.5px 괘선으로만 나눈다 */
 .more-stats .card-light {
@@ -3275,5 +3125,669 @@ a[aria-current="page"] > .nav-label::after {
 @media (prefers-reduced-motion: reduce) {
   .night-ask[open] {
     animation: none;
+  }
+}
+
+/* ── v3.32 쓰기 영역 도장 · 기분 세 무리 · 내일의 나에게 쪽지 / 나 탭 통계 / 내 사주 요약·만세력 / 기록 찾기 (명세 31, 2026-10-31) ──
+   새 그림 없음 — 키트 재사용: stamp-empty·stamp-inked-red 알파(마스크)·tag-strip paper/navy·note-slip·ruled-paper·wood-tablet·gold-wash·card-paper,
+   얼굴은 faces/. 새 모션은 어젯밤 쪽지가 펼쳐지는 160ms 하나. 빨강 없음, 금색 글자 없음(면·테두리만), 화면당 금색 면 버튼 하나 */
+
+/* 1. 쓰기 — 행복도 = 영역 여섯 줄. 이름 58px · 도장 다섯이 남은 폭(375px 카드 안쪽 267px → 도장 약 37px) 한 줄 */
+.entry-areas {
+  --area-label: 58px;
+  --area-gap: 8px;
+}
+.entry-area {
+  display: grid;
+  grid-template-columns: var(--area-label) minmax(0, 1fr);
+  column-gap: var(--area-gap);
+  align-items: center;
+}
+.entry-area__label {
+  font-size: 14px;
+  line-height: 1.3;
+  color: var(--color-ink);
+  word-break: keep-all;
+}
+.entry-area__stamps {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 4px;
+}
+/* 도장 하나: 빈 자리(stamp-empty) 위 단계 숫자 15px. 찍히면(checked) 달력·날짜 상세와 같은 네 단계 면을 stamp-inked-red 알파로 오려 낸 자국 —
+   1~2 남색 · 3 종이 · 4~5 금빛. 인주 빨강은 보이지 않는다(기본 .stamp의 inked-red 그림을 끈다). 눌림 120ms는 .stamp 규칙 그대로 */
+.entry-stamp {
+  position: relative;
+  isolation: isolate;
+  width: 100%;
+  font-size: 15px;
+  line-height: 1;
+  color: var(--color-muted);
+  font-variant-numeric: tabular-nums;
+}
+.entry-stamp[data-level="1"],
+.entry-stamp[data-level="2"] {
+  --stamp-face: color-mix(in srgb, var(--color-sky) 82%, var(--color-paper-2));
+  --stamp-num: var(--color-paper-2);
+}
+.entry-stamp[data-level="3"] {
+  --stamp-face: color-mix(in srgb, var(--color-frame) 28%, var(--color-paper-2));
+  --stamp-num: var(--color-ink);
+}
+.entry-stamp[data-level="4"],
+.entry-stamp[data-level="5"] {
+  --stamp-face: var(--color-gold) url("/ui/gold-wash.webp") center / 256px 256px;
+  --stamp-num: var(--color-ink);
+}
+input:checked + .entry-stamp,
+.entry-stamp.stamp--on {
+  background-image: none;
+  color: var(--stamp-num);
+  font-weight: 700;
+}
+input:checked + .entry-stamp::before,
+.entry-stamp.stamp--on::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: var(--stamp-face);
+  -webkit-mask: url("/ui/stamp-inked-red-clean.png") center / contain no-repeat;
+  mask: url("/ui/stamp-inked-red-clean.png") center / contain no-repeat;
+}
+/* 위 한 줄의 점수 숫자만 송명 20px */
+.entry-areas__score {
+  font-family: var(--font-serif);
+  font-size: 20px;
+  line-height: 1;
+  color: var(--color-ink);
+}
+/* 양 끝 "아주 힘듦 / 아주 좋음"은 도장 열 아래(이름 열은 비움) */
+.entry-areas__ends {
+  padding-left: calc(var(--area-label) + var(--area-gap) + 2px);
+  padding-right: 2px;
+}
+
+/* 2. 쓰기 — 기분 세 무리: 머리(13px 굵게 muted) 오른쪽으로 녹갈 0.5px 괘선이 이어져 무리가 갈린다. 띠지 36px(h-9)·간격 6px(gap-1.5) */
+.entry-moods__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  line-height: 1;
+}
+.entry-moods__head::after {
+  content: "";
+  flex: 1;
+  height: 0;
+  border-top: 0.5px solid color-mix(in srgb, var(--color-frame) 55%, transparent);
+}
+
+/* 3. 쓰기 — 내일의 나에게: 쪽지(note-slip) 위에 바로 쓰는 손글씨 칸. 괘선 2줄(최대 3줄, 100자)이 글과 함께 움직인다 */
+.entry-tomorrow .note-slip__text {
+  display: block;
+  width: 100%;
+  min-height: calc(var(--lh) * 2);
+  max-height: calc(var(--lh) * 3);
+  field-sizing: content;
+  background-color: transparent;
+  background-attachment: local;
+  color: var(--color-ink);
+}
+.entry-tomorrow .note-slip__text::placeholder {
+  font-family: var(--font-sans);
+  font-size: 15px;
+  color: var(--color-faint);
+}
+
+/* 4. 오늘 — 어젯밤의 쪽지 (TomorrowNote): 운세 카드 위. 펼침 = 쪽지(note-slip), 접힘 = 종이 띠지 한 장 44px 버튼 */
+.tomorrow-note.note-slip {
+  display: flex;
+  flex-direction: column;
+  transform-origin: top center;
+  animation: note-unfold 160ms ease-out both;
+}
+.tomorrow-note__fold.tap {
+  align-self: flex-end;
+  min-height: 36px;
+  margin: 0 -6px -6px 0;
+}
+@keyframes note-unfold {
+  from {
+    opacity: 0;
+    transform: scaleY(0.94) translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.tomorrow-note--folded.tap {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  height: 44px;
+  min-height: 44px;
+  margin: 0;
+  padding: 0 6px;
+  border-style: solid;
+  border-width: 0 12px;
+  border-image: url("/ui/tag-strip-paper-clean.webp") 0 44 fill / 0 12px / 0 stretch;
+  background: none;
+  font-size: 15px;
+  line-height: 1;
+  color: var(--color-ink);
+  text-align: left;
+}
+
+/* 5. 나 — 그래프 칩(전체 · 일·공부 …)과 가장 행복한 날의 기간 전환(10월 / 전체): 종이 띠지 28px 13px, 켜진 칩 = 남색 띠.
+   손가락 자리는 ::after로 위아래 6px씩(40px) */
+.hchart__chip,
+.day-pick__scope-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 28px;
+  margin: 0;
+  padding: 0 2px;
+  border-style: solid;
+  border-width: 0 10px;
+  border-image: url("/ui/tag-strip-paper-clean.webp") 0 44 fill / 0 10px / 0 stretch;
+  background: none;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1;
+  color: var(--color-ink);
+  white-space: nowrap;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.hchart__chip::after,
+.day-pick__scope-btn::after {
+  content: "";
+  position: absolute;
+  inset: -6px -10px;
+}
+.hchart__chip[data-on],
+.day-pick__scope-btn[data-on] {
+  border-image-source: url("/ui/tag-strip-navy-clean.webp");
+  color: var(--color-paper-2);
+  font-weight: 700;
+}
+/* 빈 날을 건너는 구간: 같은 색·같은 굵기, 불투명도만 — 범례 견본도 같은 옅은 선 */
+.hchart__line--gap {
+  opacity: 0.35;
+}
+.hchart__fortune--gap {
+  opacity: 0.25;
+}
+.hchart__key--gap::before {
+  width: 16px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--color-ink);
+  opacity: 0.35;
+}
+
+/* 6. 나 — 영역별 행복도 막대: 이름 58px · 트랙(옅은 녹갈) · 평균(송명 15px) · 매긴 날 수(12px). 채움은 네 단계 색, 매긴 날 없는 영역은 흐리게 */
+.area-bars__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.area-bars__row {
+  display: grid;
+  grid-template-columns: 58px minmax(0, 1fr) 30px 32px;
+  align-items: center;
+  column-gap: 8px;
+  min-height: 24px;
+}
+.area-bars__label {
+  font-size: 14px;
+  line-height: 1.3;
+  color: var(--color-ink);
+  word-break: keep-all;
+}
+.area-bars__track {
+  display: block;
+  height: 8px;
+  overflow: hidden;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--color-frame) 10%, transparent);
+  box-shadow: inset 0 0 0 0.5px color-mix(in srgb, var(--color-frame) 40%, transparent);
+}
+.area-bars__fill {
+  display: block;
+  height: 100%;
+  min-width: 4px;
+  border-radius: 4px;
+  background: var(--bar-face, color-mix(in srgb, var(--color-frame) 28%, var(--color-paper-2)));
+  box-shadow: inset 0 0 0 0.5px color-mix(in srgb, var(--color-frame) 55%, transparent);
+}
+.area-bars__fill[data-tier="top"] {
+  --bar-face: var(--color-moss);
+  box-shadow: none;
+}
+.area-bars__fill[data-tier="high"] {
+  --bar-face: var(--color-gold) url("/ui/gold-wash.webp") center / 256px 256px;
+  box-shadow: none;
+}
+.area-bars__fill[data-tier="low"] {
+  --bar-face: color-mix(in srgb, var(--color-sky) 82%, var(--color-paper-2));
+  box-shadow: none;
+}
+.area-bars__value {
+  font-family: var(--font-serif);
+  font-size: 15px;
+  line-height: 1;
+  color: var(--color-ink);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.area-bars__n {
+  font-size: 12px;
+  line-height: 1;
+  color: var(--color-muted);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.area-bars__row[data-empty] {
+  opacity: 0.45;
+}
+.area-bars__row[data-empty] .area-bars__fill {
+  display: none;
+}
+
+/* 7. 나 — 가장 행복한 날 · 힘든 날: 두 칸(metrics--two). 행복한 날 = 금 1px 테, 힘든 날 = 남색 1px 테(빨강 없음).
+   칸 = 그날 얼굴 48px 원(날짜 상세와 같은 처리) + 간지 이름 + 날짜 + 행복도 도장 44px(네 단계 면, 금색은 면으로만) + 기분 칩 최대 3개. 칸 전체가 링크 */
+.day-pick__head {
+  gap: 12px;
+}
+.day-pick__head > p {
+  margin: 0;
+}
+.day-pick__scope {
+  gap: 6px;
+}
+.day-pick__card {
+  position: relative;
+  gap: 6px;
+  transition: transform 120ms ease-out;
+}
+.day-pick__card[data-kind="best"] {
+  box-shadow: inset 0 0 0 1px var(--color-gold);
+}
+.day-pick__card[data-kind="worst"] {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-sky) 55%, transparent);
+}
+.day-pick__card[data-empty] {
+  box-shadow: none;
+}
+.day-pick__card:has(.day-pick__link):active {
+  transform: scale(0.98);
+}
+.day-pick__link {
+  color: inherit;
+  text-decoration: none;
+}
+.day-pick__link::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+}
+.day-pick__link:focus-visible {
+  outline: none;
+}
+.day-pick__card:has(.day-pick__link:focus-visible) {
+  outline: 2px solid var(--color-ink);
+  outline-offset: 2px;
+}
+.day-pick__face {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
+}
+.day-pick__face > img {
+  flex: none;
+  width: 48px;
+  height: 48px;
+  padding: 4px;
+  border-radius: 50%;
+  object-fit: contain;
+  background: var(--color-paper-2) url("/ui/card-paper.webp") center / 256px 256px;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-frame) 40%, transparent);
+}
+.day-pick__ganji {
+  font-family: var(--font-serif);
+  font-size: 17px;
+  line-height: 1.2;
+}
+.day-pick__card .metric__value {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  font-size: 20px;
+  line-height: 1;
+}
+.day-pick__card .metric__value small {
+  margin: 0;
+  font-size: 13px;
+}
+.day-pick__num {
+  position: relative;
+  isolation: isolate;
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  transform: rotate(-8deg);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--stamp-num, var(--color-ink));
+}
+.day-pick__num::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: var(--stamp-face, color-mix(in srgb, var(--color-frame) 28%, var(--color-paper-2)));
+  -webkit-mask: url("/ui/stamp-inked-red-clean.png") center / contain no-repeat;
+  mask: url("/ui/stamp-inked-red-clean.png") center / contain no-repeat;
+}
+.day-pick__card .metric__value[data-tier="top"] {
+  --stamp-face:
+    linear-gradient(color-mix(in srgb, var(--color-moss) 90%, transparent), color-mix(in srgb, var(--color-moss) 90%, transparent)),
+    url("/ui/card-paper.webp") center / 256px 256px;
+  --stamp-num: var(--color-paper-2);
+}
+.day-pick__card .metric__value[data-tier="high"] {
+  --stamp-face: var(--color-gold) url("/ui/gold-wash.webp") center / 256px 256px;
+  --stamp-num: var(--color-ink);
+}
+.day-pick__card .metric__value[data-tier="low"] {
+  --stamp-face: color-mix(in srgb, var(--color-sky) 82%, var(--color-paper-2));
+  --stamp-num: var(--color-paper-2);
+}
+.day-pick__card .metric__chips {
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+/* 8. 나 — 자주 고른 기분: 카드 한 장이 아니라 제목 + 칩 한 줄(card-light 줄 안, 한지 결 그대로) */
+.metric.metric--moods {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  padding: 12px 20px;
+  border-radius: 2px;
+  background: var(--color-paper-2) url("/ui/card-paper.webp") center / 512px 512px;
+}
+.metric--moods .metric__label {
+  flex: none;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--color-ink);
+}
+.metric--moods .metric__chips {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+}
+.metric--moods .metric__sub {
+  font-size: 13px;
+}
+
+/* 9. 나 — 달력 날짜 상세: 영역 줄(kv, 가운데 280px)과 내일의 나에게 쪽지는 기존 상세 간격(12~14px) */
+.day-detail__areas {
+  max-width: 280px;
+  margin-inline: auto;
+}
+.day-detail__tomorrow {
+  margin-top: 14px;
+}
+
+/* 10. 나 — 내 사주 요약 카드(링크): 머리표 띠지 + 여덟 글자 / kv 두 줄 / 오른쪽 아래 "만세력 보기 ›" 먹색 굵게. 누르면 .985로 눌린다 */
+.saju-summary {
+  color: var(--color-ink);
+  text-decoration: none;
+  transition: transform 120ms ease-out;
+}
+.saju-summary:active {
+  transform: scale(0.985);
+}
+.saju-summary .sec-tag {
+  align-self: center;
+}
+.saju-summary__preview {
+  display: inline-flex;
+  gap: 8px;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+.saju-summary__pillar {
+  display: inline-flex;
+}
+.saju-summary__more {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-ink);
+}
+
+/* 11. 만세력 화면(/me/saju) — 표: 4열(시·일·월·연) × 7줄. 천간·지지 두 줄은 한 기둥의 나무패(위 칸 = 머리 34px, 아래 칸 = 바닥 20px, 몸통은 늘인다).
+   일주 열은 금빛 1px 세로 테(헤더 위·마지막 줄 아래도 닫힌다) = "나". 다른 줄은 13px, 줄 사이 녹갈 0.5px 괘선. 시간 모름 열은 흐린 빈 패 + "?" */
+.saju-table table {
+  table-layout: fixed;
+  width: 100%;
+  border-collapse: collapse;
+}
+.saju-table__corner {
+  width: 52px;
+}
+.saju-table__head {
+  padding: 0 0 6px;
+  font-size: 13px;
+  line-height: 1;
+  color: var(--color-muted);
+}
+.saju-table__head[data-day] {
+  font-weight: 700;
+  color: var(--color-gold-ink);
+}
+.saju-table__label {
+  padding: 0;
+  font-size: 12px;
+  line-height: 1.2;
+  color: var(--color-muted);
+  text-align: left;
+}
+.saju-table__cell {
+  padding: 6px 2px;
+  font-size: 13px;
+  line-height: 1.3;
+  color: var(--color-ink);
+  word-break: keep-all;
+}
+.saju-table__row[data-row="branchGod"] > *,
+.saju-table__row[data-row="hidden"] > *,
+.saju-table__row[data-row="unseong"] > *,
+.saju-table__row[data-row="sal12"] > * {
+  border-top: 0.5px solid color-mix(in srgb, var(--color-frame) 35%, transparent);
+}
+.saju-table__row[data-row="stemGod"] .saju-table__cell {
+  padding-bottom: 2px;
+}
+.saju-table__row[data-row="stem"] .saju-table__cell,
+.saju-table__row[data-row="branch"] .saju-table__cell {
+  padding: 0 3px;
+}
+.saju-table__row[data-row="stem"] .saju-table__char,
+.saju-table__row[data-row="branch"] .saju-table__char {
+  box-sizing: content-box; /* 높이 44px는 글자 칸만 — 머리·바닥 그림(border)은 그 밖에 */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 44px;
+  border-style: solid;
+  border-color: transparent;
+  font-family: var(--font-serif);
+  font-size: 30px;
+  line-height: 1;
+}
+/* 나무 위 오행 글자: 토·금·화는 글자용 진한 토큰(v3.28 오늘 머리와 같은 규칙) — 밝은 나무 위에서 el-earth·el-metal은 묻힌다 */
+.saju-table__char.text-el-earth { color: var(--color-el-earth-ink); }
+.saju-table__char.text-el-metal { color: var(--color-el-metal-ink); }
+.saju-table__char.text-el-fire { color: var(--color-el-fire-ink); }
+.saju-table__row[data-row="stem"] .saju-table__char {
+  border-width: 34px 0 0;
+  border-image: url("/ui/wood-tablet-clean.webp") 140 0 80 0 fill / 34px 0 0 / 0 stretch;
+}
+.saju-table__row[data-row="branch"] .saju-table__char {
+  border-width: 0 0 20px;
+  border-image: url("/ui/wood-tablet-clean.webp") 140 0 80 0 fill / 0 0 20px / 0 stretch;
+}
+.saju-table__cell[data-unknown] .saju-table__char {
+  opacity: 0.4;
+}
+.saju-table th[data-day],
+.saju-table td[data-day] {
+  --day-line: color-mix(in srgb, var(--color-gold) 75%, transparent);
+  box-shadow:
+    inset 1px 0 0 var(--day-line),
+    inset -1px 0 0 var(--day-line);
+}
+.saju-table thead th[data-day] {
+  box-shadow:
+    inset 1px 0 0 var(--day-line),
+    inset -1px 0 0 var(--day-line),
+    inset 0 1px 0 var(--day-line);
+}
+.saju-table tbody tr:last-child td[data-day] {
+  box-shadow:
+    inset 1px 0 0 var(--day-line),
+    inset -1px 0 0 var(--day-line),
+    inset 0 -1px 0 var(--day-line);
+}
+
+/* 중심 기운: "식상 기운이 여린 편" 한 줄이 주인공 — 뒤 말도 송명 20px(보조색) */
+.saju-center__strength {
+  font-family: var(--font-serif);
+  font-size: 20px;
+}
+
+/* 용신: 오행 한 글자 = 원형 도장 32px(stamp 알파 마스크). 면 = 오행 색을 한지에 옅게 섞은 것(용신 26% · 희신·기신 13%), 글자 = 진한 오행 색(글자용 ink 토큰) */
+.saju-yongsin .kv__row {
+  min-height: 36px;
+}
+.saju-yongsin .kv dd {
+  font-family: var(--font-sans);
+  font-size: 14px;
+}
+.saju-yongsin__el {
+  --el: var(--color-ink);
+  --el-ink: var(--color-ink);
+  --el-a: 26%;
+  position: relative;
+  isolation: isolate;
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  font-family: var(--font-serif);
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--el-ink);
+}
+.saju-yongsin__el::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: color-mix(in srgb, var(--el) var(--el-a), var(--color-paper-2));
+  -webkit-mask: url("/ui/stamp-inked-red-clean.png") center / contain no-repeat;
+  mask: url("/ui/stamp-inked-red-clean.png") center / contain no-repeat;
+}
+.saju-yongsin__el[data-el="wood"] { --el: var(--color-el-wood); --el-ink: var(--color-el-wood); }
+.saju-yongsin__el[data-el="fire"] { --el: var(--color-el-fire); --el-ink: var(--color-el-fire-ink); }
+.saju-yongsin__el[data-el="earth"] { --el: var(--color-el-earth); --el-ink: var(--color-el-earth-ink); }
+.saju-yongsin__el[data-el="metal"] { --el: var(--color-el-metal); --el-ink: var(--color-el-metal-ink); }
+.saju-yongsin__el[data-el="water"] { --el: var(--color-el-water); --el-ink: var(--color-el-water); }
+.saju-yongsin__el[data-rank="hee"],
+.saju-yongsin__el[data-rank="gi"] {
+  --el-a: 13%;
+}
+
+/* 신살: 이름 띠지(남색) + 한 줄 뜻 */
+.saju-sinsal__item {
+  align-items: flex-start;
+}
+.saju-sinsal__name {
+  padding: 0 4px;
+  font-size: 13px;
+}
+
+/* 십이운성: 이름(송명 15px 먹색) — 뜻(14px 본문체, 줄바꿈 허용) */
+.saju-unseong .kv__row {
+  align-items: flex-start;
+}
+.saju-unseong dt {
+  flex: none;
+  min-width: 44px;
+  padding-top: 2px;
+  font-family: var(--font-serif);
+  font-size: 15px;
+  color: var(--color-ink);
+}
+.saju-unseong dd {
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+  text-align: right;
+  white-space: normal;
+  word-break: keep-all;
+}
+
+/* 사주카우에서 더 보기: 테두리 버튼 왼쪽에 내 얼굴 28px(있는 얼굴) */
+.saju-viral__card {
+  gap: 10px;
+}
+.saju-viral__face {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  padding: 2px;
+  border-radius: 50%;
+  object-fit: contain;
+  background: var(--color-paper-2) url("/ui/card-paper.webp") center / 256px 256px;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-frame) 40%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tomorrow-note.note-slip {
+    animation: none;
+  }
+  .saju-summary,
+  .day-pick__card {
+    transition: none;
+  }
+  .saju-summary:active,
+  .day-pick__card:has(.day-pick__link):active {
+    transform: none;
   }
 }

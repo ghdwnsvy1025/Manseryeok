@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import type { Bucket, Highlights } from "@/lib/stats/ganji";
-import type { Habit, MoodCount, PointStats, Streak } from "@/lib/stats/extra";
+import type { AreaAverage, Habit, MoodCount, Streak } from "@/lib/stats/extra";
 import { happinessTier, moodTone } from "@/lib/entry";
 
 interface Props {
@@ -9,9 +9,11 @@ interface Props {
   stems: Bucket[];
   branches: Bucket[];
   elements: Bucket[];
-  /** 2026-10-09 Q4: 행복도 말고 보여 주는 지표 */
-  points: PointStats;
   moods: MoodCount[];
+  /** 가장 행복한 날·힘든 날 카드 (2026-10-31, "하면 좋아요" 칸 자리). 부모가 그려 넘긴다 (BestWorstDays) */
+  days?: ReactNode;
+  /** 최근 30일 영역별 평균 (2026-10-31). 매긴 날이 하나도 없으면 막대를 그리지 않는다 */
+  areas?: AreaAverage[];
   streak: Streak;
   /** v3.21 기록 습관 (자세한 통계 맨 위) */
   habit?: Habit;
@@ -48,12 +50,14 @@ function Bars({ title, items, element = false }: { title: string; items: Bucket[
 }
 
 /** 맞춤도 + 지표 세 칸 + 30일 그래프 + 사실 한 줄들 + 천간·지지·오행 한 판. 기간 약속·재촉 문구는 쓰지 않는다 */
-export function StatsSummary({ h, fitPercent, stems, branches, elements, points, moods, habit, chart }: Props) {
-  // v3.13: 점 대신 이름–값 줄 (왼쪽 무엇, 오른쪽 간지 + 평균 + 횟수)
+export function StatsSummary({ h, fitPercent, stems, branches, elements, moods, habit, chart, days, areas }: Props) {
+  // v3.13: 점 대신 이름–값 줄 (왼쪽 무엇, 오른쪽 간지 + 평균 + 횟수).
+  // 2026-10-31: 날짜 하나를 집는 "가장 행복한 날" 카드가 생겨, 간지 평균 줄은 "나와 잘 맞는 간지 / 버거운 간지"로 이름을 바꿨다
   const facts: { label: string; ganji: string; mean: number | null; n: number }[] = [];
-  if (h.bestGanji) facts.push({ label: "가장 행복한 날", ganji: `${h.bestGanji.ko}일`, mean: h.bestGanji.mean, n: h.bestGanji.n });
+  if (h.bestGanji) facts.push({ label: "나와 잘 맞는 간지", ganji: `${h.bestGanji.ko}일`, mean: h.bestGanji.mean, n: h.bestGanji.n });
   if (h.worstGanji && h.worstGanji.index !== h.bestGanji?.index)
-    facts.push({ label: "가장 힘든 날", ganji: `${h.worstGanji.ko}일`, mean: h.worstGanji.mean, n: h.worstGanji.n });
+    facts.push({ label: "버거운 간지", ganji: `${h.worstGanji.ko}일`, mean: h.worstGanji.mean, n: h.worstGanji.n });
+  const areaRows = areas?.some((a) => a.n > 0) ? areas : null;
 
   return (
     <div className="flex flex-col gap-4">
@@ -94,51 +98,50 @@ export function StatsSummary({ h, fitPercent, stems, branches, elements, points,
         </div>
       )}
 
-      {/* v3.22 지표 두 칸: 하면 좋아요 · 자주 고른 기분 (연속 기록은 위 기록 습관으로) */}
-      {h.total > 0 && (
-        <ul className="metrics metrics--two" aria-label="내 지표">
-          <li className="metric metric--points">
-            {/* v3.15 Q4 = A: 제목 "하면 좋아요", 큰 숫자 "3/5일", 최근 7번 답을 도장 점으로(해봤어요 = 찍힌 점, 못 했어요 = 빈 점). 퍼센트 없음 */}
-            <span className="metric__label">하면 좋아요</span>
-            <span className="metric__value">
-              {points.answered ? (
-                <>
-                  {points.kept}
-                  <small>/{points.answered}일</small>
-                </>
-              ) : (
-                "–"
-              )}
-            </span>
-            {points.recent.length > 0 ? (
-              <span className="metric__dots" aria-label={`최근 ${points.recent.length}번 중 ${points.recent.filter((r) => r === "kept").length}번 해봤어요`}>
-                {[...points.recent].reverse().map((r, k) => (
-                  <span key={k} className="metric__dot" data-kept={r === "kept" ? "" : undefined} />
-                ))}
-              </span>
-            ) : (
-              <span className="metric__sub">아직 답한 날 없음</span>
-            )}
-          </li>
-          <li className="metric metric--moods">
-            <span className="metric__label">자주 고른 기분</span>
-            {moods.length ? (
-              <span className="metric__chips">
-                {moods.map((m) => (
-                  <span key={m.mood} className="metric__chip" data-tone={moodTone(m.mood)}>
-                    {m.mood}
-                    <small>{m.n}</small>
-                  </span>
-                ))}
-              </span>
-            ) : (
-              <span className="metric__sub">아직 없음</span>
-            )}
-          </li>
-        </ul>
+      {/* 2026-10-31: 영역별 평균(최근 30일) — 막대 길이 = 평균 단계(1~5). 모양은 디자이너(.area-bars*) */}
+      {h.total > 0 && areaRows && (
+        <div className="area-bars card-frame card-light card-paper px-5 py-4" aria-label="영역별 행복도, 최근 30일">
+          <p className="text-[15px] font-bold">
+            영역별 행복도 <span className="text-[13px] font-normal text-muted">최근 30일 평균</span>
+          </p>
+          <ol className="area-bars__list mt-3 flex flex-col gap-2">
+            {areaRows.map((a) => (
+              <li key={a.key} className="area-bars__row" data-empty={a.n ? undefined : ""} aria-label={`${a.label} ${a.n ? `평균 ${a.mean}단계, ${a.n}일` : "기록 없음"}`}>
+                <span className="area-bars__label">{a.label}</span>
+                <span className="area-bars__track">
+                  <span className="area-bars__fill" style={{ width: `${a.mean === null ? 0 : (a.mean / 5) * 100}%` }} data-tier={a.mean === null ? undefined : happinessTier(a.mean * 2)} />
+                </span>
+                <span className="area-bars__value">{a.mean ?? "–"}</span>
+                <span className="area-bars__n">{a.n ? `${a.n}일` : ""}</span>
+              </li>
+            ))}
+          </ol>
+        </div>
       )}
 
-      {/* v3.17 정리: 자주 보지 않는 통계는 접는다 — 맞춤도 · 가장 행복한 날 · 글자별 막대. 모양은 디자이너(.more-stats*) */}
+      {/* 2026-10-31: "하면 좋아요" 칸 자리 = 가장 행복한 날·힘든 날 카드 두 장 (BestWorstDays) */}
+      {h.total > 0 && days}
+
+      {/* 자주 고른 기분 — 지표 두 칸에서 한 줄로 */}
+      {h.total > 0 && (
+        <div className="metric metric--moods card-frame card-light card-paper px-5 py-4">
+          <span className="metric__label">자주 고른 기분</span>
+          {moods.length ? (
+            <span className="metric__chips">
+              {moods.map((m) => (
+                <span key={m.mood} className="metric__chip" data-tone={moodTone(m.mood)}>
+                  {m.mood}
+                  <small>{m.n}</small>
+                </span>
+              ))}
+            </span>
+          ) : (
+            <span className="metric__sub">아직 없음</span>
+          )}
+        </div>
+      )}
+
+      {/* v3.17 정리: 자주 보지 않는 통계는 접는다 — 맞춤도 · 잘 맞는 간지 · 글자별 막대. 모양은 디자이너(.more-stats*) */}
       {h.total > 0 && (
         <details className="more-stats me-sep card-frame card-light card-paper">
           <summary className="more-stats__summary tap cursor-pointer list-none [&::-webkit-details-marker]:hidden">자세한 통계</summary>

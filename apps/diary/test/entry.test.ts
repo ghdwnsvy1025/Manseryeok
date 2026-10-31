@@ -7,7 +7,29 @@ const base = { entryDate: TODAY, happiness: "7", moods: [] as unknown, note: "" 
 describe("validateEntry", () => {
   test("행복도만 있어도 저장된다", () => {
     const r = validateEntry(base, TODAY);
-    expect(r).toEqual({ ok: true, value: { entryDate: TODAY, happiness: 7, moods: [], note: null, promise: null, promiseText: null } });
+    expect(r).toEqual({ ok: true, value: { entryDate: TODAY, happiness: 7, moods: [], note: null, areas: null, tomorrowNote: null } });
+  });
+
+  test("영역 점수(1~5)가 있으면 하루 행복도 = 매긴 영역 평균 × 2 반올림, 손으로 보낸 행복도는 무시", () => {
+    const r = validateEntry({ ...base, happiness: "", areas: { work: "4", money: "", health: "5", love: null } }, TODAY);
+    expect(r).toMatchObject({ ok: true, value: { happiness: 9, areas: { work: 4, health: 5 } } });
+    expect(validateEntry({ ...base, happiness: "10", areas: { family: "1" } }, TODAY)).toMatchObject({ ok: true, value: { happiness: 2 } });
+    expect(validateEntry({ ...base, areas: { work: "6" } }, TODAY).ok).toBe(false);
+    expect(validateEntry({ ...base, areas: { pet: "3" } }, TODAY).ok).toBe(false);
+  });
+
+  test("영역도 행복도도 없으면 막는다", () => {
+    expect(validateEntry({ ...base, happiness: "", areas: { work: "" } }, TODAY)).toMatchObject({ ok: false, error: expect.stringContaining("영역") });
+  });
+
+  test("내일의 나에게 쪽지는 100자까지, 앞뒤 공백 지움", () => {
+    expect(validateEntry({ ...base, tomorrowNote: "  내일은 일찍 자자 " }, TODAY)).toMatchObject({ ok: true, value: { tomorrowNote: "내일은 일찍 자자" } });
+    expect(validateEntry({ ...base, tomorrowNote: "가".repeat(101) }, TODAY).ok).toBe(false);
+  });
+
+  test("약속을 안 보내면(undefined) 값에 약속이 없다 — 저장할 때 지난 값을 건드리지 않는다", () => {
+    const r = validateEntry(base, TODAY);
+    expect(r.ok && "promise" in r.value).toBe(false);
   });
 
   test("오늘의 작은 약속: 없거나 빈 값이면 null, kept/missed/na만 받고 문장은 상태가 있을 때만 남긴다", () => {
@@ -39,10 +61,10 @@ describe("validateEntry", () => {
     expect(validateEntry({ ...base, entryDate: "2026-10-03" }, TODAY).ok).toBe(true);
   });
 
-  test("기분은 목록 안에서 3개까지, 중복은 하나로", () => {
-    expect(validateEntry({ ...base, moods: ["기쁨", "평온", "설렘"] }, TODAY).ok).toBe(true);
-    expect(validateEntry({ ...base, moods: ["기쁨", "평온", "설렘", "불안"] }, TODAY).ok).toBe(false);
+  test("기분은 목록 안에서 개수 제한 없이, 중복은 하나로", () => {
+    expect(validateEntry({ ...base, moods: ["기쁨", "평온", "설렘", "불안", "멍함", "아픔"] }, TODAY).ok).toBe(true);
     expect(validateEntry({ ...base, moods: ["행복"] }, TODAY).ok).toBe(false);
+    expect(validateEntry({ ...base, moods: ["행복함"] }, TODAY).ok).toBe(true);
     const r = validateEntry({ ...base, moods: ["기쁨", "기쁨"] }, TODAY);
     expect(r.ok && r.value.moods).toEqual(["기쁨"]);
   });

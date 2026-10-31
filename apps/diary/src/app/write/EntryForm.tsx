@@ -3,10 +3,9 @@
 import { startTransition, useActionState, useEffect, useRef, useState, type FormEvent } from "react";
 import { saveEntryAction, type FormState } from "@/app/actions";
 import { DeleteEntryButton } from "@/components/DeleteEntryButton";
-import { MAX_MOODS, MAX_NOTE, MOODS, moodTone, type Promise_ } from "@/lib/entry";
+import { AREA_LEVELS, AREAS, MAX_NOTE, MAX_TOMORROW_NOTE, MOOD_GROUPS, MOODS, areaCount, happinessFromAreas, moodTone, type AreaKey, type Areas } from "@/lib/entry";
 import { track } from "@/lib/analytics";
 import { lengthBucket } from "@/lib/analytics/core";
-import { celebrate } from "@/lib/fx";
 
 /** 어느 날의 기록인지 — 이용 통계용 (날짜 자체는 보내지 않는다) */
 export type WriteWhen = "today" | "last_night" | "past";
@@ -14,11 +13,9 @@ export type WriteWhen = "today" | "last_night" | "past";
 interface Props {
   date: string;
   when?: WriteWhen;
-  /** 그날 운세의 "하면 좋아요" 한 줄 = 오늘의 작은 약속 (톤 v3.2). 운세 캐시가 없으면 null → 약속 블록 생략 */
-  promiseText: string | null;
   /** "한 줄" 안내 문구. 과거 날짜면 "그날…" (B7). 없으면 오늘 문구 */
   notePlaceholder?: string;
-  initial: { happiness: number; moods: string[]; note: string; promise: Promise_ | null } | null;
+  initial: { happiness: number; areas: Areas | null; moods: string[]; note: string; tomorrowNote: string } | null;
   /**
    * 저장 버튼을 누르는 순간 미리 받아 둘 그림(팡 조각·카드·틀). 쓰기 화면이 열릴 때 preload하면 기록을 안 쓰고 나가는
    * 사람도 전부 받았다(전체검토 C-P1) — 저장을 누른 뒤 서버 왕복 동안 받으면 팡이 뜰 때쯤 이미 와 있다
@@ -26,11 +23,10 @@ interface Props {
   warmAssets?: readonly string[];
 }
 
-/** 약속 도장 3자리. value는 저장 규칙(entry.ts PROMISES)과 같다 */
-const PROMISE_OPTIONS: { value: Promise_; label: string }[] = [
-  { value: "kept", label: "해봤어요" },
-  { value: "missed", label: "못 했어요" },
-  { value: "na", label: "해당 없음" },
+const MOOD_SECTIONS: { tone: keyof typeof MOOD_GROUPS; label: string }[] = [
+  { tone: "pos", label: "좋았어요" },
+  { tone: "neutral", label: "그저 그래요" },
+  { tone: "neg", label: "아쉬웠어요" },
 ];
 
 const HAPPINESS_HINT: Record<number, string> = {
@@ -48,51 +44,73 @@ function hint(n: number): string {
 }
 
 /**
- * 쓰기 폼 — 일기장 페이지 한 장 (톤 v3).
- * 행복도는 도장(키트 stamp), 기분은 종이 띠지(tag-strip), 메모는 편지지 괘선 위 손글씨.
- * 폼 필드 이름·값과 저장 로직은 그대로다.
+ * 쓰기 폼 — 일기장 페이지 한 장 (톤 v3, 2026-10-31 개편).
+ * - 행복도: 여섯 영역(일·공부/돈/건강/가족/연애/대인관계)을 5단계 도장으로, 매긴 영역만. 하루 행복도 = 평균 × 2 (서버가 같은 식으로 다시 계산).
+ *   같은 도장을 다시 누르면 비운다. 영역이 없는 이전 기록을 고칠 땐 영역을 안 건드리면 그 행복도를 그대로 둔다(hidden happiness).
+ * - 기분: 좋았어요 / 그저 그래요 / 아쉬웠어요 세 무리, 개수 제한 없음.
+ * - 한 줄 메모, 그리고 "내일의 나에게" 쪽지(100자, 다음 날 오늘 화면 위에 펼쳐진다) — "오늘의 포인트" 자리를 대신한다.
+ * 폼 필드: area_<key>=1~5, moods, note, tomorrow_note, (이전 기록이면) happiness.
  */
-export function EntryForm({ date, when = "today", promiseText, notePlaceholder, initial, warmAssets = [] }: Props) {
+export function EntryForm({ date, when = "today", notePlaceholder, initial, warmAssets = [] }: Props) {
   const [state, action, pending] = useActionState<FormState, FormData>(saveEntryAction, { error: null });
-  const [happiness, setHappiness] = useState<number | null>(initial?.happiness ?? null);
-  const [promise, setPromise] = useState<Promise_ | null>(initial?.promise ?? null);
+  const [areas, setAreas] = useState<Areas>(initial?.areas ?? {});
   const [moods, setMoods] = useState<string[]>(initial?.moods ?? []);
   const [note, setNote] = useState(initial?.note ?? "");
-  // 행복도 없이 저장을 누르면 그 자리로 데려가 이유를 보여 준다 (버튼을 막아 두면 눌러도 반응이 없어 저장된 줄 안다)
-  const [missingHappiness, setMissingHappiness] = useState(false);
-  const happinessRef = useRef<HTMLFieldSetElement>(null);
+  const [tomorrowNote, setTomorrowNote] = useState(initial?.tomorrowNote ?? "");
+  // 영역 없이 저장을 누르면 그 자리로 데려가 이유를 보여 준다 (버튼을 막아 두면 눌러도 반응이 없어 저장된 줄 안다)
+  const [missingAreas, setMissingAreas] = useState(false);
+  const areasRef = useRef<HTMLFieldSetElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
+
+  // 이전 방식 기록(영역 없음)을 고칠 때: 영역을 하나도 안 매기면 그 행복도를 그대로 둔다
+  const legacyHappiness = initial && areaCount(initial.areas) === 0 ? initial.happiness : null;
+  const fromAreas = happinessFromAreas(areas);
+  const happiness = fromAreas ?? legacyHappiness;
 
   // 이용 통계 (측정.md): 열림 한 번, 저장 시도·막힘·오류. 본문·날짜는 보내지 않는다
   const opened = useRef(false);
   useEffect(() => {
     if (opened.current) return;
     opened.current = true;
-    track("diary_write_open", { when, edit: Boolean(initial), has_promise: Boolean(promiseText) });
-  }, [when, initial, promiseText]);
+    track("diary_write_open", { when, edit: Boolean(initial) });
+  }, [when, initial]);
   useEffect(() => {
     if (state.error) track("diary_save_error", { when });
   }, [state, when]);
 
-  // 하이드레이션 전에 누른 값을 잃지 않는다 (2026-10-08 진단: 폰에서 JS가 붙기 전 첫 탭은 native 라디오만 바뀌고
-  // React 상태는 null이라 "첫 클릭이 안 먹은" 것처럼 보였고, 같은 도장을 다시 눌러도 change가 안 났다).
-  // 그림(도장·띠지)은 CSS `input:checked +`가 바로 그리고, 여기서는 DOM에 남은 값을 상태로 끌어온다.
+  // 하이드레이션 전에 누른 값을 잃지 않는다 (2026-10-08 진단: 폰에서 JS가 붙기 전 첫 탭은 native 입력만 바뀌고
+  // React 상태는 비어 "첫 클릭이 안 먹은" 것처럼 보였다). 그림은 CSS `input:checked +`가 바로 그리고, 여기서 DOM 값을 상태로 끌어온다.
   useEffect(() => {
     const form = formRef.current;
     if (!form) return;
     const fd = new FormData(form);
-    const h = Number(fd.get("happiness"));
-    if (h >= 1 && h <= 10) setHappiness((cur) => cur ?? h);
-    const p = fd.get("promise");
-    if (p === "kept" || p === "missed" || p === "na") setPromise((cur) => cur ?? p);
-    const ms = fd.getAll("moods").filter((m): m is string => typeof m === "string").slice(0, MAX_MOODS);
+    const picked: Areas = {};
+    for (const a of AREAS) {
+      const v = Number(fd.get(`area_${a.key}`));
+      if (v >= 1 && v <= 5) picked[a.key] = v;
+    }
+    if (areaCount(picked)) setAreas((cur) => (areaCount(cur) ? cur : picked));
+    const ms = fd.getAll("moods").filter((m): m is string => typeof m === "string");
     if (ms.length) setMoods((cur) => (cur.length ? cur : ms));
     const n = fd.get("note");
     if (typeof n === "string" && n) setNote((cur) => cur || n);
+    const t = fd.get("tomorrow_note");
+    if (typeof t === "string" && t) setTomorrowNote((cur) => cur || t);
   }, []);
 
+  function pickArea(key: AreaKey, level: number) {
+    setMissingAreas(false);
+    // 같은 도장을 다시 누르면 비운다 — 오늘 해당 없는 영역
+    setAreas((cur) => {
+      const next = { ...cur };
+      if (next[key] === level) delete next[key];
+      else next[key] = level;
+      return next;
+    });
+  }
+
   function toggleMood(m: string) {
-    setMoods((cur) => (cur.includes(m) ? cur.filter((x) => x !== m) : cur.length < MAX_MOODS ? [...cur, m] : cur));
+    setMoods((cur) => (cur.includes(m) ? cur.filter((x) => x !== m) : [...cur, m]));
   }
 
   // form action 대신 onSubmit으로 보낸다. React 19는 action 폼을 제출 뒤 비우는데,
@@ -100,10 +118,10 @@ export function EntryForm({ date, when = "today", promiseText, notePlaceholder, 
   function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (happiness === null) {
-      track("diary_save_blocked", { reason: "happiness", when });
-      setMissingHappiness(true);
-      happinessRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-      happinessRef.current?.querySelector("input")?.focus({ preventScroll: true });
+      track("diary_save_blocked", { reason: "areas", when });
+      setMissingAreas(true);
+      areasRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      areasRef.current?.querySelector("input")?.focus({ preventScroll: true });
       return;
     }
     const data = new FormData(e.currentTarget);
@@ -111,10 +129,11 @@ export function EntryForm({ date, when = "today", promiseText, notePlaceholder, 
       when,
       edit: Boolean(initial),
       happiness,
+      areas_count: areaCount(areas),
       mood: moods[0] ?? null,
       moods_count: moods.length,
       length_bucket: lengthBucket(note.trim().length),
-      promise: promiseText ? (promise ?? "unanswered") : null,
+      tomorrow_note: tomorrowNote.trim().length > 0,
     });
     // 팡 그림은 지금부터 받는다 — 서버 저장 왕복(수백 ms)이 끝나면 대개 도착해 있다
     for (const src of warmAssets) {
@@ -125,122 +144,111 @@ export function EntryForm({ date, when = "today", promiseText, notePlaceholder, 
     startTransition(() => action(data));
   }
 
-  // 저장이 끝나는 순간의 보상 "팡"(톤 v3.1)은 SaveBurst가 맡는다. 서버 액션이 성공하면 바로 /?saved=날짜로
-  // 보내므로(actions.ts) 성공 신호는 이 폼이 아니라 오늘 화면(page.tsx)이 받는다. 여기서는 접힘 전환 없이
-  // 버튼만 흐려진다. 오류면 pending이 풀리며 적은 내용이 그대로 남는다.
+  const count = areaCount(areas);
 
   return (
     <>
     <form ref={formRef} onSubmit={onSubmit} className="flex flex-col gap-5">
       <input type="hidden" name="entryDate" value={date} />
+      {/* 영역을 안 매긴 이전 기록: 그 행복도를 그대로 */}
+      {fromAreas === null && legacyHappiness !== null && <input type="hidden" name="happiness" value={legacyHappiness} />}
 
       {/* 카드 종이 한 장 */}
       <div className="card-frame card-paper flex flex-col gap-7 p-5">
-        <fieldset ref={happinessRef}>
+        <fieldset ref={areasRef} className="entry-areas">
           <legend className="text-[17px] font-bold">행복도</legend>
-          <p className={`mt-1 h-5 text-sm ${missingHappiness && happiness === null ? "font-bold text-danger" : "text-muted"}`} aria-live="polite">
-            {happiness ? `${happiness}점, ${hint(happiness)}` : missingHappiness ? "행복도를 먼저 골라 주세요" : "1부터 10까지, 도장 하나"}
+          <p className={`mt-1 text-sm ${missingAreas && happiness === null ? "font-bold text-danger" : "text-muted"}`} aria-live="polite">
+            {fromAreas !== null
+              ? (
+                <>
+                  <span className="entry-areas__score">{fromAreas}</span>점, {hint(fromAreas)}, {count}개 영역 평균
+                </>
+              )
+              : legacyHappiness !== null
+                ? `예전 기록 ${legacyHappiness}점 — 영역을 고르면 평균으로 바뀌어요`
+                : missingAreas
+                  ? "영역을 하나 이상 골라 주세요"
+                  : "오늘 있었던 영역만, 도장 하나씩"}
           </p>
-          <div className="mt-3 grid grid-cols-5 gap-2">
-            {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => {
-              const on = happiness === n;
-              return (
-                <label key={n} className="relative">
-                  <input
-                    type="radio"
-                    name="happiness"
-                    value={n}
-                    checked={on}
-                    onChange={() => setHappiness(n)}
-                    className="peer sr-only"
-                  />
-                  <span
-                    className={`stamp flex aspect-square cursor-pointer items-center justify-center font-serif text-[22px] peer-focus-visible:outline-2 peer-focus-visible:outline-ink ${
-                      on ? "stamp--on text-paper-2" : "text-line"
-                    }`}
-                  >
-                    {n}
-                  </span>
-                </label>
-              );
-            })}
+          <div className="entry-areas__rows mt-3 flex flex-col gap-2">
+            {AREAS.map((a) => (
+              <div key={a.key} className="entry-area" role="radiogroup" aria-label={a.label}>
+                <span className="entry-area__label">{a.label}</span>
+                <div className="entry-area__stamps">
+                  {AREA_LEVELS.map((word, i) => {
+                    const level = i + 1;
+                    const on = areas[a.key] === level;
+                    return (
+                      <label key={level} className="relative">
+                        <input
+                          type="radio"
+                          name={`area_${a.key}`}
+                          value={level}
+                          checked={on}
+                          onChange={() => pickArea(a.key, level)}
+                          onClick={() => {
+                            // 이미 고른 도장을 누르면 change가 안 난다 — 여기서 비운다
+                            if (on) pickArea(a.key, level);
+                          }}
+                          aria-label={`${a.label} ${word}`}
+                          className="peer sr-only"
+                        />
+                        {/* 단계 색은 data-level(1~2 남색 · 3 종이 · 4~5 금빛, 달력 네 단계와 같은 계열). 찍힘은 CSS `input:checked +`가 바로 그린다 */}
+                        <span
+                          data-level={level}
+                          className={`stamp entry-stamp flex aspect-square cursor-pointer items-center justify-center font-serif peer-focus-visible:outline-2 peer-focus-visible:outline-ink ${
+                            on ? "stamp--on" : ""
+                          }`}
+                        >
+                          {level}
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
           </div>
+          <p className="entry-areas__ends mt-2 flex justify-between text-[12px] text-muted" aria-hidden>
+            <span>{AREA_LEVELS[0]}</span>
+            <span>{AREA_LEVELS[4]}</span>
+          </p>
         </fieldset>
 
-        {/* 오늘 약속 = 쪽지 + 도장 3자리 (톤 v3.6, 행복도 아래). 운세 캐시가 없던 날은 통째로 생략.
-            쪽지(키트 note-slip) 위에 "오늘 약속" + 문장, 아래 도장 자리 3개: 지켰어요 = 인주, 못 지켰어요 = 먹, 해당 없음 = 빈 자리.
-            name="promise"·value·hidden promise_text는 그대로 */}
-        {promiseText && (
-          <fieldset data-promise-block>
-            <legend className="sr-only">오늘의 포인트</legend>
-            <input type="hidden" name="promise_text" value={promiseText} />
-            <div className="note-slip" data-promise-text>
-              <p className="note-slip__label">
-                오늘의 포인트 <span className="note-slip__sub">운세의 &ldquo;하면 좋아요&rdquo;</span>
-              </p>
-              <p className="note-slip__text">{promiseText}</p>
-            </div>
-            <p className="mt-2 text-[15px] text-muted">오늘 이걸 해봤나요?</p>
-            <div className="promise-stamps" role="radiogroup" aria-label="오늘 포인트를 해봤는지">
-              {PROMISE_OPTIONS.map((o) => {
-                const on = promise === o.value;
-                return (
-                  <label key={o.value} className="contents">
-                    <input
-                      type="radio"
-                      name="promise"
-                      value={o.value}
-                      checked={on}
-                      onChange={(e) => {
-                        setPromise(o.value);
-                        // v3.20 보상 순간: "해봤어요" 도장을 찍을 때 금빛 가루
-                        if (o.value === "kept") celebrate(e.currentTarget.nextElementSibling);
-                      }}
-                      className="sr-only"
-                    />
-                    <span className="promise-stamp">
-                      <span aria-hidden className="promise-stamp__mark" data-kind={o.value} />
-                      {o.label}
-                    </span>
-                  </label>
-                );
-              })}
-            </div>
-          </fieldset>
-        )}
-
-        <fieldset>
+        <fieldset className="entry-moods">
           <legend className="text-[17px] font-bold">기분</legend>
           <p className="mt-1 text-sm text-muted">
-            {MAX_MOODS}개까지, 안 골라도 돼요 {moods.length > 0 && <span className="text-ganji">({moods.length}/{MAX_MOODS})</span>}
+            몇 개든, 안 골라도 돼요 {moods.length > 0 && <span className="text-ganji">({moods.length})</span>}
           </p>
-          <div className="mt-3 flex flex-wrap gap-2">
-            {MOODS.map((m) => {
-              const on = moods.includes(m);
-              const full = !on && moods.length >= MAX_MOODS;
-              return (
-                <label key={m}>
-                  <input
-                    type="checkbox"
-                    name="moods"
-                    value={m}
-                    checked={on}
-                    disabled={full}
-                    onChange={() => toggleMood(m)}
-                    className="peer sr-only"
-                  />
-                  <span
-                    data-tone={moodTone(m)}
-                    className={`tag mood-tag h-10 cursor-pointer text-[14px] peer-focus-visible:outline-2 peer-focus-visible:outline-ink ${
-                      on ? "tag--on font-bold text-paper-2" : "text-ink"
-                    } ${full ? "cursor-not-allowed opacity-45" : ""}`}
-                  >
-                    {m}
-                  </span>
-                </label>
-              );
-            })}
-          </div>
+          {MOOD_SECTIONS.map((sec) => (
+            <div key={sec.tone} className="entry-moods__group mt-4" data-tone={sec.tone}>
+              <p className="entry-moods__head text-[13px] font-bold text-muted">{sec.label}</p>
+              <div className="entry-moods__tags mt-2 flex flex-wrap gap-1.5">
+                {MOOD_GROUPS[sec.tone].map((m) => {
+                  const on = moods.includes(m);
+                  return (
+                    <label key={m}>
+                      <input type="checkbox" name="moods" value={m} checked={on} onChange={() => toggleMood(m)} className="peer sr-only" />
+                      <span
+                        data-tone={moodTone(m)}
+                        className={`tag mood-tag h-9 cursor-pointer text-[14px] peer-focus-visible:outline-2 peer-focus-visible:outline-ink ${
+                          on ? "tag--on font-bold text-paper-2" : "text-ink"
+                        }`}
+                      >
+                        {m}
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+          {/* 지난 기록에 목록 밖 기분이 있으면(없어야 하지만) 잃지 않게 */}
+          {moods
+            .filter((m) => !(MOODS as readonly string[]).includes(m))
+            .map((m) => (
+              <input key={m} type="hidden" name="moods" value={m} />
+            ))}
         </fieldset>
 
         <div>
@@ -257,6 +265,23 @@ export function EntryForm({ date, when = "today", promiseText, notePlaceholder, 
             onChange={(e) => setNote(e.target.value)}
             placeholder={notePlaceholder ?? "오늘 기억하고 싶은 일 하나"}
             className="ruled mt-2 w-full resize-none bg-transparent px-1 font-hand text-[17px] break-keep text-ink placeholder:font-sans placeholder:text-[16px] placeholder:text-faint focus:outline-none focus-visible:outline-2 focus-visible:outline-ink"
+          />
+        </div>
+
+        {/* 내일의 나에게 (2026-10-31, "오늘의 포인트" 자리): 쪽지(키트 note-slip) 한 장. 다음 날 오늘 화면 위에 펼쳐진다 */}
+        <div className="note-slip entry-tomorrow">
+          <label htmlFor="tomorrow_note" className="note-slip__label">
+            내일의 나에게 <span className="note-slip__sub">내일 아침 오늘 화면에 펼쳐져요</span>
+          </label>
+          <textarea
+            id="tomorrow_note"
+            name="tomorrow_note"
+            rows={2}
+            maxLength={MAX_TOMORROW_NOTE}
+            value={tomorrowNote}
+            onChange={(e) => setTomorrowNote(e.target.value)}
+            placeholder="내일의 나에게 한마디"
+            className="note-slip__text mt-1 w-full resize-none bg-transparent font-hand text-[17px] break-keep text-ink placeholder:font-sans placeholder:text-[15px] placeholder:text-faint focus:outline-none focus-visible:outline-2 focus-visible:outline-ink"
           />
         </div>
       </div>

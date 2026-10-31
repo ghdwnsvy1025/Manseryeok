@@ -1,12 +1,12 @@
 import Link from "next/link";
 import { characterOfGanji } from "@/lib/character";
-import { happinessTier, moodTone } from "@/lib/entry";
+import { AREA_LEVELS, AREAS, happinessTier, moodTone, type Areas } from "@/lib/entry";
 
 interface Props {
   date: string;
   /** 그날 간지 한글 ("병진") — 서버가 계산해 넘긴다(클라이언트에서 엔진을 부르지 않게) */
   ganjiKo: string;
-  entry: { happiness: number; moods: string[]; note: string | null } | null;
+  entry: { happiness: number; moods: string[]; note: string | null; areas?: Areas | null; tomorrowNote?: string | null } | null;
 }
 
 /**
@@ -41,7 +41,24 @@ export function CalendarDayDetail({ date, ganjiKo, entry }: Props) {
               ))}
             </ul>
           )}
+          {/* 2026-10-31 영역별 단계 (매긴 영역만) */}
+          {entry.areas && AREAS.some((a) => typeof entry.areas?.[a.key] === "number") && (
+            <dl className="day-detail__areas kv mt-3">
+              {AREAS.filter((a) => typeof entry.areas?.[a.key] === "number").map((a) => (
+                <div key={a.key} className="kv__row">
+                  <dt>{a.label}</dt>
+                  <dd>{AREA_LEVELS[entry.areas![a.key]! - 1]}</dd>
+                </div>
+              ))}
+            </dl>
+          )}
           {entry.note && <p className="day-detail__note ruled mt-3 font-hand text-[17px] break-keep text-ink">{entry.note}</p>}
+          {entry.tomorrowNote && (
+            <div className="day-detail__tomorrow note-slip mt-3">
+              <p className="note-slip__label">내일의 나에게</p>
+              <p className="note-slip__text font-hand text-[17px] break-keep">{entry.tomorrowNote}</p>
+            </div>
+          )}
           <p className="mt-3 text-center">
             <Link href={`/write?date=${date}`} className="tap text-sm text-muted underline underline-offset-4">
               고치기

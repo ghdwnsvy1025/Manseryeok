@@ -5,6 +5,8 @@ import { Booting } from "@/components/Booting";
 import { FortuneCard } from "@/components/FortuneCard";
 import { FortunePending } from "@/components/FortunePending";
 import { LinkPromptCard } from "@/components/LinkPromptCard";
+import { RememberAccount } from "@/components/RememberAccount";
+import { TomorrowNote } from "@/components/TomorrowNote";
 import { TodayEntryCard } from "@/components/TodayEntryCard";
 import { getUser } from "@/lib/supabase/server";
 import { birthProfileOf, getEntry, getFortuneVote, getLinkPromptState, getSajuProfile, listEntriesForStats, readFortuneCacheRow } from "@/lib/db";
@@ -28,7 +30,7 @@ function HanjaByElement({ hanja, label }: { hanja: string; label: string }) {
   );
 }
 import { shouldShowLinkPrompt } from "@/lib/linkPrompt";
-import { pointStats, streakOf } from "@/lib/stats/extra";
+import { streakOf } from "@/lib/stats/extra";
 import { nightCarryDate } from "@/lib/writeNav";
 import { addDays, formatKoreanDate, hourKST, todayKST } from "@/lib/time";
 
@@ -70,9 +72,11 @@ export default async function TodayPage() {
   if (!user) return <Booting title={formatKoreanDate(today)} cards={2} />;
 
   // 한 단계에 전부 읽는다 — 운세 캐시 행·투표도 여기서. 캐시가 맞으면 Suspense 없이 바로 그린다 (전수조사 A-2·3)
-  const [profile, entry, entries, linkState, cachedRow, vote] = await Promise.all([
+  const [profile, entry, yesterdayEntry, entries, linkState, cachedRow, vote] = await Promise.all([
     getSajuProfile(supabase, user.id),
     getEntry(supabase, user.id, today),
+    // 어젯밤의 내가 남긴 쪽지 (2026-10-31) — 어제 기록의 tomorrow_note
+    getEntry(supabase, user.id, addDays(today, -1)),
     listEntriesForStats(supabase, user.id),
     getLinkPromptState(supabase, user.id),
     readFortuneCacheRow(supabase, user.id, today),
@@ -114,7 +118,6 @@ export default async function TodayPage() {
   const sameGanjiTimes = entries.filter((e) => e.day_ganji_index === ganji.index).length;
   const metCards = new Set(entries.map((e) => e.day_ganji_index)).size;
   const streak = streakOf(entries, today);
-  const points = pointStats(entries);
   const writeCard = entry ? (
     <TodayEntryCard
       entry={entry}
@@ -123,14 +126,13 @@ export default async function TodayPage() {
       sameGanjiTimes={sameGanjiTimes}
       metCards={metCards}
       streak={streak.current}
-      points={points.answered ? { kept: points.kept, answered: points.answered } : null}
       justSaved={false}
     />
   ) : (
     <section className={card}>
       <h2 className="font-serif text-[24px] leading-snug">{carry ? "어젯밤 하루, 어땠어요?" : "오늘 하루, 어땠어요?"}</h2>
       <p className="mt-2 text-[15px] text-muted">
-        {carry ? "자정이 지났지만 아직 어젯밤이에요. 어제 날짜로 남겨요." : "행복도 하나만 골라도 돼요. 30초면 끝나요."}
+        {carry ? "자정이 지났지만 아직 어젯밤이에요. 어제 날짜로 남겨요." : "영역 하나만 매겨도 돼요. 30초면 끝나요."}
       </p>
       {/* 금색 면 버튼은 화면에 하나 — 이것 */}
       <Link href="/write" className={goldButton}>
@@ -141,6 +143,8 @@ export default async function TodayPage() {
 
   return (
     <main className="flex flex-col gap-5">
+      {/* 이 기기에서 쓰던 계정을 적어 둔다 — 세션을 잃으면 AnonBoot가 새 계정 대신 /restore로 (ANON_START.md 8절) */}
+      <RememberAccount userId={user.id} anonymous={user.is_anonymous} />
       {/* 머리 (v3.9): 가운데 축. 제목(날짜·간지) → 한 줄 → 두 캐릭터 "나 × 오늘"을 가운데에 크게(각 108px).
           그림은 이 한 쌍이 전부. v3.27: 얼굴 그림(faces)을 달창(moon-window) 창틀 안에 — 내 쪽 금빛 창틀, 오늘 쪽 녹갈 창틀. 색으로 길흉을 말하지 않는다 */}
       <header className="flex flex-col items-center text-center">
@@ -173,6 +177,8 @@ export default async function TodayPage() {
         </div>
       </header>
 
+      {/* 어젯밤의 내가 남긴 쪽지 (2026-10-31): 오늘 처음 열 때 펼쳐지고, 그 뒤엔 접힌 띠 */}
+      {yesterdayEntry?.tomorrow_note && <TomorrowNote date={today} text={yesterdayEntry.tomorrow_note} />}
       {/* 순서 고정: 운세 카드가 늘 위, 기록 카드가 아래 (톤 v3) */}
       {fortuneCard}
       {writeCard}
