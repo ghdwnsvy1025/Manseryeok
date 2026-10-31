@@ -7,7 +7,8 @@ const KEY = "signal-legend-seen";
 /**
  * 오늘의 신호 상자 위 화살표 범례 — 첫 한 번만 (전수조사 C "화살표 범례 없음").
  * localStorage `signal-legend-seen`이 없을 때만 보이고, ×로 닫으면 다시 안 나온다. 저장소를 못 쓰면 그냥 보인다.
- * 색은 신호 상자와 같다 (↑ 금색 · → 보조 · ↓ 먹색 — 길흉을 색으로 말하지 않는다).
+ * 색은 신호 상자와 같다 (↑ 금색 · ↓ 먹색 — 길흉을 색으로 말하지 않는다).
+ * v3.37 (명세 33, 운세 v4.20): → 줄은 더 오지 않으므로 범례에서도 뺐다.
  */
 export function SignalLegend() {
   const [show, setShow] = useState(false);
@@ -35,7 +36,6 @@ export function SignalLegend() {
       <span>
         <span className="inline-flex gap-4">
           <span><span className="text-gold font-bold">↑</span> 좋아요</span>
-          <span><span>→</span> 보통</span>
           <span><span className="text-ink">↓</span> 조심</span>
         </span>
       </span>

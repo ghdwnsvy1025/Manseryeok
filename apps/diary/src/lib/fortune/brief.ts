@@ -8,10 +8,10 @@
 import { TEN_GOD_THEME } from "./base";
 import { buildPlan, CONTEXT_FACT_RE, daySeed, hanjaToKo, READ_WORD, stripTenGodNames, type FortunePlan } from "./plan";
 import { solarTermOf } from "./solarTerms";
-import { BANNED, namesFromCore } from "./text";
+import { areaStateOf, BANNED, namesFromCore } from "./text";
 import type { AreaName, AreaPeriod, AreaSignal, CoreFortune, PersonalAdjustment } from "./types";
 
-export { BAND_DIRECTION, CONTEXT_FACT_RE, daySeed, hanjaToKo } from "./plan";
+export { CONTEXT_FACT_RE, daySeed, hanjaToKo } from "./plan";
 
 /** 사주 코어 content/validate.ts의 COMMON_BAN·HEALTH_BAN 복사. 하루 운세에서도 같은 선을 지킨다 */
 export const CORE_BANNED = [
@@ -134,7 +134,7 @@ export interface FortuneBrief {
   /** 최근 3일 (첫 문장·제목 겹침·"아니에요") */
   recent: RecentFortune[];
   /** 최근 제목(14일 — 완전히 같으면 수리)과 7일 본문 문장(검사기용) */
-  avoid: { headlines: string[]; lines?: { date: string; lines: string[] }[] };
+  avoid: { headlines: string[]; lines?: { date: string; lines: string[] }[]; actions?: { date: string; lines: string[] }[] };
 }
 
 export const BAND_WORD = { 좋음: "수월한 편", 무난: "보통", 주의: "조심할 편" } as const;
@@ -152,15 +152,16 @@ export function buildBrief(input: BriefInput): FortuneBrief {
   const plan = buildPlan({ core, personal: input.personal, date: input.date, band: input.band, recent: input.recent });
   const facts = core.facts.map(plainFact);
   const caveats = core.caveats.map(hanjaToKo);
-  const [y, m, d] = input.date.split("-").map(Number) as [number, number, number];
   const term = solarTermOf(input.date);
   const names = namesFromCore(core);
   const hasMonth = plan.context.some((c) => c.startsWith("이달 운"));
-  const shown = [plan.support && plan.support.kind !== "기운" ? plan.support.text : "", ...plan.context, ...caveats, term.label, String(y), String(m), String(d)];
+  // v4.21 (ChatGPT 3차 10항): 날짜·절기 날수는 작가에게 보내지 않으니 숫자 허용 목록에서도 뺀다 — 계획(보조·맥락·참고)에 실린 숫자만
+  const shown = [plan.support && plan.support.kind !== "기운" ? plan.support.text : "", ...plan.context, ...caveats];
 
   const recentAll = [...(input.recent ?? [])].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
   const within = (days: number) => recentAll.filter((r) => daySeed(input.date) - daySeed(r.date) <= days);
   const recentLines = within(7).filter((r) => r.lines?.length).map((r) => ({ date: r.date, lines: r.lines! }));
+  const recentActions = within(3).filter((r) => r.actions?.length).map((r) => ({ date: r.date, lines: r.actions! }));
 
   return {
     plan,
@@ -176,7 +177,7 @@ export function buildBrief(input: BriefInput): FortuneBrief {
     banned: BANNED_ALL,
     jargon: JARGON,
     recent: within(3),
-    avoid: { headlines: within(14).map((r) => r.headline), ...(recentLines.length ? { lines: recentLines } : {}) },
+    avoid: { headlines: within(14).map((r) => r.headline), ...(recentLines.length ? { lines: recentLines } : {}), ...(recentActions.length ? { actions: recentActions } : {}) },
   };
 }
 
@@ -186,13 +187,11 @@ export function renderBrief(b: FortuneBrief): string {
   // 사실 문장("내게 모자란 … 채워져요")은 판정 말투라 보내지 않는다 — 읽기(오늘)와 표현 후보로 충분하다 (v4.18까지 판정 문장이 본문에 새던 1위 경로)
   const part = (x: FortunePlan["core"]) => ({ 뜻: x.meaning, 오늘: READ_WORD[x.read], 표현: x.expressions });
   const av = p.avoid;
+  // v4.20 (Q2): 장면·동작·첫 어절·제목 끝맺음 회피는 보내지 않는다 — 중요한 명사를 못 쓰게 하고 억지 장면을 부르던 압박. 거의 같은 문장·제목은 검사기가 막는다
+  // v4.21 (ChatGPT 3차 8항): "내용이 안 맞음"(voteDown)은 작가에게 보내지 않는다 — 다음 날도 그 뜻이 실제로 세면 숨기는 게 더 틀린 글이다.
+  //   계획(avoid.voteDown)에는 남겨 P2 갈래 고르기의 약한 감점에 쓴다. "뻔함"은 같은 조언 문장을 피하는 표현 단계 일이라 그대로 보낸다
   const avoid = {
-    ...(av.scenes.length ? { 장면: av.scenes } : {}),
-    ...(av.verbs.length ? { 동작: av.verbs } : {}),
-    ...(av.openers.length ? { 첫어절: av.openers } : {}),
-    ...(av.headlineEndings.length ? { 제목끝: av.headlineEndings } : {}),
     ...(av.headlines.length ? { 최근제목: av.headlines } : {}),
-    ...(av.voteDown.length ? { 아니에요: av.voteDown } : {}),
     ...(av.obvious.length ? { 뻔했던조언: av.obvious } : {}),
   };
   return JSON.stringify({
@@ -200,11 +199,11 @@ export function renderBrief(b: FortuneBrief): string {
     ...(b.today.useSolarTerm ? { 절기첫날: b.today.solarTermName } : {}),
     단계: `${b.score.band}(${b.score.word})`,
     말투: b.tone,
-    방향: p.direction,
     핵심: part(p.core),
     ...(p.support ? { 보조: p.support.kind === "기운" ? part(p.support.part) : { 사실: stripTenGodNames(p.support.text) } } : {}),
     ...(p.context.length ? { 맥락: p.context } : {}),
-    영역: p.areas.map((a) => ({ 영역: a.area, 말: a.word, 기간: a.period, 신호: a.signal })),
+    // v4.21 (ChatGPT 3차 3항): 화살표만 주고 뜻을 짐작시키지 않는다 — 화면 상태말과 같은 뜻 (오늘 영역 옆에 보이는 그 말)
+    영역: p.areas.map((a) => ({ 영역: a.area, 말: a.word, 기간: a.period, 신호: a.signal, 뜻: areaStateOf(a.area, a.signal as "↑" | "↓") })),
     ...(Object.keys(avoid).length ? { 피할것: avoid } : {}),
     숫자: b.allowedNumbers,
     ...(b.caveats.length ? { 참고: b.caveats } : {}),

@@ -153,7 +153,7 @@ describe("v4.9 칸마다 같은 말 반복", () => {
     expect(validateFortuneText(t, b).some((i) => i.includes("do: 본문 문장을 되풀이"))).toBe(true);
   });
   it("SYSTEM이 칸 역할과 '아니에요' 기억을 말한다", () => {
-    expect(SYSTEM).toContain("본문 조언을 되풀이하지 않고");
-    expect(SYSTEM).toContain("피할것.아니에요");
+    expect(SYSTEM).toContain("본문 문장을 되풀이하지 않고");
+    expect(SYSTEM).not.toContain("피할것.아니에요");   // v4.21: "내용이 안 맞음"은 작가에게 보내지 않는다
   });
 });

@@ -149,6 +149,9 @@ export function FortuneCard({ fortune, ganjiKo, canVote, vote, defaultOpen, vers
   const paragraphs = splitParagraphs(fortune.body);
   /** 영역 줄 최대 4 (오늘 ≤2 · 이달 1 · 올해 1). period는 기능 쪽이 곧 넣는다 — 없으면 "오늘" */
   const areas = (fortune.areas ?? []).slice(0, 4).map((a) => ({ ...a, period: (a as { period?: Period }).period ?? "오늘" }));
+  /** v3.37: line이 있으면 줄(↑ → ↓ 순), 비어 있으면 칩(데이터 순서 그대로 — 이달 → 올해) */
+  const areaRows = [...areas.filter((a) => a.line && a.signal === "↑"), ...areas.filter((a) => a.line && a.signal === "→"), ...areas.filter((a) => a.line && a.signal === "↓")];
+  const areaChips = areas.filter((a) => !a.line);
   const personal = personalLines(fortune, ganjiKo);
   const gaewoon = fortune.core?.luckEls ? gaewoonOf(fortune.core, fortune.date) : null;
   /** v3.36 "오늘 힘이 되는 것": 코어 키워드 긍정 앞 3개 (v4.19는 fortune.keywords, 옛 캐시는 core.keywords). 없으면 줄째 없음 */
@@ -228,21 +231,39 @@ export function FortuneCard({ fortune, ganjiKo, canVote, vote, defaultOpen, vers
                 )}
                 {/* 화살표 범례: 처음 한 번만 (닫으면 다시 안 뜸) */}
                 {areas.length > 0 && <SignalLegend />}
-                <ul className="traits__list">
-                  {[...areas.filter((a) => a.signal === "↑"), ...areas.filter((a) => a.signal === "→"), ...areas.filter((a) => a.signal === "↓")].map((a) => (
-                    <li key={`${a.period}-${a.area}`} className="trait break-keep" data-signal={a.signal}>
-                      <span className="trait__tag sig sig--line">
-                        <span className="trait__period">{a.period}</span>
-                        <span className="trait__area">{AREA_WORD[a.area]}</span>
-                        <span aria-hidden className={`trait__arrow ${SIGNAL_COLOR[a.signal]}`}>
+                {/* v3.37 (명세 33, 운세 v4.20): line이 있는 줄(오늘 = 코드가 정한 짧은 상태말, 옛 캐시 = 예전 문장)은 띠지 + 말 한 줄,
+                    line이 빈 줄(이달·올해)은 문장 없이 화살표 띠지 칩만 한 줄. 행동은 "오늘 해 볼 것"이 맡는다. → 줄은 더 오지 않는다 */}
+                {areaRows.length > 0 && (
+                  <ul className="traits__list">
+                    {areaRows.map((a) => (
+                      <li key={`${a.period}-${a.area}`} className="trait break-keep" data-signal={a.signal}>
+                        <span className="trait__tag sig sig--line">
+                          <span className="trait__period">{a.period}</span>
+                          <span className="trait__area">{AREA_WORD[a.area]}</span>
+                          <span aria-hidden className={`trait__arrow ${SIGNAL_COLOR[a.signal]}`}>
+                            {a.signal}
+                          </span>
+                          <span className="sr-only">{SIGNAL_WORD[a.signal]}</span>
+                        </span>
+                        <span className="trait__text">{a.line}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {areaChips.length > 0 && (
+                  <ul className="traits__chips" aria-label="이달과 올해">
+                    {areaChips.map((a) => (
+                      <li key={`${a.period}-${a.area}`} className="trait-chip" data-signal={a.signal}>
+                        <span className="trait-chip__period">{a.period}</span>
+                        <span className="trait-chip__area">{AREA_WORD[a.area]}</span>
+                        <span aria-hidden className={`trait-chip__arrow ${SIGNAL_COLOR[a.signal]}`}>
                           {a.signal}
                         </span>
                         <span className="sr-only">{SIGNAL_WORD[a.signal]}</span>
-                      </span>
-                      <span className="trait__text">{a.line}</span>
-                    </li>
-                  ))}
-                </ul>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </section>
             )}
             <span aria-hidden className="rule rule--light mt-6" />

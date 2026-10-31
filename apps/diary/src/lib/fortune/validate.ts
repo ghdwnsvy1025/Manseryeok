@@ -47,14 +47,14 @@ export const needsRewrite = (issues: readonly Issue[]): boolean => issues.some((
 
 export const LIMITS = {
   headlineMax: 22,
-  /** v4.19: 본문 문장 4~5개를 요청한다. 6까지는 받고, 수리로 지워 3개까지는 쓴다 */
-  bodySentences: [4, 6] as const,
+  /** v4.19: 본문 문장 4~5개를 요청했다. v4.20: 3~5개를 요청하고 6까지는 받는다(내용이 적은 날 채우려고 장면을 지어내지 않게) */
+  bodySentences: [3, 6] as const,
   bodyKeepMin: 3,
   areaLineMax: 70,
   doDontMax: 45,
   sentenceMin: 12,
   sentenceMax: 85,
-  /** 같은 낱말(어절 앞 두 글자)은 본문에서 세 번까지 */
+  /** 같은 낱말(어절 앞 두 글자)은 본문에서 세 번까지 — v4.20부터 검사기는 이걸로 탈락시키지 않는다(overusedWords는 측정용으로 남김) */
   wordMax: 3,
 } as const;
 
@@ -105,6 +105,9 @@ export function tokenOverlap(a: string, b: string): number {
 }
 /** v4.9: 칸마다 같은 말 반복 — 영역 줄·do·dont가 본문 어느 문장과든 이만큼 겹치면 탈락 */
 export const REPEAT_OVERLAP_MAX = 0.5;
+/** v4.21 (ChatGPT 3차 7항): 최근 운세와의 겹침은 "거의 복사"일 때만 수리한다. 0.6에서는 같은 신호가 다시 나온 날의 비슷한 뜻까지 고치게 했다 —
+ *  같은 사주 신호면 비슷한 말이 나오는 게 정상이고, 날짜 사이 반복은 품질 지표(scripts/fortune-judge)로 잰다 */
+export const RECENT_COPY_MIN = 0.85;
 const REPEAT_STOP = new Set(["오늘", "오늘은", "이달엔", "올해는", "평소", "평소엔", "평소보다", "하루예요", "날이에요", "있어요", "좋아요", "해요", "편이", "쪽이", "쪽으로", "조금", "한결"]);
 const stemsOf = (s: string): string[] => tokensOf(s).filter((t) => !REPEAT_STOP.has(t)).map((t) => t.slice(0, 2));
 export function stemOverlap(a: string, b: string): number {
@@ -169,14 +172,16 @@ export function normalizeDraft(raw: unknown): Draft | null {
   if (!raw || typeof raw !== "object") return null;
   const t = raw as Partial<ModelText>;
   const str = (v: unknown) => (typeof v === "string" ? trimTail(v.trim()) : "");
+  // v4.20: 배열 원소로 받은 문장은 마침표를 빼먹기도 한다(B 측정 8.6%) — 이어 붙이면 "쉬워요 그 마음이"가 된다. 끝이 한글이면 마침표를 붙인다
+  const period = (x: string) => (/[가-힣]$/.test(x) ? `${x}.` : x);
   const bodyRaw = Array.isArray(t.body) ? t.body.map(String) : typeof t.body === "string" ? [t.body] : [];
-  const body = bodyRaw.flatMap((x) => splitSentences(x.replace(/\n+/g, " "))).map((x) => trimTail(x));
+  const body = bodyRaw.flatMap((x) => splitSentences(x.replace(/\n+/g, " "))).map((x) => period(trimTail(x)));
   const areaLines = Array.isArray(t.areaLines)
     ? t.areaLines.filter((a) => a && typeof a === "object").map((a) => ({ area: a.area, text: str(a.text) }))
     : Array.isArray(t.areas)
       ? t.areas.filter((a) => a && typeof a === "object").map((a) => ({ area: a.area, text: str(a.line) }))
       : [];
-  return { headline: str(t.headline), body, areaLines, do: str(t.do), dont: str(t.dont) };
+  return { headline: str(t.headline), body, areaLines, do: period(str(t.do)), dont: period(str(t.dont)) };
 }
 
 /** 이슈를 사람이 읽는 한 줄로 (기록·옛 테스트용) */
@@ -252,8 +257,7 @@ export function checkDraft(d: Draft | null, b: FortuneBrief, opts: { minBody?: n
   const body = d.body;
   const [minDraft, maxS] = LIMITS.bodySentences;
   const minS = opts.minBody ?? minDraft;   // 수리·지우기 뒤에는 3문장까지 쓴다 (LIMITS.bodyKeepMin)
-  if (body.length < minS) push("whole", undefined, "body_count", `본문 ${body.length}문장 (${minDraft}~5문장)`);
-  else if (body.length > maxS) push("whole", undefined, "body_count", `본문 ${body.length}문장 (${minDraft}~5문장)`);
+  if (body.length < minS || body.length > maxS) push("whole", undefined, "body_count", `본문 ${body.length}문장 (${minDraft}~5문장)`);
   if (b.plan && !coreCovered(body, b.plan.coreStems)) push("whole", undefined, "core_missing", `핵심("${b.plan.core.meaning}" 쪽 — ${b.plan.core.expressions[0] ?? ""})이 본문에 보이지 않음`);
 
   // ---- 본문 문장마다 ----
@@ -272,8 +276,8 @@ export function checkDraft(d: Draft | null, b: FortuneBrief, opts: { minBody?: n
     const pres = s.match(PRESUME_RE); if (pres) add("presume", `넘겨짚는 말 "${pres[0]}"`);
     if (b.score?.band === "주의" && !/이달|이번 달|올해|10년/.test(s)) { const m = s.match(CARE_DAY_REVERSAL_RE); if (m) add("reversal", `주의인 날 반전 말 "${m[0]}"`); }
     if (exSentences.some((x) => tokenOverlap(s, x) >= 0.7)) add("example_copy", "예시 문장을 베낌");
-    const hit = recentLines.find((r) => r.lines.some((line) => s.trim() === line.trim() || tokenOverlap(s, line) >= 0.6));
-    if (hit) add("recent_line", `최근(${hit.date}) 문장과 겹침 (같은 뜻이라도 다른 장면·다른 말로)`);
+    const hit = recentLines.find((r) => r.lines.some((line) => s.trim() === line.trim() || tokenOverlap(s, line) >= RECENT_COPY_MIN));
+    if (hit) add("recent_line", `최근(${hit.date}) 문장을 거의 그대로 씀`);
   });
   // 본문 전체 규칙 → 그 규칙을 처음 넘긴 문장
   if (FIRST_CONNECTIVE_RE.test(body[0] ?? "")) at("body", 0)("connective", "첫 문장이 이음말로 시작");
@@ -282,23 +286,11 @@ export function checkDraft(d: Draft | null, b: FortuneBrief, opts: { minBody?: n
   if (body.length >= 4 && conn.length >= 3) at("body", conn[2]!)("connectives", `이음말로 시작하는 문장이 ${conn.length}개`);
   const seenTimes: string[] = [];
   body.forEach((s, i) => { for (const w of TIME_WORDS) if (s.includes(w) && !seenTimes.includes(w)) { seenTimes.push(w); if (seenTimes.length === 3) at("body", i)("time_list", `시간대 나열 (${seenTimes.join("·")}) — 장면 1~2개만`); } });
-  {
-    const counts = new Map<string, number>();
-    body.forEach((s, i) => {
-      for (const w of s.replace(/[.,!?'"()\n]/g, " ").split(/\s+/)) {
-        if (w.length < 2) continue;
-        const stem = w.slice(0, 2);
-        if (WORD_STOP.has(stem)) continue;
-        const n = (counts.get(stem) ?? 0) + 1;
-        counts.set(stem, n);
-        if (n === LIMITS.wordMax + 1) at("body", i)("overuse", `같은 낱말 "${stem}…"이 본문에서 ${n}번째 (${LIMITS.wordMax}번까지)`);
-      }
-    });
-  }
+  // v4.20 (ChatGPT 2차 3항): "같은 낱말 세 번까지" 탈락은 없앴다 — "결정을… 그 결정은"처럼 뜻을 분명히 하는 반복까지 막았다
   // 최근 3일 첫 문장 겹침
   for (const r of b.recent ?? []) {
     const first = splitSentences(r.start)[0] ?? "";
-    if (first && (body[0]!.trim() === first.trim() || tokenOverlap(body[0]!, first) >= 0.6)) { at("body", 0)("recent_start", `최근(${r.date}) 운세 첫 문장과 겹침`); break; }
+    if (first && (body[0]!.trim() === first.trim() || tokenOverlap(body[0]!, first) >= RECENT_COPY_MIN)) { at("body", 0)("recent_start", `최근(${r.date}) 운세 첫 문장과 겹침`); break; }
   }
 
   // ---- 제목 ----
@@ -309,7 +301,7 @@ export function checkDraft(d: Draft | null, b: FortuneBrief, opts: { minBody?: n
     for (const e of FORTUNE_EXAMPLES) if (d.headline.trim() === e.text.headline) add("example_copy", `예시 제목을 그대로 씀`);
     const same14 = (b.avoid?.headlines ?? []).find((h) => d.headline.trim() === h.trim());
     if (same14) add("recent_headline", `최근 14일 제목과 같음 "${same14}"`);
-    else { const r3 = (b.recent ?? []).find((r) => tokenOverlap(d.headline, r.headline) >= 0.6); if (r3) add("recent_headline", `최근(${r3.date}) 제목과 겹침 "${r3.headline}"`); }
+    else { const r3 = (b.recent ?? []).find((r) => tokenOverlap(d.headline, r.headline) >= RECENT_COPY_MIN); if (r3) add("recent_headline", `최근(${r3.date}) 제목과 겹침 "${r3.headline}"`); }
   }
 
   // ---- 하면·피해요 ----
@@ -323,6 +315,9 @@ export function checkDraft(d: Draft | null, b: FortuneBrief, opts: { minBody?: n
     if (v.length > LIMITS.doDontMax) add("length", `${v.length}자 (${LIMITS.doDontMax}자 안)`);
     const hit = repeatedSentence(v, body);
     if (hit) add("repeat", `본문 문장을 되풀이함 ${quoteHit(hit)}`);
+    // v4.20: 최근 3일 하면·피해요와 거의 같으면 그 칸만 고친다 (주의인 날마다 같은 하면이 나왔다). v4.21: 거의 복사(RECENT_COPY_MIN)만
+    const prev = (b.avoid?.actions ?? []).find((r) => r.lines.some((x) => v.trim() === x.trim() || tokenOverlap(v, x) >= RECENT_COPY_MIN));
+    if (prev) add("recent_action", `최근(${prev.date}) 하면·피해요와 겹침`);
     for (const e of FORTUNE_EXAMPLES) if (v === e.text[k]) { add("example_copy", "예시 하면·피해요를 그대로 씀"); break; }
   }
 

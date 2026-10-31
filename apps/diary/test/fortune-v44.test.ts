@@ -188,7 +188,7 @@ describe("v4.4 brief·SYSTEM·검사 — 요일·절기 재료, 금지어, 맥�
     expect(termDay.today.useSolarTerm).toBe(true);
     expect(tj.절기첫날).toBe(termDay.today.solarTermName);
     // 맥락 문장이 없는 날 "10년"이 없고, 절기 라벨은 숫자를 더하지 않는다 (7·10·2026은 날짜)
-    expect(plain.allowedNumbers).toEqual([7, 10, 2026]);
+    expect(plain.allowedNumbers).toEqual([]);   // v4.21: 날짜 숫자 없음
   });
 
   test("금지어 추가: 특별한·남다른·다른 날과 달리·차별 — BANNED·brief.banned·검사", () => {
@@ -218,7 +218,7 @@ describe("v4.4 brief·SYSTEM·검사 — 요일·절기 재료, 금지어, 맥�
     expect(CONTEXT_MENTION_RE.test("이달 운은 힘이 드는 쪽이에요")).toBe(false);
     for (const extra of ["올해 운과 겹쳐 조급해지기 쉬우니 천천히 가요.", "지금 10년 단위 운이 받쳐 줘서 마음이 놓여요."]) {
       const r = validateFortuneText({ ...OKC, body: [...OKC.body, extra] }, plain);
-      expect(r, extra).toEqual(["본문 5번째 문장: 오늘만: 계획에 없는 올해·10년 단위 운을 말함"]);
+      expect(r, extra).toContain("본문 5번째 문장: 오늘만: 계획에 없는 올해·10년 단위 운을 말함");   // v4.21: 날짜 숫자가 허용 목록에서 빠져 "10"도 함께 걸린다
     }
     expect(validateFortuneText({ ...OKC, body: [...OKC.body, "이달 운은 조심할 편이라 서두르지 않아요."] }, plain)).toEqual(["본문 5번째 문장: 이달 운 재료가 없는데 이달 운을 말함"]);
     expect(validateFortuneText({ ...OKC, dont: "올해 운만 믿고 벌이지 않아요." }, plain)).toEqual(["dont: 오늘만: 계획에 없는 올해·10년 단위 운을 말함"]);

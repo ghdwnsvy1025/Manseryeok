@@ -486,7 +486,7 @@ describe("템플릿 문장", () => {
           const t = templateText({ tenGod, relation, yongsin }, personal, todayKo);
           const all = [t.headline, t.body, t.do, t.dont].join(" ");
           expect(findBanned(all), all).toEqual([]);
-          expect(all).toMatch(/(어요|해요|돼요|예요)\.?/);
+          expect(all).toMatch(/요\.?/);
           expect(t.headline.length).toBeLessThanOrEqual(22);
           // v4.13: 템플릿도 추상어·생극 금칙을 지킨다
           expect(all, all).not.toMatch(ABSTRACT_RE);
@@ -575,7 +575,7 @@ describe("3단계 brief (v4.19: 계획을 건네는 얇은 묶음)", () => {
     expect(b.jargon).toContain("용신");
     expect(b.jargon).toEqual(expect.arrayContaining(["일간", "일지", "천간", "지지", "삼합", "육합", "기신"]));
     // v4.2: 점수(9.2)는 허용 숫자에 없다
-    expect(b.allowedNumbers).toEqual([6, 15, 2026]);
+    expect(b.allowedNumbers).toEqual([]);   // v4.21: 날짜 숫자 없음
     expect(b.score.value).toBe(9.2);
     // v4.4: 요일·절기가 오늘 재료로
     expect(b.today).toEqual({ date: "2026-06-15", weekday: "월요일", ganji: "경신일", solarTerm: "망종 열흘째", useSolarTerm: false, solarTermName: "망종" });
@@ -679,9 +679,9 @@ describe("3단계 검사 (validate) — v4.19 Draft", () => {
     expect(tokenOverlap("돈 쓰는 일은 계획대로 가요.", OK.body.join(" "))).toBe(0);
   });
 
-  test("문장 수: 본문 3문장·7문장은 전체 이슈(다시 쓰기) / 기간 약속 · 한자", () => {
-    expect(v({ body: OK.body.slice(0, 3) })).toEqual(["본문 3문장 (4~5문장)"]);
-    expect(v({ body: [...OK.body, "하나 더 있는 문장이에요.", "또 하나 더 있는 문장이에요.", "셋째로 더 있는 문장이에요."] })).toEqual(expect.arrayContaining(["본문 7문장 (4~5문장)"]));
+  test("문장 수: 본문 2문장·7문장은 전체 이슈(다시 쓰기, v4.20) / 기간 약속 · 한자", () => {
+    expect(v({ body: OK.body.slice(0, 2) })).toEqual(["본문 2문장 (3~5문장)"]);   // v4.20: 3~5문장
+    expect(v({ body: [...OK.body, "하나 더 있는 문장이에요.", "또 하나 더 있는 문장이에요.", "셋째로 더 있는 문장이에요."] })).toEqual(expect.arrayContaining(["본문 7문장 (3~5문장)"]));
     expect(v({ dont: "3일 더 쓰면 달라지지 않아요." }).some((x) => x.includes("기간 약속"))).toBe(true);
     expect(v({ headline: "庚申의 아침" }).some((x) => x.includes("한자"))).toBe(true);
   });

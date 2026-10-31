@@ -19,12 +19,12 @@ import { computeCoreFortune } from "./core";
 import { generateFortuneText, PROMPT_VERSION, type GenerateResult } from "./llm";
 import { adjustWithEntries, bandOf, fitPercent, toTenPoint, type EntryLike } from "./personal";
 import { templateInputFromCore, templateText } from "./text";
-import type { FortuneContent, FortuneMetrics } from "./types";
+import type { AreaName, AreaPeriod, FortuneContent, FortuneMetrics } from "./types";
 import { dailyCap, regenPolicy, retryAfterFor, usableCachedContent } from "./policy";
 export { REGEN_LIMIT, TRANSIENT_RETRY_MS, dailyCap, regenCountOf, regenPolicy, retryAfterFor, usableCachedContent } from "./policy";
 
 /** 캐시 지문에 들어간다. 올리면 기존 캐시가 전부 무효 */
-export const FORTUNE_VERSION = "v4.20";
+export const FORTUNE_VERSION = "v4.21";
 
 export type FortuneOwner = { userId: string; guestKey?: undefined } | { guestKey: string; userId?: undefined };
 
@@ -217,9 +217,9 @@ export async function computeFortune(
   const text = llm ? llm.text : fallback;
   const source: FortuneContent["source"] = llm ? "llm" : "template";
 
-  // 영역: 신호는 코어 것 전부(모델이 지울 수 없음), 문장은 모델 것(계획이 고른 영역) — 템플릿이면 템플릿 줄
+  // 영역: 신호는 코어 것 전부(모델이 지울 수 없음). v4.20: 문장은 모델·템플릿 어느 쪽도 쓰지 않고 화면이 코드 상태말로(visible.composeAreas)
   const areaSignals = core.areas.map((a) => ({ period: a.period, area: a.area, signal: a.signal, why: a.why }));
-  const areaNarratives = llm ? llm.areaNarratives ?? [] : (fallback.areas ?? []).map((a) => ({ period: a.period, area: a.area, text: a.line }));
+  const areaNarratives: { period: AreaPeriod; area: AreaName; text: string }[] = [];
   const areas = composeAreas(areaSignals, areaNarratives, core.facts);
   const calls = r?.metrics.calls ?? [];
   const usage = r && calls.length ? r.usage : undefined;   // 템플릿으로 떨어져도 그때까지 쓴 토큰은 남긴다

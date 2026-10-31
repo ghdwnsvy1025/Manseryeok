@@ -78,7 +78,7 @@ const BY_TEN_GOD: Record<TenGod, { headline: string; lead: string; do: string; d
   },
   정재: {
     headline: "차곡차곡 쌓이는 날이에요",
-    lead: "크게 벌이기보다 하던 일을 마무리할 때 성과가 나요.",
+    lead: "크게 벌이기보다 하던 일을 마무리하는 데 마음이 가요.",
     do: "작은 일을 끝까지 마무리해요.",
     dont: "큰 변화를 새로 벌이지 않아요.",
   },
@@ -90,7 +90,7 @@ const BY_TEN_GOD: Record<TenGod, { headline: string; lead: string; do: string; d
   },
   정관: {
     headline: "약속과 역할이 중요한 날이에요",
-    lead: "정해진 틀 안에서 움직일 때 일이 순해요.",
+    lead: "약속과 순서를 지키는 쪽으로 마음이 기울어요.",
     do: "정해진 시간과 절차를 지켜요.",
     dont: "체면 때문에 억지로 떠맡지 않아요.",
   },
@@ -178,8 +178,24 @@ const AREA_LINE: Record<AreaName, Record<AreaSignal, [string, string]>> = {
   건강: { "↑": ["몸이 가벼운 편이에요.", "몸을 움직이기 좋은 때예요."], "→": ["몸 상태는 평소와 비슷해요.", "몸은 평소대로 돌보면 돼요."], "↓": ["일찍 쉬는 게 남는 날이에요.", "무리한 일정은 하나 빼요."] },
 };
 
-/** v4.19: 영역 × 신호 템플릿 줄 (variant 0·1). 모델 문장이 없는 신호 줄에 화면이 쓴다 (visible.composeAreas) */
+/** v4.19: 영역 × 신호 템플릿 줄 (variant 0·1). 템플릿 글의 영역 줄에 쓴다 */
 export const areaLineOf = (area: AreaName, signal: AreaSignal, variant = 0): string => AREA_LINE[area][signal][Math.min(variant, 1)]!;
+
+/**
+ * v4.20 (ChatGPT 2차 14항, Q1): 오늘 영역 옆 짧은 상태말. 행동 문장이 아니라 "어떤 쪽인지"만 — 행동은 하면·피해요가 맡는다.
+ * 모델이 영역마다 문장을 쓰던 것을 없앴다(이달 줄이 매일 새로 쓰이며 겹치고, "평소와 비슷해요" 줄이 자리를 차지했다). → 는 줄을 만들지 않는다
+ * v4.21 (ChatGPT 3차 3항): 작가도 같은 표를 영역의 뜻으로 받는다(화살표만 받고 뜻을 짐작했다). 그래서 결과를 약속하는 말은 상태로 — 재물 ↑ "돈 일이 계획대로 가는 쪽" → "돈 판단이 차분한 쪽"
+ */
+const AREA_STATE: Record<AreaName, Record<"↑" | "↓", string>> = {
+  대인: { "↑": "사람 사이가 순한 쪽", "↓": "말이 엇갈리기 쉬운 쪽" },
+  재물: { "↑": "돈 판단이 차분한 쪽", "↓": "지출이 불어나기 쉬운 쪽" },
+  직업: { "↑": "손에 든 일에 힘이 실리는 쪽", "↓": "일이 늘어지기 쉬운 쪽" },
+  학업: { "↑": "배운 것이 잘 남는 쪽", "↓": "새 내용이 잘 안 붙는 쪽" },
+  연애: { "↑": "마음을 보이기 쉬운 쪽", "↓": "서운함이 생기기 쉬운 쪽" },
+  가족: { "↑": "집안 일이 순한 쪽", "↓": "사소한 말에 걸리기 쉬운 쪽" },
+  건강: { "↑": "몸이 가벼운 쪽", "↓": "쉽게 지치는 쪽" },
+};
+export const areaStateOf = (area: AreaName, signal: "↑" | "↓"): string => AREA_STATE[area][signal];
 
 /** 템플릿이 쓰는 재료. v3 BaseFortune도 그대로 들어간다 */
 export type TemplateInput = Pick<BaseFortune, "tenGod" | "relation" | "yongsin"> & {
@@ -220,7 +236,8 @@ export function templateText(
   lines.push(first + ".");
   lines.push(t.lead);
   lines.push(second + ".");
-  lines.push(reversed ? "오늘은 새로 벌이기보다 하던 것을 지키는 쪽이 편해요." : "오늘은 손에 든 일부터 하나씩 끝내는 쪽이 편해요.");
+  // v4.21 (ChatGPT 3차 15항): 고정 조언 문장("새로 벌이기보다 하던 것을 지키는 쪽이 편해요")이 폴백마다 붙어 주의인 날 반복을 키웠다 — 표현 후보 하나 더. 조언은 하면·피해요가 맡는다
+  lines.push(pickExpression(list, seed + 2, [first, second]) + ".");
   // v4.16: 맞는지 판정 문장(fitLine)·이름 문장(nameLine)은 본문에 넣지 않는다 (이론은 내부 판단). 관계 줄은 결과만 말하는 문장이라 남긴다
   if (base.relation) lines.push(RELATION_LINE[base.relation]);
   // v4.17: 내 기록 숫자 문장(personalLine)은 넣지 않는다 — 카드의 "운세 / 내 기록" 막대가 보여 준다

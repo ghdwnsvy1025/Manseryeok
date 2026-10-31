@@ -105,7 +105,6 @@ describe("v4.19 계획 (plan.ts) — 무엇을 말할지 코드가 고른다", (
     expect(p.context).toEqual([]);
     expect(brief.month).toBeNull();
     expect(p.areas.map((a) => `${a.period}${a.area}${a.signal}`)).toEqual(["오늘재물↑", "오늘연애↑"]);
-    expect(p.direction).toContain("해 볼 만한");
   });
   test("맥락: 바뀌는 날(입절일)엔 그 운 문장, ctx를 빼면 밴드가 바뀌는 날엔 올해·10년 운, 아니면 없음", () => {
     const termDay = coreOf("2026-10-08");   // 한로 = 월운이 바뀌는 날
@@ -146,13 +145,13 @@ describe("v4.19 brief·SYSTEM 줄이기", () => {
   test("모델에게 가는 brief: 계획 칸만, 십신 이름·판정 사실 문장·금지어 목록·태그·rules 없음", () => {
     const json = renderBrief(brief);
     const o = JSON.parse(json) as Record<string, unknown>;
-    expect(Object.keys(o)).toEqual(expect.arrayContaining(["단계", "방향", "핵심", "영역", "숫자"]));
+    expect(Object.keys(o)).toEqual(expect.arrayContaining(["단계", "말투", "핵심", "영역", "숫자"]));
     expect(o).not.toHaveProperty("오늘");   // v4.20: 날짜·요일·절기는 보내지 않는다
     for (const k of ["inside", "rules", "banned", "jargon", "personal", "mine", "facts", "맥락", "tags", "avoid"]) expect(o).not.toHaveProperty(k);
     for (const n of TEN_GOD_NAMES) expect(json).not.toContain(n);
     expect(json).not.toMatch(/채워져요|넉넉한/);
     expect(json.length).toBeLessThan(1200);
-    expect(brief.allowedNumbers).toEqual([6, 15, 2026]);
+    expect(brief.allowedNumbers).toEqual([]);   // v4.21: 날짜 숫자 없음
   });
   test("SYSTEM: 글쓰기 철학 + 절대 금지 한 번, 예시 세 편 없음, 2,500자 안. 스키마는 작가 칸만", () => {
     expect(SYSTEM).toContain("[절대 쓰지 않는 것]");
@@ -160,10 +159,11 @@ describe("v4.19 brief·SYSTEM 줄이기", () => {
     for (const e of FORTUNE_EXAMPLES) expect(SYSTEM).not.toContain(e.text.headline);
     expect(SYSTEM).not.toContain("판단.후보");
     expect(SYSTEM.split("흐름").length - 1).toBeLessThanOrEqual(2);   // 금지 낱말은 목록에 한 번 (+ 비유 예 한 번)
-    expect(OUTPUT_SCHEMA.required).toEqual(["headline", "body", "areaLines", "do", "dont"]);
+    expect(OUTPUT_SCHEMA.required).toEqual(["headline", "body", "do", "dont"]);   // v4.20: 영역 줄은 모델이 쓰지 않는다
+    expect(OUTPUT_SCHEMA.properties).not.toHaveProperty("areaLines");
     expect(OUTPUT_SCHEMA.properties.body.type).toBe("array");
     expect(REPAIR_SCHEMA.properties.fixes.items.properties.action.enum).toEqual(["replace", "delete"]);
-    expect(PROMPT_VERSION).toMatch(/^v4\.19-[0-9a-f]{8}$/);
+    expect(PROMPT_VERSION).toMatch(/^v4\.21-[0-9a-f]{8}$/);
   });
 });
 
@@ -182,7 +182,8 @@ describe("v4.19 검사기 — 구조화 이슈", () => {
   });
   test("다시 쓰기는 JSON 아님·문장이 너무 적음·핵심 누락일 때만", () => {
     expect(needsRewrite(checkDraft(null, brief))).toBe(true);
-    const short = checkDraft({ ...GOOD, body: GOOD.body.slice(0, 3) }, brief);
+    expect(checkDraft({ ...GOOD, body: GOOD.body.slice(0, 3) }, brief)).toEqual([]);   // v4.20: 3문장도 받는다
+    const short = checkDraft({ ...GOOD, body: GOOD.body.slice(0, 2) }, brief);
     expect(short).toEqual([expect.objectContaining({ code: "body_count", field: "whole" })]);
     const off = checkDraft({ ...GOOD, body: ["오늘은 몸이 조금 무겁게 느껴질 수 있어요.", "밥을 거르지 말고 쉬는 시간을 먼저 챙겨 봐요.", "운동은 가볍게 걷는 정도로 줄여도 괜찮아요.", "잠들기 전에는 화면을 조금 일찍 꺼 두는 편이 좋아요."] }, brief);
     expect(off.some((i) => i.code === "core_missing")).toBe(true);
@@ -373,11 +374,11 @@ describe("v4.19 content (computeFortune) — metrics·영역 신호 분리·키�
     expect(c.metrics!.fallback).toBeUndefined();
     for (const k of ["totalMs", "coreMs", "briefMs"] as const) expect(c.metrics![k]).toBeGreaterThanOrEqual(0);
     expect(c.areaSignals!.map((a) => `${a.period}${a.area}${a.signal}`)).toEqual(core.areas.map((a) => `${a.period}${a.area}${a.signal}`));
-    expect(c.areaNarratives).toHaveLength(2);
-    // 화면(FortuneCard)이 읽는 areas: 오늘 둘은 모델 문장, 이달은 템플릿 줄, 올해는 그 운 문장이 없는 날이라 숨김(v4.5)
+    expect(c.areaNarratives).toEqual([]);   // v4.20: 모델이 영역 줄을 쓰지 않는다
+    // 화면(FortuneCard)이 읽는 areas: 오늘 둘은 코드 상태말, 이달은 빈 줄(화살표 칩만), 올해는 그 운 문장이 없는 날이라 숨김(v4.5), →는 없음
     expect(c.areas!.map((a) => `${a.period}${a.area}`)).toEqual(["오늘재물", "오늘연애", "이달대인"]);
-    expect(c.areas![0]!.line).toBe(GOOD.areaLines[0]!.text);
-    expect(c.areas![2]!.line).toBe("사람 사이 말이 엇갈리기 쉬워 짧게 말해요.");
+    expect(c.areas![0]!.line).toBe("돈 판단이 차분한 쪽");
+    expect(c.areas![2]!.line).toBe("");
     expect(areasOf(c)).toEqual(c.areas);
     expect(c.bodySentences).toEqual(GOOD.body);
     expect(c.body).toContain("\n\n");

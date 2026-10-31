@@ -6,7 +6,7 @@
 //   - 보조 0~1개: 일·월 자리 충 > 다른 쪽 기운(|점수| ≥ 1) > 복음·다른 충 > 없음
 //   - 맥락(이달·올해·10년 운): 운이 바뀌는 날·운↔일진 충인 날(core.facts에 그 문장이 있는 날), 또는 맥락 점수(ctx)를 빼면 밴드가 바뀌는 날만.
 //     아니면 맥락 재료를 brief에 아예 넣지 않는다
-//   - 밴드별 행동 방향, 글로 풀 영역 최대 2개(↑ 먼저, 그다음 ↓ — 같은 신호 안에서는 코어 순서 = |합| 순)
+//   - 글로 풀 영역 최대 2개(오늘 것을 코어 순서 = |합| 순으로 먼저. v4.21에서 ↑ 먼저 정렬과 밴드별 행동 방향을 뺐다)
 //   - 최근 쓴 장면·동작·첫 어절·제목 끝맺음 — 같은 주제가 다시 나오는 것은 괜찮고, 표현 면(장면·행동·제목 꼴)만 돌린다
 // 이 파일은 brief.ts를 부르지 않는다(brief.ts가 이 파일을 부른다). 공용 작은 함수(daySeed·hanjaToKo·맥락 정규식·밴드 방향)는 여기 두고 brief.ts가 다시 내보낸다.
 import type { TenGod } from "@saju/engine";
@@ -30,12 +30,9 @@ export function daySeed(date: string): number {
 }
 /** v4.4: facts 안의 맥락 문장(올해·이달·10년 단위 운). 바뀌는 날·충인 날에만 core.facts에 들어 있다 */
 export const CONTEXT_FACT_RE = /^(올해 운|이달 운|지금 10년 단위 운)/;
-/** v4.16 6항: 단계는 문장 톤과 조언 방향을 정하는 내부 정보 */
-export const BAND_DIRECTION = {
-  좋음: "해 볼 만한 쪽 — 미뤄 둔 일을 처리하기, 먼저 연락하기, 정리해 두면 결과가 빨리 보일 수 있음. 들뜨게 부풀리지 않기",
-  무난: "조건을 붙여 조절하는 쪽 — 서두르지만 않으면 무난, 하던 일을 유지하는 편이 편함",
-  주의: "새 행동보다 실수 방지와 속도 조절 — 바로 결정하기보다 한 번 더 확인, 기분이 올라온 상태에선 중요한 말을 미루기",
-} as const;
+/** v4.16 6항: 단계는 문장 톤과 조언 방향을 정하는 내부 정보였다.
+ *  v4.20 P1: 구체 행동을 빼고 "말투 강도"만 남겼는데도 주의의 "범위를 줄이는 쪽으로"가 행동으로 읽혀 주의 87편 중 73편이 범위·벌이기·하나만으로 모였다.
+ *  v4.21 (ChatGPT 3차 1항): 방향 칸을 없앤다. 얼마나 조심스럽게 말할지는 단계와 말투(brief.tone)가 정하고, 행동의 종류는 핵심·보조·영역의 뜻에서만 나온다 */
 
 /** 십신 이름 괄호 "(겁재)"를 뗀다 — 모델에게 가는 사실 문장에 이름을 싣지 않는다 */
 const TEN_GOD_PAREN_RE = /\((비견|겁재|식신|상관|편재|정재|편관|정관|편인|정인)\)/g;
@@ -84,7 +81,6 @@ export interface FortunePlan {
   contextReason: "운이 바뀌거나 오늘과 어긋나는 날" | "운 맥락이 단계를 바꾸는 날" | null;
   /** 맥락 문장 (includeContext일 때만, 아니면 빈 배열) */
   context: string[];
-  direction: string;
   /** 글로 풀 영역 (최대 2) */
   areas: PlanArea[];
   avoid: PlanAvoid;
@@ -102,7 +98,14 @@ export interface PlanInput {
 
 const readOf = (role: RoleLabel, method: CoreFortune["dayLuck"]["method"]): PartRead =>
   method === "용신 없음" || role === null ? "보류" : role === "용" || role === "희" ? "활용" : role === "한" ? "보통" : "과함";
-export const READ_WORD: Record<PartRead, string> = { 활용: "잘 쓰이는 쪽", 보통: "그 성격대로 가는 쪽", 과함: "지나치기 쉬운 쪽", 보류: "좋고 나쁨은 단정하지 않음(태어난 시간 모름)" };
+/** v4.21 (ChatGPT 3차 2항): 작가에게 가는 내부 말은 자연스러움보다 뜻이 하나여야 한다. "지나치기 쉬운 쪽"은 "그냥 지나쳐 버리기 쉽다"로도 읽혀
+ *  "그 마음이 쉽게 지나쳐지는 날"처럼 반대로 쓰였다(B 119편 중 3~4편) */
+export const READ_WORD: Record<PartRead, string> = {
+  활용: "이 성향이 오늘 도움이 되는 쪽으로 나타남",
+  보통: "이 성향이 좋고 나쁨 없이 평소대로 나타남",
+  과함: "이 성향이 필요 이상으로 세지기 쉬움",
+  보류: "좋고 나쁨은 단정하지 않음(태어난 시간 모름)",
+};
 
 /** 낱말 어간(앞 두 글자) 집합. 흔한 말은 뺀다 */
 const COMMON_STEMS = new Set(["오늘", "평소", "마음", "생각", "있어", "없어", "하고", "해요", "돼요", "보다", "쉬워", "커져", "싶어", "하기", "에서", "으로", "이나", "같은", "그런", "이런", "조금", "한번", "먼저", "많아", "편이", "쪽이", "내가", "내게", "나를", "남이", "남에",
@@ -208,9 +211,10 @@ export function buildPlan(input: PlanInput): FortunePlan {
       ? factLines
       : core.contextFacts.filter((f) => /^(올해 운|지금 10년 단위 운) /.test(f)).map((f) => hanjaToKo(f));
 
-  // 영역: ↑ 먼저, 그다음 ↓ (→는 글로 풀지 않는다). 이달·올해는 맥락을 쓰는 날만. 같은 영역은 한 번
-  const cand = core.areas.filter((a) => a.signal !== "→" && (a.period === "오늘" || includeContext));
-  const ordered = [...cand.filter((a) => a.signal === "↑"), ...cand.filter((a) => a.signal === "↓")];
+  // 영역 (→는 글로 풀지 않는다): 오늘 것을 코어 순서(|합| 순)대로 먼저, 이달·올해는 맥락을 쓰는 날만 그다음. 같은 영역은 한 번.
+  // v4.21 (ChatGPT 3차 9항): ↑를 먼저 보내던 정렬은 뺐다 — 맥락을 쓰는 날 이달 ↑가 오늘 ↓를 밀어냈다. 좋음·주의에 맞추려고 영역을 고르지 않는다
+  const nonFlat = core.areas.filter((a) => a.signal !== "→");
+  const ordered = [...nonFlat.filter((a) => a.period === "오늘"), ...(includeContext ? nonFlat.filter((a) => a.period !== "오늘") : [])];
   const areas: PlanArea[] = [];
   for (const a of ordered) {
     if (areas.some((x) => x.area === a.area)) continue;
@@ -227,7 +231,6 @@ export function buildPlan(input: PlanInput): FortunePlan {
     includeContext,
     contextReason: !includeContext ? null : factLines.length ? "운이 바뀌거나 오늘과 어긋나는 날" : "운 맥락이 단계를 바꾸는 날",
     context,
-    direction: BAND_DIRECTION[band],
     areas,
     avoid: avoidFromRecent(input.date, input.recent ?? []),
     coreStems,

@@ -90,7 +90,7 @@ describe("v4.16 검사기 — 이론은 내부 판단으로만", () => {
     expect(at("그러면 저녁에 남은 돈이 바로 보이게 돼요.")).toEqual(["promise_head@3"]);
     expect(at("볕이 드는 자리처럼 오늘은 하나씩 끝내고 싶어요.")).toEqual(["metaphor@3"]);
     expect(at("판정으로 나와요, 오늘은 하나씩 끝내고 싶은 날이에요.")).toEqual(["internal@3"]);
-    expect(at("마음이 마음을 마음에 마음으로 흔들리는 날이에요.")).toEqual(["overuse@3"]);
+    expect(at("마음이 마음을 마음에 마음으로 흔들리는 날이에요.")).toEqual([]);   // v4.20: 같은 낱말 반복으로는 탈락시키지 않는다
   });
   it("꼬리 쓰레기는 잘라 낸다", () => {
     expect(trimTail("큰돈 드는 결제는 내일로 미뤄요.1")).toBe("큰돈 드는 결제는 내일로 미뤄요.");
