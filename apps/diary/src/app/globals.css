@@ -1376,12 +1376,13 @@ details[open] > .fortune-body {
   font-size: 10px;
   fill: var(--color-muted);
 }
+/* 2026-10-31 사용자: 점선 → 실선. 운세 점수 = 가는 녹갈 실선, 내 행복도 = 굵은 먹 실선 — 색과 굵기로 가른다 */
 .hchart__fortune {
-  stroke: var(--color-gold);
-  stroke-width: 1.5;
-  stroke-dasharray: 4 3;
-  stroke-linecap: butt;
-  opacity: 0.7;
+  stroke: var(--color-frame);
+  stroke-width: 1.25;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.75;
 }
 .hchart__line {
   stroke: var(--color-ink);
@@ -1415,7 +1416,7 @@ details[open] > .fortune-body {
 .hchart__key--fortune::before {
   width: 16px;
   height: 0;
-  border-top: 1.5px dashed var(--color-gold);
+  border-top: 1.25px solid var(--color-frame);
   opacity: 0.85;
 }
 
@@ -3195,10 +3196,9 @@ input:checked + .entry-stamp::before,
   -webkit-mask: url("/ui/stamp-inked-red-clean.png") center / contain no-repeat;
   mask: url("/ui/stamp-inked-red-clean.png") center / contain no-repeat;
 }
-/* 위 한 줄의 점수 숫자만 송명 20px */
+/* 위 한 줄의 점수 숫자 — v3.33에서 32px + 팡으로 키웠다(맨 아래 v3.33 블록). 여기서는 글꼴·색만 */
 .entry-areas__score {
   font-family: var(--font-serif);
-  font-size: 20px;
   line-height: 1;
   color: var(--color-ink);
 }
@@ -3788,6 +3788,157 @@ input:checked + .entry-stamp::before,
   }
   .saju-summary:active,
   .day-pick__card:has(.day-pick__link):active {
+    transform: none;
+  }
+}
+
+/* ── v3.33 쓰기 행복도 숫자 팡 · 다음 달 예상 카드 · 달력 예상 표식 · 나 탭 만세력 그 자리에서 펼치기 (명세 31 "추가 2차" 6~9절, 2026-10-31) ──
+   새 그림 없음 — 키트 재사용: stamp-inked-red 알파(마스크)·gold-wash·stamp-board-cell-empty·card-paper. 새 모션은 점수 숫자 팡(260ms, 한 번) 하나.
+   빨강 없음, 금색 글자 없음(면·테두리만). 그래프 운세 선(가는 녹갈 실선)은 기능 쪽이 바꿨고 여기선 손대지 않는다 */
+
+/* 1. 쓰기 — 행복도 줄: [숫자 송명 32px 먹][점, 말 14px muted] 한 묶음 + 계산 과정 13px muted(고정폭 숫자). 한 줄에 안 들어가면 계산이 아래 줄로 */
+.entry-areas__total {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 10px;
+  row-gap: 2px;
+}
+.entry-areas__sum {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 3px;
+  white-space: nowrap;
+}
+.entry-areas__score {
+  display: inline-block;
+  font-size: 32px;
+  font-variant-numeric: tabular-nums;
+  transform-origin: 50% 85%;
+}
+.entry-areas__hint {
+  font-size: 14px;
+  line-height: 1.3;
+}
+.entry-areas__calc {
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--color-muted);
+  font-variant-numeric: tabular-nums;
+  word-break: keep-all;
+}
+/* 도장을 누를 때마다 key가 바뀌어 다시 그려지고, 숫자가 한 번 팡 — 0.9 → 1.15 → 1, 260ms. 반복 없음 */
+.entry-areas__score[data-pop] {
+  animation: score-pop 260ms cubic-bezier(0.2, 0.7, 0.3, 1) both;
+}
+@keyframes score-pop {
+  0% {
+    transform: scale(0.9);
+  }
+  55% {
+    transform: scale(1.15);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* 2. 나 — 다음 달 예상 두 칸(.day-pick__next): 지난 날 카드와 같은 틀이되 아직 오지 않은 날이라 한 단계 가볍게 —
+   종이 면을 옅게(paper-3 45%만), 테는 점선 1px(좋은 날 금빛 · 조심할 날 남색, 빨강 없음). 이유 한 줄 13px 먹색 */
+.day-pick__next > p {
+  margin: 0;
+}
+.day-pick__card--forecast {
+  background: color-mix(in srgb, var(--color-paper-3) 45%, var(--color-paper-2));
+  box-shadow: none;
+  outline: 1px dashed transparent;
+  outline-offset: -1px;
+}
+.day-pick__card--forecast[data-kind="best"] {
+  box-shadow: none;
+  outline-color: color-mix(in srgb, var(--color-gold) 85%, transparent);
+}
+.day-pick__card--forecast[data-kind="worst"] {
+  box-shadow: none;
+  outline-color: color-mix(in srgb, var(--color-sky) 50%, transparent);
+}
+.day-pick__card--forecast[data-empty] {
+  outline: none;
+}
+.day-pick__reason {
+  margin-top: 2px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--color-ink);
+  word-break: keep-all;
+}
+
+/* 3. 나 — 달력 미래 칸의 예상 표식: 칸 바탕은 다른 미래 칸처럼 .35로 흐리되(::before), 오른쪽 아래 14px 도장 점만 또렷하게 —
+   좋은 날 = 금빛 면(gold-wash), 조심할 날 = 남색 면. 모양은 stamp-inked-red 알파. 날짜 숫자는 조금 더 읽히게(55%) */
+.cal__cell[data-forecast] {
+  opacity: 1;
+  background: none;
+}
+.cal__cell[data-forecast]::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: url("/ui/stamp-board-cell-empty-clean.webp") center / 100% 100% no-repeat;
+  opacity: 0.35;
+}
+.cal__cell[data-forecast] .cal__day {
+  color: color-mix(in srgb, var(--color-muted) 55%, transparent);
+}
+.cal__forecast {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  width: 14px;
+  height: 14px;
+  background: var(--fc-face);
+  -webkit-mask: url("/ui/stamp-inked-red-clean.png") center / contain no-repeat;
+  mask: url("/ui/stamp-inked-red-clean.png") center / contain no-repeat;
+  pointer-events: none;
+}
+.cal__cell[data-forecast="best"] {
+  --fc-face: var(--color-gold) url("/ui/gold-wash.webp") center / 128px 128px;
+}
+.cal__cell[data-forecast="worst"] {
+  --fc-face: color-mix(in srgb, var(--color-sky) 82%, var(--color-paper-2));
+}
+
+/* 4. 나 — 내 사주 요약(details > summary.saju-summary): 펼치면 요약 카드가 아래 만세력 카드들의 머리가 된다 —
+   아래 테두리 녹갈 2px, "펼쳐 보는 중 ▾"는 보통 굵기 muted(상태 말이지 행동이 아니다). 접기 버튼은 맨 아래 가운데 글자 버튼 15px 먹색.
+   펼침 모션 없음(내용이 길다) */
+.saju-summary-fold > .saju-summary {
+  border-radius: 2px;
+}
+.saju-summary-fold[open] > .saju-summary {
+  border-bottom-width: 2px;
+  border-bottom-color: var(--color-frame);
+  border-radius: 2px 2px 0 0;
+}
+.saju-summary-fold[open] .saju-summary__more {
+  font-weight: 400;
+  color: var(--color-muted);
+}
+.fold-button {
+  justify-content: center;
+  font-size: 15px;
+  line-height: 1;
+  color: var(--color-ink);
+  text-decoration: none;
+}
+.fold-button:active {
+  transform: scale(0.96);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .entry-areas__score[data-pop] {
+    animation: none;
+  }
+  .fold-button:active {
     transform: none;
   }
 }

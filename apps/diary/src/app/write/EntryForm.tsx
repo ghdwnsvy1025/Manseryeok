@@ -145,6 +145,8 @@ export function EntryForm({ date, when = "today", notePlaceholder, initial, warm
   }
 
   const count = areaCount(areas);
+  /** 매긴 영역 단계(영역 순서대로) — 평균 계산 줄 */
+  const areaValues = AREAS.map((a) => areas[a.key]).filter((v): v is number => typeof v === "number");
 
   return (
     <>
@@ -157,11 +159,22 @@ export function EntryForm({ date, when = "today", notePlaceholder, initial, warm
       <div className="card-frame card-paper flex flex-col gap-7 p-5">
         <fieldset ref={areasRef} className="entry-areas">
           <legend className="text-[17px] font-bold">행복도</legend>
-          <p className={`mt-1 text-sm ${missingAreas && happiness === null ? "font-bold text-danger" : "text-muted"}`} aria-live="polite">
+          <p className={`entry-areas__total mt-1 text-sm ${missingAreas && happiness === null ? "font-bold text-danger" : "text-muted"}`} aria-live="polite">
             {fromAreas !== null
               ? (
                 <>
-                  <span className="entry-areas__score">{fromAreas}</span>점, {hint(fromAreas)}, {count}개 영역 평균
+                  {/* 2026-10-31 사용자: 도장을 누를 때마다 행복도가 "팡" 하며 바뀌고, 평균 계산이 그 자리에서 보인다.
+                      key가 바뀌면 다시 그려져 .entry-areas__score[data-pop] 애니메이션이 한 번 돈다 (모양은 디자이너, 명세 31 6절).
+                      v3.33: 숫자 송명 32px 먹색이 이 카드의 주인공 — "N점, 말"은 한 묶음(.entry-areas__sum), 계산 줄은 옆 또는 아래 줄 */}
+                  <span className="entry-areas__sum">
+                    <span key={`${fromAreas}-${count}`} className="entry-areas__score" data-pop="">
+                      {fromAreas}
+                    </span>
+                    <span className="entry-areas__hint">점, {hint(fromAreas)}</span>
+                  </span>
+                  <span className="entry-areas__calc" aria-hidden>
+                    ({areaValues.join(" + ")}) ÷ {count} = {(areaValues.reduce((x, y) => x + y, 0) / count).toFixed(1)}, × 2
+                  </span>
                 </>
               )
               : legacyHappiness !== null

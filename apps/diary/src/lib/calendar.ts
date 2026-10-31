@@ -17,7 +17,7 @@ export interface CalendarMonth {
   month: number;
   /** 일요일 시작, 7칸씩 */
   weeks: CalendarDay[][];
-  /** 이전·다음 달 "YYYY-MM". 2020-01 이전이나 이번 달 뒤면 null */
+  /** 이전·다음 달 "YYYY-MM". 2020-01 이전이나 다음 달 뒤면 null */
   prev: string | null;
   next: string | null;
   /** 이 달 기록 수와 평균 행복도 */
@@ -27,13 +27,13 @@ export interface CalendarMonth {
 
 const pad = (n: number) => String(n).padStart(2, "0");
 
-/** "?m=" 값을 검사. 잘못됐거나 미래면 오늘의 달 */
+/** "?m=" 값을 검사. 잘못됐거나 다음 달보다 뒤면 오늘의 달 (2026-10-31: 다음 달은 볼 수 있다 — 좋은 날·조심할 날 예측 표시) */
 export function resolveMonth(param: string | undefined, today: string): string {
   const cur = today.slice(0, 7);
   if (!param || !/^\d{4}-\d{2}$/.test(param)) return cur;
   const mm = Number(param.slice(5));
   if (mm < 1 || mm > 12) return cur;
-  if (param > cur || param < EARLIEST_ENTRY_DATE.slice(0, 7)) return cur;
+  if (param > shift(cur, 1) || param < EARLIEST_ENTRY_DATE.slice(0, 7)) return cur;
   return param;
 }
 
@@ -83,7 +83,7 @@ export function buildMonth(ym: string, entries: { entry_date: string; happiness:
     month,
     weeks,
     prev: prev >= EARLIEST_ENTRY_DATE.slice(0, 7) ? prev : null,
-    next: next <= today.slice(0, 7) ? next : null,
+    next: next <= shift(today.slice(0, 7), 1) ? next : null,
     count: hs.length,
     mean: hs.length ? Math.round((hs.reduce((a, b) => a + b, 0) / hs.length) * 10) / 10 : null,
   };

@@ -22,7 +22,20 @@ export interface DayInfo {
  * 달 이동(‹ ›)은 링크(서버) 그대로. 오늘 기록이 있고 이 세션에서 처음 보면 오늘 칸에 data-stamp-in(도장 꽝 한 번, CSS).
  * 모양은 디자이너(.cal*). 칸: data-tier, data-selected, data-today, data-future.
  */
-export function MonthCalendar({ cal, days, initialSelected = null, today }: { cal: CalendarMonth; days: Record<string, DayInfo>; initialSelected?: string | null; today: string }) {
+export function MonthCalendar({
+  cal,
+  days,
+  initialSelected = null,
+  today,
+  forecast = {},
+}: {
+  cal: CalendarMonth;
+  days: Record<string, DayInfo>;
+  initialSelected?: string | null;
+  today: string;
+  /** 다음 달 예측 (2026-10-31): 날짜 → 좋은 날(best)·조심할 날(worst). 미래 칸에 data-forecast로 표시 */
+  forecast?: Record<string, "best" | "worst">;
+}) {
   const [selected, setSelected] = useState<string | null>(initialSelected);
   const [stampIn, setStampIn] = useState(false);
 
@@ -99,8 +112,16 @@ export function MonthCalendar({ cal, days, initialSelected = null, today }: { ca
           c.date === null ? (
             <li key={`e${i}`} className="cal__cell cal__cell--blank" aria-hidden />
           ) : c.isFuture ? (
-            <li key={c.date} className="cal__cell" data-future="">
+            <li
+              key={c.date}
+              className="cal__cell"
+              data-future=""
+              data-forecast={forecast[c.date] ?? undefined}
+              aria-label={forecast[c.date] ? `${cal.month}월 ${c.day}일 ${forecast[c.date] === "best" ? "좋은 날 예상" : "조심할 날 예상"}` : undefined}
+            >
               <span className="cal__day">{c.day}</span>
+              {/* v3.33: 표식은 글자(☀/☂)가 아니라 CSS가 그리는 작은 도장 점 — 좋은 날 금빛 면, 조심할 날 남색 면 (뜻은 li의 aria-label) */}
+              {forecast[c.date] && <span className="cal__forecast" aria-hidden />}
             </li>
           ) : (
             <li key={c.date}>

@@ -11,8 +11,12 @@ import { StatsSummary } from "@/components/StatsSummary";
 import { TrackOnMount } from "@/components/track/TrackOnMount";
 import { birthProfileOf, countEntries, getEntry, getSajuProfile, listEntries, listEntriesInMonth, listEntriesForStats, listFortuneScores } from "@/lib/db";
 import { sajuChart } from "@/lib/saju/chart";
+import { paidReadingOpen } from "@/lib/sajucow";
+import { SajuChartPanel } from "@/components/SajuChartPanel";
+import { FoldButton } from "@/components/FoldButton";
 import { areaAverages, bestWorstDays, growingSeries, habitOf, happinessSeries, moodTop, streakOf, type PickedDay } from "@/lib/stats/extra";
-import { BestWorstDays, type DayCard } from "@/components/BestWorstDays";
+import { BestWorstDays, type DayCard, type ForecastCard } from "@/components/BestWorstDays";
+import { forecastMonth, nextMonthOf, type ForecastDay } from "@/lib/stats/forecast";
 import { HappinessChart } from "@/components/HappinessChart";
 import { MonthCalendar, type DayInfo } from "@/components/MonthCalendar";
 import { buildMonth, resolveMonth } from "@/lib/calendar";
@@ -35,8 +39,8 @@ const ELEMENT_TEXT: Record<Element, string> = {
 };
 const ELEMENT_KO: Record<Element, string> = { wood: "목", fire: "화", earth: "토", metal: "금", water: "수" };
 
-export default async function MePage({ searchParams }: { searchParams: Promise<{ cell?: string; view?: string; m?: string; d?: string; saved?: string; at?: string }> }) {
-  const { cell, view, m, d, saved, at } = await searchParams;
+export default async function MePage({ searchParams }: { searchParams: Promise<{ cell?: string; view?: string; m?: string; d?: string; saved?: string; at?: string; saju?: string }> }) {
+  const { cell, view, m, d, saved, at, saju } = await searchParams;
   const { supabase, user } = await getUser();
   // 세션이 아직 없는 첫 요청: 리디렉트하지 않고 뼈대만 그린다. AnonBoot가 곧 새로 그린다 (docs/ANON_START.md 1절, B2)
   if (!user) return <Booting title="나" cards={3} />;
@@ -46,7 +50,7 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
   const calYm = resolveMonth(dParam ? dParam.slice(0, 7) : m, today);
   // 2026-10-24: 저장하면 쓰기 폼이 여기로 온다 (/me?d=날짜&saved=날짜&at=시각, actions.ts). 팡은 저장한 날의 기록으로 — 오늘 화면에서 옮겨 왔다
   const savedDate = saved && parseYmd(saved) && saved <= today ? saved : null;
-  const [profile, total, all, fortuneScores, monthEntries, savedEntry, recent] = await Promise.all([
+  const [profile, total, all, fortuneScores, monthEntries, savedEntry, recent, paidOpen] = await Promise.all([
     getSajuProfile(supabase, user.id),
     countEntries(supabase, user.id),
     listEntriesForStats(supabase, user.id),
@@ -54,6 +58,8 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
     listEntriesInMonth(supabase, user.id, calYm),
     savedDate ? getEntry(supabase, user.id, savedDate) : Promise.resolve(null),
     savedDate ? listEntries(supabase, user.id, 8) : Promise.resolve([]),
+    // 만세력의 유료 풀이 버튼 — 결제가 열렸는지 (바이럴에 5분 캐시로 묻는다, 실패하면 닫힘)
+    paidReadingOpen(),
   ]);
   // 생년월일이 없으면 먼저 받는다 (로그인 사용자와 같은 규칙)
   if (!profile) redirect("/onboarding?next=/me");
@@ -88,12 +94,21 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
     const g = dayGanji(p.date);
     return { date: p.date, label: formatKoreanDate(p.date).replace(/\s*\S+요일$/, ""), happiness: p.happiness, moods: p.moods, ganjiKo: g.ko, faceSrc: characterOfGanji(g.ko).faceSrc };
   };
+  // 다음 달 좋은 날·조심할 날 예상 (2026-10-31): 오늘 운세 점수와 같은 계산을 다음 달 매일에 (코드만, 약 0.2초)
+  const nextYm = nextMonthOf(today.slice(0, 7));
+  const fc = forecastMonth({ pillars: profile.pillars, profile: birthProfileOf(profile), entries: all, ym: nextYm });
+  const toForecast = (f: ForecastDay | null): ForecastCard | null =>
+    f ? { date: f.date, label: formatKoreanDate(f.date).replace(/\s*\S+요일$/, ""), ganjiKo: f.ganjiKo, faceSrc: characterOfGanji(f.ganjiKo).faceSrc, reason: f.reason } : null;
+  const forecastMarks: Record<string, "best" | "worst"> = {};
+  if (fc.best) forecastMarks[fc.best.date] = "best";
+  if (fc.worst) forecastMarks[fc.worst.date] = "worst";
   const monthPick = bestWorstDays(all, calYm);
   const allPick = bestWorstDays(all);
   const dayCards = (
     <BestWorstDays
       month={{ label: `${Number(calYm.slice(5, 7))}월`, best: toCard(monthPick.best), worst: toCard(monthPick.worst) }}
       all={{ best: toCard(allPick.best), worst: toCard(allPick.worst) }}
+      next={{ label: `${Number(nextYm.slice(5, 7))}월`, ym: nextYm, best: toForecast(fc.best), worst: toForecast(fc.worst) }}
     />
   );
   const areaAvg = areaAverages(all, today, 30);
@@ -101,7 +116,7 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
   const streak = streakOf(all, today);
   const series = growingSeries(happinessSeries(all, fortuneScores, today, 30));
   const cells = ganjiGrid(all);
-  // 2026-10-31: 내 사주는 요약 카드 → 만세력 화면(/me/saju)
+  // 2026-10-31: 내 사주는 요약 카드, 누르면 그 아래에 만세력이 펼쳐진다 (SajuChartPanel)
   const chart = sajuChart(profile.pillars, birthProfileOf(profile), today);
   // v3.10: 오늘 화면에서 뺀 "기록 N일째"를 여기로. 60칸 중 채운 칸 = 기록이 1건 이상인 간지 수
   const filledCells = cells.filter((c) => c.n > 0).length;
@@ -156,8 +171,10 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
         </dl>
       </header>
 
-      {/* 2026-10-31 내 사주 요약 (나무패 서랍 대신): 여덟 글자 · 중심 기운 · 용신 한 줄씩, 누르면 만세력 화면. 모양은 디자이너(.saju-summary*) */}
-      <Link href="/me/saju" className="saju-summary card-frame card-light card-paper flex flex-col gap-3 p-5">
+      {/* 2026-10-31 내 사주 요약 (나무패 서랍 대신): 여덟 글자 · 중심 기운 · 용신 한 줄씩. 누르면 바로 아래에 만세력 한 판이 펼쳐지고
+          맨 아래 "접기" — 따로 창으로 가지 않는다(사용자, 같은 날). 아래 달력·통계는 그대로 이어진다. 모양은 디자이너(.saju-summary*) */}
+      <details id="saju" className="saju-summary-fold group" open={saju === "open"}>
+        <summary className="saju-summary card-frame card-light card-paper flex cursor-pointer list-none flex-col gap-3 p-5 [&::-webkit-details-marker]:hidden">
         <span className="flex items-center justify-between gap-3">
           <h2 className="sec-tag">내 사주</h2>
           <span className="saju-summary__preview font-serif text-[17px]" lang="zh-Hant" aria-label="내 사주 여덟 글자">
@@ -192,8 +209,25 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
             </div>
           )}
         </dl>
-        <span className="saju-summary__more self-end text-sm text-muted">만세력 보기 ›</span>
-      </Link>
+        <span className="saju-summary__more self-end text-sm text-muted">
+          <span className="group-open:hidden">만세력 펼치기 ›</span>
+          <span className="hidden group-open:inline">펼쳐 보는 중 ▾</span>
+        </span>
+      </summary>
+        <div className="saju-summary-fold__body mt-5 flex flex-col gap-5">
+          <p className="flex items-center justify-between px-1 text-sm text-muted">
+            <span>
+              {profile.calendar === "lunar" ? "음력" : "양력"} {profile.birth_year}.{profile.birth_month}.{profile.birth_day}
+              {profile.birth_hour !== null ? ` ${String(profile.birth_hour).padStart(2, "0")}:${String(profile.birth_minute).padStart(2, "0")}` : " 시간 모름"}
+            </span>
+            <Link href="/onboarding?next=/me" className="tap underline underline-offset-4">
+              고치기
+            </Link>
+          </p>
+          <SajuChartPanel chart={chart} ganjiKo={me.ganjiKo} faceSrc={me.faceSrc} open={paidOpen} />
+          <FoldButton />
+        </div>
+      </details>
 
       <section id="me-records" className="me-sep me-sep--wide flex flex-col gap-4">
         <div>
@@ -208,7 +242,7 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
           </nav>
         </div>
         {isCal ? (
-          <MonthCalendar cal={calMonth} days={calDays} initialSelected={pickedDay} today={today} />
+          <MonthCalendar cal={calMonth} days={calDays} initialSelected={pickedDay} today={today} forecast={forecastMarks} />
         ) : (
           <GanjiGrid
             cells={cells}

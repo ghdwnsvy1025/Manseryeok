@@ -102,16 +102,17 @@ export function StatsSummary({ h, fitPercent, stems, branches, elements, moods, 
       {h.total > 0 && areaRows && (
         <div className="area-bars card-frame card-light card-paper px-5 py-4" aria-label="영역별 행복도, 최근 30일">
           <p className="text-[15px] font-bold">
-            영역별 행복도 <span className="text-[13px] font-normal text-muted">최근 30일 평균</span>
+            영역별 행복도 <span className="text-[13px] font-normal text-muted">최근 30일 평균, 10점 기준</span>
           </p>
           <ol className="area-bars__list mt-3 flex flex-col gap-2">
             {areaRows.map((a) => (
-              <li key={a.key} className="area-bars__row" data-empty={a.n ? undefined : ""} aria-label={`${a.label} ${a.n ? `평균 ${a.mean}단계, ${a.n}일` : "기록 없음"}`}>
+              <li key={a.key} className="area-bars__row" data-empty={a.n ? undefined : ""} aria-label={`${a.label} ${a.n && a.mean !== null ? `평균 ${Math.round(a.mean * 20) / 10}점, ${a.n}일` : "기록 없음"}`}>
                 <span className="area-bars__label">{a.label}</span>
                 <span className="area-bars__track">
                   <span className="area-bars__fill" style={{ width: `${a.mean === null ? 0 : (a.mean / 5) * 100}%` }} data-tier={a.mean === null ? undefined : happinessTier(a.mean * 2)} />
                 </span>
-                <span className="area-bars__value">{a.mean ?? "–"}</span>
+                {/* 2026-10-31: 하루 행복도와 같은 10점 기준으로 (단계 평균 × 2) */}
+                <span className="area-bars__value">{a.mean === null ? "–" : Math.round(a.mean * 20) / 10}</span>
                 <span className="area-bars__n">{a.n ? `${a.n}일` : ""}</span>
               </li>
             ))}

@@ -18,7 +18,8 @@ describe("monthRange", () => {
 
 describe("resolveMonth", () => {
   it("미래·잘못된 값은 이번 달", () => {
-    expect(resolveMonth("2026-11", "2026-10-10")).toBe("2026-10");
+    expect(resolveMonth("2026-11", "2026-10-10")).toBe("2026-11"); // 다음 달은 볼 수 있다 (예측 표시)
+    expect(resolveMonth("2026-12", "2026-10-10")).toBe("2026-10");
     expect(resolveMonth("abc", "2026-10-10")).toBe("2026-10");
     expect(resolveMonth("2026-13", "2026-10-10")).toBe("2026-10");
     expect(resolveMonth("2026-09", "2026-10-10")).toBe("2026-09");
@@ -35,6 +36,7 @@ describe("buildMonth", () => {
     expect(flat.find((d) => d.date === "2026-10-08")!.happiness).toBe(7);
     expect(flat.find((d) => d.date === "2026-10-10")!.isToday).toBe(true);
     expect(flat.find((d) => d.date === "2026-10-11")!.isFuture).toBe(true);
-    expect(c).toMatchObject({ count: 2, mean: 6, prev: "2026-09", next: null });
+    expect(c).toMatchObject({ count: 2, mean: 6, prev: "2026-09", next: "2026-11" });
+    expect(buildMonth("2026-11", [], "2026-10-10").next).toBeNull(); // 다음 달까지만 (예측 표시)
   });
 });
