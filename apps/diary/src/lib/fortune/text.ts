@@ -237,17 +237,19 @@ export function templateText(
   return { headline: t.headline, body, do: t.do, dont: t.dont, ...(areas.length ? { areas } : {}) };
 }
 
-/** v4 core → 템플릿 재료. 관계는 태어난 날 글자(일지)와의 것만, 용신 표시는 합계 방향으로. v4.13: 라벨(role)과 이름 재료(names)도 */
-export function templateInputFromCore(core: CoreFortune): TemplateInput {
+/** v4 core → 템플릿 재료. 관계는 태어난 날 글자(일지)와의 것만, 용신 표시는 합계 방향으로. v4.13: 라벨(role)과 이름 재료(names)도.
+ *  v4.20: 계획의 핵심(planCore)을 주면 십신·라벨을 그쪽으로 — 모델 글과 템플릿이 같은 기운을 말한다 */
+export function templateInputFromCore(core: CoreFortune, planCore?: { tenGod: TenGod; label: RoleLabel }): TemplateInput {
   const dayHit = core.relations.hits.find((h) => h.pos === "일" && h.kind !== "복음") ?? core.relations.hits.find((h) => h.pos === "일");
   const relation: BaseFortune["relation"] = !dayHit ? null : dayHit.kind === "충" ? "충" : dayHit.kind === "육합" ? "육합" : dayHit.kind === "복음" ? "복음" : "삼합";
   const labels = [core.dayLuck.stem.label, core.dayLuck.branch.label];
   const has = (...ls: RoleLabel[]) => labels.find((x) => ls.includes(x)) as Exclude<RoleLabel, "한"> | undefined;
   // 합계가 +면 용·희 중 있는 것(용 우선), −면 기·구 중 있는 것(기 우선). 0이거나 라벨이 없으면 없음
-  const role = core.dayLuck.raw > 0 ? (has("용") ?? has("희")) : core.dayLuck.raw < 0 ? (has("기") ?? has("구")) : undefined;
+  const planRole = planCore && planCore.label && planCore.label !== "한" ? planCore.label : undefined;
+  const role = planCore ? planRole : core.dayLuck.raw > 0 ? (has("용") ?? has("희")) : core.dayLuck.raw < 0 ? (has("기") ?? has("구")) : undefined;
   const yongsin: BaseFortune["yongsin"] = role === "용" || role === "희" ? "용신" : role === "기" || role === "구" ? "기신" : null;
   const fitNote = core.caveats.some((c) => c.startsWith("시간 모름")) && (core.dayLuck.method === "용신 없음" || (core.dayLuck.agreement ?? 1) < 1) ? "태어난 시간을 모르면 운세의 폭이 넓어져요." : undefined;
-  return { tenGod: core.dayLuck.stem.tenGod, relation, yongsin, areas: core.areas, names: namesFromCore(core), ...(role ? { role } : {}), ...(fitNote ? { fitNote } : {}) };
+  return { tenGod: planCore?.tenGod ?? core.dayLuck.stem.tenGod, relation, yongsin, areas: core.areas, names: namesFromCore(core), ...(role ? { role } : {}), ...(fitNote ? { fitNote } : {}) };
 }
 
 export function findBanned(text: string): string[] {

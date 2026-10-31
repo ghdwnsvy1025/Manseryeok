@@ -77,6 +77,8 @@ export interface RecentFortune {
   start: string;
   /** v4.9: 그날 "맞아요"(1)·"아니에요"(-1). -1이면 오늘은 그 주제를 앞세우지 않는다 */
   vote?: 1 | -1;
+  /** v4.20: "아니에요"의 이유 — content(내용이 안 맞음)·obvious(뻔함)·awkward(문장이 어색함). 이유마다 쓰는 곳이 다르다(plan.avoidFromRecent) */
+  voteReason?: "content" | "obvious" | "awkward";
   /** v4.11: 그날의 이달·올해 영역 줄 */
   areas?: string[];
   /** v4.15: 그날 사례 무대 이름 (옛 캐시 호환) */
@@ -191,9 +193,11 @@ export function renderBrief(b: FortuneBrief): string {
     ...(av.headlineEndings.length ? { 제목끝: av.headlineEndings } : {}),
     ...(av.headlines.length ? { 최근제목: av.headlines } : {}),
     ...(av.voteDown.length ? { 아니에요: av.voteDown } : {}),
+    ...(av.obvious.length ? { 뻔했던조언: av.obvious } : {}),
   };
   return JSON.stringify({
-    오늘: { 날짜: b.today.date, 요일: b.today.weekday, 절기: b.today.solarTerm, 절기첫날: b.today.useSolarTerm },
+    // v4.20: 날짜·요일·절기는 보내지 않는다 — 받은 정보는 쓰려 들어 "토요일 하루가", "입동 첫날이니"가 붙었다. 절기 첫날에만 이름을 곁들일 거리로
+    ...(b.today.useSolarTerm ? { 절기첫날: b.today.solarTermName } : {}),
     단계: `${b.score.band}(${b.score.word})`,
     말투: b.tone,
     방향: p.direction,

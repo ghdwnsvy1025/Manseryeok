@@ -166,7 +166,7 @@ describe("v4.4 brief·SYSTEM·검사 — 요일·절기 재료, 금지어, 맥�
     dont: "체면 때문에 억지로 떠맡지 않아요.",
   };
 
-  test("today.solarTerm·weekday가 재료로 들어가고, 맥락 재료는 바뀌는 날에만", () => {
+  test("요일·절기 라벨은 보내지 않고(v4.20, 절기 첫날만 이름), 맥락 재료는 바뀌는 날에만", () => {
     expect(plain.areas.map((a) => `${a.period}:${a.area}${a.signal}`)).toEqual(["오늘:직업↑"]);   // v4.19: 이달·올해 신호는 화면(areaSignals)에 있고 글로는 맥락 날만
     expect(plain.today).toEqual({ date: "2026-10-07", weekday: "수요일", ganji: "갑인일", solarTerm: "추분 보름째", useSolarTerm: false, solarTermName: "추분" });
     expect(termDay.today.useSolarTerm).toBe(true);
@@ -181,7 +181,12 @@ describe("v4.4 brief·SYSTEM·검사 — 요일·절기 재료, 금지어, 맥�
     const tj = JSON.parse(renderBrief(termDay)) as Record<string, unknown>;
     expect(pj).not.toHaveProperty("맥락");
     expect(tj.맥락).toContain("이달 운 무술은 힘이 드는 편이에요.");
-    expect(pj.오늘).toMatchObject({ 요일: "수요일", 절기: "추분 보름째", 절기첫날: false });
+    // v4.20: 요일·날짜·절기 라벨은 보내지 않는다. 절기 첫날에만 이름 하나
+    expect(pj).not.toHaveProperty("오늘");
+    expect(pj).not.toHaveProperty("절기첫날");
+    expect(JSON.stringify(pj)).not.toContain("수요일");
+    expect(termDay.today.useSolarTerm).toBe(true);
+    expect(tj.절기첫날).toBe(termDay.today.solarTermName);
     // 맥락 문장이 없는 날 "10년"이 없고, 절기 라벨은 숫자를 더하지 않는다 (7·10·2026은 날짜)
     expect(plain.allowedNumbers).toEqual([7, 10, 2026]);
   });

@@ -67,6 +67,8 @@ export interface CoreRelationHit {
   strength: number;
   /** 상대 글자(원국 지지) 또는 합 글자 */
   chars: string;
+  /** v4.20: 이 관계로 만든 사실 문장(충·복음만). 옛 캐시엔 없다 */
+  fact?: string;
 }
 
 export interface CoreLuckContextItem {

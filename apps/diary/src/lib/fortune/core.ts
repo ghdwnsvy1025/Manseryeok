@@ -407,16 +407,18 @@ export function computeCoreFortune(input: CoreInput): CoreFortune {
     // 전문용어(충·반합 등)는 relations.hits에 있으므로 문장에는 넣지 않는다. v4.2: 합 문장("짝이 돼요/한편이 돼요")은 없다 — 합은 아래 플래그 문장 두 종류만
     if (h.kind === "충") {
       // v4.5: 구조("아랫글자 … 부딪혀요") 대신 그 결과를 생활 영역으로
+      // v4.20: 문장을 그 관계 객체에 붙인다 — 계획이 문장을 정규식으로 다시 찾다가 다른 자리 충 문장을 집던 문제
       const life = POS_LIFE[h.pos];
-      facts.push(
+      h.fact =
         h.direction === "불리"
           ? `오늘은 ${life} 쪽 일이 흔들려 예정이 틀어지기 쉬워요.`
           : h.direction === "유리"
             ? `오늘은 ${life} 쪽에서 오래 묵혀 둔 일이 움직이기 쉬워요.`
-            : `오늘은 ${life} 쪽에 작은 변화가 생기기 쉬워요.`,
-      );
+            : `오늘은 ${life} 쪽에 작은 변화가 생기기 쉬워요.`;
+      facts.push(h.fact);
     } else if (h.kind === "복음") {
-      facts.push(`오늘은 ${POS_LIFE[h.pos]} 쪽에서 비슷한 일이 되풀이되기 쉬워요.`);
+      h.fact = `오늘은 ${POS_LIFE[h.pos]} 쪽에서 비슷한 일이 되풀이되기 쉬워요.`;
+      facts.push(h.fact);
     }
   }
   // 오늘 플래그 문장 (같은 문장은 한 번만). 맥락 문장보다 앞 — 10문장 상한에서 오늘 것이 먼저 남는다.

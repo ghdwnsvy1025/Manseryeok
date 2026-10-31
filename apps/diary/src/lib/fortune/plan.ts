@@ -42,7 +42,7 @@ const TEN_GOD_PAREN_RE = /\((비견|겁재|식신|상관|편재|정재|편관|�
 export const stripTenGodNames = (s: string): string => s.replace(TEN_GOD_PAREN_RE, "");
 
 /** 최근 운세 한 편 (brief.ts RecentFortune과 같은 모양 — 순환 import를 피해 필요한 칸만) */
-interface RecentLike { date: string; headline: string; lines?: string[]; actions?: string[]; vote?: 1 | -1 }
+interface RecentLike { date: string; headline: string; lines?: string[]; actions?: string[]; vote?: 1 | -1; voteReason?: "content" | "obvious" | "awkward" }
 
 // ---------- 계획 ----------
 export type PartRead = "활용" | "보통" | "과함" | "보류";
@@ -72,8 +72,10 @@ export interface PlanAvoid {
   headlineEndings: string[];
   /** 최근 7일 제목 */
   headlines: string[];
-  /** 최근 3일 가운데 "아니에요"를 누른 날의 제목 — 그 주제를 앞세우지 않는다 */
+  /** 최근 3일 가운데 "아니에요"(이유: 내용이 안 맞음, 또는 이유 없음)를 누른 날의 제목 — 그 주제를 앞세우지 않는다 */
   voteDown: string[];
+  /** v4.20: 최근 7일 가운데 "너무 뻔함"을 누른 날의 하면·피해요 — 그 조언을 다시 쓰지 않는다. "문장이 어색함"은 주제·조언 어느 쪽도 피하지 않는다(측정에만) */
+  obvious: string[];
 }
 export interface FortunePlan {
   core: PlanPart;
@@ -163,7 +165,9 @@ export function avoidFromRecent(date: string, recent: readonly RecentLike[]): Pl
   const endCount = new Map<string, number>();
   for (const r of d14) { const e = headlineEnding(r.headline); if (e) endCount.set(e, (endCount.get(e) ?? 0) + 1); }
   const headlineEndings = [...endCount.entries()].filter(([, n]) => n >= 2).sort((a, b) => b[1] - a[1]).map(([e]) => e);
-  return { scenes, verbs, openers, headlineEndings, headlines: d7.map((r) => r.headline), voteDown: d3.filter((r) => r.vote === -1).map((r) => r.headline) };
+  const voteDown = d3.filter((r) => r.vote === -1 && (r.voteReason === undefined || r.voteReason === "content")).map((r) => r.headline);
+  const obvious = d7.filter((r) => r.vote === -1 && r.voteReason === "obvious").flatMap((r) => r.actions ?? []);
+  return { scenes, verbs, openers, headlineEndings, headlines: d7.map((r) => r.headline), voteDown, obvious };
 }
 
 export function buildPlan(input: PlanInput): FortunePlan {
@@ -177,10 +181,8 @@ export function buildPlan(input: PlanInput): FortunePlan {
   const other = coreIsStem ? branch : stem;
 
   // 보조: 일·월 자리 충 > 다른 쪽 기운(|점수| ≥ 1, 다른 십신) > 복음·다른 충 > 없음
-  const clashFact = (pred: (pos: string) => boolean) => {
-    const hit = core.relations.hits.find((h) => h.kind === "충" && pred(h.pos));
-    return hit ? core.facts.find((f) => /쪽 일이 흔들려|쪽에서 오래 묵혀|쪽에 작은 변화/.test(f)) ?? null : null;
-  };
+  // v4.20: 관계 객체에 붙은 문장을 그대로 쓴다 (문장을 정규식으로 다시 찾지 않는다 — 충이 둘인 날 다른 자리 문장을 집었다)
+  const clashFact = (pred: (pos: string) => boolean) => core.relations.hits.find((h) => h.kind === "충" && pred(h.pos) && h.fact)?.fact ?? null;
   let support: PlanSupport | null = null;
   const nearClash = clashFact((pos) => pos === "일" || pos === "월");
   if (nearClash) support = { kind: "충", text: nearClash };
@@ -188,7 +190,7 @@ export function buildPlan(input: PlanInput): FortunePlan {
     const part = partPlan(core, other, coreIsStem ? "지지" : "천간", seed + 1, recentLines);
     support = { kind: "기운", part: { ...part, expressions: part.expressions.slice(0, 2) }, text: part.fact ?? part.meaning };
   } else {
-    const rep = core.relations.hits.some((h) => h.kind === "복음") ? core.facts.find((f) => /비슷한 일이 되풀이/.test(f)) ?? null : null;
+    const rep = core.relations.hits.find((h) => h.kind === "복음" && h.fact)?.fact ?? null;
     const farClash = clashFact(() => true);
     if (farClash) support = { kind: "충", text: farClash };
     else if (rep) support = { kind: "복음", text: rep };

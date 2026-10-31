@@ -12,6 +12,7 @@ import { ENGINE_VERSION } from "@saju/engine";
 import { adminClient } from "../supabase/admin";
 import { ownerFilter, saveFortuneCache, type FortuneCacheDb, type FortuneCacheRow } from "./cache";
 import { dayGanji } from "../ganji";
+import { isMissingColumnError, VOTE_REASONS, type VoteReason } from "../db";
 import type { BirthProfile, PillarsSnapshot } from "../profile";
 import { addDays, parseYmd } from "../time";
 import { computeCoreFortune } from "./core";
@@ -23,7 +24,7 @@ import { dailyCap, regenPolicy, retryAfterFor, usableCachedContent } from "./pol
 export { REGEN_LIMIT, TRANSIENT_RETRY_MS, dailyCap, regenCountOf, regenPolicy, retryAfterFor, usableCachedContent } from "./policy";
 
 /** 캐시 지문에 들어간다. 올리면 기존 캐시가 전부 무효 */
-export const FORTUNE_VERSION = "v4.19";
+export const FORTUNE_VERSION = "v4.20";
 
 export type FortuneOwner = { userId: string; guestKey?: undefined } | { guestKey: string; userId?: undefined };
 
@@ -118,17 +119,17 @@ async function getTodayFortuneUncached(req: FortuneRequest): Promise<FortuneCont
       .order("fortune_date", { ascending: false })
       .limit(14);   // v4.16: 태그 7일·제목 14일
     recent = recentFromRows((data ?? []) as Parameters<typeof recentFromRows>[0]);
-    // v4.9: 그날 누른 "맞아요/아니에요"를 붙인다 (로그인 사용자만)
+    // v4.9: 그날 누른 "맞아요/아니에요"를 붙인다 (로그인 사용자만). v4.20: "아니에요"의 이유도 (0006 적용 전이면 투표만)
     if (recent.length && req.owner.userId) {
-      const { data: votes } = await sb
-        .from("night_fortune_feedback")
-        .select("fortune_date, vote")
-        .eq("user_id", req.owner.userId)
-        .in("fortune_date", recent.map((r) => r.date));
-      const byDate = new Map(((votes ?? []) as { fortune_date: string; vote: number }[]).map((v) => [v.fortune_date, v.vote]));
+      const q = (cols: string) => sb.from("night_fortune_feedback").select(cols).eq("user_id", req.owner.userId!).in("fortune_date", recent.map((r) => r.date));
+      let { data: votes, error } = await q("fortune_date, vote, reason");
+      if (error && isMissingColumnError(error)) ({ data: votes } = await q("fortune_date, vote"));
+      const byDate = new Map(((votes ?? []) as unknown as { fortune_date: string; vote: number; reason?: string | null }[]).map((v) => [v.fortune_date, v]));
       recent = recent.map((r) => {
         const v = byDate.get(r.date);
-        return v === 1 || v === -1 ? { ...r, vote: v } : r;
+        if (!v || (v.vote !== 1 && v.vote !== -1)) return r;
+        const reason = v.vote === -1 && (VOTE_REASONS as readonly string[]).includes(v.reason ?? "") ? (v.reason as VoteReason) : undefined;
+        return { ...r, vote: v.vote, ...(reason ? { voteReason: reason } : {}) };
       });
     }
   } catch (e) {
@@ -192,10 +193,12 @@ export async function computeFortune(
   const todayInfo = { ko: today.ko, hanja: today.hanja, stemKo: today.stemKo, branchKo: today.branchKo };
   const weekday = WEEKDAYS[new Date(Date.UTC(p.year, p.month - 1, p.day)).getUTCDay()]!;
 
-  const tmplInput = { ...templateInputFromCore(core), seed: daySeed(req.date) };
-  const fallback = templateText(tmplInput, personal, todayInfo);
   const band = bandOf(score10);
   const briefInput = { core, personal, today: todayInfo, date: req.date, weekday, score10, band, recent: req.recent ?? [] };
+  // v4.20: 템플릿도 모델과 같은 계획에서 — 계획이 지지를 핵심으로 고른 날 템플릿이 천간 이야기를 하던 문제
+  const basePlan = buildBrief(briefInput).plan;
+  const tmplInput = { ...templateInputFromCore(core, basePlan.core), seed: daySeed(req.date) };
+  const fallback = templateText(tmplInput, personal, todayInfo);
   const useModel = opts.useModel ?? Boolean(process.env.ANTHROPIC_API_KEY);
   let r: GenerateResult | null = null;
   let transient: FortuneContent["transient"];
@@ -229,7 +232,7 @@ export async function computeFortune(
     firstPass: r?.metrics.firstPass ?? false,
     ...(llm ? {} : { fallback: failWhy ?? r?.metrics.fallback ?? (useModel ? "unresolved" : "no_model") }),
   };
-  const plan = r?.plan ?? planSummary(buildBrief(briefInput).plan);
+  const plan = r?.plan ?? planSummary(basePlan);
 
   return {
     version: "v4",

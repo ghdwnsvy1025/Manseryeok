@@ -1,7 +1,7 @@
 // 3단계 — 글 생성. Claude Sonnet 5 (Anthropic SDK). 설계: docs/FORTUNE_V4.md "3단계 — 글" · "v4.19".
 // v4.19 (2026-10-31, ChatGPT 검토 반영): 사주 계산은 코드가 하고, 오늘 무엇을 말할지도 코드(plan.ts)가 고르고, 모델은 그걸 사람 말처럼 쓰는 데만 쓴다.
 //   계획(plan.ts) → brief(brief.ts) → 초안 1회(구조화 출력 {headline, body[], areaLines, do, dont}) → 검사(validate.ts: 구조화 이슈)
-//   → 걸린 칸·문장만 수리(한 번의 호출로 여러 항목 replace/delete) → 같은 검사 → 수리 최대 2라운드 → 그래도 걸린 본문 문장·영역 줄은 지운다.
+//   → 걸린 칸·문장만 수리(한 번의 호출로 여러 항목 replace/delete) → 같은 검사 → 수리 최대 2라운드 → 그래도 걸린 영역 줄은 지운다(v4.20: 본문 문장은 지우지 않고 템플릿으로).
 //   글 전체 다시 쓰기는 JSON 깨짐·잘림·문장이 너무 적음·핵심 누락일 때만. 초안 + 수리(또는 다시 쓰기) 합쳐 호출은 최대 3번(MAX_ATTEMPTS).
 //   v4.14의 칸 고쳐 쓰기(PATCH: areas·do·dont)는 이 수리 틀로 합쳤다. 판단·태그 출력은 없앴다(태그가 필요하면 plan.tagsFromPlan).
 // 규칙(system)은 고정이라 cache_control로 캐시한다. 샘플링 파라미터(temperature 등)는 보내지 않는다 — Sonnet 5는 400을 낸다.
@@ -36,7 +36,7 @@ export const SYSTEM = `당신은 일기 앱 "사주읽는밤"의 작가입니다
 - 중심은 계획.핵심 하나입니다. 핵심.표현 가운데 하나를 골라 오늘의 구체적인 장면으로 풀어 씁니다(그대로 옮기지 않기). 핵심.뜻·오늘·사실은 이해를 돕는 재료일 뿐 그 말을 글에 쓰지 않습니다.
 - 보조가 있으면 핵심을 세게 하거나 누그러뜨리는 한 문장으로만, 맥락이 있으면 오늘 행동을 바꾸는 한 문장으로만 녹입니다. 없으면 말하지 않습니다.
 - 조언은 계획.방향 쪽으로, 말투는 계획.말투로. 아무 날에나 맞는 말("힘내요", "마음을 편히 가져요", "무리하지 않아요")은 쓰지 않습니다.
-- 계획.피할것은 최근 글에 쓴 장면·동작·첫 어절·제목 끝맺음입니다. 주제는 같아도 되지만 이것들은 다른 것으로 바꿉니다. 피할것.아니에요의 주제는 앞세우지 않습니다.
+- 계획.피할것은 최근 글에 쓴 장면·동작·첫 어절·제목 끝맺음입니다. 주제는 같아도 되지만 이것들은 다른 것으로 바꿉니다. 피할것.아니에요의 주제는 앞세우지 않고, 피할것.뻔했던조언과 같은 조언은 쓰지 않습니다.
 
 [출력]
 - headline: 20자 안, 오늘 체감할 내용 한 구절. 기운·이론을 말하는 제목("기회가 열리는 날")은 안 됩니다.
@@ -50,7 +50,7 @@ export const SYSTEM = `당신은 일기 앱 "사주읽는밤"의 작가입니다
 - 오행 이름을 기운으로("토 기운"), "A와 B"꼴 성격 이름("경쟁과 추진"), 판정 문장("맞는 편·모자란·넉넉한·실속을 챙기는·기운이 거들어·과해지기 쉬워"), 생·극·구조 설명("누르다·부딪히다·글자"), 비유("손에 붙어요·흐름이 열려요·신호가 들어와요", 볕·바위·불씨 같은 사물 그림), 속말("판정·원국·내부 판단").
 - 명령형("~하세요/~마세요")·반말·"~입니다", 결과 약속("그러면 ~해져요")·기간 약속("3일 더 하면"), 넘겨짚기("~한 적 있으시죠"), 되받기("앞에서 말한"), 정의문("A와 B를 합쳐 C라 해요").
 - 질병·사고·돈 액수·연애 사건, 직장 장면(회의·출근·상사·동료·업무), 점수와 내 기록 이야기("N점", "기록했·평균·N번"), 계획.숫자에 없는 숫자, 이모지·한자, 아침·점심·저녁·밤을 차례로 늘어놓기.
-- 절기 이름은 계획.오늘.절기첫날이 true일 때만 한 번, 요일은 꼭 필요할 때만 한 번. 글을 절기·요일로 시작하지 않습니다.
+- 요일·날짜는 쓰지 않습니다. 계획.절기첫날이 있을 때만 그 이름을 분위기로 한 번 쓸 수 있고, 행동이나 결과의 까닭으로 삼지 않습니다.
 - 단계가 주의인 날엔 오늘 이야기에 "풀리다·수월하다·순조롭다·술술"을 쓰지 않습니다.`;
 
 /** 구조화 출력 스키마 (v4.19: 작가 칸만) */
@@ -261,18 +261,16 @@ export function applyRepair(d: Draft, fixes: unknown, allowed: ReadonlySet<strin
   return out;
 }
 
-/** 수리 라운드가 끝났는데도 걸린 본문 문장·영역 줄을 지운다. 제목·하면·피해요·전체 이슈가 남거나 본문이 너무 짧아지면 null */
+/** 수리 라운드가 끝났는데도 걸린 영역 줄을 지운다. v4.20: 영역 줄 말고 다른 칸(본문 포함)이 걸려 있으면 null — 본문 문장은 지우지 않는다 */
 export function pruneFailing(d: Draft, brief: FortuneBrief): Draft | null {
   let cur = d;
   for (let n = 0; n < 6; n++) {
     const issues = checkDraft(cur, brief, KEEP);
     if (!issues.length) return cur;
-    if (issues.some((i) => i.field === "headline" || i.field === "do" || i.field === "dont" || i.field === "whole")) return null;
-    const dropB = new Set(issues.filter((i) => i.field === "body").map((i) => i.index!));
+    // v4.20: 본문 문장은 지우지 않는다 — A→B→C에서 B를 지우면 A→C로 비약이 생긴다. 본문이 걸려 있으면 템플릿으로
+    if (issues.some((i) => i.field !== "area")) return null;
     const dropA = new Set(issues.filter((i) => i.field === "area").map((i) => i.index!));
-    const body = cur.body.filter((_, i) => !dropB.has(i));
-    if (body.length < LIMITS.bodyKeepMin) return null;
-    cur = { ...cur, body, areaLines: cur.areaLines.filter((_, i) => !dropA.has(i)) };
+    cur = { ...cur, areaLines: cur.areaLines.filter((_, i) => !dropA.has(i)) };
   }
   return checkDraft(cur, brief, KEEP).length ? null : cur;
 }

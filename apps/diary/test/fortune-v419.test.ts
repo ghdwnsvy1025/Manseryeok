@@ -146,7 +146,8 @@ describe("v4.19 brief·SYSTEM 줄이기", () => {
   test("모델에게 가는 brief: 계획 칸만, 십신 이름·판정 사실 문장·금지어 목록·태그·rules 없음", () => {
     const json = renderBrief(brief);
     const o = JSON.parse(json) as Record<string, unknown>;
-    expect(Object.keys(o)).toEqual(expect.arrayContaining(["오늘", "단계", "방향", "핵심", "영역", "숫자"]));
+    expect(Object.keys(o)).toEqual(expect.arrayContaining(["단계", "방향", "핵심", "영역", "숫자"]));
+    expect(o).not.toHaveProperty("오늘");   // v4.20: 날짜·요일·절기는 보내지 않는다
     for (const k of ["inside", "rules", "banned", "jargon", "personal", "mine", "facts", "맥락", "tags", "avoid"]) expect(o).not.toHaveProperty(k);
     for (const n of TEN_GOD_NAMES) expect(json).not.toContain(n);
     expect(json).not.toMatch(/채워져요|넉넉한/);
@@ -202,15 +203,14 @@ describe("v4.19 검사기 — 구조화 이슈", () => {
     expect(old.areaLines).toEqual([{ area: "재물", text: "줄이에요." }]);
     expect(joinBody(GOOD.body)).toBe(`${GOOD.body.slice(0, 2).join(" ")}\n\n${GOOD.body.slice(2).join(" ")}`);
   });
-  test("applyRepair·pruneFailing: 표시한 칸만 바꾸고, 그래도 걸린 본문 문장은 지운다", () => {
+  test("applyRepair·pruneFailing: 표시한 칸만 바꾸고, 그래도 본문이 걸려 있으면 지우지 않고 null(템플릿) — v4.20", () => {
     const bad = replaceBody(GOOD, 2, "가까운 사람과의 흐름이 바뀌면 피하지 말고 들어 봐요.");
     const fixed = applyRepair(bad, { fixes: [{ id: "body.2", action: "replace", text: "가까운 사람과 미뤄 둔 이야기가 나오면 끝까지 들어 봐요." }, { id: "headline", action: "replace", text: "몰래 바꾼 제목" }] }, new Set(["body.2"]));
     expect(fixed.headline).toBe(GOOD.headline);   // 표시하지 않은 칸은 무시
     expect(checkDraft(fixed, brief)).toEqual([]);
     const dropped = applyRepair(bad, { fixes: [{ id: "body.2", action: "delete", text: "" }] }, new Set(["body.2"]));
     expect(dropped.body).toHaveLength(4);
-    const pruned = pruneFailing(bad, brief)!;
-    expect(pruned.body).toEqual(GOOD.body.filter((_, i) => i !== 2));
+    expect(pruneFailing(bad, brief)).toBeNull();   // 본문 문장을 지워 비약을 만들지 않는다
     expect(pruneFailing({ ...bad, headline: "흐름이 좋은 날" }, brief)).toBeNull();   // 제목은 지울 수 없다
   });
 });
@@ -280,26 +280,24 @@ describe("v4.19 파이프라인 — 초안 1 + 수리 최대 2라운드, 측정"
       delete process.env.FORTUNE_PATCH_MODEL;
     }
   });
-  test("수리 두 번 다 실패한 본문 문장은 지운다 (호출 3, 글은 산다)", async () => {
+  test("수리 두 번 다 실패한 본문 문장은 지우지 않고 템플릿 (호출 3) — v4.20", async () => {
     const bad = replaceBody(GOOD, 2, "가까운 사람과의 흐름이 바뀌면 피하지 말고 들어 봐요.");
     const still = { fixes: [{ id: "body.2", action: "replace", text: "가까운 사람과의 흐름을 따라 들어 봐요." }] };
     const { client } = fakeClient([bad, still, still]);
     const r = await generateFortuneText(input, fallback, { client, reviewModel: null });
-    expect(r).toMatchObject({ source: "llm", attempts: 3, patches: 2 });
+    expect(r).toMatchObject({ source: "template", attempts: 3 });
     expect(m(r)).toEqual(["draft:banned", "patch:banned", "patch:banned"]);
-    expect(r.bodySentences).toEqual(GOOD.body.filter((_, i) => i !== 2));
+    expect(r.metrics.fallback).toBe("unresolved");
   });
-  test("4문장 초안도 걸린 한 문장을 지워 3문장으로 산다. 수리 중 API 장애면 지우기로 살리고 transient를 남기지 않는다", async () => {
+  test("4문장 초안의 걸린 문장도 지우지 않는다. 수리 중 API 장애면 템플릿 + transient api — v4.20", async () => {
     const four = { ...GOOD, body: GOOD.body.slice(0, 4).map((s, i) => (i === 1 ? "둘러보는 흐름이 재미있어서 이것저것 알아보고 싶어져요." : s)) };
     const still = { fixes: [{ id: "body.1", action: "replace", text: "흐름을 타고 이것저것 알아보고 싶어져요." }] };
     const a = fakeClient([four, still, still]);
     const r1 = await generateFortuneText(input, fallback, { client: a.client, reviewModel: null });
-    expect(r1.source).toBe("llm");
-    expect(r1.bodySentences).toEqual([four.body[0], four.body[2], four.body[3]]);
+    expect(r1.source).toBe("template");
     const b = fakeClient([four, new Error("overloaded")]);
     const r2 = await generateFortuneText(input, fallback, { client: b.client, reviewModel: null });
-    expect(r2).toMatchObject({ source: "llm", attempts: 2 });
-    expect(r2.transient).toBeUndefined();
+    expect(r2).toMatchObject({ source: "template", attempts: 2, transient: "api" });
     expect(r2.metrics.calls.map((c) => c.issueCodes.join("+"))).toEqual(["banned", "api"]);
   });
   test("제목이 끝까지 걸리면 템플릿 — 그래도 쓴 토큰·호출은 usage·metrics에 남는다", async () => {
@@ -338,13 +336,13 @@ describe("v4.19 파이프라인 — 초안 1 + 수리 최대 2라운드, 측정"
     expect(r3.metrics.fallback).toBe("refusal");
     expect(r3.usage.input).toBe(100);
   });
-  test("시간: 남은 시간이 MIN_CALL_MS보다 적으면 수리를 시작하지 않는다 — 걸린 본문 문장은 지우고, 제목이 걸렸으면 템플릿(deadline)", async () => {
+  test("시간: 남은 시간이 MIN_CALL_MS보다 적으면 수리를 시작하지 않는다 — 본문이든 제목이든 걸렸으면 템플릿(deadline) — v4.20", async () => {
     let clock = 0;
     const now = () => clock;
     const slow = (answer: unknown) => ({ messages: { create: async () => { clock += TOTAL_DEADLINE_MS - MIN_CALL_MS + 1; return { stop_reason: "end_turn", content: [{ type: "text", text: JSON.stringify(answer) }], usage: USAGE }; } } }) as never;
     const r1 = await generateFortuneText(input, fallback, { client: slow(replaceBody(GOOD, 2, "가까운 사람과의 흐름이 바뀌면 피하지 말고 들어 봐요.")), reviewModel: null, now });
-    expect(r1).toMatchObject({ source: "llm", attempts: 1 });
-    expect(r1.bodySentences).toHaveLength(4);
+    expect(r1).toMatchObject({ source: "template", attempts: 1 });
+    expect(r1.metrics.fallback).toBe("deadline");
     expect(r1.metrics.calls[0]!.ms).toBe(TOTAL_DEADLINE_MS - MIN_CALL_MS + 1);
     clock = 0;
     const r2 = await generateFortuneText(input, fallback, { client: slow({ ...GOOD, headline: "흐름이 좋은 날" }), reviewModel: null, now });
