@@ -37,7 +37,19 @@ export default async function WelcomePage() {
           {me.ganjiKo}({profile.pillars.day.stem}
           {profile.pillars.day.branch}) = 태어난 날의 간지예요
         </p>
-        <p className="mt-1 text-[16px] leading-[1.6] text-muted break-keep">60갑자 중 당신의 날이에요. 매일 밤 한 줄이 이 카드에 쌓여요</p>
+        <p className="mt-1 text-[16px] leading-[1.6] text-muted break-keep">60갑자 중 당신의 날이에요</p>
+        {/* v3.31 (명세 30): 하루 흐름 세 줄 — 튜토리얼 대신. 머리는 한지 띠지(나 탭 머리표와 같은 재료), 번호·금색·그림 없음.
+            순서가 아니라 하루의 모양이라 번호를 붙이지 않는다. 글과 같은 burst-text 전환 안에 들어온다 */}
+        <dl className="day-flow">
+          <dt className="day-flow__head">낮</dt>
+          <dd className="day-flow__text">오늘 운세를 읽어요</dd>
+          <dt className="day-flow__head">밤</dt>
+          <dd className="day-flow__text">
+            행복도 하나, 한 줄이면 돼요<span className="day-flow__aside">30초</span>
+          </dd>
+          <dt className="day-flow__head">쌓이면</dt>
+          <dd className="day-flow__text">운세와 내 하루가 얼마나 맞았는지 보여요</dd>
+        </dl>
       </div>
       {/* 금색 면 버튼 — 이 화면에 하나. 자동 이동 없음 */}
       <TrackedLink event="welcome_start_click" href="/" className="burst-text burst-text--late gold-plate flex h-14 w-full max-w-[320px] items-center justify-center rounded-xl text-[17px] font-bold text-gold-ink">

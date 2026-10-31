@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 /*
-  사주읽는밤 — 한지 일기장 (톤 v3.1).
+  사주카우 일기 — 한지 일기장 (톤 v3.1).
   재료는 바이럴 60갑자 카드의 넷뿐: 한지 크림, 녹갈색 선, 별 금색, 밤하늘 남색(악센트로만 — v3.1에서 남색 면과 밤 번짐을 지웠다).
   색 값은 눈대중이 아니라 에셋 키트(에셋/사주 일기/ui-kit)를 analyze_kit.py로 측정한 값이다 (2026-10-05 v3 재측정).
   바탕·카드 종이·테두리·버튼면·괘선·도장·띠지·도장판·나무패는 CSS 색이 아니라 public/ui/ 의 키트 이미지를 쓴다 (아래 재료 클래스).
@@ -366,32 +366,51 @@ input:focus-visible + .seg__cell,
 .fortune-loading {
   min-height: 171px; /* 닫힌 운세 카드와 같은 높이 — 로딩→카드 전환 때 튀지 않게 */
 }
-/* v3.30 (명세 29) 먹 달이 차오른다: 키트 moon-ink-disc(붓 먹 보름달 원판, 알파 지름 82.6%) 한 장을 64px 상자에 contain으로 놓고,
-   원판과 같은 지름의 가림 원 하나를 뺀 마스크(radial-gradient 구멍)로 깎는다 — 앱 아이콘과 같은 "원 빼기 원" 초승달.
-   구멍 중심은 상자 가운데에서 --moon-p(0~1)에 따라 오른쪽으로 빠져나간다: p=0 지름의 10%(얇은 초승달) → p=1 지름+4px(보름달).
+/* v3.31 (명세 30) 옅은 보름달 위로 먹 달이 차오른다: 키트 moon-ink-disc(붓 먹 보름달 원판, 알파 지름 82.6%) 한 장을 72px 상자에
+   두 겹으로 — 같은 요소의 ::before(옅은 보름달 18%, 마스크 없음 = "다 찬 달의 자리")와 ::after(진한 달, 가림 원 마스크).
+   두 겹이 같은 상자(inset 0)라 1px도 어긋나지 않는다. 가림 원은 원판과 같은 지름(radial-gradient 구멍)이고
+   중심은 상자 가운데에서 --moon-p(0~1)에 따라 오른쪽으로 빠져나간다: p=0 지름의 10%(얇은 초승달) → p=1 지름+4px(보름달).
    마스크 층(256px, 구멍은 층 가운데 128px)을 mask-position으로 옮기므로 300ms 전환 하나로 이어져 차오른다(갱신 간격과 같다).
-   가려진 쪽엔 아무것도 없다(한지 그대로) — 윤곽·점선·후광 없음. 막대·퍼센트 없음 */
-.fortune-loading__row {
+   옅은 달은 움직이지도 깜빡이지도 않는다 — 윤곽·점선·후광 없음. 막대·퍼센트 없음.
+   높이: 테두리 6 + 패딩 40 + 제목 22.5 + 달 72 + 10 + 말 20 = 170.5 ≤ 171 (넘치면 달을 68px까지만 줄인다, 카드는 안 키운다) */
+.fortune-loading__body {
   display: flex;
   flex: 1;
+  flex-direction: column;
   align-items: center;
-  gap: 12px;
-  margin-top: 8px;
+  justify-content: center;
+  gap: 10px;
   min-width: 0;
+  min-height: 0;
 }
 .fortune-loading__moon {
-  --moon-d: 52.9px; /* 64px 상자 안 원판 지름 (512 webp 알파 bbox 46~468) */
+  --moon-s: 72px; /* 상자 */
+  --moon-d: 59.5px; /* 72px 상자 안 원판 지름 (512 webp 알파 bbox 46~468 = 82.6%) */
   --moon-r: calc(var(--moon-d) / 2);
-  --moon-x: calc(32px + var(--moon-d) * 0.1 + var(--moon-p, 0) * (var(--moon-d) * 0.9 + 4px)); /* 가림 원 중심(상자 기준) */
+  --moon-x: calc(var(--moon-s) / 2 + var(--moon-d) * 0.1 + var(--moon-p, 0) * (var(--moon-d) * 0.9 + 4px)); /* 가림 원 중심(상자 기준) */
+  position: relative;
   flex: none;
   display: block;
-  width: 64px;
-  height: 64px;
+  width: var(--moon-s);
+  height: var(--moon-s);
+}
+.fortune-loading__moon::before,
+.fortune-loading__moon::after {
+  content: "";
+  position: absolute;
+  inset: 0;
   background: url("/ui/moon-ink-disc-512.webp") center / contain no-repeat;
+}
+/* 아래 겹: 옅은 보름달. 마른 붓 가장자리가 희미하게 보일 만큼만 (한지 위 실물로 보고 18%) */
+.fortune-loading__moon::before {
+  opacity: 0.18;
+}
+/* 위 겹: 가림 원으로 깎은 진한 달 */
+.fortune-loading__moon::after {
   -webkit-mask-image: radial-gradient(circle var(--moon-r) at 128px 50%, transparent calc(var(--moon-r) - 0.5px), #000 calc(var(--moon-r) + 0.5px));
   mask-image: radial-gradient(circle var(--moon-r) at 128px 50%, transparent calc(var(--moon-r) - 0.5px), #000 calc(var(--moon-r) + 0.5px));
-  -webkit-mask-size: 256px 64px;
-  mask-size: 256px 64px;
+  -webkit-mask-size: 256px var(--moon-s);
+  mask-size: 256px var(--moon-s);
   -webkit-mask-repeat: no-repeat;
   mask-repeat: no-repeat;
   -webkit-mask-position: calc(var(--moon-x) - 128px) 0;
@@ -399,15 +418,19 @@ input:focus-visible + .seg__cell,
   transition: mask-position 300ms linear, -webkit-mask-position 300ms linear;
 }
 /* ready: 남은 만큼을 300ms ease-out으로 보름달까지 */
-.fortune-loading__moon[data-ready] {
+.fortune-loading__moon[data-ready]::after {
   transition: mask-position 300ms cubic-bezier(0.3, 0.7, 0.3, 1), -webkit-mask-position 300ms cubic-bezier(0.3, 0.7, 0.3, 1);
 }
-/* 진행 말: 단계가 바뀌면 새 글자가 120ms 페이드로 들어온다(슬라이드·타이핑 없음). 한 줄 넘침은 말줄임 */
+/* 진행 말: 달 아래 가운데 한 줄. 단계가 바뀌면 새 글자가 120ms 페이드로 들어온다(슬라이드·타이핑 없음). 한 줄 넘침은 말줄임 */
 .fortune-loading__text {
+  max-width: 100%;
   min-width: 0;
+  margin: 0;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
+  text-align: center;
+  line-height: 20px;
   animation: fortune-loading-fade 120ms ease-out both;
 }
 @keyframes fortune-loading-fade {
@@ -420,8 +443,8 @@ input:focus-visible + .seg__cell,
 }
 @media (prefers-reduced-motion: reduce) {
   /* 전환 없이 값만 바뀐다 — 달은 단계별로 툭툭 차오르고, 문구는 바로 교체 */
-  .fortune-loading__moon,
-  .fortune-loading__moon[data-ready] {
+  .fortune-loading__moon::after,
+  .fortune-loading__moon[data-ready]::after {
     transition: none;
   }
   .fortune-loading__text {
@@ -659,6 +682,51 @@ details[open] > .fortune-body {
 /* /welcome의 버튼: 글 다음에 (카드 팡이 끝난 뒤) */
 .burst-text--late {
   animation-delay: 450ms;
+}
+/* /welcome 하루 흐름 세 줄 (v3.31, 명세 30): 가운데 놓인 좁은 묶음(최대 300px) 안에서 왼쪽 정렬.
+   머리 = 한지 띠지(키트 tag-strip-paper, 나 탭 머리표 .sec-tag와 같은 재료·13px 굵게) — 격자 열이라 셋의 폭이 가장 긴 "쌓이면"에 맞춰 같고,
+   말의 시작이 한 줄로 선다. 말 15px muted, 줄 사이 8px, 묶음 위 16px. 금색·번호·그림 없음. 말이 두 줄이 되면 띠지는 첫 줄 가운데에 맞춘다 */
+.day-flow {
+  --row: 26px; /* 띠지 높이 = 말 첫 줄의 기준 */
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  column-gap: 10px;
+  row-gap: 8px;
+  width: 100%;
+  max-width: 300px;
+  margin: 16px auto 0;
+  text-align: left;
+}
+.day-flow__head {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  align-self: start;
+  height: var(--row);
+  margin: 0;
+  padding: 0 4px;
+  border-style: solid;
+  border-width: 0 12px;
+  border-image: url("/ui/tag-strip-paper-clean.webp") 0 44 fill / 0 12px / 0 stretch;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--color-ink);
+  white-space: nowrap;
+}
+.day-flow__text {
+  margin: 0;
+  padding-top: calc((var(--row) - 22px) / 2); /* 첫 줄(22px) 가운데 = 띠지 가운데 */
+  font-size: 15px;
+  line-height: 22px;
+  color: var(--color-muted);
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+/* "30초"처럼 덧붙는 짧은 값은 가운뎃점 없이 간격으로만 (v3.13) */
+.day-flow__aside {
+  margin-left: 8px;
+  white-space: nowrap;
 }
 /* /welcome 실루엣 → 팡 → 정사각 카드 (v3.8, SaveBurst reveal 가지).
    무대 .reveal-stage는 정사각(폭 62vw·최대 320px) 하나. 실루엣 동안엔 키트 card-frame(1:1) 틀 + paper-2 바탕 안에

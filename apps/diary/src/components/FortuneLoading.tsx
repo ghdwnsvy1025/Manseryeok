@@ -4,12 +4,14 @@ import { useEffect, useState, type CSSProperties } from "react";
 
 /**
  * 운세 카드 자리 — 운세가 캐시에 없는 날, 뒤에서 만드는 5~25초 동안 보인다 (FortunePending이 그린다).
- * 디자인 명세 29 (톤 v3.30): 열린 운세 카드와 같은 틀(card-gold card-paper) 안에
- *   1. 먹 달 64px — 키트의 붓 먹 보름달 원판(moon-ink-disc) 한 장을 마스크로 가려 초승달을 만든다.
- *      진척이 오르면 가림 원이 오른쪽으로 빠져나가 달이 차오른다(초승달 → 반달 → 보름달). 모양이 곧 진행이라 막대·퍼센트가 없다.
- *   2. 진행 말 한 줄 — 달 오른쪽. 단계가 바뀔 때 글자만 바뀐다(페이드 120ms).
+ * 디자인 명세 30 (톤 v3.31): 열린 운세 카드와 같은 틀(card-gold card-paper) 안에
+ *   1. 먹 달 72px, 가로 가운데 — 키트의 붓 먹 보름달 원판(moon-ink-disc) 한 장을 두 겹으로.
+ *      아래 겹은 마스크 없이 옅게(18%) 깔린 보름달 = "다 찬 달의 자리", 위 겹은 같은 자리·같은 크기의 진한 달을
+ *      가림 원(마스크)으로 깎은 것. 진척이 오르면 가림 원이 오른쪽으로 빠져나가 옅은 달 위로 진한 달이 차오른다
+ *      (초승달 → 반달 → 보름달). 모양이 곧 진행이라 막대·퍼센트가 없다.
+ *   2. 진행 말 한 줄 — 달 아래 10px, 가운데. 단계가 바뀔 때 글자만 바뀐다(페이드 120ms).
  * 서버는 진행률을 모르므로 마운트 뒤 경과 시간으로 추정한다(아래 표). 퍼센트 숫자는 보조 기술에만 있다.
- * 막대·캐릭터·스피너·점 세 개·돌아가는 문구 없음. 높이는 닫힌 운세 카드와 같다(.fortune-loading min-height) — 카드가 와도 화면이 튀지 않는다.
+ * 막대·캐릭터·스피너·점 세 개·돌아가는 문구 없음. 높이는 닫힌 운세 카드와 같다(.fortune-loading min-height 171px) — 카드가 와도 화면이 튀지 않는다.
  *
  * `character`는 page.tsx가 아직 넘기지만 v3.29부터 쓰지 않는다(prop 서명만 유지).
  * `ready`: 캐시가 생겨 refresh 직전(수백 ms) — 보름달로 채우고 "다 됐어요".
@@ -44,7 +46,7 @@ export function estimateProgress(elapsedSec: number): { pct: number; stage: numb
 
 export function FortuneLoading({ character, ready = false }: { character?: string; ready?: boolean }) {
   void character; // v3.29: 캐릭터는 그리지 않는다 (page.tsx가 넘기는 값은 무시)
-  // 서버 렌더(첫 그림)는 0% · 첫 문구. 클라이언트에서 마운트 시점부터 센다
+  // 서버 렌더(첫 그림)는 0% · 첫 문구 · 옅은 보름달. 클라이언트에서 마운트 시점부터 센다
   const [elapsed, setElapsed] = useState(0);
 
   useEffect(() => {
@@ -61,9 +63,10 @@ export function FortuneLoading({ character, ready = false }: { character?: strin
   return (
     <section className="fortune-loading card-gold card-paper flex flex-col p-5" aria-busy={!ready} aria-live="polite">
       <h2 className="text-[15px] text-muted">오늘의 운세</h2>
-      <div className="fortune-loading__row">
-        {/* 먹 달: 원판 그림을 가림 원(마스크)으로 깎는다. 진척(--moon-p 0~1)에 따라 가림 원이 오른쪽으로 빠져나간다 — 모양은 globals.css.
-            숫자는 보조 기술에만 (role=progressbar) */}
+      {/* 달 + 말 세로 묶음: 제목 아래 남은 높이의 세로 가운데 */}
+      <div className="fortune-loading__body">
+        {/* 먹 달 두 겹(같은 상자의 ::before = 옅은 보름달, ::after = 가림 원으로 깎은 진한 달).
+            진척(--moon-p 0~1)에 따라 가림 원이 오른쪽으로 빠져나간다 — 모양은 globals.css. 숫자는 보조 기술에만 (role=progressbar) */}
         <span
           className="fortune-loading__moon"
           role="progressbar"
