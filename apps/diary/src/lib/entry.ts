@@ -42,15 +42,6 @@ export function areaCount(a: Areas | null | undefined): number {
   return a ? AREAS.filter((x) => typeof a[x.key] === "number").length : 0;
 }
 
-/** 매긴 영역 평균(1~5) × 2 → 1~10 반올림. 매긴 영역이 없으면 null */
-export function happinessFromAreas(a: Areas | null | undefined): number | null {
-  if (!a) return null;
-  const vals = AREAS.map((x) => a[x.key]).filter((v): v is number => typeof v === "number");
-  if (vals.length === 0) return null;
-  const avg = vals.reduce((s, v) => s + v, 0) / vals.length;
-  return Math.min(10, Math.max(1, Math.round(avg * 2)));
-}
-
 export const MAX_NOTE = 500;
 /** 내일의 나에게 쪽지 (2026-10-31, "오늘 해볼 일" 자리). 다음 날 오늘 화면 위에 펼쳐진다 */
 export const MAX_TOMORROW_NOTE = 100;
@@ -94,7 +85,7 @@ export function validateEntryDate(raw: unknown, today: string = todayKST()): Val
 export function validateEntry(
   raw: {
     entryDate: unknown;
-    /** 영역을 하나도 안 매겼을 때만 쓴다 — 이전 방식 기록을 고칠 때 그 행복도를 그대로 두는 길 */
+    /** 하루 행복도 1~10 (필수, 직접 매긴 값) */
     happiness?: unknown;
     moods: unknown;
     note: unknown;
@@ -122,10 +113,11 @@ export function validateEntry(
       areas[k as AreaKey] = n;
     }
   }
-  const fromAreas = happinessFromAreas(areas);
-  const happiness = fromAreas ?? Number(raw.happiness);
-  if (!Number.isInteger(happiness) || happiness < 1 || happiness > 10) {
-    return { ok: false, error: "영역을 하나 이상 골라 주세요." };
+  // 2026-11-01 사용자 결정: 행복도는 직접 매긴 값 하나(필수). 영역은 골라도 안 골라도 되고, 행복도를 바꾸지 않는다
+  //   (영역 평균 × 2는 다섯 영역이 보통이고 하나가 아주 나빴던 날처럼 내 느낌과 어긋났다. 영역 이전 기록 129개와도 같은 모양)
+  const happiness = Number(raw.happiness);
+  if (raw.happiness === "" || raw.happiness == null || !Number.isInteger(happiness) || happiness < 1 || happiness > 10) {
+    return { ok: false, error: "행복도를 먼저 골라 주세요." };
   }
 
   const list = Array.isArray(raw.moods) ? raw.moods : raw.moods == null ? [] : [raw.moods];
@@ -140,7 +132,7 @@ export function validateEntry(
   const tomorrow = typeof raw.tomorrowNote === "string" ? raw.tomorrowNote.trim() : "";
   if (tomorrow.length > MAX_TOMORROW_NOTE) return { ok: false, error: `내일의 나에게 쪽지는 ${MAX_TOMORROW_NOTE}자까지 쓸 수 있어요.` };
 
-  const value: EntryInput = { entryDate, happiness, moods: moods as Mood[], note: text || null, areas: fromAreas === null ? null : areas, tomorrowNote: tomorrow || null };
+  const value: EntryInput = { entryDate, happiness, moods: moods as Mood[], note: text || null, areas: areaCount(areas) === 0 ? null : areas, tomorrowNote: tomorrow || null };
   // 약속: 폼에 없으면(undefined) 건드리지 않는다. 빈 값이면 null. 목록 밖의 값은 거부
   if (raw.promise === undefined) return { ok: true, value };
   const promiseRaw = typeof raw.promise === "string" ? raw.promise.trim() : "";

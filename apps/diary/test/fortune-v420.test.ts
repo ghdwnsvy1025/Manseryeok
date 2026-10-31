@@ -127,3 +127,13 @@ test("v4.21 표현 후보와 템플릿 본문이 결과를 약속하지 않는�
   const t = templateText(templateInputFromCore(core), NONE, { ko: "경신", stemKo: "경", branchKo: "신" });
   expect(t.body).not.toMatch(/새로 벌이기보다 하던 것을 지키는|손에 든 일부터 하나씩 끝내는 쪽이 편해요/);
 });
+
+test("v4.21 템플릿 본문에 lead와 거의 같은 표현이 두 번 나오지 않는다", () => {
+  const tgs = ["비견", "겁재", "식신", "상관", "편재", "정재", "편관", "정관", "편인", "정인"] as const;
+  for (const tenGod of tgs) for (const role of ["용", "구"] as const) for (let seed = 0; seed < 8; seed++) {
+    const t = templateText({ ...templateInputFromCore(core), tenGod, role, seed }, NONE, { ko: "경신", stemKo: "경", branchKo: "신" });
+    const sents = t.body.replace(/\n+/g, " ").split(/(?<=요\.)\s+/);
+    const heads = sents.map((x) => x.split(" ").slice(0, 2).join(" "));
+    expect(new Set(heads).size, `${tenGod} ${role} ${seed}: ${t.body}`).toBe(heads.length);
+  }
+});

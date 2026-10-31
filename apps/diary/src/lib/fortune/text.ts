@@ -4,7 +4,7 @@
 //   이달 한 줄·오늘 기운 이름·맞는지 한 문장을 넣으며, 같은 영역 줄이 두 번 나오면 둘째 변형을 쓴다. 기운 이름 재료(namesFromCore)는 brief도 같이 쓴다.
 import { BRANCH_META, ELEMENT_EN_TO_KO, STEM_META, type TenGod } from "@saju/engine";
 import { GROUP_POWER, TEN_GOD_THEME, VERDICT_WORD } from "./base";
-import { pickExpression, TEN_GOD_EXPRESSIONS } from "./expressions";
+import { TEN_GOD_EXPRESSIONS } from "./expressions";
 import type { AreaName, AreaPeriod, AreaSignal, BaseFortune, CoreFortune, PersonalAdjustment, RoleLabel } from "./types";
 
 /** 사용자 문장에 쓰면 안 되는 말. 테스트가 전 조합을 검사한다. v4.4: "특별한·남다른·다른 날과 달리·차별"(날마다 다르다고 우기는 말) 추가.
@@ -197,6 +197,13 @@ const AREA_STATE: Record<AreaName, Record<"↑" | "↓", string>> = {
 };
 export const areaStateOf = (area: AreaName, signal: "↑" | "↓"): string => AREA_STATE[area][signal];
 
+const stems2 = (x: string) => new Set(x.replace(/[.,]/g, " ").split(/\s+/).filter((w) => w.length >= 2).map((w) => w.slice(0, 2)));
+function nearSame(a: string, b: string): boolean {
+  if (a.split(/\s+/).slice(0, 2).join(" ") === b.split(/\s+/).slice(0, 2).join(" ")) return true;
+  const sa = stems2(a), sb = stems2(b);
+  return [...sa].filter((w) => sb.has(w)).length / Math.max(1, Math.min(sa.size, sb.size)) >= 0.5;
+}
+
 /** 템플릿이 쓰는 재료. v3 BaseFortune도 그대로 들어간다 */
 export type TemplateInput = Pick<BaseFortune, "tenGod" | "relation" | "yongsin"> & {
   areas?: { period?: AreaPeriod; area: AreaName; signal: AreaSignal }[];
@@ -230,14 +237,21 @@ export function templateText(
   // 2026-10-24 사용자 지적: 모델이 떨어진 날 본문이 두 문장뿐이었다 → 표현 둘 + 성향 + 조언으로 네 문장 이상, 두 문단
   const pool = TEN_GOD_EXPRESSIONS[base.tenGod];
   const seed = base.seed ?? 0;
-  const list = reversed ? [...pool.과할때, ...pool.경향] : role === "용" || role === "희" ? [...pool.활용, ...pool.경향] : pool.경향;
-  const first = pickExpression(list, seed);
-  const second = pickExpression(list, seed + 1, [first]);
-  lines.push(first + ".");
+  const all = reversed ? [...pool.과할때, ...pool.경향] : role === "용" || role === "희" ? [...pool.활용, ...pool.경향] : pool.경향;
+  // v4.21: 표현 셋째를 더하자 거의 같은 말이 한 글에 두 번 나왔다("크게 벌이기보다 …" × 2). 날짜로 돌린 순서에서 lead·앞서 고른 표현과
+  //   앞 두 어절이 같거나 어간이 반 넘게 겹치는 것은 건너뛴다. 셋을 못 채우면 있는 만큼만
+  const start = seed % all.length;
+  const picked: string[] = [];
+  for (let i = 0; i < all.length && picked.length < 3; i++) {
+    const x = all[(start + i) % all.length]!;
+    if (![t.lead, ...picked].some((y) => nearSame(x, y))) picked.push(x);
+  }
+  const [first, second, third] = picked;
+  if (first) lines.push(first + ".");
   lines.push(t.lead);
-  lines.push(second + ".");
+  if (second) lines.push(second + ".");
   // v4.21 (ChatGPT 3차 15항): 고정 조언 문장("새로 벌이기보다 하던 것을 지키는 쪽이 편해요")이 폴백마다 붙어 주의인 날 반복을 키웠다 — 표현 후보 하나 더. 조언은 하면·피해요가 맡는다
-  lines.push(pickExpression(list, seed + 2, [first, second]) + ".");
+  if (third) lines.push(third + ".");
   // v4.16: 맞는지 판정 문장(fitLine)·이름 문장(nameLine)은 본문에 넣지 않는다 (이론은 내부 판단). 관계 줄은 결과만 말하는 문장이라 남긴다
   if (base.relation) lines.push(RELATION_LINE[base.relation]);
   // v4.17: 내 기록 숫자 문장(personalLine)은 넣지 않는다 — 카드의 "운세 / 내 기록" 막대가 보여 준다

@@ -3,7 +3,7 @@
 import { startTransition, useActionState, useEffect, useRef, useState, type FormEvent } from "react";
 import { saveEntryAction, type FormState } from "@/app/actions";
 import { DeleteEntryButton } from "@/components/DeleteEntryButton";
-import { AREA_LEVELS, AREAS, MAX_NOTE, MAX_TOMORROW_NOTE, MOOD_GROUPS, MOODS, areaCount, happinessFromAreas, moodTone, type AreaKey, type Areas } from "@/lib/entry";
+import { AREA_LEVELS, AREAS, MAX_NOTE, MAX_TOMORROW_NOTE, MOOD_GROUPS, MOODS, areaCount, moodTone, type AreaKey, type Areas } from "@/lib/entry";
 import { track } from "@/lib/analytics";
 import { lengthBucket } from "@/lib/analytics/core";
 
@@ -45,27 +45,24 @@ function hint(n: number): string {
 
 /**
  * 쓰기 폼 — 일기장 페이지 한 장 (톤 v3, 2026-10-31 개편).
- * - 행복도: 여섯 영역(일·공부/돈/건강/가족/연애/대인관계)을 5단계 도장으로, 매긴 영역만. 하루 행복도 = 평균 × 2 (서버가 같은 식으로 다시 계산).
- *   같은 도장을 다시 누르면 비운다. 영역이 없는 이전 기록을 고칠 땐 영역을 안 건드리면 그 행복도를 그대로 둔다(hidden happiness).
+ * - 행복도: 1~10 도장 하나(필수). 2026-11-01 사용자 결정 — 영역 평균 × 2로 정하던 것을 되돌렸다(6줄이 다 채워야 하는 것처럼 보였고, 평균이 내 느낌과 어긋났다).
+ * - 영역: 여섯 영역(일·공부/돈/건강/가족/연애/대인관계) 5단계 도장, 선택. 행복도를 바꾸지 않고 영역 통계(나 탭 육각형·영역 적중률)에만 쓴다.
+ *   같은 도장을 다시 누르면 비운다.
  * - 기분: 좋았어요 / 그저 그래요 / 아쉬웠어요 세 무리, 개수 제한 없음.
  * - 한 줄 메모, 그리고 "내일의 나에게" 쪽지(100자, 다음 날 오늘 화면 위에 펼쳐진다) — "오늘의 포인트" 자리를 대신한다.
- * 폼 필드: area_<key>=1~5, moods, note, tomorrow_note, (이전 기록이면) happiness.
+ * 폼 필드: happiness=1~10, area_<key>=1~5, moods, note, tomorrow_note.
  */
 export function EntryForm({ date, when = "today", notePlaceholder, initial, warmAssets = [] }: Props) {
   const [state, action, pending] = useActionState<FormState, FormData>(saveEntryAction, { error: null });
+  const [happiness, setHappiness] = useState<number | null>(initial?.happiness ?? null);
   const [areas, setAreas] = useState<Areas>(initial?.areas ?? {});
   const [moods, setMoods] = useState<string[]>(initial?.moods ?? []);
   const [note, setNote] = useState(initial?.note ?? "");
   const [tomorrowNote, setTomorrowNote] = useState(initial?.tomorrowNote ?? "");
-  // 영역 없이 저장을 누르면 그 자리로 데려가 이유를 보여 준다 (버튼을 막아 두면 눌러도 반응이 없어 저장된 줄 안다)
-  const [missingAreas, setMissingAreas] = useState(false);
-  const areasRef = useRef<HTMLFieldSetElement>(null);
+  // 행복도 없이 저장을 누르면 그 자리로 데려가 이유를 보여 준다 (버튼을 막아 두면 눌러도 반응이 없어 저장된 줄 안다)
+  const [missingHappiness, setMissingHappiness] = useState(false);
+  const happinessRef = useRef<HTMLFieldSetElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
-
-  // 이전 방식 기록(영역 없음)을 고칠 때: 영역을 하나도 안 매기면 그 행복도를 그대로 둔다
-  const legacyHappiness = initial && areaCount(initial.areas) === 0 ? initial.happiness : null;
-  const fromAreas = happinessFromAreas(areas);
-  const happiness = fromAreas ?? legacyHappiness;
 
   // 이용 통계 (측정.md): 열림 한 번, 저장 시도·막힘·오류. 본문·날짜는 보내지 않는다
   const opened = useRef(false);
@@ -84,6 +81,8 @@ export function EntryForm({ date, when = "today", notePlaceholder, initial, warm
     const form = formRef.current;
     if (!form) return;
     const fd = new FormData(form);
+    const h = Number(fd.get("happiness"));
+    if (h >= 1 && h <= 10) setHappiness((cur) => cur ?? h);
     const picked: Areas = {};
     for (const a of AREAS) {
       const v = Number(fd.get(`area_${a.key}`));
@@ -98,8 +97,12 @@ export function EntryForm({ date, when = "today", notePlaceholder, initial, warm
     if (typeof t === "string" && t) setTomorrowNote((cur) => cur || t);
   }, []);
 
+  function pickHappiness(n: number) {
+    setMissingHappiness(false);
+    setHappiness(n);
+  }
+
   function pickArea(key: AreaKey, level: number) {
-    setMissingAreas(false);
     // 같은 도장을 다시 누르면 비운다 — 오늘 해당 없는 영역
     setAreas((cur) => {
       const next = { ...cur };
@@ -118,10 +121,10 @@ export function EntryForm({ date, when = "today", notePlaceholder, initial, warm
   function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (happiness === null) {
-      track("diary_save_blocked", { reason: "areas", when });
-      setMissingAreas(true);
-      areasRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-      areasRef.current?.querySelector("input")?.focus({ preventScroll: true });
+      track("diary_save_blocked", { reason: "happiness", when });
+      setMissingHappiness(true);
+      happinessRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      happinessRef.current?.querySelector("input")?.focus({ preventScroll: true });
       return;
     }
     const data = new FormData(e.currentTarget);
@@ -145,43 +148,30 @@ export function EntryForm({ date, when = "today", notePlaceholder, initial, warm
   }
 
   const count = areaCount(areas);
-  /** 매긴 영역 단계(영역 순서대로) — 평균 계산 줄 */
-  const areaValues = AREAS.map((a) => areas[a.key]).filter((v): v is number => typeof v === "number");
 
   return (
     <>
     <form ref={formRef} onSubmit={onSubmit} className="flex flex-col gap-5">
       <input type="hidden" name="entryDate" value={date} />
-      {/* 영역을 안 매긴 이전 기록: 그 행복도를 그대로 */}
-      {fromAreas === null && legacyHappiness !== null && <input type="hidden" name="happiness" value={legacyHappiness} />}
 
       {/* 카드 종이 한 장 */}
       <div className="card-frame card-paper flex flex-col gap-7 p-5">
-        <fieldset ref={areasRef} className="entry-areas">
+        <fieldset ref={happinessRef} className="entry-happy">
           <legend className="text-[17px] font-bold">행복도</legend>
-          <p className={`entry-areas__total mt-1 text-sm ${missingAreas && happiness === null ? "font-bold text-danger" : "text-muted"}`} aria-live="polite">
-            {fromAreas !== null
+          <p className={`entry-areas__total mt-1 text-sm ${missingHappiness && happiness === null ? "font-bold text-danger" : "text-muted"}`} aria-live="polite">
+            {happiness !== null
               ? (
-                <>
-                  {/* 2026-10-31 사용자: 도장을 누를 때마다 행복도가 "팡" 하며 바뀌고, 평균 계산이 그 자리에서 보인다.
-                      key가 바뀌면 다시 그려져 .entry-areas__score[data-pop] 애니메이션이 한 번 돈다 (모양은 디자이너, 명세 31 6절).
-                      v3.33: 숫자 송명 32px 먹색이 이 카드의 주인공 — "N점, 말"은 한 묶음(.entry-areas__sum), 계산 줄은 옆 또는 아래 줄 */}
-                  <span className="entry-areas__sum">
-                    <span key={`${fromAreas}-${count}`} className="entry-areas__score" data-pop="">
-                      {fromAreas}
-                    </span>
-                    <span className="entry-areas__hint">점, {hint(fromAreas)}</span>
+                // 도장을 누를 때마다 숫자가 "팡" — key가 바뀌면 .entry-areas__score[data-pop] 애니메이션이 한 번 돈다 (명세 31 6절)
+                <span className="entry-areas__sum">
+                  <span key={happiness} className="entry-areas__score" data-pop="">
+                    {happiness}
                   </span>
-                  <span className="entry-areas__calc" aria-hidden>
-                    ({areaValues.join(" + ")}) ÷ {count} = {(areaValues.reduce((x, y) => x + y, 0) / count).toFixed(1)}, × 2
-                  </span>
-                </>
+                  <span className="entry-areas__hint">점, {hint(happiness)}</span>
+                </span>
               )
-              : legacyHappiness !== null
-                ? `예전 기록 ${legacyHappiness}점 — 영역을 고르면 평균으로 바뀌어요`
-                : missingAreas
-                  ? "영역을 하나 이상 골라 주세요"
-                  : "오늘 있었던 영역만, 도장 하나씩"}
+              : missingHappiness
+                ? "행복도를 먼저 골라 주세요"
+                : "1부터 10까지, 도장 하나"}
           </p>
           {/* 2026-10-31 사용자 Q3: 행복도를 분홍 막대로 — 10점 기준으로 차오른다(--h 0~1). 모양은 디자이너(.happy-bar) */}
           {happiness !== null && (
@@ -189,6 +179,34 @@ export function EntryForm({ date, when = "today", notePlaceholder, initial, warm
               <span className="happy-bar__fill" />
             </span>
           )}
+          {/* 도장 열 10개 — 375px에서 5 × 2줄(카드 안쪽 267px → 도장 약 47px, 손가락 자리 40px 이상). 10개 한 줄이면 23px이라 두 줄 (명세 34) */}
+          <div className="entry-happy__stamps mt-3 grid grid-cols-5 gap-2">
+            {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => {
+              const on = happiness === n;
+              return (
+                <label key={n} className="relative">
+                  <input type="radio" name="happiness" value={n} checked={on} onChange={() => pickHappiness(n)} aria-label={`${n}점`} className="peer sr-only" />
+                  {/* 찍힘은 CSS `input:checked +`가 바로 그린다 (하이드레이션 전 첫 탭). 단계 면은 data-level(1~3 남색 · 4~5 종이 · 6~7 금빛 · 8~10 moss — 달력 v3.22 네 단계와 같은 기준) */}
+                  <span
+                    data-level={n}
+                    className={`stamp entry-happy__stamp flex aspect-square cursor-pointer items-center justify-center font-serif peer-focus-visible:outline-2 peer-focus-visible:outline-ink ${on ? "stamp--on" : ""}`}
+                  >
+                    {n}
+                  </span>
+                </label>
+              );
+            })}
+          </div>
+        </fieldset>
+
+        {/* 영역은 선택 — 행복도보다 한 단계 가볍게: 위 녹갈 0.5px 괘선(필수/선택의 경계, 틀 안의 틀은 아님), 머리 15px 굵게 + 같은 줄 안내 13px muted (명세 34) */}
+        <fieldset className="entry-areas">
+          <legend className="entry-areas__legend">
+            영역
+            <span className="entry-areas__note">
+              오늘 있었던 것만, 안 골라도 돼요 {count > 0 && <span className="text-ganji">({count})</span>}
+            </span>
+          </legend>
           <div className="entry-areas__rows mt-3 flex flex-col gap-2">
             {AREAS.map((a) => (
               <div key={a.key} className="entry-area" role="radiogroup" aria-label={a.label}>

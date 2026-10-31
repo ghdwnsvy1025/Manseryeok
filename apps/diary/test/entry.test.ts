@@ -10,16 +10,17 @@ describe("validateEntry", () => {
     expect(r).toEqual({ ok: true, value: { entryDate: TODAY, happiness: 7, moods: [], note: null, areas: null, tomorrowNote: null } });
   });
 
-  test("영역 점수(1~5)가 있으면 하루 행복도 = 매긴 영역 평균 × 2 반올림, 손으로 보낸 행복도는 무시", () => {
-    const r = validateEntry({ ...base, happiness: "", areas: { work: "4", money: "", health: "5", love: null } }, TODAY);
-    expect(r).toMatchObject({ ok: true, value: { happiness: 9, areas: { work: 4, health: 5 } } });
-    expect(validateEntry({ ...base, happiness: "10", areas: { family: "1" } }, TODAY)).toMatchObject({ ok: true, value: { happiness: 2 } });
+  test("영역 점수(1~5)는 선택, 하루 행복도는 직접 매긴 값 그대로 (2026-11-01: 영역 평균으로 덮지 않는다)", () => {
+    const r = validateEntry({ ...base, happiness: "6", areas: { work: "4", money: "", health: "5", love: null } }, TODAY);
+    expect(r).toMatchObject({ ok: true, value: { happiness: 6, areas: { work: 4, health: 5 } } });
+    expect(validateEntry({ ...base, happiness: "10", areas: { family: "1" } }, TODAY)).toMatchObject({ ok: true, value: { happiness: 10 } });
     expect(validateEntry({ ...base, areas: { work: "6" } }, TODAY).ok).toBe(false);
     expect(validateEntry({ ...base, areas: { pet: "3" } }, TODAY).ok).toBe(false);
   });
 
-  test("영역도 행복도도 없으면 막는다", () => {
-    expect(validateEntry({ ...base, happiness: "", areas: { work: "" } }, TODAY)).toMatchObject({ ok: false, error: expect.stringContaining("영역") });
+  test("행복도가 없으면 영역을 매겨도 막는다", () => {
+    expect(validateEntry({ ...base, happiness: "", areas: { work: "" } }, TODAY)).toMatchObject({ ok: false, error: expect.stringContaining("행복도") });
+    expect(validateEntry({ ...base, happiness: "", areas: { work: "4" } }, TODAY)).toMatchObject({ ok: false, error: expect.stringContaining("행복도") });
   });
 
   test("내일의 나에게 쪽지는 100자까지, 앞뒤 공백 지움", () => {
