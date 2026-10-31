@@ -1,4 +1,4 @@
-// 원본: 사주 코어 core/src/extras.ts @ 240c91dbe54a60059d42b74148db88a31aebd16d (2026-10-07 복사, 이전 ebf972d). 판정 로직 수정 금지 — 바꾸려면 코어에서 먼저 바꾸고 다시 복사.
+// 원본: 사주 코어 core/src/extras.ts @ 4f795caaff12b331779feacbc2f4a49caa24c211 (2026-10-31 복사, 이전 240c91d). 판정 로직 수정 금지 — 바꾸려면 코어에서 먼저 바꾸고 다시 복사.
 // 규칙/부가태그.md (판정에 쓰지 않는 태그) + 규칙/조후.md (J-01~J-03 보조 태그)
 import { type Element, type Pillars, type Role, STEMS, BRANCHES, STEM_EL, BRANCH_EL, POS_NAME } from "./base";
 import type { Yongsin } from "./yongsin";
@@ -57,8 +57,11 @@ export function extraTags(p: Pillars): Tag[] {
 export type Johu = { 점수: number; 온도: "조열 뚜렷" | "조열 경향" | "무난" | "한습 경향" | "한습 뚜렷"; 습조: "습" | "조" | null; 필요오행: Element | null; 용신과: "조후 일치" | "조후 상충" | null;
   극단: boolean; 조후용신: Element | null; 활력: string | null; 계산: string[] };
 // J-04 [합의·조건부 2026-10-07 카드 005]: 극단으로 뜨겁거나 차면 억부 용신보다 조후용신을 먼저 찾는다. 극단 기준 |점수| ≥ 6 [가설]
-// — 운 판정(Y-09)은 아직 억부 용신 그대로. 조후용신을 운에 어떻게 반영할지는 충돌 카드 009가 정함
+// J-05 [합의·조건부 2026-10-07 카드 009]: 극단이면 운 판정도 억부와 조후를 "통합" — 운 글자의 온도를 억부 점수에 더한다 (yongsin.ts luck). 글자 온도는 아래 LETTER_TEMP
 const JOHU_EXTREME = 6;
+/** J-05 글자 온도 [가설]: 화 글자 +1, 수 글자 −1, 조토(未戌) +0.5, 습토(丑辰) −0.5, 나머지 0. 사용자 예: 조열 극단에는 축토·진토가, 한습 극단에는 술토·미토가 좋다 */
+export const LETTER_TEMP: Record<string, number> = { 丙: 1, 丁: 1, 壬: -1, 癸: -1, 巳: 1, 午: 1, 亥: -1, 子: -1, 未: 0.5, 戌: 0.5, 丑: -0.5, 辰: -0.5 };
+export const letterTemp = (ch: string): number => LETTER_TEMP[ch] ?? 0;
 // J-04 역할: 조후는 "활력·기분의 기복" 보조 태그(정신 건강·질병·성격 판정에 쓰지 않음). 에너지 섹션의 재료
 const VITALITY: Partial<Record<Johu["온도"], string>> = { "조열 뚜렷": "열이 쌓이는 쪽 — 밖으로 내보내는(발산) 일이 먼저", "조열 경향": "열이 쌓이기 쉬운 쪽", "한습 경향": "가라앉기 쉬운 쪽", "한습 뚜렷": "가라앉는 쪽 — 몸을 데우고 움직이는 일이 먼저" };
 

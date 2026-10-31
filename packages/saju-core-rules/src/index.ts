@@ -3,8 +3,10 @@
 export type { Pillars, Element, Group, TenGod, Role } from "./base";
 export { parsePillars, checkPillars, toKo } from "./base";
 
-export type { Balance, Yongsin, Luck, LuckPart, LuckVerdict, YongsinMethod } from "./yongsin";
-export { balance, yongsin, luck, unknownHour } from "./yongsin";
+export type { Balance, Yongsin, Luck, LuckPart, LuckVerdict, YongsinMethod, PowerMethod } from "./yongsin";
+export { balance, yongsin, luck, unknownHour, power } from "./yongsin";
+// 세력 방식 (코어 4f795ca, 카드 016·033). 유료 풀이(readFromPillars)는 DEFAULT_POWER_METHOD, balance()·power()의 기본값은 "정기"
+export { DEFAULT_POWER_METHOD, POWER_METHODS } from "./yongsin";
 
 export type { Relations } from "./relations";
 export { relations, luckRelations, luckClash } from "./relations";
@@ -15,7 +17,7 @@ export { gyeokguk, gyeokInLuck } from "./gyeokguk";
 export type { Johu } from "./extras";
 export { johu, extraTags } from "./extras";
 
-// Y-12 쓰는 기운 · K-09 T존 조합 (코어 240c91d, 2026-10-07) · 이론 버전
+// Y-12 쓰는 기운 · K-09 T존 조합 (코어 240c91d, 2026-10-07; 4f795ca에서 조합 3종 추가) · 이론 버전
 export type { Usable, UsableItem, TzoneCombo } from "./usable";
 export { usable, tzoneCombo } from "./usable";
 export { THEORY_VERSION } from "./version";

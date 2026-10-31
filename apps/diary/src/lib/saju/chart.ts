@@ -5,9 +5,10 @@
 // 해석 원칙: 십이운성·신살은 이름과 한 줄 뜻만 보이고 길흉을 말하지 않는다. 유료 풀이(사주 코어) 규칙이
 // "노트가 비판적이고 근거가 약하다"며 판정에서 뺀 것들이라, 앱이 단정하지 않는다(규칙/부가태그.md).
 // 중심 기운·용신·격국은 운세(fortune/core.ts)와 같은 코어 판정(@saju/core-rules)을 쓴다 — 오늘 운세와 말이 어긋나지 않게.
+// 세력은 유료 풀이와 같은 DEFAULT_POWER_METHOD로 센다(코어 4f795ca, 2026-10-31) — 무료 만세력과 유료 풀이의 용신이 같게.
 import "server-only";
 import { BRANCH_META, ELEMENT_KO_TO_EN, ELEMENT_ORDER, STEM_META, calculateElementDistribution, calculateHiddenStems, getTenGod, type Element, type StemHanja } from "@saju/engine";
-import { balance, currentLuckContext, extraTags, fromBirth, gyeokguk, relations, toCorePillars, toKo, yongsin as coreYongsin, type Group } from "@saju/core-rules";
+import { DEFAULT_POWER_METHOD, balance, currentLuckContext, extraTags, fromBirth, gyeokguk, relations, toCorePillars, toKo, yongsin as coreYongsin, type Group } from "@saju/core-rules";
 import { resolveYongsin, toBirthInput } from "@/lib/fortune/core";
 import type { BirthProfile, PillarSnapshot, PillarsSnapshot } from "@/lib/profile";
 
@@ -186,7 +187,7 @@ export function sajuChart(pillars: PillarsSnapshot, birth: BirthProfile, today: 
     specials.push({ name, where: t.대상, note });
   }
 
-  const b = balance(p);
+  const b = balance(p, DEFAULT_POWER_METHOD);
   const { y } = resolveYongsin(p, b);
   const g = gyeokguk(p, b, relations(p, b, y ?? coreYongsin(p, b)));
   const roleEl = (role: string) => {

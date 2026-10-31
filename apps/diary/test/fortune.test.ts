@@ -28,6 +28,7 @@ const PROFILE_A: BirthProfile = { gender: "male", calendar: "solar", isLeapMonth
 const PROFILE_B: BirthProfile = { gender: "female", calendar: "solar", isLeapMonth: false, birthYear: 1994, birthMonth: 1, birthDay: 28, birthHour: 12, birthMinute: 0, city: "seoul" };
 // v4.1 보강의 계기가 된 사주: 1995-10-25 14:00 남 → 乙亥 丙戌 己丑 辛未. 2026-10-07 甲寅일은 천간·지지 모두 정관 = 한신
 // v4.2 (코어 240c91d 동기화): 비겁 중심 신강이라 Y-12로 관성 운이 희신급 → 甲寅일은 "유리"(코어 규칙 우선)
+// v4.18 (코어 4f795ca 동기화): 원국 지지에 비겁(丑·未·戌)이 셋이라 Y-15로 지지 寅(관성) 점수 절반 1 → 0.5. 판정 "유리"는 그대로
 const PROFILE_C: BirthProfile = { gender: "male", calendar: "solar", isLeapMonth: false, birthYear: 1995, birthMonth: 10, birthDay: 25, birthHour: 14, birthMinute: 0, city: "seoul" };
 
 function pillarsOf(p: BirthProfile): PillarsSnapshot {
@@ -83,6 +84,7 @@ describe("v4 점수·밴드·영역 스냅샷 (사주 2 × 날짜 5)", () => {
   // 2026-10-07 v4.2 갱신(코어 240c91d): Y-12 — A(己巳 丙子 丙寅 甲午, 비겁 중심 신강)의 관성(수) 운이 한신 0.5 → 희신급 1. A 壬子 한·한이 "유리"·직업↑, A 대운 癸酉 2.75 → 3.5, 세운 乙巳 등 수 글자 점수 ↑. B(중화)는 변화 없음.
   // 2026-10-07 v4.2 합 점수 삭제: rel에는 충만 남고 합(육합·삼합·반합)·운 지지 합(union)은 0 → A 甲午 3.3→3.5(반합 寅午 제거), A 己酉 8.1→7.9(반합 巳酉 +0.25 제거), B 壬子 3.1→2.6(육합 子丑 +0.5·월운 합 제거), B 甲午 4.1→3.9, B 己酉 9.2→9.1, B 庚申 8.5→8.3.
   //   영역은 오늘(일운 ≤2) → 이달(월운 1) → 올해(세운 1)로 최대 4개, period가 붙는다.
+  // 2026-10-31 v4.18 갱신(코어 4f795ca + 세력 방식 정기연속80엔진20): B 庚申 8.3→8 — 운 천간 庚이 원국 월간 乙(비겁)과 乙庚합이라 카드 013으로 천간 점수 절반(0.75 → 0.375). 나머지 9건은 그대로.
   const CASES: { prof: BirthProfile; date: string; ganji: string; score: number; band: string; total: string; areas: string[] }[] = [
     { prof: PROFILE_A, date: "2026-10-05", ganji: "壬子", score: 7.5, band: "좋음", total: "유리", areas: ["오늘:직업↑", "이달:연애↑", "올해:대인↓"] },
     { prof: PROFILE_A, date: "2026-01-20", ganji: "甲午", score: 3.6, band: "주의", total: "어려움", areas: ["오늘:대인↓", "오늘:재물↓", "이달:직업↑", "올해:대인↓"] },
@@ -92,7 +94,7 @@ describe("v4 점수·밴드·영역 스냅샷 (사주 2 × 날짜 5)", () => {
     { prof: PROFILE_B, date: "2026-10-05", ganji: "壬子", score: 2.9, band: "주의", total: "주의", areas: ["오늘:학업↓", "오늘:가족↓", "이달:직업↑", "올해:직업↑"] },
     { prof: PROFILE_B, date: "2026-01-20", ganji: "甲午", score: 3.9, band: "주의", total: "주의", areas: ["오늘:대인↓", "오늘:재물↓", "이달:재물↑", "올해:대인↓"] },
     { prof: PROFILE_B, date: "2026-02-04", ganji: "己酉", score: 9.1, band: "좋음", total: "매우 유리", areas: ["오늘:재물↑", "오늘:대인↑", "이달:대인↓", "올해:직업↑"] },
-    { prof: PROFILE_B, date: "2026-06-15", ganji: "庚申", score: 8.3, band: "좋음", total: "보통", areas: ["오늘:직업→", "오늘:연애→", "이달:대인↓", "올해:직업↑"] },
+    { prof: PROFILE_B, date: "2026-06-15", ganji: "庚申", score: 8, band: "좋음", total: "보통", areas: ["오늘:직업→", "오늘:연애→", "이달:대인↓", "올해:직업↑"] },
     { prof: PROFILE_B, date: "2027-03-01", ganji: "己卯", score: 7.4, band: "좋음", total: "유리", areas: ["오늘:재물↑", "오늘:대인↑", "이달:대인↓", "올해:재물↑"] },
   ];
   for (const c of CASES) {
@@ -156,13 +158,14 @@ describe("v4.1 보강 (乙亥 丙戌 己丑 辛未 × 2026-10-07 甲寅: 천간�
     expect(toCorePillars(pillarsOf(PROFILE_C))).toEqual(["乙亥", "丙戌", "己丑", "辛未"]);
     expect(dayGanji("2026-10-07").hanja).toBe("甲寅");
     expect(r.dayLuck.stem).toMatchObject({ tenGod: "정관", label: "한", score: 1.5 });
-    expect(r.dayLuck.branch).toMatchObject({ tenGod: "정관", label: "한", score: 1 });
+    expect(r.dayLuck.branch).toMatchObject({ tenGod: "정관", label: "한", score: 0.5 }); // v4.18: Y-15 지지 비겁 셋을 누르느라 절반
+    expect(r.relations.flags).toContain("운 寅 관성: 지지 비겁 3개를 누르느라 부담 — 극당하는 재성보단 덜 위험, 점수 절반 (Y-15)");
     expect(r.dayLuck.method).toBe("라벨 점수");
     expect(r.relations.flags).toContain("관성은 보조 용신 — 희신급으로 셈 (Y-12)");
   });
 
   test("① 한·한이어도 코어가 올린(Y-12) 한신이면 코어 판정 그대로(유리) — 문장은 희신 말. 순수 한·한(B 庚申)은 여전히 보통", () => {
-    expect(r.dayLuck.raw).toBe(2.5);
+    expect(r.dayLuck.raw).toBe(2); // v4.18: 1.5 + 0.5 (Y-15)
     expect(r.dayLuck.total).toBe("유리");
     expect(r.facts).toContain("둘을 합치면 오늘은 수월한 편이에요.");
     // v4.2: "위아래" 문장은 없다. 같은 십신이면 구조 없는 한 문장 — v4.3: "두 번 겹쳐요" → "아주 강해요"
@@ -175,7 +178,7 @@ describe("v4.1 보강 (乙亥 丙戌 己丑 辛未 × 2026-10-07 甲寅: 천간�
     // 코어가 올리지 않은 한·한(B 중화 사주, 2026-06-15 庚申 편관·편관)은 v4.1 ① 그대로 "보통"
     const pure = v4(PROFILE_B, "2026-06-15");
     expect([pure.dayLuck.stem.label, pure.dayLuck.branch.label]).toEqual(["한", "한"]);
-    expect(pure.dayLuck.raw).toBe(1.25);
+    expect(pure.dayLuck.raw).toBe(0.875); // v4.18: 천간 庚이 월간 乙(비겁)과 합 → 카드 013 절반 (0.75 → 0.375) + 지지 0.5
     expect(pure.dayLuck.total).toBe("보통");
     // v4.5: 한신("기울지 않고 그 성격대로") 문장은 글 재료에서 뺐다
     expect(pure.facts.some((f) => f.includes("기울지 않고"))).toBe(false);
@@ -203,7 +206,7 @@ describe("v4.1 보강 (乙亥 丙戌 己丑 辛未 × 2026-10-07 甲寅: 천간�
     expect(r.context.wolun).toMatchObject({ 간지: "丁酉", 판정: "주의", 합계: -0.5 });
     expect(r.context.daeun?.clash ?? r.context.seun.clash ?? r.context.wolun?.clash).toBeUndefined();
     expect(r.parts.ctx).toBe(-0.17); // 1×0.2 + (−2.5)×0.15 = −0.175 → 소수 2자리 (월운 −0.5는 0)
-    expect(r.parts.score01).toBe(0.69); // v4.2: raw 1.25 → 2.5 (Y-12), 寅亥 육합 +0.5는 합 점수 삭제로 0 (0.74 → 0.69)
+    expect(r.parts.score01).toBe(0.65); // v4.2: raw 1.25 → 2.5 (Y-12), 寅亥 육합 +0.5는 합 점수 삭제로 0 (0.74 → 0.69). v4.18: raw 2 (Y-15) → 0.65
     expect(r.context.daeun?.플래그).toEqual(expect.arrayContaining([expect.stringContaining("용신 손상"), expect.stringContaining("개두")]));
     // v4.4: 2026-10-07(추분 보름째, 충 없음)은 평일 — 맥락 문장은 contextFacts에만
     expect(r.contextFacts).toEqual([

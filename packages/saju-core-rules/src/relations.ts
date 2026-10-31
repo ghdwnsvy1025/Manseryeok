@@ -1,4 +1,4 @@
-// 원본: 사주 코어 core/src/relations.ts @ ebf972d4c44c02f6f6bf01bbd4fa396b2d6907cc (2026-10-05 복사). 판정 로직 수정 금지 — 바꾸려면 코어에서 먼저 바꾸고 다시 복사.
+// 원본: 사주 코어 core/src/relations.ts @ 4f795caaff12b331779feacbc2f4a49caa24c211 (2026-10-31 복사, 이전 240c91d). 판정 로직 수정 금지 — 바꾸려면 코어에서 먼저 바꾸고 다시 복사.
 // 규칙/충.md (C-01~C-10) + 규칙/삼합.md (S-01~S-09). 합과 충은 서로의 강도를 바꾸므로(C-02 = S-07) 한 파일에서 함께 판정합니다.
 // 적용 순서: S-04 → S-01~03 → S-06 → S-07/C-02 → C-03. 세력(%)은 건드리지 않습니다(S-05).
 import {
@@ -30,15 +30,26 @@ const BANGHAP: { 글자: string; 왕: string; el: Element }[] = [
   { 글자: "寅卯辰", 왕: "卯", el: "목" }, { 글자: "巳午未", 왕: "午", el: "화" }, { 글자: "申酉戌", 왕: "酉", el: "금" }, { 글자: "亥子丑", 왕: "子", el: "수" },
 ];
 const YUKHAP: Record<string, string> = { 子: "丑", 丑: "子", 寅: "亥", 亥: "寅", 卯: "戌", 戌: "卯", 辰: "酉", 酉: "辰", 巳: "申", 申: "巳", 午: "未", 未: "午" };
+// 카드 015 [기각·대체 2026-10-07]: 육합은 "묶여서 기능을 못 쓰는" 것이 아니라 합화 오행의 세기가 강해지는 것. 巳申만은 화·금이 쏠리지 않고 대립(오행 없음). 午未 = 화는 [가설](토로 보는 설도 있음)
+const YUKHAP_EL: Record<string, Element | null> = { 子丑: "토", 丑子: "토", 寅亥: "목", 亥寅: "목", 卯戌: "화", 戌卯: "화", 辰酉: "금", 酉辰: "금", 巳申: null, 申巳: null, 午未: "화", 未午: "화" };
 const CHUNG: Record<string, { 상대: string; 종류: Chung["종류"]; 기본: number; 위축: string | null }> = {
   寅: { 상대: "申", 종류: "생지충", 기본: 3, 위축: "寅" }, 申: { 상대: "寅", 종류: "생지충", 기본: 3, 위축: "寅" },
   巳: { 상대: "亥", 종류: "생지충", 기본: 3, 위축: "巳" }, 亥: { 상대: "巳", 종류: "생지충", 기본: 3, 위축: "巳" },
   子: { 상대: "午", 종류: "왕지충", 기본: 3, 위축: "午" }, 午: { 상대: "子", 종류: "왕지충", 기본: 3, 위축: "午" },
   卯: { 상대: "酉", 종류: "왕지충", 기본: 3, 위축: "卯" }, 酉: { 상대: "卯", 종류: "왕지충", 기본: 3, 위축: "卯" },
-  辰: { 상대: "戌", 종류: "고지충", 기본: 2, 위축: null }, 戌: { 상대: "辰", 종류: "고지충", 기본: 2, 위축: null },
+  辰: { 상대: "戌", 종류: "고지충", 기본: 3, 위축: null }, 戌: { 상대: "辰", 종류: "고지충", 기본: 3, 위축: null },   // 카드 026: 辰戌은 삶의 근본이 흔들려 丑未보다 강함 → 고지충이지만 기본 3, 운 충에서도 −1 없음
   丑: { 상대: "未", 종류: "고지충", 기본: 2, 위축: null }, 未: { 상대: "丑", 종류: "고지충", 기본: 2, 위축: null },
 };
 const STORE: Record<string, Element> = { 辰: "수", 戌: "화", 丑: "금", 未: "목" };
+// 카드 020 [기각·대체 2026-10-08]: 충은 힘을 줄이는 게 아니라 불안정성을 키움 — 좋은 것도 나쁜 것도 불안해짐(힘이 줄어드는 건 생극 때문). 점수는 바꾸지 않고 뜻만 붙임.
+//   丑未충은 약해지기보다 더 날뜀. 子午충은 수는 더 요동치고 화는 더 불안정하게 위축. 卯酉·寅申충은 몸 쪽, 子午·丑未충은 마음 쪽. 辰戌·巳亥충은 아직 미정(카드로 물음)
+const CHUNG_MEANING: Record<string, string> = {
+  子午: "수는 더 요동치고 화는 더 불안정하게 위축 — 마음 쪽 불안정", 丑未: "약해지기보다 더 날뜀 — 마음 쪽 불안정",
+  卯酉: "몸 쪽 불안정(다치거나 몸이 상하기 쉬움)", 寅申: "몸 쪽 불안정(다치거나 몸이 상하기 쉬움)",
+  // 카드 026 [합의·조건부 2026-10-15]: "진술충은 삶의 근본이 흔들릴 수 있기 때문에 축미충보다 강하고 마음도 움직인다. 사해충은 움직임과 마음. 사해충은 어쨌든 수극화이기 때문에 화가 위축되긴 하지만 자오충보다는 덜하다."
+  辰戌: "삶의 근본이 흔들릴 수 있음 — 丑未보다 강하고 마음도 움직임", 巳亥: "움직임(이동)과 마음 쪽 — 수가 화를 쳐 화가 위축되지만 子午보다는 덜함",
+};
+export const chungMeaning = (a: string, c: string): string => `불안정성이 커짐 — 좋은 것도 나쁜 것도 요동` + ((CHUNG_MEANING[a + c] ?? CHUNG_MEANING[c + a]) ? `, ${CHUNG_MEANING[a + c] ?? CHUNG_MEANING[c + a]}` : "") + " (카드 020)";
 const AREA = ["어린 시절 환경·부모", "사회 환경·직업", "배우자·생활 기반", "자녀·노년"];
 const GROUP_MEANING: Record<Group, string> = {
   비겁: "형제·친구·동료 관계가 두터움", 식상: "활동력, 아랫사람과의 관계", 재성: "재물 욕구, 사회적 관계망",
@@ -76,7 +87,7 @@ function hapCandidates(bs: B[]): Cand[] {
   for (const a of bs) for (const b of bs) {
     if (a.pos >= b.pos || YUKHAP[a.ch] !== b.ch) continue;
     const d = dist(a, b); if (d > 2) continue;
-    out.push({ 종류: "육합", members: [a, b], el: null, 단계: d === 1 ? "중" : "약", 왕: null, 근거: [d === 1 ? "인접" : "한 칸 떨어짐"] });
+    out.push({ 종류: "육합", members: [a, b], el: YUKHAP_EL[a.ch + b.ch] ?? null, 단계: d === 1 ? "중" : "약", 왕: null, 근거: [d === 1 ? "인접" : "한 칸 떨어짐", YUKHAP_EL[a.ch + b.ch] ? `${YUKHAP_EL[a.ch + b.ch]}이 강해짐 (카드 015)` : "巳申은 화·금이 대립 (카드 015)"] });
   }
   return out;
 }
@@ -143,7 +154,7 @@ export function relations(p: Pillars, b: Balance, y: Yongsin): Relations {
     return {
       이름: `${ch.a.ch}${ch.c.ch}충`, 글자: [ch.a.ch, ch.c.ch], 자리: [name(ch.a), name(ch.c)], 종류: ch.info.종류,
       기본강도: ch.info.기본, 강도, 풀림: 강도 === 0, 위축, 방향: 역전가능 ? "중립" : 방향, 역전가능,
-      생활기반충: 기반, 월령흔들림: 강도 > 0 && [ch.a, ch.c].some((m) => m.pos === 1), 영역: [AREA[ch.a.pos], AREA[ch.c.pos]], 개고태그, 근거: ch.근거,
+      생활기반충: 기반, 월령흔들림: 강도 > 0 && [ch.a, ch.c].some((m) => m.pos === 1), 영역: [AREA[ch.a.pos], AREA[ch.c.pos]], 개고태그, 근거: 강도 > 0 ? [...ch.근거, chungMeaning(ch.a.ch, ch.c.ch)] : ch.근거,
     };
   });
   const toHap = (c: Cand): Hap => ({
@@ -163,7 +174,7 @@ export function luckRelations(p: Pillars, luckGanji: string, b: Balance, y: Yong
   const bs = branchesOf(p); const L = luckGanji[1]; const pct = enginePct ?? b.판정용퍼센트; const 플래그: string[] = [];
   const 충 = bs.filter((x) => CHUNG[L]?.상대 === x.ch).map((x) => {
     const info = CHUNG[L]; const w = info.위축; const role = w ? y.오행역할[BRANCH_EL[w]] : null;
-    return { 상대: x.ch, 자리: name(x), 강도: SEAT[x.pos] - (info.종류 === "고지충" ? 1 : 0), 위축: w,
+    return { 상대: x.ch, 자리: name(x), 강도: SEAT[x.pos] - (info.종류 === "고지충" && !"辰戌".includes(L) ? 1 : 0), 위축: w,
       방향: !role ? "해당 없음" : "용희".includes(role) ? "불리" : "기구".includes(role) ? "유리" : "중립", 월령흔들림: x.pos === 1 };
   });
   const 합: LuckRelations["합"] = []; const has = (ch: string) => bs.some((x) => x.ch === ch);
@@ -177,10 +188,14 @@ export function luckRelations(p: Pillars, luckGanji: string, b: Balance, y: Yong
       합.push({ 종류: "반합", 글자: s.왕 + L, 단계: ok ? "중" : "불성립", 오행: s.el, 근거: ok ? `원국 ${s.el} ${Math.round(pct[s.el])}% ≥ 30` : `원국 ${s.el} ${Math.round(pct[s.el])}% < 30 → 운 글자는 본래 오행대로` });
     }
   }
+  for (const c of [...new Set(충.map((c) => c.상대))]) 플래그.push(`운 ${L}이 원국 ${c}와 충: ${chungMeaning(L, c)}`);   // 카드 020
   for (const x of bs) if (YUKHAP[L] === x.ch) {
-    합.push({ 종류: "육합", 글자: L + x.ch, 단계: "중", 오행: null, 근거: `${name(x)}와 육합 (세력 변화 없음)` });
+    const he = YUKHAP_EL[L + x.ch] ?? null;
+    합.push({ 종류: "육합", 글자: L + x.ch, 단계: "중", 오행: he, 근거: `${name(x)}와 육합 — ${he ? `${he}이 강해짐(묶임 아님)` : "巳申은 화·금 대립"} (카드 015)` });
     for (const c of natal.충) if (!c.풀림 && c.글자.includes(x.ch)) 플래그.push(`긴장이 풀리는 시기: 운 ${L}이 ${x.ch}와 합해 원국 ${c.이름}을 늦춤`);
   }
+  // S-08 보충 [카드 011 기각·조건부 2026-10-07]: 운 지지가 원국과 합해 기신·구신 오행을 키우면 "좋지 않은 점도 생기지만 이미 익숙한 기운이라 크게 달라지지 않음" → 점수는 그대로, 양면 플래그만
+  for (const h of 합) if (h.오행 && h.단계 !== "불성립") { const r = y.오행역할[h.오행]; if (r === "기" || r === "구") 플래그.push(`양면: 운 ${L}이 원국과 ${h.종류}(${h.글자})으로 ${h.오행}(${r}신)을 키움 — 좋지 않은 점도 생기나 이미 익숙한 기운이라 크게 달라지지 않음, 점수는 그대로 (카드 011)`); }
   if (충.some((c) => c.월령흔들림)) 플래그.push("월령 흔들림 (격국.md 파격 조건의 형충)");
   return { 충, 합: 합, 플래그 };
 }

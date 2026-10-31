@@ -4,6 +4,7 @@ import { test } from "vitest";
 import assert from "node:assert/strict";
 import {
   balance, yongsin, luck, luckRelations, relations, fromBirth, currentLuckContext, toCorePillars, monthGanjiList, yearGanji, type Pillars,
+  power, DEFAULT_POWER_METHOD, parsePillars,
 } from "../src/index";
 
 test("toCorePillars: 일기 앱 PillarsSnapshot(한자 stem/branch) → 코어 Pillars 튜플, 시주 null 유지", () => {
@@ -37,4 +38,14 @@ test("Y-11 월운 기대값(코어 birth.test.ts 마지막 케이스)을 luck()�
   assert.equal(verdict("戊戌"), "매우 유리");   // 용신 토 두 글자
   assert.equal(verdict("壬寅"), "어려움");     // 구신 수 + 기신 목
   assert.ok(luckRelations(p, "丁未", b, y, rel).충.some((c: any) => c.자리 === "월지"));   // 丑未충
+});
+
+// usable.test.ts에서 reading.ts 의존으로 뺀 카드 016·033 테스트 중 코어 함수만 쓰는 부분 (기대값은 코어 core/test/usable.test.ts @ 4f795ca 그대로)
+test("카드 016·033: 유료 풀이 기본 세력 방식 = 정기연속80엔진20 — 1995 乙亥 丙戌 己丑 辛未는 신강·용신 수, balance() 기본값은 정기 그대로", () => {
+  assert.equal(DEFAULT_POWER_METHOD, "정기연속80엔진20");
+  const p = parsePillars("乙亥 丙戌 己丑 辛未"); const m = balance(p, DEFAULT_POWER_METHOD);
+  assert.equal(m.신강약, "신강"); assert.equal(yongsin(p, m).용신오행, "수");   // 코어: r.섹션3_힘의지형.신강약.값 / r.섹션5_용신.용신.오행
+  assert.ok(Math.abs(m.판정용퍼센트.토 - (power(p, "정기연속").토 * 0.8 + power(p, "엔진분포").토 * 0.2)) < 0.06);
+  assert.deepEqual(balance(p), balance(p, "정기"));
+  const q = parsePillars("丁未 丁未 己丑 辛未"); assert.ok(power(q, "정기연속").토 > power(q, "정기").토, "붙은 토가 더 세짐 (카드 033)");
 });

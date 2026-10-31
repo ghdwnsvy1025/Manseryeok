@@ -13,30 +13,32 @@ const b = balance(p); const y = yongsin(p, b);
 luck(p, "庚申", b, y).판정;                  // "매우 유리" | "유리" | "보통" | "주의" | "어려움"
 ```
 
-검사: `npm test` (vitest, 47개) · `npm run typecheck`
+검사: `npm test` (vitest, 68개) · `npm run typecheck`
 
 ## 복사 출처
 
-- 사주 코어 커밋 **`240c91dbe54a60059d42b74148db88a31aebd16d`** ("카드 004~006", 2026-10-07), 2026-10-07 재복사. 그 전은 `ebf972d4c44c02f6f6bf01bbd4fa396b2d6907cc`(2026-10-05) — 이번에 바뀐 파일은 `yongsin.ts`·`extras.ts`와 새 파일 `usable.ts`·`version.ts`뿐이고 나머지는 ebf972d와 같다(코어에서 그 파일들이 안 바뀜).
-- 240c91d 뒤 코어 작업 트리에 **미커밋** 변경(Y-13 극단 비겁 · Y-14 운 비겁 무게 · J-05 조후 통합, `version.ts` "가설 009")이 있었으나 규칙 문서·가설 대장에 아직 반영되지 않은 진행 중 작업이라 **가져오지 않았다**. 커밋되면 다시 복사.
-- 코어의 `core/vendor/manseryeok/ORIGIN.txt`는 엔진 커밋 `e57449c`(2026-09-16) 기준 복사본이라고 적혀 있습니다. 현재 `@saju/engine`과의 차이는 아래 "엔진 차이" 참고.
+- 사주 코어 커밋 **`4f795caaff12b331779feacbc2f4a49caa24c211`** ("Y-06 보충: 신약에 인성 용신이면 희신 = 비겁, 한신 = 관성", 2026-10-18), 2026-10-31 재복사. 이번에 바뀐 파일은 `yongsin.ts`·`relations.ts`·`usable.ts`·`extras.ts`·`version.ts`와 `test/usable.test.ts`뿐이고(첫 줄 주석 `@ 4f795ca`), 나머지는 240c91d·ebf972d와 같다(코어 `core/src`에서 그 파일들이 안 바뀜 — `git diff 240c91d 4f795ca -- core/src`로 확인). 이론 버전 `THEORY_VERSION` = "가설 035까지 반영 + Y-06 보충 (2026-10-18)".
+- 그 전 복사: `240c91dbe54a60059d42b74148db88a31aebd16d`("카드 004~006", 2026-10-07), 그 전 `ebf972d4c44c02f6f6bf01bbd4fa396b2d6907cc`(2026-10-05). 240c91d 때 미커밋이라 빼 두었던 Y-13 극단 비겁 · Y-14 운 비겁 무게 · J-05 조후 통합은 이번에 커밋된 판으로 들어왔다.
+- 코어 작업 트리의 미커밋 변경은 `content/`·`server/`·`core/cli.ts`·`docs/`뿐이고 `core/src`에는 없다(2026-10-31 확인).
+- 코어의 `core/vendor/manseryeok/ORIGIN.txt`는 이제 엔진 커밋 `3d887c2`(ENGINE_VERSION 1.1.0, 2026-10-15) 복사본이라고 적혀 있습니다. 4f795ca의 `yongsin.ts`가 새로 쓰는 `vendor/manseryeok/elementDistribution.ts`는 `@saju/engine`의 같은 파일과 import 확장자(`.ts`)만 다릅니다. 아래 "엔진 차이"는 예전(e57449c) vendor 기준으로 쓴 것.
 
 | 이 패키지 파일 | 원본 | 바꾼 점 |
 |---|---|---|
 | `src/base.ts` | `core/src/base.ts` | import 경로의 `.ts` 확장자 제거만 |
-| `src/yongsin.ts` | `core/src/yongsin.ts` | 같음 (240c91d: Y-08 전왕표·`isCollapsed` 제거, Y-12 관성 보조 가중) |
-| `src/relations.ts` | `core/src/relations.ts` | 같음 |
+| `src/yongsin.ts` | `core/src/yongsin.ts` | `.ts` 제거 + `../vendor/manseryeok/elementDistribution.ts` → `@saju/engine` (`calculateElementDistribution`, 세력방식 "엔진분포"). 4f795ca: 세력 방식 `PowerMethod`·`DEFAULT_POWER_METHOD`(카드 016·033), Y-06 보충, 신약 관성 운(카드 014·019·031), Y-13~15, 카드 013 천간합, J-05 조후 통합, 반동 플래그(카드 021·025). 240c91d: Y-08 전왕표 제거, Y-12 관성 보조 가중 |
+| `src/relations.ts` | `core/src/relations.ts` | 같음 (4f795ca: 육합 오행 카드 015, 충 뜻 `chungMeaning` 카드 020·026, 辰戌충 기본 3, 운 합의 양면 플래그 카드 011) |
 | `src/structure.ts` | `core/src/structure.ts` | 같음 |
 | `src/gyeokguk.ts` | `core/src/gyeokguk.ts` | 같음 |
-| `src/extras.ts` | `core/src/extras.ts` | 같음 (240c91d: `Johu`에 `극단`·`조후용신`·`활력` J-04) |
-| `src/usable.ts` | `core/src/usable.ts` | 같음 (240c91d 신규: Y-12 `usable()`·K-09 `tzoneCombo()`) |
-| `src/version.ts` | `core/src/version.ts` | 같음 (240c91d 신규: `THEORY_VERSION`) |
+| `src/extras.ts` | `core/src/extras.ts` | 같음 (4f795ca: J-05 글자 온도 `LETTER_TEMP`·`letterTemp`. 240c91d: `Johu`에 `극단`·`조후용신`·`활력` J-04) |
+| `src/usable.ts` | `core/src/usable.ts` | 같음 (4f795ca: `tzoneCombo(p, T, b)` 셋째 인자, T존 관성+인성·식상+재성·재성+관성. 240c91d 신규: Y-12 `usable()`·K-09 `tzoneCombo()`) |
+| `src/version.ts` | `core/src/version.ts` | 같음 (`THEORY_VERSION`) |
 | `src/areas.ts` | `core/src/areas.ts` | 같음 |
 | `src/keywords.ts` | `core/src/keywords.ts` | `.ts` 제거 + `import KWJSON from "../../규칙/키워드.json" with { type: "json" }` → `import KWJSON from "./data/키워드"` (import attributes 대신 `.ts` 상수) |
 | `src/birth.ts` | `core/src/birth.ts` | `.ts` 제거 + `../vendor/manseryeok/{calculator,lunarConverter,solarTerms}.ts` → `@saju/engine` (`calculateSaju`·`lunarToSolar`·`getSolarTermKSTIso`, 시그니처 동일 → 어댑터 불필요) |
 | `src/data/키워드.json` | `규칙/키워드.json` | 그대로 복사 (대조용) |
 | `src/data/키워드.ts` | `규칙/키워드.json` | JSON 본문을 `const 키워드 = {...}; export default 키워드;` 로 감쌈. `test/data.test.ts`가 `.json`과 deepEqual 로 대조 |
 | `test/{yongsin,structure,relations,gyeokguk,extras,birth,usable}.test.ts` | `core/test/…` | `import test from "node:test"` → `import { test } from "vitest"`, `.ts` 제거. `node:assert/strict` 와 기대값은 그대로 |
+| `test/usable.test.ts` | `core/test/usable.test.ts` @ 4f795ca | 위와 같고, `reading.ts`(옮기지 않음)의 `readFromPillars`·`readFromBirth`를 쓰는 테스트 8개(카드 022·024 해기준, 024 의지·사건, 023·030·033 겉모습, 016 풀이 세력 방식, 027·028, 029 고집)를 뺌 → 그중 코어 함수만 쓰는 부분(016·033)은 `test/adapters.test.ts` 마지막 테스트로 옮김 |
 | `test/areas.test.ts` | `core/test/areas_gunghap.test.ts` | 위와 같고, `gunghap.ts`를 옮기지 않아 궁합 테스트 2개(gunghap·iljuPair) 제거 |
 | `test/birth.test.ts` | `core/test/birth.test.ts` | 마지막 케이스("Y-11 월운이 판정에 붙고 …")는 `reading.ts` 의존이라 제거 → 같은 기대값을 `test/adapters.test.ts`에서 `luck()`·`luckRelations()`로 직접 확인 |
 | `test/fixtures/expected_42.json` | `core/test/fixtures/expected_42.json` | 그대로 |
@@ -45,13 +47,15 @@ luck(p, "庚申", b, y).판정;                  // "매우 유리" | "유리" |
 
 - `core/src/reading.ts` — 8개 섹션을 묶는 조립 층. 그중 "기준일로 현재 대운·세운 고르기"만 `src/adapters/luckContext.ts`로 뗐습니다.
 - `core/src/gunghap.ts` — 궁합. 일기 앱에 필요 없음.
+- `core/src/outward.ts` — K-10 겉모습·숨은 고집(카드 023·029·030). `reading.ts` 섹션1에서만 씀.
+- `core/test/manseryeok-shared.test.ts` — 만세력 공통 회귀 표. 원본이 엔진의 `test/fixtures/shared-cases.json`이라 엔진 쪽 테스트로 갈음.
 - `core/cli.ts`, `core/vendor/manseryeok/` — `@saju/engine`으로 대체.
 
 ### 원본 아님 (이 패키지에서 새로 쓴 것)
 
 | 파일 | 내용 |
 |---|---|
-| `src/index.ts` | export 진입점 |
+| `src/index.ts` | export 진입점 (2026-10-31: `power`·`PowerMethod`·`DEFAULT_POWER_METHOD`·`POWER_METHODS` 추가) |
 | `src/adapters/pillars.ts` | `toCorePillars(snapshot): Pillars` — 일기 앱 `PillarsSnapshot`({year,month,day,hour?: {stem, branch}} 한자) → 코어 `Pillars` (`[연, 월, 일, 시 \| null]` 간지 문자열). `apps/diary/src/lib/profile.ts`에 의존하지 않고 구조만 따름 |
 | `src/adapters/luckContext.ts` | `currentLuckContext(birth, 기준일): LuckContext` — `reading.ts` 37·52~56행의 고르기 규칙을 그대로: 현재 대운 = `시작일 ≤ 기준일 < 끝일`; 첫 대운 전이면 순서 0·간지는 월주; 세운 = 기준일 양력 연도와 다음 해(`yearGanji`); 월운 = `monthGanjiList(기준일, 1)[0]`. **유불리 판정은 하지 않음** |
 | `test/adapters.test.ts`, `test/data.test.ts` | 어댑터·데이터 대조 테스트 |
@@ -78,7 +82,9 @@ luck(p, "庚申", b, y).판정;                  // "매우 유리" | "유리" |
 - **라벨의 천장** (`용신.md` 173~174행): 강사는 운 글자와 원국 글자의 개별 상호작용(용신이 극당함, 희신이 과함, 소운별 갈림)을 보는데 라벨만으로는 못 잡습니다. 그래서 점수와 별개로 **플래그**를 같이 냅니다 (`용신.md` 176~181행): `용신 손상`, 운 지지–원국 지지 충(`충.md` C-08), 운으로 합 성립(`삼합.md` S-08), 개두·절각(`운 내부 상충`). 코드는 `luckRelations()`·`gyeokInLuck()`. 플래그는 점수에 넣지 않습니다.
 - **Y-08 균형붕괴·전왕표는 제거됨** (코어 240c91d, `용신.md` 12절 "Y-08 균형붕괴·전왕표 — 제거 [사용자 결정 2026-10-07]"): 운은 항상 라벨 점수. `isCollapsed()`·`방식: "전왕표"`는 더 이상 없습니다.
 - **Y-12 쓰는 기운·관성 보조** (`용신.md` 11절, 코어 240c91d): 비겁이 1순위 중심인 신강 사주에서 **관성 운은 라벨이 "한"인 채 점수만 희신급(1, 천간 ×1.5)**. 인성이 앞서는 인비 혼합이면 비겁 비율만큼(0.5+0.5×비겁/(비겁+인성)), 그때 합계가 0 근처(|합계|<0.5)면 판정 "보통". `luck()` 플래그 "관성은 보조 용신 — … (Y-12)"로 알 수 있습니다. 일기 앱의 "한·한 → 보통" 후처리는 이 글자를 빼야 합니다(코어 규칙 우선). `usable(p, b)`는 공식 용신 옆의 "쓰는 기운"(신강·중화: 원국의 식·재·관, 신약: 비겁·인성)을 세기와 함께 냅니다 — 일운 판정에는 쓰지 않습니다.
-- **J-04 조후 극단** (`조후.md`, 코어 240c91d): `johu()`가 `극단`(|점수|≥6 [가설])·`조후용신`·`활력`을 냅니다. 240c91d 시점에는 운 판정(Y-09)에 반영하지 않습니다(충돌 카드 009 → 코어 미커밋 J-05가 다룸).
+- **J-04·J-05 조후 극단** (`조후.md`): `johu()`가 `극단`(|점수|≥6 [가설])·`조후용신`·`활력`을 냅니다. 4f795ca부터는 극단이면 `luck()`이 운 글자의 온도(`LETTER_TEMP`)를 억부 점수에 더합니다(J-05, 플래그 "J-05 조후 통합").
+- **세력 방식** (코어 4f795ca, 카드 016·033): 유료 풀이(`readFromPillars`)는 `balance(p, DEFAULT_POWER_METHOD)` = "정기연속80엔진20"으로 신강약·중심·용신을 정합니다. `balance(p)`의 기본값은 비교·테스트용 "정기" 그대로라, `balance(p)`를 부르면 유료 풀이와 원국 판정이 일부 다릅니다(2026-10-31 표본 505명: 용신 오행 7%, 신강약 8.5%). 일기 앱은 운세 v4.18부터 `balance(p, DEFAULT_POWER_METHOD)`를 씁니다(`apps/diary/src/lib/fortune/core.ts`·`lib/saju/chart.ts`). 시간 모름의 12시주(`unknownHour`, 유료 풀이의 시주 고르기)는 코어도 `balance(q)` 기본값 "정기"입니다.
+- **4f795ca에서 운 점수가 바뀌는 규칙**: Y-06 보충(신약·인성 용신 → 희신 비겁, 한신 관성) · Y-12 신약(같은 경우 비겁 운 희신급, 플래그 "(Y-12 신약, 카드 012)" — 일기 앱의 `includes("(Y-12)")`와는 겹치지 않음) · 신약의 관성 운(카드 014·019·031: 원국에 관성 없으면 희신급, 아니면 일간 음양 × 편관·정관으로 −0.5~−2) · Y-13 극단 비겁 · Y-14 운 비겁 무게 · Y-15 군겁쟁재 · 카드 013 운 천간이 원국 비겁과 합이면 절반 · J-05. 플래그만 붙는 것: 카드 020 충 뜻, 021·025 신강 관성 운 반동, 011 양면.
 - **Y-11 월운 = Y-09를 달마다 적용 [가설·검증 없음]** (`용신.md` 196~201행): 달은 양력 1일이 아니라 **절입**에 바뀜(`monthGanjiList`). **확신도는 항상 "낮음"**, 글에서는 "가볍게 참고"라고 밝힐 것. 일운은 코어에 아직 규칙이 없고(`00_읽는법.md` 22행 "(예정) Y-09를 월·일 단위로 확장 — 아직"), 월운과 같은 지위로 보는 것이 맞습니다.
 - **영역별 기간 신호** (`영역.md` 179~181행): = (그 영역을 건드리는 운 글자의 Y-09 점수) + (그 영역의 주 재료 글자가 운에서 충·합을 맞는지 플래그). **"월운·일운은 노트에 근거가 거의 없습니다 → 같은 방식을 적용하되 확신도는 항상 '낮음'"**. 0~100 점수화는 전부 [가설]이므로 코어는 **5단계 라벨**까지만 내고 숫자화는 컨텐츠 층의 일. Y-09 일치율이 71%이므로 영역별 기간 신호의 확신도는 그보다 높을 수 없습니다. `luckAreas(l, "일운")`이 이미 단위 인자를 받습니다 (`areas.ts` E-11).
 - **세운 연도 주의** (`reading.ts` 37행, `adapters/luckContext.ts`): 코어는 기준일의 양력 연도로 `yearGanji`를 뽑습니다. 입춘(2월 4일 무렵) 전 1~2월은 전년 간지가 맞을 수 있으니 일운에 세운을 붙일 때 호출 쪽에서 판단해야 합니다.

@@ -1,4 +1,4 @@
-// 원본: 사주 코어 core/src/usable.ts @ 240c91dbe54a60059d42b74148db88a31aebd16d (2026-10-07 복사, 이전 ebf972d). 판정 로직 수정 금지 — 바꾸려면 코어에서 먼저 바꾸고 다시 복사.
+// 원본: 사주 코어 core/src/usable.ts @ 4f795caaff12b331779feacbc2f4a49caa24c211 (2026-10-31 복사, 이전 240c91d). 판정 로직 수정 금지 — 바꾸려면 코어에서 먼저 바꾸고 다시 복사.
 // 규칙/용신.md Y-12 쓰는 기운(억부 보조) · 규칙/구조.md K-09 T존 조합
 // 2026-10-07 이론 확답 루프 카드 001·002·003·006 [합의] — 사용자 확답 원문은 규칙/가설대장.md
 //
@@ -13,7 +13,7 @@
 //   - 플래그는 길흉이 함께 드러난다는 뜻이지 빼라는 뜻이 아니다(군겁쟁재, 식상-관성 맞닿음, 도식).
 // 숫자(가중·점수)는 전부 [가설] — 사람이 확답할 수 없는 값이라 서비스 응답으로만 고친다.
 import { type Pillars, type Group, type Element, type Node, nodesOf, adjacent, isDayStem, nodeName, tenGod, mainStem, groupMap } from "./base";
-import type { Balance } from "./yongsin";
+import { type Balance, balance } from "./yongsin";
 import type { TzoneItem } from "./structure";
 
 export type UsableItem = { 글자: string; 자리: string; 십신: string; 그룹: Group; 오행: Element; 세기: number; 근거: string[]; 플래그: string[] };
@@ -83,8 +83,8 @@ function weakUsable(p: Pillars, b: Balance): Usable {
 }
 
 export type TzoneCombo ={ 조합: Group[]; 태그: string; 양면?: string };
-/** K-09 T존 조합 — 합의된 조합만 (카드 001) */
-export function tzoneCombo(p: Pillars, T: TzoneItem[]): TzoneCombo[] {
+/** K-09 T존 조합 — 합의된 조합만 (카드 001 식상+인성, 032 관성+인성, 034 식상+재성, 035 재성+관성) */
+export function tzoneCombo(p: Pillars, T: TzoneItem[], b: Balance = balance(p)): TzoneCombo[] {
   const inEl = groupMap(p[2][0]).toElement.인성;
   const sik = T.filter((t) => t.그룹 === "식상"), ins = T.filter((t) => t.그룹 === "인성");
   const out: TzoneCombo[] = [];
@@ -93,5 +93,25 @@ export function tzoneCombo(p: Pillars, T: TzoneItem[]): TzoneCombo[] {
     out.push({ 조합: ["식상", "인성"], 태그: "배운 것을 말이나 결과물로 꺼내는 재능이 있되, 꺼내기 전에 오래 고름",
       ...(pressed.length ? { 양면: `${pressed.map((t) => t.자리).join("·")}의 식상을 인성이 바로 누름 — 고르는 재능이 막힘으로 드러날 수 있음(길흉 함께)` } : {}) });
   }
+  // 카드 032 [합의 2026-10-17, 답을 고쳐 씀]: "(1) 맞다. 관성의 극을 인성으로 잘 흐르게 해 주기 때문에 관성의 긍정성을 살리게 된다 — 직장에서 윗사람들에게 이쁨을 받고 성실하다는 평가.
+  //   (2) 신약에서는 마음의 여유가 생기고 뒤를 돌아보게 되면서 충전하게 된다. 신강에서는 너무 생각이 많아지니까 답답해지고 시작이 느려진다. (3) 편관 편인이면 편인의 느낌이 더 살아서 독특한 형태로 된다."
+  const gwan = T.filter((t) => t.그룹 === "관성");
+  if (gwan.length && ins.length) {
+    const odd = gwan.some((t) => t.십신 === "편관") && ins.some((t) => t.십신 === "편인");
+    out.push({ 조합: ["관성", "인성"], 태그: "관성의 압박을 인성이 잘 흐르게 해 관성의 좋은 면이 살아남 — 책임을 배움으로 소화하고, 윗사람에게 이쁨받고 성실하다는 평가를 받음"
+      + (b.신강약 === "신약" ? " · 신약이라 마음의 여유가 생기고 뒤를 돌아보며 충전함" : b.신강약 === "신강" ? "" : "")
+      + (odd ? " · 편관·편인이라 편인의 결이 더 살아 독특한 모양으로 드러남" : ""),
+      ...(b.신강약 === "신강" ? { 양면: "신강이라 생각이 너무 많아져 답답하고 시작이 느려질 수 있음" } : {}) });
+  }
+  // 카드 034 [합의·조건부 2026-10-17]: "식상생재는 꼭 말과 아이디어뿐만 아니라 모든 사회활동들을 그냥 혼자 보람차서 하는 것 이상으로 결과물을 만드는 것을 목표를 두는 성향이다.
+  //   신약이면 그것이 너무 과하기 때문에 번아웃이 오거나 한곳에 집중 못하니 결과물이 분산되서 오히려 안 좋을 수도 있다."
+  if (sik.length && T.some((t) => t.그룹 === "재성"))
+    out.push({ 조합: ["식상", "재성"], 태그: "하는 일마다 혼자 보람으로 끝내지 않고 결과물을 만드는 것을 목표로 둠(식상생재)",
+      ...(b.신강약 === "신약" ? { 양면: "신약이라 그 욕심이 과해 번아웃이 오거나, 한곳에 집중하지 못해 결과물이 흩어질 수 있음" } : {}) });
+  // 카드 035 [합의·조건부 2026-10-17]: "재성관성이 있으면 사회생활에 매우 유리하다. 성과도 있고 명예욕도 있기 때문에 서로 시너지가 나서 부스터가 생긴다.
+  //   신약이면 신경쇠약에 번아웃이 올 수 있고 책임감이 압박과 부담감으로 작용할 수 있다."
+  if (T.some((t) => t.그룹 === "재성") && T.some((t) => t.그룹 === "관성"))
+    out.push({ 조합: ["재성", "관성"], 태그: "사회생활에 매우 유리함 — 성과를 내려는 마음과 명예를 바라는 마음이 서로 밀어 줘 힘이 붙음(재생관)",
+      ...(b.신강약 === "신약" ? { 양면: "신약이라 신경이 닳고 번아웃이 올 수 있으며, 책임감이 압박과 부담으로 작용할 수 있음" } : {}) });
   return out;
 }

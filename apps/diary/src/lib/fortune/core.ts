@@ -15,11 +15,15 @@
 //   v4.4 (운세 글 — 오늘만, 00-톤.md v3.6): 대운·세운·월운 판정 문장과 대운 플래그 문장은 facts에서 빼고 contextFacts(근거 표시용, 항상)로 옮긴다.
 //        facts에는 바뀌는 날에만 한 문장 — (a) 월운이 바뀐 날(절기 입절일 = monthGanjiList 시작일) 이달 운, (b) 입춘일 올해 운, (c) 대운 교체일(현재 대운 시작일) 10년 운,
 //        (d) 운↔일진 충(최고경보 포함)이 있는 날 그 운. 점수·영역·context 데이터는 그대로.
+//   v4.18 (코어 4f795ca, 2026-10-31 동기화): 원국 세력은 유료 풀이와 같은 DEFAULT_POWER_METHOD("정기연속80엔진20", 카드 016·033)로 센다 — 무료 만세력·운세·유료 풀이의 용신이 같게.
+//        시간 모름의 12시주 다수결(resolveYongsin)은 유료 풀이(readFromPillars)처럼 시주마다 balance(q) 기본값 "정기" 그대로.
+//        새 코어 규칙(Y-06 보충, 신약 관성 운 카드 014·019·031, Y-13~15, 카드 013, J-05)은 luck() 안에서 적용되고 어댑터는 그대로.
 //
 // 모델 호출은 없다. 문장은 쓰지 않고(facts는 글 재료) 숫자는 영역에 만들지 않는다(코어: 일운 확신도 "낮음").
 import type { TenGod } from "@saju/engine";
 import { getSolarTermKSTIso, getTenGod, type StemHanja } from "@saju/engine";
 import {
+  DEFAULT_POWER_METHOD,
   balance,
   currentLuckContext,
   fromBirth,
@@ -217,7 +221,7 @@ export function computeCoreFortune(input: CoreInput): CoreFortune {
   const p = toCorePillars(input.pillars);
   const dayStem = p[2][0]!;
   const g = input.todayHanja;
-  const b = balance(p);
+  const b = balance(p, DEFAULT_POWER_METHOD); // v4.18: 유료 풀이와 같은 세력 방식
   const caveats: string[] = [];
   const facts: string[] = [];
 
