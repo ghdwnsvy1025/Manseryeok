@@ -65,10 +65,20 @@ beforeEach(() => {
 describe("fortuneVoteAction", () => {
   test("1·-1은 그대로 upsert", async () => {
     await fortuneVoteAction(form({ date: "2026-10-08", vote: "1" }));
-    expect(calls).toEqual([{ op: "upsert", table: "night_fortune_feedback", row: { user_id: "u-1", fortune_date: "2026-10-08", vote: 1 } }]);
+    // 맞아요로 바꾸면 "아니에요"의 이유는 지운다 (2026-10-31)
+    expect(calls).toEqual([{ op: "upsert", table: "night_fortune_feedback", row: { user_id: "u-1", fortune_date: "2026-10-08", vote: 1, reason: null } }]);
     calls.length = 0;
     await fortuneVoteAction(form({ date: "2026-10-08", vote: "-1" }));
     expect(calls[0]!.row).toMatchObject({ vote: -1 });
+    expect(calls[0]!.row).not.toHaveProperty("reason");
+  });
+
+  test("아니에요의 이유: 목록 안 값만 저장, 목록 밖이면 null", async () => {
+    await fortuneVoteAction(form({ date: "2026-10-08", vote: "-1", reason: "obvious" }));
+    expect(calls[0]!.row).toMatchObject({ vote: -1, reason: "obvious" });
+    calls.length = 0;
+    await fortuneVoteAction(form({ date: "2026-10-08", vote: "-1", reason: "nope" }));
+    expect(calls[0]!.row).toMatchObject({ vote: -1, reason: null });
   });
 
   test("\"0\"이면 그 날짜의 피드백 행을 지운다", async () => {

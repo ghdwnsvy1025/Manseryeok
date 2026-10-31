@@ -1,9 +1,11 @@
 // 오늘의 운세 — 계산, 문장, 캐시를 한 곳에서.
 // 1) 사용자(또는 게스트 지문) × 날짜 캐시가 있으면 그대로 준다.
-// 2) 없으면 코어 판정(v4: core.ts) → 10점 환산 → 내 기록 보정 → 글(3단계 llm.ts: 모델 → 검사 → 재작성 1회 → 템플릿) → 캐시에 쓴다.
+// 2) 없으면 코어 판정(v4: core.ts) → 10점 환산 → 내 기록 보정 → 글(3단계 llm.ts: 계획 → 초안 → 검사 → 걸린 문장만 수리 → 템플릿) → 캐시에 쓴다.
+// v4.19: content.metrics에 시간·호출·토큰을 남긴다(본문은 로그에 따로 남기지 않는다). 영역 신호는 코어 것 전부(areaSignals), 모델 문장은 areaNarratives.
 // v3의 computeBaseFortune(base.ts)은 더 쓰지 않는다 (백테스트·테스트가 참조하므로 파일은 둔다).
-import { visibleAreas } from "./visible";
-import { recentFromRows, type RecentFortune, daySeed } from "./brief";
+import { composeAreas } from "./visible";
+import { buildBrief, recentFromRows, type RecentFortune, daySeed } from "./brief";
+import { planSummary } from "./plan";
 import "server-only";
 import { createHash } from "node:crypto";
 import { ENGINE_VERSION } from "@saju/engine";
@@ -13,15 +15,15 @@ import { dayGanji } from "../ganji";
 import type { BirthProfile, PillarsSnapshot } from "../profile";
 import { addDays, parseYmd } from "../time";
 import { computeCoreFortune } from "./core";
-import { generateFortuneText } from "./llm";
+import { generateFortuneText, PROMPT_VERSION, type GenerateResult } from "./llm";
 import { adjustWithEntries, bandOf, fitPercent, toTenPoint, type EntryLike } from "./personal";
 import { templateInputFromCore, templateText } from "./text";
-import type { FortuneContent } from "./types";
+import type { FortuneContent, FortuneMetrics } from "./types";
 import { dailyCap, regenPolicy, retryAfterFor, usableCachedContent } from "./policy";
 export { REGEN_LIMIT, TRANSIENT_RETRY_MS, dailyCap, regenCountOf, regenPolicy, retryAfterFor, usableCachedContent } from "./policy";
 
 /** 캐시 지문에 들어간다. 올리면 기존 캐시가 전부 무효 */
-export const FORTUNE_VERSION = "v4.18";
+export const FORTUNE_VERSION = "v4.19";
 
 export type FortuneOwner = { userId: string; guestKey?: undefined } | { guestKey: string; userId?: undefined };
 
@@ -115,7 +117,7 @@ async function getTodayFortuneUncached(req: FortuneRequest): Promise<FortuneCont
       .lt("fortune_date", req.date)
       .order("fortune_date", { ascending: false })
       .limit(14);   // v4.16: 태그 7일·제목 14일
-    recent = recentFromRows((data ?? []) as { fortune_date: string; content: { headline?: string; body?: string; stage?: string; tags?: FortuneContent["tags"] } | null }[]);
+    recent = recentFromRows((data ?? []) as Parameters<typeof recentFromRows>[0]);
     // v4.9: 그날 누른 "맞아요/아니에요"를 붙인다 (로그인 사용자만)
     if (recent.length && req.owner.userId) {
       const { data: votes } = await sb
@@ -174,13 +176,18 @@ async function getTodayFortuneUncached(req: FortuneRequest): Promise<FortuneCont
 }
 
 /** 캐시 없이 계산만. 테스트와 미리보기용 */
-export async function computeFortune(req: Omit<FortuneRequest, "owner"> & { recent?: RecentFortune[] }, opts: { useModel?: boolean } = {}): Promise<FortuneContent> {
+export async function computeFortune(
+  req: Omit<FortuneRequest, "owner"> & { recent?: RecentFortune[] },
+  opts: { useModel?: boolean; generate?: typeof generateFortuneText } = {},
+): Promise<FortuneContent> {
+  const t0 = Date.now();
   const p = parseYmd(req.date);
   if (!p) throw new Error(`잘못된 날짜: ${req.date}`);
   const today = dayGanji(req.date);
 
   const core = computeCoreFortune({ pillars: req.pillars, profile: req.profile, date: req.date, todayHanja: today.hanja });
   const personal = adjustWithEntries(core.parts.score01, req.entries, { index: today.index, stemKo: today.stemKo, branchKo: today.branchKo });
+  const coreMs = Date.now() - t0;
   const score10 = toTenPoint(personal.score);
   const todayInfo = { ko: today.ko, hanja: today.hanja, stemKo: today.stemKo, branchKo: today.branchKo };
   const weekday = WEEKDAYS[new Date(Date.UTC(p.year, p.month - 1, p.day)).getUTCDay()]!;
@@ -188,33 +195,41 @@ export async function computeFortune(req: Omit<FortuneRequest, "owner"> & { rece
   const tmplInput = { ...templateInputFromCore(core), seed: daySeed(req.date) };
   const fallback = templateText(tmplInput, personal, todayInfo);
   const band = bandOf(score10);
-  let text = fallback;
-  let source: FortuneContent["source"] = "template";
-  let attempts = 0;
-  let model: string | undefined;
-  let usage: FortuneContent["usage"];
-  let transient: FortuneContent["transient"];
-  let stage: string | undefined;
-  let tags: FortuneContent["tags"];
-  let judge: FortuneContent["judge"];
+  const briefInput = { core, personal, today: todayInfo, date: req.date, weekday, score10, band, recent: req.recent ?? [] };
   const useModel = opts.useModel ?? Boolean(process.env.ANTHROPIC_API_KEY);
+  let r: GenerateResult | null = null;
+  let transient: FortuneContent["transient"];
+  let failWhy: string | undefined;
   if (useModel) {
     try {
-      const r = await generateFortuneText({ core, personal, today: todayInfo, date: req.date, weekday, score10, band, recent: req.recent ?? [] }, fallback);
-      text = r.text;
-      source = r.source;
-      attempts = r.attempts;
-      if (r.model) model = r.model;
-      if (r.attempts > 0) usage = r.usage;
+      r = await (opts.generate ?? generateFortuneText)(briefInput, fallback);
       transient = r.transient;
-      stage = r.stage;
-      tags = r.tags;
-      judge = r.judge;
     } catch (e) {
       console.warn("운세 글 생성 실패, 템플릿 사용:", e instanceof Error ? e.message : e);
       transient = "api";
+      failWhy = "error";
     }
   }
+  const llm = r?.source === "llm" ? r : null;
+  const text = llm ? llm.text : fallback;
+  const source: FortuneContent["source"] = llm ? "llm" : "template";
+
+  // 영역: 신호는 코어 것 전부(모델이 지울 수 없음), 문장은 모델 것(계획이 고른 영역) — 템플릿이면 템플릿 줄
+  const areaSignals = core.areas.map((a) => ({ period: a.period, area: a.area, signal: a.signal, why: a.why }));
+  const areaNarratives = llm ? llm.areaNarratives ?? [] : (fallback.areas ?? []).map((a) => ({ period: a.period, area: a.area, text: a.line }));
+  const areas = composeAreas(areaSignals, areaNarratives, core.facts);
+  const calls = r?.metrics.calls ?? [];
+  const usage = r && calls.length ? r.usage : undefined;   // 템플릿으로 떨어져도 그때까지 쓴 토큰은 남긴다
+  const metrics: FortuneMetrics = {
+    promptVersion: PROMPT_VERSION,
+    totalMs: Date.now() - t0,
+    coreMs,
+    briefMs: r?.metrics.briefMs ?? 0,
+    calls,
+    firstPass: r?.metrics.firstPass ?? false,
+    ...(llm ? {} : { fallback: failWhy ?? r?.metrics.fallback ?? (useModel ? "unresolved" : "no_model") }),
+  };
+  const plan = r?.plan ?? planSummary(buildBrief(briefInput).plan);
 
   return {
     version: "v4",
@@ -225,17 +240,21 @@ export async function computeFortune(req: Omit<FortuneRequest, "owner"> & { rece
     band,
     headline: text.headline,
     body: text.body,
+    ...(llm?.bodySentences ? { bodySentences: llm.bodySentences } : {}),
     do: text.do,
     dont: text.dont,
-    ...(text.areas ? { areas: visibleAreas(text.areas, core.facts, { all: source === "llm" }) } : {}),
+    ...(areas.length ? { areas } : {}),
+    areaSignals,
+    areaNarratives,
+    keywords: core.keywords,
     source,
-    attempts,
-    ...(model ? { model } : {}),
+    attempts: r?.attempts ?? 0,
+    ...(llm ? { model: llm.model! } : {}),
     ...(usage ? { usage } : {}),
     ...(transient ? { transient } : {}),
-    ...(stage ? { stage } : {}),
-    ...(tags ? { tags } : {}),
-    ...(judge ? { judge } : {}),
+    ...(llm?.tags ? { tags: llm.tags } : {}),
+    plan,
+    metrics,
     core,
     personal,
     fitPercent: fitPercent(req.entries.length),

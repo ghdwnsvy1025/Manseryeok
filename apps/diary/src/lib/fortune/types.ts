@@ -30,8 +30,15 @@ export interface PersonalAdjustment {
   sameGanjiMean: number | null;
   /** 기록이 점수에 미친 비중 0~1 */
   weight: number;
-  /** 보정 뒤 점수 0~1 */
+  /** 보정 뒤 점수 0~1. v4.19: base + shift */
   score: number;
+  /**
+   * v4.19: 기록이 점수를 실제로 움직인 양(0~1 눈금, ±0.08 = ±0.8점). 전체 기록 평균 대비 편차만 쓴다 —
+   * clamp(weight × (mean − overallMean) / 9, −0.08, +0.08). 전체 기록 10개 미만 또는 같은 성분 3개 미만이면 0. 옛 캐시엔 없다
+   */
+  shift?: number;
+  /** v4.19: 전체 기록의 평균 행복도 (1~10). 기록이 없으면 null. 옛 캐시엔 없다 */
+  overallMean?: number | null;
 }
 
 // ---------------- v4: 사주 코어 판정 (docs/FORTUNE_V4.md) ----------------
@@ -123,6 +130,47 @@ export interface CoreFortune {
   parts: { raw: number; rel: number; ctx: number; score01: number };
 }
 
+/** v4.19: 모델 호출 한 번의 측정 */
+export interface FortuneCallMetric {
+  kind: "draft" | "patch" | "rewrite";
+  /** 이 호출의 모델 */
+  model?: string;
+  ms: number;
+  input: number;
+  output: number;
+  cacheRead: number;
+  cacheWrite: number;
+  /** 이 호출의 결과를 검사했을 때 남은 이슈 코드 (통과면 빈 배열). 호출이 실패하면 ["api"]·["json"]·["truncated"]·["refusal"] */
+  issueCodes: string[];
+}
+
+/** v4.19: 한 편을 만드는 데 든 시간·호출. 본문은 넣지 않는다 */
+export interface FortuneMetrics {
+  /** 프롬프트 판본 ("v4.19-1a2b3c4d" = 버전 + SYSTEM·스키마 지문) */
+  promptVersion: string;
+  totalMs: number;
+  /** 코어 판정 + 내 기록 보정 */
+  coreMs: number;
+  /** 계획(plan.ts) + brief */
+  briefMs: number;
+  calls: FortuneCallMetric[];
+  /** 첫 초안이 수리 없이 검사를 통과했는가 */
+  firstPass: boolean;
+  /** 템플릿으로 떨어졌으면 그 까닭 (no_model · no_key · api · refusal · deadline · unresolved · json · error) */
+  fallback?: string;
+}
+
+/** v4.19: 코드가 고른 오늘의 내용 계획 요약 (기록·검수용. 화면에는 안 나감) */
+export interface FortunePlanSummary {
+  /** 핵심: 천간·지지 중 |점수| 큰 쪽 */
+  core: { part: "천간" | "지지"; tenGod: TenGod; read: string };
+  support: { kind: "기운" | "충" | "복음"; text: string } | null;
+  includeContext: boolean;
+  contextReason: string | null;
+  /** 글로 풀 영역 (최대 2) */
+  areas: { period: AreaPeriod; area: AreaName; signal: AreaSignal }[];
+}
+
 export interface FortuneContent {
   version: "v3" | "v4";
   date: string;
@@ -135,8 +183,19 @@ export interface FortuneContent {
   body: string;
   do: string;
   dont: string;
-  /** 영역 신호 줄 (v4). v4.2: period가 붙고 순서는 오늘(≤2) → 이달(1) → 올해(1), 최대 4. line에 기간 접두는 없다(모델 글은 "이달엔/올해는"으로 시작) */
+  /** v4.19: 본문 문장 배열 (body는 이것을 이어 붙인 문자열 — 옛 캐시·화면 호환). 옛 캐시엔 없다 */
+  bodySentences?: string[];
+  /**
+   * 영역 신호 줄 (v4). v4.2: period가 붙고 순서는 오늘(≤2) → 이달(1) → 올해(1), 최대 4. line에 기간 접두는 없다(모델 글은 "이달엔/올해는"으로 시작).
+   * v4.19: 화면 호환용 파생 값 — areaSignals(전부) + areaNarratives(모델 문장)로 visible.composeAreas가 만든다. 새로 읽는 쪽은 visible.areasOf(content)를 쓴다
+   */
   areas?: { period: AreaPeriod; area: AreaName; signal: AreaSignal; line: string }[];
+  /** v4.19: 코어가 계산한 영역 신호 전부(오늘 ≤2 → 이달 1 → 올해 1). 모델이 지울 수 없다. 옛 캐시엔 없다 */
+  areaSignals?: { period: AreaPeriod; area: AreaName; signal: AreaSignal; why: string }[];
+  /** v4.19: 계획이 고른 영역(최대 2)에 모델이 쓴 문장. 템플릿이면 템플릿 줄. 옛 캐시엔 없다 */
+  areaNarratives?: { period: AreaPeriod; area: AreaName; text: string }[];
+  /** v4.19: 코어 키워드(KW-03) 그대로 — 화면은 나중에 (core.keywords와 같은 값) */
+  keywords?: { positive: string[]; negative: string[] };
   source: "llm" | "template";
   /** 3단계: 모델을 부른 횟수 (0이면 부르지 않았다) */
   attempts?: number;
@@ -152,9 +211,13 @@ export interface FortuneContent {
   regen?: number;
   /** v4.15: 사례 블록의 무대 이름(집·길·사람·몸·돈·쉼·말·물건). v4.16부터는 쓰지 않는다(옛 캐시 호환) */
   stage?: string;
-  /** v4.16: 의미 태그(주제·감정·상황·영역·장면·권장·피할·제목뜻). 다음 7일(제목뜻 14일)은 이와 뜻이 같은 글을 피한다. 템플릿·옛 캐시엔 없다 */
+  /** v4.16: 의미 태그(주제·감정·상황·영역·장면·권장·피할·제목뜻). v4.19: 모델이 아니라 코드가 계획·최종 글에서 만든다(기록용 — 태그 겹침으로 거부하지 않는다) */
   tags?: { 주제: string; 감정: string; 상황: string; 영역: string; 장면: string; 권장: string; 피할: string; 제목뜻: string };
-  /** v4.16: 모델이 글보다 먼저 정한 판단(후보·핵심·이유·구조·둘째 기운·운 맥락). 검수·기록용 */
+  /** v4.19: 코드가 고른 내용 계획 요약 */
+  plan?: FortunePlanSummary;
+  /** v4.19: 시간·호출·토큰 측정 (본문 없음) */
+  metrics?: FortuneMetrics;
+  /** v4.16~4.18: 모델이 글보다 먼저 정한 판단(후보·핵심·이유·구조·둘째 기운·운 맥락). v4.19부터는 쓰지 않는다(옛 캐시 호환) */
   judge?: { 후보: string[]; 핵심: string; 이유: string; 구조: string; 둘째기운: string; 운맥락: string };
   /** v3 재료. v4 캐시에는 없다 */
   base?: Omit<BaseFortune, "score"> & { score: number };

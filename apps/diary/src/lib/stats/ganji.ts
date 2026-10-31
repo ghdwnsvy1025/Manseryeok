@@ -2,6 +2,10 @@
 // 저장하지 않고 읽을 때 계산한다. 기록 수천 건이어도 즉시 끝난다.
 import { BRANCHES, BRANCHES_KO, ELEMENT_EN_TO_KO, ELEMENT_WORD as ENGINE_ELEMENT_WORD, GANJI_60, STEMS, STEMS_KO, STEM_META, BRANCH_META } from "@saju/engine";
 import type { EntryLike } from "../fortune/personal";
+import { AREAS, type AreaKey, type Areas } from "../entry";
+
+/** 영역 점수까지 있는 기록 (2026-10-31) */
+type AreaEntry = EntryLike & { areas?: Areas | null };
 
 export type Signal = "없음" | "약함" | "보통" | "뚜렷함";
 
@@ -35,13 +39,22 @@ function round1(x: number): number {
   return Math.round(x * 10) / 10;
 }
 
-function bucketize<K extends string>(entries: EntryLike[], keyOf: (e: EntryLike) => K, keys: readonly K[], koOf: (k: K) => string): Bucket[] {
+/** valueOf: 무엇의 평균인지 (기본 하루 행복도). null이면 그 기록은 건너뛴다 — 영역 점수가 없는 날 (2026-10-31) */
+function bucketize<K extends string, E extends EntryLike = EntryLike>(
+  entries: E[],
+  keyOf: (e: E) => K,
+  keys: readonly K[],
+  koOf: (k: K) => string,
+  valueOf: (e: E) => number | null = (e) => e.happiness,
+): Bucket[] {
   const acc = new Map<K, number[]>();
   const kept = new Map<K, number>();
   for (const e of entries) {
+    const v = valueOf(e);
+    if (v === null) continue;
     const k = keyOf(e);
     const arr = acc.get(k) ?? [];
-    arr.push(e.happiness);
+    arr.push(v);
     acc.set(k, arr);
     if (e.promise === "kept") kept.set(k, (kept.get(k) ?? 0) + 1);
   }
@@ -130,4 +143,35 @@ export function highlights(entries: EntryLike[]): Highlights {
     bestBranch: top(byBranch(entries), 3, 1),
     unseen: grid.filter((c) => c.n === 0).length,
   };
+}
+
+export interface AreaGlyphs {
+  key: AreaKey;
+  label: string;
+  /** 이 영역을 매긴 기록 수 */
+  n: number;
+  stems: Bucket[];
+  branches: Bucket[];
+  elements: Bucket[];
+}
+
+/**
+ * 영역별 "글자별 행복도" (2026-10-31 사용자 Q4 = b): 그 영역 점수(5단계 × 2 = 10점 기준)를 천간·지지·오행으로 묶는다.
+ * "금 기운 날에 돈 점수가 높았어요" 같은 통계. 영역 점수는 2026-10-31부터 저장돼 이전 기록은 빠진다.
+ */
+export function areaGlyphs(entries: AreaEntry[]): AreaGlyphs[] {
+  return AREAS.map((a) => {
+    const valueOf = (e: AreaEntry) => {
+      const lv = e.areas?.[a.key];
+      return typeof lv === "number" ? lv * 2 : null;
+    };
+    return {
+      key: a.key,
+      label: a.label,
+      n: entries.filter((e) => valueOf(e) !== null).length,
+      stems: bucketize(entries, (e) => e.day_stem, STEMS_KO, (k) => k, valueOf),
+      branches: bucketize(entries, (e) => e.day_branch, BRANCHES_KO, (k) => k, valueOf),
+      elements: bucketize(entries, (e) => stemElementKo(e.day_stem), ["목", "화", "토", "금", "수"], (k) => `${ELEMENT_WORD[k]}(${k})`, valueOf),
+    };
+  });
 }

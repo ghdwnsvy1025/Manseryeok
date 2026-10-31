@@ -1,11 +1,23 @@
-// 내 기록으로 점수를 당긴다. 베이지안 수축: 기록이 적으면 사주 쪽, 많으면 기록 쪽.
-//   w     = n / (n + K)
-//   점수  = 사주 점수 × (1 − w) + 내 평균 행복도 × w
+// 내 기록으로 점수를 조금 민다 (v4.19, 2026-10-31 GPT 검토 반영).
+//   v4.18까지: 점수 = 사주 점수 × (1 − w) + 내 평균 행복도 × w — 행복도 "절대값"을 섞어서, 평소 행복도가 높은 사람은 모든 날이 올라가고
+//   낮은 사람은 모든 날이 내려갔다(사주와 상관없는 그 사람의 기본 기분이 점수가 됐다).
+//   v4.19: 전체 기록 평균 대비 "편차"만 쓴다.
+//     편차  = (같은 성분 날 n개의 평균 행복도) − (전체 기록 평균 행복도)
+//     w     = n / (n + K)
+//     shift = clamp(w × 편차 / 9, −0.08, +0.08)   (±0.08 = 10점 눈금 ±0.8점)
+//     점수  = 사주 점수 + shift
+//   전체 기록이 10개 미만이거나 같은 성분 기록이 3개 미만이면 shift 0 — 비교 수치(n·mean·overallMean)만 남긴다.
 // n은 "오늘과 같은 일간 또는 같은 일지를 가진 날"의 기록 수. 60갑자가 완전히 같은 날은 따로 센다.
 import type { PersonalAdjustment } from "./types";
 
-/** 같은 성분 기록 K개면 사주와 기록이 반반 */
+/** 같은 성분 기록 K개면 편차의 반을 반영 (w = n/(n+K)) */
 export const K_PERSONAL = 5;
+/** v4.19: 기록이 점수를 움직일 수 있는 최대 폭 (0~1 눈금. 0.08 = ±0.8점) */
+export const SHIFT_MAX = 0.08;
+/** v4.19: 전체 기록이 이만큼 안 되면 보정하지 않는다 (평균이 아직 그 사람의 평소를 말하지 못함) */
+export const MIN_ENTRIES_FOR_SHIFT = 10;
+/** v4.19: 같은 성분 기록이 이만큼 안 되면 보정하지 않는다 */
+export const MIN_MATCHING_FOR_SHIFT = 3;
 /** 전체 기록 K개면 맞춤도 50% */
 export const K_FIT = 20;
 
@@ -38,8 +50,12 @@ export function adjustWithEntries(
   const sameGanji = entries.filter((e) => e.day_ganji_index === today.index);
   const n = matching.length;
   const m = mean(matching.map((e) => e.happiness));
+  const overall = mean(entries.map((e) => e.happiness));
   const weight = n / (n + K_PERSONAL);
-  const score = m === null ? baseScore : baseScore * (1 - weight) + happinessToScore(m) * weight;
+  const enough = entries.length >= MIN_ENTRIES_FOR_SHIFT && n >= MIN_MATCHING_FOR_SHIFT && m !== null && overall !== null;
+  const rawShift = enough ? Math.max(-SHIFT_MAX, Math.min(SHIFT_MAX, (weight * (m! - overall!)) / 9)) : 0;
+  const shift = Math.round(rawShift * 1000) / 1000 || 0;   // −0 → 0
+  const score = Math.max(0, Math.min(1, baseScore + shift));
   return {
     n,
     mean: m === null ? null : Math.round(m * 10) / 10,
@@ -50,6 +66,8 @@ export function adjustWithEntries(
     })(),
     weight: Math.round(weight * 100) / 100,
     score,
+    shift,
+    overallMean: overall === null ? null : Math.round(overall * 10) / 10,
   };
 }
 

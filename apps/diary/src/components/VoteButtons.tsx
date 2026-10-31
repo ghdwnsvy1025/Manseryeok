@@ -10,8 +10,19 @@ import { celebrate } from "@/lib/fx";
  * 예전엔 form 제출 → 서버 저장 → 화면 전체 다시 그림이라 0.3~1초 멈칫하고, 그때 운세 카드가 처음 상태(밤엔 접힘)로 돌아갔다.
  * 액션은 revalidate하지 않는다(이 화면이 다시 그려지지 않는다). 모양은 globals.css .vote / .vote__btn 그대로.
  */
+/** "아니에요"의 이유 세 가지 (db.ts VOTE_REASONS와 같은 값) */
+type VoteReason = "content" | "obvious" | "awkward";
+const REASONS: [VoteReason, string][] = [
+  ["content", "내용이 안 맞았어요"],
+  ["obvious", "너무 뻔했어요"],
+  ["awkward", "문장이 어색했어요"],
+];
+
 export function VoteButtons({ date, initial }: { date: string; initial: 1 | -1 | null }) {
   const [vote, setVote] = useState<1 | -1 | null>(initial);
+  // "아니에요"를 이번에 눌렀을 때만 한 번 이유를 묻는다 (2026-10-31, ChatGPT 검토): 엔진이 틀렸는지·뻔했는지·문장이 어색했는지
+  const [askReason, setAskReason] = useState(false);
+  const [reason, setReason] = useState<VoteReason | null>(null);
   const [, start] = useTransition();
   const key = `saju-vote:${date}`;
 
@@ -31,6 +42,8 @@ export function VoteButtons({ date, initial }: { date: string; initial: 1 | -1 |
     if (next === 1 && el) celebrate(el);
     track("fortune_feedback", { v: next ?? 0 });
     setVote(next);
+    setAskReason(next === -1);
+    setReason(null);
     try {
       sessionStorage.setItem(key, String(next ?? 0));
     } catch {
@@ -39,6 +52,17 @@ export function VoteButtons({ date, initial }: { date: string; initial: 1 | -1 |
     const fd = new FormData();
     fd.set("date", date);
     fd.set("vote", String(next ?? 0));
+    start(() => fortuneVoteAction(fd));
+  };
+
+  const pickReason = (r: VoteReason) => {
+    setReason(r);
+    setAskReason(false);
+    track("fortune_feedback_reason", { reason: r });
+    const fd = new FormData();
+    fd.set("date", date);
+    fd.set("vote", "-1");
+    fd.set("reason", r);
     start(() => fortuneVoteAction(fd));
   };
 
@@ -51,7 +75,20 @@ export function VoteButtons({ date, initial }: { date: string; initial: 1 | -1 |
       <button type="button" aria-pressed={vote === -1} onClick={() => press(-1)} className="vote__btn">
         아니에요
       </button>
-      {vote !== null && <span className="basis-full break-keep text-[14px] text-muted">고마워요, 내일 운세에 반영해요. 다시 누르면 취소돼요.</span>}
+      {vote === -1 && askReason && (
+        <span className="vote__reasons basis-full flex flex-wrap gap-2" role="group" aria-label="어떤 점이 아니었나요">
+          {REASONS.map(([r, label]) => (
+            <button key={r} type="button" onClick={() => pickReason(r)} className="vote__reason">
+              {label}
+            </button>
+          ))}
+        </span>
+      )}
+      {vote !== null && !askReason && (
+        <span className="basis-full break-keep text-[14px] text-muted">
+          {reason ? "알려 줘서 고마워요. " : "고마워요. "}다음 운세 표현을 다듬는 데 참고할게요.
+        </span>
+      )}
     </div>
   );
 }

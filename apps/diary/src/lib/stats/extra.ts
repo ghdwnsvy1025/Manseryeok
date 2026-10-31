@@ -257,3 +257,68 @@ export function monthlySeries(entries: StatEntry[], fortunes: { fortune_date: st
   }
   return out;
 }
+
+export interface FortuneAccuracy {
+  /** 답한 날 */
+  answered: number;
+  /** 맞아요 */
+  hit: number;
+  /** 0~100. 답한 날이 없으면 null */
+  rate: number | null;
+  /** 최근 답 10개 (오래된 → 최근), 1 = 맞아요 */
+  recent: (1 | -1)[];
+}
+
+/** 운세 적중률 (2026-10-31 사용자 결정 Q3 = a): 운세 카드의 "맞아요 / 아니에요"를 모은다. 점수 계산에는 쓰지 않는다 */
+export function fortuneAccuracy(votes: { fortune_date: string; vote: 1 | -1 }[]): FortuneAccuracy {
+  const sorted = [...votes].sort((a, b) => (a.fortune_date < b.fortune_date ? -1 : 1));
+  const hit = sorted.filter((v) => v.vote === 1).length;
+  return {
+    answered: sorted.length,
+    hit,
+    rate: sorted.length ? Math.round((100 * hit) / sorted.length) : null,
+    recent: sorted.slice(-10).map((v) => v.vote),
+  };
+}
+
+export interface AreaRadarRow {
+  key: AreaKey;
+  label: string;
+  /** 이번 달 평균 단계(1~5). 매긴 날이 없으면 null */
+  cur: number | null;
+  /** 지난달 평균 단계 */
+  prev: number | null;
+}
+
+/** 육각형 그래프 (2026-10-31 사용자 Q4 = a): 여섯 영역의 이번 달·지난달 평균 단계 */
+export function areaRadar(entries: StatEntry[], ym: string): AreaRadarRow[] {
+  const [y, m] = ym.split("-").map(Number) as [number, number];
+  const prevYm = m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, "0")}`;
+  const avg = (month: string, key: AreaKey) =>
+    mean(entries.filter((e) => e.entry_date.startsWith(month)).map((e) => e.areas?.[key]).filter((v): v is number => typeof v === "number"));
+  return AREAS.map((a) => ({ key: a.key, label: a.label, cur: avg(ym, a.key), prev: avg(prevYm, a.key) }));
+}
+
+export interface Unlock {
+  /** 무엇이 열리는지 */
+  title: string;
+  /** 지금까지 / 필요한 만큼. 날짜가 아닌 행동이면 have 0, need 1 */
+  have: number;
+  need: number;
+  /** 행동 안내 한 줄 */
+  how: string;
+}
+
+/**
+ * 다음에 열리는 통계 하나 (2026-10-31 사용자: 데이터가 없을 때 설명은 깔끔하게, 매일 기록하고 싶게).
+ * 빈 블록마다 안내문을 늘어놓지 않고 "다음에 열리는 것" 하나만 보인다. 다 열렸으면 null.
+ * 순서: 그래프(2일) → 글자별 행복도(3일) → 영역 점수 → 운세 적중률 → 1년 그래프(두 달)
+ */
+export function nextUnlock(input: { days: number; areaDays: number; votes: number; months: number }): Unlock | null {
+  if (input.days < 2) return { title: "행복도 그래프", have: input.days, need: 2, how: "하루 더 기록하면 열려요" };
+  if (input.days < 3) return { title: "글자별 내 행복도", have: input.days, need: 3, how: "하루 더 기록하면 열려요" };
+  if (input.areaDays < 1) return { title: "영역별 행복도", have: 0, need: 1, how: "기록할 때 영역에 도장을 찍으면 열려요" };
+  if (input.votes < 1) return { title: "운세 적중률", have: 0, need: 1, how: "운세 아래에서 한 번 답하면 열려요" };
+  if (input.months < 2) return { title: "1년 그래프", have: input.months, need: 2, how: "다음 달에도 기록하면 열려요" };
+  return null;
+}

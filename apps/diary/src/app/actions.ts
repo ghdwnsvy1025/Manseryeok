@@ -18,6 +18,8 @@ import {
   saveName,
   saveNotificationSettings,
   saveSajuProfile,
+  VOTE_REASONS,
+  type VoteReason,
 } from "@/lib/db";
 // fortune/index가 아니라 policy에서 — index는 모델·관리자 클라이언트까지 끌어와 서버 액션 묶음이 무거워지고, 쓰기 화면 테스트의 모의 순서와도 얽힌다
 import { usableCachedContent } from "@/lib/fortune/policy";
@@ -243,11 +245,14 @@ export async function fortuneVoteAction(form: FormData): Promise<void> {
   const date = String(form.get("date") ?? "");
   const vote = Number(form.get("vote"));
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || (vote !== 1 && vote !== -1 && vote !== 0)) return;
+  // "아니에요"의 이유 (2026-10-31): 보내지 않으면 건드리지 않는다. 목록 밖 값은 버린다
+  const rawReason = form.get("reason");
+  const reason = rawReason === null ? undefined : (VOTE_REASONS as readonly string[]).includes(String(rawReason)) ? (String(rawReason) as VoteReason) : null;
   const { supabase, user } = await getUser();
   if (!user) return;
   try {
     if (vote === 0) await deleteFortuneVote(supabase, user.id, date);
-    else await saveFortuneVote(supabase, user.id, date, vote);
+    else await saveFortuneVote(supabase, user.id, date, vote, reason);
   } catch (e) {
     console.error(e);
   }

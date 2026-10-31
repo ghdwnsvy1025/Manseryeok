@@ -2,8 +2,9 @@
 // 사주 코어 content/src/문맥.ts와 같은 생각. 낱말 검사기는 "그래서 앞뒤가 안 이어짐", "아무 날에나 맞는 말"을 못 잡는다.
 // 기본은 꺼져 있다(호출이 하루 사용자마다 늘어 비용이 두 배가 되므로). 환경변수 FORTUNE_REVIEW_MODEL(예: claude-haiku-4-5-20251001)을 적으면 켜진다.
 // 문제가 있으면 같은 brief에 문제를 붙여 한 번 더 쓰게 하고, 고친 글도 같은 검사를 통과할 때만 쓴다. 검수가 실패해도 초고는 그대로 살아 있다.
+// v4.19: 글 전체 다시 쓰기 대신, 인용이 든 문장만 수리 틀(llm.ts repair)로 고친다. 핵심은 모델이 아니라 계획(plan.ts)이 정한 것을 보여 준다.
 import type { FortuneBrief } from "./brief";
-import type { ModelText } from "./validate";
+import type { Draft } from "./validate";
 
 export type ReviewProblem = { 종류: "비약" | "끊김" | "가리킴" | "어긋남" | "뻔한말"; 인용: string; 왜: string; 고칠방향: string };
 const KINDS = new Set(["비약", "끊김", "가리킴", "어긋남", "뻔한말"]);
@@ -25,22 +26,22 @@ export const REVIEW_SYSTEM = `당신은 한국어 편집자입니다. 일기 앱
 '고칠방향'은 사실을 더하거나 빼지 않고 잇는 방법 한 줄입니다(이음말 바꾸기, 가리키는 말을 명사로, 빠진 한 걸음 채우기, 뻔한 마무리를 핵심에서 나온 행동으로).
 출력은 JSON 하나만: {"문제":[{"종류":"비약|끊김|가리킴|어긋남|뻔한말","인용":"...","왜":"한 줄","고칠방향":"한 줄"}]}  다른 글자를 앞뒤에 붙이지 마세요.`;
 
-export function reviewUser(t: ModelText, b: FortuneBrief): string {
+export function reviewUser(t: Draft, b: FortuneBrief): string {
   return [
-    `[오늘] ${b.today.ganji} · ${b.score.band} · 짜임 ${b.angle}`,
-    ...(t.핵심 ? [`[핵심 — 작가가 먼저 정한 한 줄] ${t.핵심}`] : []),
-    "[글]", `headline: ${t.headline}`, `body: ${t.body}`,
-    ...t.areas.map((a) => `areas(${a.period ?? ""} ${a.area}): ${a.line}`),
+    `[오늘] ${b.today.ganji} · ${b.score.band}`,
+    `[핵심 — 계획이 정한 것] ${b.plan.core.meaning} (${b.plan.core.read})`,
+    "[글]", `headline: ${t.headline}`, `body: ${t.body.join(" ")}`,
+    ...t.areaLines.map((a) => `areas(${a.area}): ${a.text}`),
     `do: ${t.do}`, `dont: ${t.dont}`,
   ].join("\n");
 }
 
 /** 편집자 답 → 문제 목록. 형식이 깨졌거나 글에 없는 인용이면 그 문제는 버림 */
-export function parseReview(raw: string, t: ModelText): ReviewProblem[] {
+export function parseReview(raw: string, t: Draft): ReviewProblem[] {
   const a = raw.indexOf("{"), z = raw.lastIndexOf("}"); if (a < 0 || z <= a) return [];
   let j: { 문제?: unknown }; try { j = JSON.parse(raw.slice(a, z + 1)); } catch { return []; }
   if (!Array.isArray(j.문제)) return [];
-  const text = squash([t.headline, t.body, ...t.areas.map((x) => x.line), t.do, t.dont].join(" "));
+  const text = squash([t.headline, ...t.body, ...t.areaLines.map((x) => x.text), t.do, t.dont].join(" "));
   const seen = new Set<string>();
   return (j.문제 as Record<string, unknown>[])
     .filter((x) => x && KINDS.has(String(x.종류)) && typeof x.인용 === "string" && x.인용.trim().length >= 4 && text.includes(squash(x.인용)) && !seen.has(squash(x.인용)) && seen.add(squash(x.인용)))
@@ -50,7 +51,14 @@ export function parseReview(raw: string, t: ModelText): ReviewProblem[] {
 
 export const problemLine = (p: ReviewProblem): string => `[${p.종류}] "${p.인용}"${p.왜 ? ` — ${p.왜}` : ""}${p.고칠방향 ? ` → ${p.고칠방향}` : ""}`;
 
-/** 작가에게 돌려보낼 user 메시지 — 그 문제만 고치고 나머지는 그대로. 길이 한도를 같이 적는다(한 걸음을 채우면 글이 늘어 검사에 걸림) */
-export function reviewRewriteContent(briefJson: string, prev: ModelText, problems: ReviewProblem[], bodyMax: number): string {
-  return `${briefJson}\n\n[편집자가 먼저 쓴 글을 검수했습니다. 아래 문제만 고치고 나머지 문장·사실·숫자는 그대로 두세요. 사실을 더하거나 빼지 않습니다. 고친 글 전체를 같은 JSON 형식으로 다시 씁니다]\n- ${problems.map(problemLine).join("\n- ")}\n- 길이: body는 4~6문장·${bodyMax}자 이내(지금 ${prev.body.length}자). 한 걸음을 채우느라 늘어나면 그만큼 다른 문장을 줄입니다.\n먼저 쓴 글: ${JSON.stringify(prev)}`;
+/** v4.19: 인용이 든 칸 — 수리 대상 (못 찾으면 null) */
+export function problemTarget(p: ReviewProblem, t: Draft): { field: "headline" | "body" | "area" | "do" | "dont"; index?: number } | null {
+  const q = squash(p.인용);
+  const bi = t.body.findIndex((s) => squash(s).includes(q));
+  if (bi >= 0) return { field: "body", index: bi };
+  if (squash(t.headline).includes(q)) return { field: "headline" };
+  if (squash(t.do).includes(q)) return { field: "do" };
+  if (squash(t.dont).includes(q)) return { field: "dont" };
+  const ai = t.areaLines.findIndex((a) => squash(a.text).includes(q));
+  return ai >= 0 ? { field: "area", index: ai } : null;
 }

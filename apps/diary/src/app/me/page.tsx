@@ -9,12 +9,14 @@ import { Booting } from "@/components/Booting";
 import { characterOf, characterOfGanji } from "@/lib/character";
 import { StatsSummary } from "@/components/StatsSummary";
 import { TrackOnMount } from "@/components/track/TrackOnMount";
-import { birthProfileOf, countEntries, getEntry, getSajuProfile, listEntries, listEntriesInMonth, listEntriesForStats, listFortuneScores } from "@/lib/db";
+import { birthProfileOf, countEntries, getEntry, getSajuProfile, listEntries, listEntriesInMonth, listEntriesForStats, listFortuneScores, listFortuneVotes } from "@/lib/db";
+import { AreaRadar } from "@/components/AreaRadar";
+import { AreaGlyphBars } from "@/components/AreaGlyphBars";
 import { sajuChart } from "@/lib/saju/chart";
 import { paidReadingOpen } from "@/lib/sajucow";
 import { SajuChartPanel } from "@/components/SajuChartPanel";
 import { FoldButton } from "@/components/FoldButton";
-import { areaAverages, bestWorstDays, growingSeries, habitOf, happinessSeries, monthlySeries, moodTop, streakOf, type PickedDay } from "@/lib/stats/extra";
+import { areaAverages, areaRadar, bestWorstDays, fortuneAccuracy, growingSeries, habitOf, happinessSeries, monthlySeries, moodTop, nextUnlock, streakOf, type PickedDay } from "@/lib/stats/extra";
 import { BestWorstDays, type DayCard, type ForecastCard } from "@/components/BestWorstDays";
 import { forecastMonth, nextMonthOf, type ForecastDay } from "@/lib/stats/forecast";
 import { HappinessChart } from "@/components/HappinessChart";
@@ -23,7 +25,7 @@ import { buildMonth, resolveMonth } from "@/lib/calendar";
 import { addDays, formatKoreanDate, parseYmd } from "@/lib/time";
 import { fitPercent } from "@/lib/fortune/personal";
 import { dayGanji } from "@/lib/ganji";
-import { byBranch, byElement, byStem, ganjiGrid, highlights } from "@/lib/stats/ganji";
+import { areaGlyphs, byBranch, byElement, byStem, ganjiGrid, highlights } from "@/lib/stats/ganji";
 import { todayKST } from "@/lib/time";
 
 export const dynamic = "force-dynamic";
@@ -50,7 +52,7 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
   const calYm = resolveMonth(dParam ? dParam.slice(0, 7) : m, today);
   // 2026-10-24: 저장하면 쓰기 폼이 여기로 온다 (/me?d=날짜&saved=날짜&at=시각, actions.ts). 팡은 저장한 날의 기록으로 — 오늘 화면에서 옮겨 왔다
   const savedDate = saved && parseYmd(saved) && saved <= today ? saved : null;
-  const [profile, total, all, fortuneScores, monthEntries, savedEntry, recent, paidOpen] = await Promise.all([
+  const [profile, total, all, fortuneScores, monthEntries, savedEntry, recent, paidOpen, votes] = await Promise.all([
     getSajuProfile(supabase, user.id),
     countEntries(supabase, user.id),
     listEntriesForStats(supabase, user.id),
@@ -61,6 +63,8 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
     savedDate ? listEntries(supabase, user.id, 8) : Promise.resolve([]),
     // 만세력의 유료 풀이 버튼 — 결제가 열렸는지 (바이럴에 5분 캐시로 묻는다, 실패하면 닫힘)
     paidReadingOpen(),
+    // 운세 적중률 (맞아요/아니에요)
+    listFortuneVotes(supabase, user.id),
   ]);
   // 생년월일이 없으면 먼저 받는다 (로그인 사용자와 같은 규칙)
   if (!profile) redirect("/onboarding?next=/me");
@@ -117,6 +121,24 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
   const streak = streakOf(all, today);
   const series = growingSeries(happinessSeries(all, fortuneScores, today, 30));
   const yearSeries = growingSeries(monthlySeries(all, fortuneScores, today, 12));
+  // 2026-10-31: 빈 자리는 블록마다 안내하지 않고 "다음에 열리는 것" 하나. 그래프는 최근 30일 기록 2일부터
+  const chartReady = series.filter((p) => p.happiness !== null).length >= 2;
+  const areaDays = all.filter((e) => e.areas && Object.keys(e.areas).length > 0).length;
+  const unlock = nextUnlock({ days: all.length, areaDays, votes: votes.length, months: yearSeries.filter((p) => p.happiness !== null).length });
+  const accuracy = fortuneAccuracy(votes);
+  // 영역 자세히: 육각형(이번 달·지난달) + 영역별 글자 막대. 영역 점수가 하나도 없으면 칸째 빼고 unlock이 말한다
+  const thisYm = today.slice(0, 7);
+  const lastYm = (() => {
+    const [yy, mm] = thisYm.split("-").map(Number) as [number, number];
+    return mm === 1 ? `${yy - 1}-12` : `${yy}-${String(mm - 1).padStart(2, "0")}`;
+  })();
+  const areaDetail =
+    areaDays > 0 ? (
+      <>
+        <AreaRadar rows={areaRadar(all, thisYm)} curLabel={`${Number(thisYm.slice(5))}월`} prevLabel={`${Number(lastYm.slice(5))}월`} />
+        <AreaGlyphBars areas={areaGlyphs(all)} />
+      </>
+    ) : null;
   const cells = ganjiGrid(all);
   // 2026-10-31: 내 사주는 요약 카드, 누르면 그 아래에 만세력이 펼쳐진다 (SajuChartPanel)
   const chart = sajuChart(profile.pillars, birthProfileOf(profile), today);
@@ -278,7 +300,7 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
             pickedEntries={selected === null ? [] : all.filter((e) => e.day_ganji_index === selected)}
           />
         )}
-        <StatsSummary h={h} fitPercent={fitPercent(all.length)} stems={byStem(all)} branches={byBranch(all)} elements={byElement(all)} days={dayCards} areas={areaAvg} moods={moods} streak={streak} habit={habitOf(all, today)} chart={<HappinessChart series={series} yearSeries={yearSeries} emptyArt={me.characterSrc} />} />
+        <StatsSummary h={h} fitPercent={fitPercent(all.length)} stems={byStem(all)} branches={byBranch(all)} elements={byElement(all)} days={dayCards} areas={areaAvg} moods={moods} streak={streak} habit={habitOf(all, today)} chart={<HappinessChart series={series} yearSeries={yearSeries} emptyArt={me.characterSrc} />} chartReady={chartReady} unlock={unlock} accuracy={accuracy} areaDetail={areaDetail} writeHref="/write" />
       </section>
       {/* v3.16: "내 카드 공유" 섹션은 없앴다 — 공유는 오늘 화면 운세 카드의 "공유"(오늘의 운세 한 장)로 */}
 

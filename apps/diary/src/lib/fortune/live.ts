@@ -1,6 +1,7 @@
 // 오늘 저장한 기록을 운세 카드 "내 기록으로 본 오늘"에 바로 반영한다 (전수조사 B5).
 // 운세 캐시는 날짜 단위라 personal이 저장 전 값이다. 점수·밴드·글은 캐시 그대로 두고(글과 어긋나지 않게),
 // 내 기록 블록(personal)과 맞춤도(fitPercent)만 현재 기록으로 다시 센다. 순수 함수 — 모델 호출 없음.
+// v4.19: personal에 shift·overallMean(전체 평균 대비 편차 보정)이 같이 다시 계산된다. 점수는 캐시 그대로라 shift는 비교 수치일 뿐이다.
 import { dayGanji } from "../ganji";
 import { adjustWithEntries, fitPercent, type EntryLike } from "./personal";
 import type { FortuneContent } from "./types";

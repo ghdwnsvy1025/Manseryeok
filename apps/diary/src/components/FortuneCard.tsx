@@ -151,6 +151,8 @@ export function FortuneCard({ fortune, ganjiKo, canVote, vote, defaultOpen, vers
   const areas = (fortune.areas ?? []).slice(0, 4).map((a) => ({ ...a, period: (a as { period?: Period }).period ?? "오늘" }));
   const personal = personalLines(fortune, ganjiKo);
   const gaewoon = fortune.core?.luckEls ? gaewoonOf(fortune.core, fortune.date) : null;
+  /** v3.36 "오늘 힘이 되는 것": 코어 키워드 긍정 앞 3개 (v4.19는 fortune.keywords, 옛 캐시는 core.keywords). 없으면 줄째 없음 */
+  const power = (fortune.keywords?.positive ?? fortune.core?.keywords?.positive ?? []).slice(0, 3);
   return (
     <details open={defaultOpen} className="group card-gold card-paper text-ink">
       <summary className="cursor-pointer list-none p-5 [&::-webkit-details-marker]:hidden">
@@ -161,14 +163,14 @@ export function FortuneCard({ fortune, ganjiKo, canVote, vote, defaultOpen, vers
             +
           </span>
         </span>
-        {/* 카드의 주인공 — 밴드 단어 + 점수, 카드 폭 가운데, 뒤에 금빛 붓 자국 (v3.7).
-            v3.11: 붓 자국 색만 단계별(data-band: 좋음 금빛 · 무난 녹갈 · 주의 옅은 먹빛). 카드 바탕·숫자 색은 같다 */}
+        {/* v3.36 (명세 32): 카드의 주인공은 핵심 문장. 밴드 단어는 작은 단계 붓 자국(data-band, v3.11 색 그대로) 위에 송명 22px,
+            점수는 그 옆 한 줄 15px muted — 점수는 판정 단계를 계수로 옮긴 값이라 크게 보이면 실제보다 정밀해 보인다. 숨기지는 않는다 */}
         <span className="score-brush mt-2" data-band={fortune.band}>
-          <span className="font-serif text-[44px] text-ink">{fortune.band}</span>
-          <span className="font-serif text-[34px] tabular-nums text-gold-ink">{scoreText}</span>
-          <span className="text-[14px] text-muted">/10</span>
+          <span className="score-brush__band font-serif text-[22px] text-ink">{fortune.band}</span>
+          <span className="score-brush__score text-[15px] tabular-nums text-muted">{scoreText} / 10</span>
         </span>
-        {/* v3.18 (2026-10-11 Q2 = A): 점수 아래 오늘 영역 한 줄 — "사람 ↑ · 돈 ↓"를 작은 띠지로. 카드를 펼치기 전에도 보인다.
+        <span className="fortune-headline">{fortune.headline}</span>
+        {/* v3.18 (2026-10-11 Q2 = A): 핵심 문장 아래 오늘 영역 한 줄 — "사람 ↑ · 돈 ↓"를 작은 띠지로. 카드를 펼치기 전에도 보인다.
             엔진은 영역마다 점수가 아니라 방향(↑ → ↓)만 내므로 숫자·막대는 만들지 않는다. 보기만(누르면 카드가 펼쳐질 뿐). 모양은 디자이너(.area-chips*) */}
         {areas.some((a) => a.period === "오늘") && (
           <span className="area-chips" aria-label="오늘 영역">
@@ -192,10 +194,9 @@ export function FortuneCard({ fortune, ganjiKo, canVote, vote, defaultOpen, vers
           {/* 이용 통계: 카드가 보인 순간(펼쳐짐) fortune_view 한 번 */}
           <FortuneViewTrack band={fortune.band} />
           <div className="px-5 pb-5">
-            {/* v3.24: 공유 버튼 삭제 — 헤드라인이 끝 글자 하나만 줄바꿈되던 문제. 헤드라인이 줄 전체를 쓴다 */}
-            <h2 className="border-l-2 border-gold pl-3 font-serif text-[24px] leading-snug break-keep">{fortune.headline}</h2>
+            {/* v3.36: 헤드라인은 닫힌 카드 머리에 있으니 본문에서 다시 쓰지 않는다. 문단부터 시작 */}
             {/* 본문 2~3문단 (v3.7). 문단 사이 12px, 들여쓰기 없음 */}
-            <div className="mt-3 flex flex-col gap-3 text-[16px] leading-[1.7] text-ink/90">
+            <div className="flex flex-col gap-3 text-[16px] leading-[1.7] text-ink/90">
               {paragraphs.map((p, i) => (
                 <p key={i} className="break-keep">
                   {p}
@@ -209,11 +210,24 @@ export function FortuneCard({ fortune, ganjiKo, canVote, vote, defaultOpen, vers
 
             {/* v3.14 (2026-10-10): 섹션 둘로 — "오늘의 특징"(영역 줄, ↑ → ↓ 순) / 붓선 / "오늘 해 볼 것"(하면 좋아요 · 피해요).
                 예전엔 좋은 쪽·조심 쪽 상자에 영역 줄과 행동이 섞여 뒤죽박죽이었다. 모양은 디자이너(.traits* / .actions*) */}
-            {areas.length > 0 && (
+            {(areas.length > 0 || power.length > 0) && (
               <section className="traits mt-6" aria-labelledby="traits-title">
                 <h3 id="traits-title" className="traits__title">오늘의 특징</h3>
+                {/* v3.36: 화살표 줄 위에 "오늘 힘이 되는 것" 띠지 칩 한 줄(긍정 tone = 금빛 선, 면은 한지). 모양은 디자이너(.power*) */}
+                {power.length > 0 && (
+                  <div className="power">
+                    <p className="power__title">오늘 힘이 되는 것</p>
+                    <ul className="power__chips" aria-label="오늘 힘이 되는 것">
+                      {power.map((w) => (
+                        <li key={w} className="power-chip">
+                          {w}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
                 {/* 화살표 범례: 처음 한 번만 (닫으면 다시 안 뜸) */}
-                <SignalLegend />
+                {areas.length > 0 && <SignalLegend />}
                 <ul className="traits__list">
                   {[...areas.filter((a) => a.signal === "↑"), ...areas.filter((a) => a.signal === "→"), ...areas.filter((a) => a.signal === "↓")].map((a) => (
                     <li key={`${a.period}-${a.area}`} className="trait break-keep" data-signal={a.signal}>

@@ -178,6 +178,9 @@ const AREA_LINE: Record<AreaName, Record<AreaSignal, [string, string]>> = {
   건강: { "↑": ["몸이 가벼운 편이에요.", "몸을 움직이기 좋은 때예요."], "→": ["몸 상태는 평소와 비슷해요.", "몸은 평소대로 돌보면 돼요."], "↓": ["일찍 쉬는 게 남는 날이에요.", "무리한 일정은 하나 빼요."] },
 };
 
+/** v4.19: 영역 × 신호 템플릿 줄 (variant 0·1). 모델 문장이 없는 신호 줄에 화면이 쓴다 (visible.composeAreas) */
+export const areaLineOf = (area: AreaName, signal: AreaSignal, variant = 0): string => AREA_LINE[area][signal][Math.min(variant, 1)]!;
+
 /** 템플릿이 쓰는 재료. v3 BaseFortune도 그대로 들어간다 */
 export type TemplateInput = Pick<BaseFortune, "tenGod" | "relation" | "yongsin"> & {
   areas?: { period?: AreaPeriod; area: AreaName; signal: AreaSignal }[];

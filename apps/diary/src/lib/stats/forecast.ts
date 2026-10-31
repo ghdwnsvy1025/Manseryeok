@@ -1,6 +1,6 @@
 // 다음 달 좋은 날·조심할 날 예측 (2026-10-31 사용자 결정 Q1 = b): 오늘 운세 점수와 같은 계산을 다음 달 매일에 돌린다.
-//   사주 판정(코어 일진 유불리 + 충합 + 운 맥락, computeCoreFortune) → 내 기록 보정(adjustWithEntries, 같은 일간·일지 기록이 많을수록
-//   내 기록 쪽) → 10점. 그중 가장 높은 날 하나, 가장 낮은 날 하나. 모델(글)은 부르지 않는다 — 코드 계산만, 비용 0.
+//   사주 판정(코어 일진 유불리 + 충합 + 운 맥락, computeCoreFortune) → 내 기록 보정(adjustWithEntries — v4.19: 같은 일간·일지 날 행복도가
+//   전체 평균보다 높거나 낮은 만큼 ±0.8점 안에서) → 10점. 그중 가장 높은 날 하나, 가장 낮은 날 하나. 모델(글)은 부르지 않는다 — 코드 계산만, 비용 0.
 // 서버 전용(엔진·코어 판정).
 import "server-only";
 import { computeCoreFortune } from "@/lib/fortune/core";
@@ -16,7 +16,7 @@ export interface ForecastDay {
   score: number;
   /** 왜 이 날인지 한 줄 */
   reason: string;
-  /** 내 기록이 점수에 들어간 비중(0~1). 0이면 사주 판정만 */
+  /** 내 기록이 점수에 들어간 비중(0~1). 0이면 사주 판정만. v4.19: 보정이 실제로 걸린 날(shift ≠ 0)만 0이 아니다 */
   weight: number;
 }
 
@@ -35,10 +35,10 @@ function daysIn(ym: string): string[] {
 const GOOD = new Set(["용", "희"]);
 const BAD = new Set(["기", "구"]);
 
-function reasonOf(kind: "best" | "worst", stem: CoreLuckPart, branch: CoreLuckPart, weight: number, mean: number | null): string {
-  if (weight >= 0.5 && mean !== null) {
-    return kind === "best" ? "이런 기운의 날, 내 기록이 좋았어요" : "이런 기운의 날, 내 기록이 무거웠어요";
-  }
+/** v4.19: "내 기록" 이유는 보정이 실제로 걸렸고(shift ≠ 0) 그 방향이 이 날의 종류와 같을 때만 (전체 평균 대비 편차 — personal.ts) */
+function reasonOf(kind: "best" | "worst", stem: CoreLuckPart, branch: CoreLuckPart, shift: number): string {
+  if (kind === "best" && shift > 0) return "이런 기운의 날, 내 기록이 좋았어요";
+  if (kind === "worst" && shift < 0) return "이런 기운의 날, 내 기록이 무거웠어요";
   const labels = [stem.label, branch.label];
   if (kind === "best") {
     if (labels.some((l) => l === "용")) return "내게 가장 필요한 기운이 들어오는 날";
@@ -68,8 +68,8 @@ export function forecastMonth(input: { pillars: PillarsSnapshot; profile: BirthP
     date: r.date,
     ganjiKo: r.g.ko,
     score: r.score,
-    reason: reasonOf(kind, r.core.dayLuck.stem, r.core.dayLuck.branch, r.personal.weight, r.personal.mean),
-    weight: r.personal.weight,
+    reason: reasonOf(kind, r.core.dayLuck.stem, r.core.dayLuck.branch, r.personal.shift ?? 0),
+    weight: (r.personal.shift ?? 0) !== 0 ? r.personal.weight : 0,
   });
   return { best: day(best, "best"), worst: worst.score < best.score ? day(worst, "worst") : null };
 }

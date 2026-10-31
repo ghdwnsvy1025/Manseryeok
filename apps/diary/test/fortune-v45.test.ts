@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { buildBrief, ABSTRACT_LABELS } from "@/lib/fortune/brief";
 import { computeCoreFortune, toScore01 } from "@/lib/fortune/core";
-import { SYSTEM, SYSTEM_EXAMPLES } from "@/lib/fortune/llm";
+import { SYSTEM } from "@/lib/fortune/llm";
+import { FORTUNE_EXAMPLES as SYSTEM_EXAMPLES } from "@/lib/fortune/examples";   // v4.19: 운영 SYSTEM에서 빠지고 베낌 검사·테스트에만 남았다
 import { adjustWithEntries, bandOf, toTenPoint } from "@/lib/fortune/personal";
 import { validateFortuneText } from "@/lib/fortune/validate";
 import { visibleAreas } from "@/lib/fortune/visible";
@@ -18,7 +19,8 @@ function briefFor(date: string, bandOverride?: "좋음" | "무난" | "주의") {
   const personal = adjustWithEntries(core.parts.score01, [], { index: g.index, stemKo: g.stemKo, branchKo: g.branchKo });
   const score10 = toTenPoint(personal.score);
   const band = bandOverride ?? bandOf(score10);
-  return buildBrief({ core, personal, today: { ko: g.ko, hanja: g.hanja, stemKo: g.stemKo, branchKo: g.branchKo }, date, weekday: "토요일", score10, band });
+  const b = buildBrief({ core, personal, today: { ko: g.ko, hanja: g.hanja, stemKo: g.stemKo, branchKo: g.branchKo }, date, weekday: "토요일", score10, band });
+  return { ...b, plan: { ...b.plan, coreStems: [] as string[] } };   // 이 파일의 글은 그날 핵심과 무관한 예시 글 — 핵심 누락 검사는 끈다
 }
 
 describe("v4.5 점수 곡선", () => {
@@ -35,26 +37,27 @@ describe("v4.5 점수 곡선", () => {
 });
 
 describe("v4.5 사실 문장 — 구조 말 없음", () => {
-  it("facts·areas.why에 글자·부딪혀·아랫글자·기울지 않고·치우침이 없다", () => {
+  it("facts·맥락 문장에 글자·부딪혀·아랫글자·기울지 않고·치우침이 없다", () => {
     for (const date of ["2026-10-05", "2026-10-10", "2026-10-13", "2027-03-01"]) {
       const b = briefFor(date);
-      const all = [...b.facts, ...b.areas.map((a) => a.why)].join(" ");
+      const all = [...b.facts, ...b.context].join(" ");
       for (const w of ["글자", "부딪혀", "아랫글자", "기울지 않고", "치우침"]) expect(all.includes(w), `${date} ${w}`).toBe(false);
     }
   });
 });
 
-describe("v4.5 SYSTEM 예시", () => {
-  it("예시 세 편(좋음·무난·주의)이 들어 있고 모두 검사기를 통과한다", () => {
+describe("v4.5 예시 세 편 (v4.19: SYSTEM 밖, 베낌 검사용)", () => {
+  it("예시 세 편(좋음·무난·주의)이 있고 모두 검사기를 통과한다. SYSTEM에는 없다", () => {
     expect(SYSTEM_EXAMPLES.map((e) => e.band)).toEqual(["좋음", "무난", "주의"]);
     for (const e of SYSTEM_EXAMPLES) {
       // v4.16: 예시는 사주 용어·판정 문장 없이 검사기를 통과한다 (areas·최근은 비움)
       const b0 = briefFor("2026-10-10", e.band);
-      const b = { ...b0, areas: [], recent: [], avoid: { tags: [], headlines: [], scenes: [] } };
-      expect(validateFortuneText(e.text, b).filter((i) => !i.startsWith("예시")), e.band).toEqual([]);
+      const b = { ...b0, areas: [], recent: [], avoid: { headlines: [] } };
+      expect(validateFortuneText(e.text, b).filter((i) => !i.includes("예시")), e.band).toEqual([]);
       expect(e.text.body, e.band).not.toMatch(/비견|겁재|식신|상관|편재|정재|편관|정관|편인|정인|맞는 편|모자란|넉넉한/);
       expect(["A", "B", "C", "D", "E"], e.band).toContain(e.text.판단.구조);
-      expect(validateFortuneText(e.text, b).some((i) => i.startsWith("예시 headline")), "예시를 그대로 쓰면 걸린다").toBe(true);
+      expect(validateFortuneText(e.text, b).some((i) => i.startsWith("headline: 예시 제목")), "예시를 그대로 쓰면 걸린다").toBe(true);
+      expect(SYSTEM).not.toContain(e.text.headline);
     }
     expect(SYSTEM).toContain("직장 장면");
   });
@@ -81,7 +84,7 @@ describe("v4.5 검사 항목", () => {
   it("추상 이름 그대로", () => {
     expect(ABSTRACT_LABELS).toContain("경쟁과 추진");
     const t = { ...base, body: `오늘은 경쟁과 추진의 성격이 센 날이에요. ${base.body}` };
-    expect(validateFortuneText(t, b()).some((i) => i.includes("추상 이름"))).toBe(true);
+    expect(validateFortuneText(t, b()).some((i) => i.includes("성격 이름"))).toBe(true);
   });
   it("절기 첫날이 아니면 절기 이름 금지 (2026-10-10 = 한로 사흘째)", () => {
     const br = b();
@@ -113,14 +116,10 @@ describe("v4.6 오늘의 짜임", () => {
     // v4.8: 판정이 보통이면 담백형
     expect(angleOf({ relations: { hits: [], flags: [] }, areas: [{ period: "오늘", area: "재물", signal: "↑", why: "" }], facts: [], dayLuck: { total: "보통" } } as never).angle).toBe("calm");
   });
-  it("brief에 angle·focusArea가 들어간다", () => {
-    const b = briefFor("2026-10-13");
-    expect(["change", "focus", "calm"]).toContain(b.angle);
-  });
 });
 
 describe("v4.8 반복 줄이기", () => {
-  it("말투·기억이 brief에 들어간다 (v4.16: 표현 돌리기·진입 방식은 생활 표현 후보 풀로 대체)", () => {
+  it("말투·기억이 brief에 들어간다 (v4.19: 표현 돌리기는 계획의 피할것)", () => {
     const b = briefFor("2026-10-13");
     expect(b.tone.length).toBeGreaterThan(0);
     expect(b.recent).toEqual([]);
@@ -130,7 +129,7 @@ describe("v4.8 반복 줄이기", () => {
     const t = { ...base, headline: "해야 할 일이 보이는 날", do: "미뤄 둔 답장을 오늘 정리해요.", dont: "남의 몫까지 먼저 떠맡지 않아요.", body: "오늘은 할 일이 하나둘 눈에 밟히는 날이에요. 책임감이 커지는 만큼 마음이 조금 무거울 수 있어요.\n\n미뤄 둔 정리를 하나 끝내면 한결 가벼워져요. 할 수 있는 만큼만 맡으면 무리 없이 지나가요." };
     const b = { ...briefFor("2026-10-10", "무난"), areas: [], recent: [{ date: "2026-10-09", headline: "해야 할 일이 보이는 날", start: "오늘은 할 일이 하나둘 눈에 밟히는 날이에요. 책임감이 커지는 만큼 마음이 조금 무거울 수 있어요." }] };
     const issues = validateFortuneText(t, b);
-    expect(issues.some((i) => i.includes("헤드라인과 겹침"))).toBe(true);
+    expect(issues.some((i) => i.includes("제목과 겹침"))).toBe(true);
     expect(issues.some((i) => i.includes("첫 문장과 겹침"))).toBe(true);
   });
   it("겉과 속 문장: 천간·지지가 반대 방향일 때만", async () => {
@@ -151,10 +150,10 @@ describe("v4.9 칸마다 같은 말 반복", () => {
     const b = { ...briefFor("2026-10-10", "무난"), areas: [] };
     expect(validateFortuneText(base, b).some((i) => i.includes("되풀이"))).toBe(false);
     const t = { ...base, do: "혼자 정답을 찾으려고 너무 오래 붙잡지 않아요." };   // v4.16 예시 2의 본문 문장을 되풀이
-    expect(validateFortuneText(t, b).some((i) => i.includes("do가 본문 문장을 되풀이"))).toBe(true);
+    expect(validateFortuneText(t, b).some((i) => i.includes("do: 본문 문장을 되풀이"))).toBe(true);
   });
   it("SYSTEM이 칸 역할과 '아니에요' 기억을 말한다", () => {
-    expect(SYSTEM).toContain("본문의 조언을 그대로 되풀이하지 않고");   // v4.16
-    expect(SYSTEM).toContain("vote: -1");
+    expect(SYSTEM).toContain("본문 조언을 되풀이하지 않고");
+    expect(SYSTEM).toContain("피할것.아니에요");
   });
 });

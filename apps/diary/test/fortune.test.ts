@@ -3,12 +3,11 @@ import { STEMS, getTenGod, solarTermsOfYear } from "@saju/engine";
 import { fromBirth, toCorePillars } from "@saju/core-rules";
 import { branchRelation, computeBaseFortune, FAMILY_OF } from "@/lib/fortune/base";
 import { COEF, computeCoreFortune, ipchunDate, resolveYongsin, seunOf, toBirthInput, UNKNOWN_HOUR_MIN } from "@/lib/fortune/core";
-import { buildBrief, hanjaToKo, hasContextFact, plainFact, type BriefInput } from "@/lib/fortune/brief";
+import { buildBrief, hanjaToKo, hasContextFact, plainFact, renderBrief, type BriefInput } from "@/lib/fortune/brief";
 import { ownerFilter, saveFortuneCache } from "@/lib/fortune/cache";
-import { generateFortuneText, OUTPUT_SCHEMA, SYSTEM, SYSTEM_EXAMPLES } from "@/lib/fortune/llm";
 import { REGEN_LIMIT, TRANSIENT_RETRY_MS, regenCountOf, regenPolicy, retryAfterFor, usableCachedContent } from "@/lib/fortune/policy";
 import { solarTermOf, termDayWord } from "@/lib/fortune/solarTerms";
-import { ABSTRACT_RE, AREA_OVERLAP_MAX, CONTEXT_MENTION_RE, SHENG_KE_RE, STRUCTURE_WORDS, splitSentences, tokenOverlap, validateFortuneText, type ModelText } from "@/lib/fortune/validate";
+import { ABSTRACT_RE, AREA_OVERLAP_MAX, SHENG_KE_RE, STRUCTURE_WORDS, tokenOverlap, validateFortuneText, type Draft } from "@/lib/fortune/validate";
 import { adjustWithEntries, bandOf, fitPercent, happinessToScore, toTenPoint } from "@/lib/fortune/personal";
 import { BANNED, findBanned, templateInputFromCore, templateText } from "@/lib/fortune/text";
 import type { AreaName, AreaSignal, CoreFortune } from "@/lib/fortune/types";
@@ -438,12 +437,17 @@ describe("내 기록 보정", () => {
     expect(r).toMatchObject({ n: 0, mean: null, weight: 0, score: 0.62 });
   });
 
-  test("같은 성분 5일이면 반반, 행복도 10은 1.0", () => {
-    const entries = Array.from({ length: 5 }, (_, i) => ({ day_ganji_index: i, day_stem: "신", day_branch: "자", happiness: 10 }));
-    const r = adjustWithEntries(0.4, entries, today);
+  test("v4.19: 같은 성분 5일이면 w 0.5 — 점수는 전체 평균 대비 편차만큼(±0.08 안), 절대값을 섞지 않는다", () => {
+    const same = Array.from({ length: 5 }, (_, i) => ({ day_ganji_index: i, day_stem: "신", day_branch: "자", happiness: 10 }));
+    const others = Array.from({ length: 10 }, (_, i) => ({ day_ganji_index: 10 + i, day_stem: "갑", day_branch: "오", happiness: 9 }));
+    const r = adjustWithEntries(0.4, [...same, ...others], today);
     expect(r.n).toBe(5);
     expect(r.weight).toBe(0.5);
-    expect(r.score).toBeCloseTo(0.4 * 0.5 + 1 * 0.5, 5);
+    expect(r.overallMean).toBe(9.3);
+    expect(r.shift).toBeCloseTo((0.5 * (10 - 28 / 3)) / 9, 3);
+    expect(r.score).toBeCloseTo(0.4 + r.shift!, 5);
+    // 기록이 5개뿐이면(10개 미만) 보정 없음
+    expect(adjustWithEntries(0.4, same, today)).toMatchObject({ shift: 0, score: 0.4 });
   });
 
   test("같은 60갑자 날은 따로 센다", () => {
@@ -549,326 +553,148 @@ describe("템플릿 문장", () => {
   });
 });
 
-describe("3단계 brief", () => {
+describe("3단계 brief (v4.19: 계획을 건네는 얇은 묶음)", () => {
   const today = { ko: "경신", hanja: "庚申", stemKo: "경", branchKo: "신" };
   const base = (personal: BriefInput["personal"]): BriefInput => ({ core: v4(PROFILE_A, "2026-06-15"), personal, today, date: "2026-06-15", weekday: "월요일", score10: 9.2, band: "좋음" });
   const NONE = { n: 0, mean: null, sameGanjiCount: 0, sameGanjiMean: null, weight: 0, score: 0.5 };
 
-  test("한자를 한글로 바꾼 사실(v4.13: 십신 괄호는 남긴다), 영역·키워드·금지어·허용 숫자가 들어간다", () => {
+  test("한자를 한글로 바꾼 사실(검사기용), 계획의 영역·금지어·허용 숫자가 들어간다", () => {
     const b = buildBrief(base(NONE));
     expect(hanjaToKo("丙午")).toBe("병오");
     expect(plainFact("오늘 윗글자 庚은 나에게 '기회'(편재) 쪽이에요.")).toBe("오늘 윗글자 경은 나에게 '기회'(편재) 쪽이에요.");
     for (const f of b.facts) expect(f).not.toMatch(/[㐀-鿿]/);
-    expect(b.facts[0]).toMatch(/\(편재\)/); // 이름이 brief까지 온다 (검수 §4: 지워지던 것)
-    // v4.13: 이름 재료 — 오늘 기운·오행·맞는지, 내게 필요한 기운, 이달 한 줄
-    expect(b.today).toMatchObject({ tenGods: "편재", elements: "경=금, 신=금", fit: "맞는 편" });
-    expect(b.me.need).toBe("금(재성) · 실속을 챙기는 힘");
-    expect(b.month).toEqual({ ganji: "갑오월", elements: "갑=목, 오=화", verdict: "힘이 드는 편", line: "이달 갑오월은 힘이 드는 편이에요." });
-    expect(b.rules.body).toContain("핵심 하나");   // v4.16
-    expect(b.rules.terms).toContain("편재");
-    expect(b.rules.context).toContain("오늘 행동을 바꿀 때만");   // v4.16
     // brief 재료 자체가 추상어·생극 금칙을 쓰지 않는다
-    const all = [...b.facts, ...b.areas.map((a) => a.why), ...b.caveats].join(" ");
+    const all = [...b.facts, ...b.caveats, ...b.context].join(" ");
     expect(all).not.toMatch(ABSTRACT_RE);
     expect(all).not.toMatch(SHENG_KE_RE);
-    expect(b.areas.map((a) => `${a.period}:${a.area}`)).toEqual(["오늘:재물", "오늘:연애", "이달:대인", "올해:대인"]);
+    // v4.19: 영역은 계획이 고른 것(↑ 먼저, 최대 2). 이달·올해 신호는 맥락을 쓰는 날만 글로 푼다 (화면 신호는 content.areaSignals에 전부)
+    expect(b.areas.map((a) => `${a.period}:${a.area}`)).toEqual(["오늘:재물", "오늘:연애"]);
     expect(b.areas[0]).toMatchObject({ period: "오늘", word: "돈", signal: "↑" });
-    expect(b.keywords.positive).toContain("무대가 넓어짐");
-    expect(b.banned).not.toContain("기운"); // v4.13: 풀렸다
+    expect(b.month).toBeNull();   // 맥락을 쓰지 않는 날 — 이달 운 언급을 검사기가 막는다
     expect(b.banned).toContain("반드시");
-    expect(b.jargon).toContain("용신"); // v4.16: 다시 금지 — 이론은 내부 판단으로만
-    expect(b.jargon).not.toContain("편재");
+    expect(b.jargon).toContain("용신");
     expect(b.jargon).toEqual(expect.arrayContaining(["일간", "일지", "천간", "지지", "삼합", "육합", "기신"]));
-    // v4.2: 점수(9.2)는 허용 숫자에 없다 — 점수는 화면이 보여 준다. v4.4: 평일엔 "10년 단위 운" 문장이 없으니 10도 없다
+    // v4.2: 점수(9.2)는 허용 숫자에 없다
     expect(b.allowedNumbers).toEqual([6, 15, 2026]);
-    expect(b.allowedNumbers).not.toContain(9.2);
     expect(b.score.value).toBe(9.2);
-    expect(b.rules.numbers).toContain("점수는 화면에 있으니");
-    expect(b.rules.areas).toContain("0~3개");   // v4.16
     // v4.4: 요일·절기가 오늘 재료로
-    expect(b.today).toEqual({ date: "2026-06-15", weekday: "월요일", ganji: "경신일", solarTerm: "망종 열흘째", useSolarTerm: false, solarTermName: "망종", tenGods: "편재", elements: "경=금, 신=금", fit: "맞는 편" });
+    expect(b.today).toEqual({ date: "2026-06-15", weekday: "월요일", ganji: "경신일", solarTerm: "망종 열흘째", useSolarTerm: false, solarTermName: "망종" });
   });
 
-  test("기록이 없으면 mine이 null이고 기록 이야기를 금지한다", () => {
-    const b = buildBrief(base(NONE));
-    expect(b.personal).toBeNull();
-    expect(b.mine).toBeNull();
-    expect(b.rules.mine).toContain("하지 않기");
-  });
-
-  test("v4.17: 기록이 있어도 내 숫자 문장 재료를 주지 않고 그 숫자도 허용하지 않는다 (지지 이름·점수가 본문에 새던 문제)", () => {
+  test("v4.17: 기록이 있어도 내 숫자 문장 재료를 주지 않고 그 숫자도 허용하지 않는다", () => {
     const b = buildBrief(base({ n: 12, mean: 6.8, sameGanjiCount: 2, sameGanjiMean: 7.5, weight: 0.71, score: 0.6 }));
-    expect(b.mine).toBeNull();
-    expect(b.personal).toBeNull();
-    expect(b.rules.mine).toContain("하지 않기");
     expect(b.allowedNumbers).not.toContain(7.5);
-    const b2 = buildBrief(base({ n: 5, mean: 8, sameGanjiCount: 0, sameGanjiMean: null, weight: 0.5, score: 0.6 }));
-    expect(b2.mine).toBeNull();
-    expect(JSON.stringify(b2)).not.toContain("기록했고");
-    expect(JSON.stringify(b2).length).toBeLessThan(4000);
+    expect(b.allowedNumbers).not.toContain(6.8);
+    const json = renderBrief(b);
+    expect(json).not.toContain("기록");
+    expect(json).not.toContain("6.8");
+    expect(json.length).toBeLessThan(1500);
   });
 });
 
-describe("3단계 검사 (validate)", () => {
+describe("3단계 검사 (validate) — v4.19 Draft", () => {
   const today = { ko: "경신", hanja: "庚申", stemKo: "경", branchKo: "신" };
   const core = v4(PROFILE_A, "2026-06-15"); // 庚申: 오늘 재물↑ 연애↑ / 이달 대인↓ / 올해 대인↓
   const NONE = { n: 0, mean: null, sameGanjiCount: 0, sameGanjiMean: null, weight: 0, score: 0.5 };
-  const briefOf = (personal: BriefInput["personal"]) => buildBrief({ core, personal, today, date: "2026-06-15", weekday: "월요일", score10: 9.2, band: "좋음" });
-  const brief = briefOf({ n: 5, mean: 8, sameGanjiCount: 0, sameGanjiMean: null, weight: 0.5, score: 0.6 });
-  const OK: ModelText = {
-    headline: "제안이 눈에 들어오는 월요일",
-    body: "아침에 메일함을 열면 미뤄 둔 제안 하나가 다시 눈에 들어와요. 이달 갑오월은 내게 조심할 편이지만, 오늘 경신일은 기회와 확장을 뜻하는 편재가 아주 센 날이고 내게 모자란 금을 채우는 쪽이라 평소보다 힘이 덜 들어요. 다만 예정이 한 번쯤 틀어지기 쉬운 날이라 여유를 두는 게 좋아요. 저녁엔 들어온 제안을 적어 두고 하루 묵히는 쪽이 편해요.",
-    areas: [
-      { period: "오늘", area: "재물", line: "돈 쓰는 일은 계획대로 가요." },
-      { period: "오늘", area: "연애", line: "가까운 사람에게 마음을 보이기 좋아요." },
-      { period: "이달", area: "대인", line: "이달엔 사람 사이 말이 엇갈리기 쉬워 짧게 말해요." },
-      { period: "올해", area: "대인", line: "올해는 내 속도만 고집하면 사람이 멀어지기 쉬워요." },
+  const brief = buildBrief({ core, personal: NONE, today, date: "2026-06-15", weekday: "월요일", score10: 9.2, band: "좋음" });
+  const OK: Draft = {
+    headline: "눈에 들어온 제안을 적어 두는 날",
+    body: [
+      "평소라면 그냥 넘겼을 할인 소식이나 제안이 오늘은 자꾸 눈에 들어와요.",
+      "둘러보는 재미가 있어서 이것저것 알아보고 싶은 마음이 커질 수 있어요.",
+      "가까운 사람과 미뤄 둔 이야기가 다시 나오면 피하지 말고 들어 봐요.",
+      "다만 마음에 든 것을 그 자리에서 정하기보다 한 번 적어 두는 편이 좋아요.",
     ],
-    do: "오랜만에 산책길을 바꿔 걸어 봐요.",
-    dont: "충동 지출을 하지 않아요.",
+    areaLines: [
+      { area: "재물", text: "필요한 물건은 미리 정한 가격 안에서만 골라 봐요." },
+      { area: "연애", text: "가까운 사람에게 오늘 본 재미있는 것을 먼저 보여 줘요." },
+    ],
+    do: "눈에 띈 제안 하나를 메모장에 적어 둬요.",
+    dont: "처음 본 상품을 그 자리에서 결제하지 않아요.",
   };
+  const v = (d: Partial<Draft>) => validateFortuneText({ ...OK, ...d }, brief);
+  const b3 = (s: string) => OK.body.map((x, i) => (i === 3 ? s : x));
 
   test("통과 예: 사유 없음", () => {
     expect(validateFortuneText(OK, brief)).toEqual([]);
   });
 
-  test("금지어·전문용어·명령조·이모지", () => {
-    const r = validateFortuneText({ ...OK, body: OK.body.replace("힘이 덜 들어요", "흐름이 좋아요") }, brief);
-    expect(r.some((x) => x.includes('금지어 "흐름"'))).toBe(true);
-    // v4.13: "기운"·"용신"·십신 이름은 더 이상 금지어·전문용어가 아니다. 구조어(일진·천간)는 그대로
-    expect(validateFortuneText({ ...OK, headline: "기운이 좋은 날" }, brief)).toEqual([]);
-    expect(validateFortuneText({ ...OK, headline: "용신이 들어오는 날" }, brief)).toEqual(['전문용어 "용신"']);   // v4.16
-    expect(validateFortuneText({ ...OK, headline: "일진이 좋은 날" }, brief).some((x) => x.includes('전문용어 "일진"'))).toBe(true);
-    expect(validateFortuneText({ ...OK, do: "제안은 적어 두세요." }, brief).some((x) => x.includes("명령조"))).toBe(true);
-    expect(validateFortuneText({ ...OK, headline: "좋은 날 ✨" }, brief).some((x) => x.includes("이모지"))).toBe(true);
-    // "상관없어요", "힘이 드는 편인 병오", "고른 편인데"는 일상어 (실제 샘플에서 걸렸던 거짓 양성)
-    expect(validateFortuneText({ ...OK, dont: "작은 실수는 상관없어요." }, brief)).toEqual([]);
-    // v4.4: 평일(맥락 문장 없음)엔 "올해 운"을 말할 수 없으니 "오늘 일"로 — 보는 건 '편인 병오'가 전문용어로 안 걸리는 것
-    expect(validateFortuneText({ ...OK, dont: "오늘 일은 힘이 드는 편인 병오라 서두르지 않아요." }, brief)).toEqual([]);
-    expect(validateFortuneText({ ...OK, dont: "속도가 고른 편인데 서두르지 않아요." }, brief)).toEqual([]);
-    // v4.13: "무슨 일지·할 일지 모르"는 일상어라 금지어·전문용어 "일지"에 걸리지 않는다. 자리 이름 "일지"는 그대로 걸린다
-    expect(validateFortuneText({ ...OK, dont: "무슨 일지 모르는 연락에 바로 답하지 않아요." }, brief)).toEqual([]);
-    expect(validateFortuneText({ ...OK, dont: "오늘 일지와 맞는 날이라 서두르지 않아요." }, brief)).toEqual(expect.arrayContaining(['금지어 "일지"', '전문용어 "일지"']));
-    // 오늘 것이 아닌 십신 이름은 날조로 걸린다 ("글자"는 구조 서술로 따로)
-    expect(validateFortuneText({ ...OK, dont: "편인 글자를 믿지 않아요." }, brief)).toEqual(expect.arrayContaining(['오늘 기운이 아닌 이름 "편인" (brief.today.tenGods에 있는 것만)', '구조 서술 "글자"']));
-    expect(validateFortuneText({ ...OK, body: OK.body.replace("힘이 덜 들어요", "올해의 큰 흐름은 힘이 드는 쪽이에요") }, brief).some((x) => x.includes('금지어 "흐름"'))).toBe(true);
+  test("금지어·전문용어·십신 이름·명령조·이모지, 일상어 오탐 없음", () => {
+    expect(v({ body: b3("다만 흐름이 좋다고 그 자리에서 정하기보다 적어 두는 편이 좋아요.") }).some((x) => x.includes('금지어 "흐름"'))).toBe(true);
+    expect(v({ headline: "용신이 들어오는 날" })).toEqual(['headline: 전문용어 "용신"']);
+    expect(v({ headline: "일진이 좋은 날" }).some((x) => x.includes('전문용어 "일진"'))).toBe(true);
+    expect(v({ dont: "편인 쪽으로 서두르지 않아요." }).some((x) => x.includes("십신 이름"))).toBe(true);
+    expect(v({ do: "제안은 적어 두세요." }).some((x) => x.includes("명령조"))).toBe(true);
+    expect(v({ headline: "좋은 날 ✨" }).some((x) => x.includes("이모지"))).toBe(true);
+    // "상관없어요", "힘이 드는 편인 병오", "고른 편인데", "무슨 일지 모르는"은 일상어 (실제 샘플에서 걸렸던 거짓 양성)
+    expect(v({ dont: "작은 실수는 상관없어요." })).toEqual([]);
+    expect(v({ dont: "오늘 일은 힘이 드는 편인 병오라 서두르지 않아요." })).toEqual([]);
+    expect(v({ dont: "속도가 고른 편인데 서두르지 않아요." })).toEqual([]);
+    expect(v({ dont: "무슨 일지 모르는 연락에 바로 답하지 않아요." })).toEqual([]);
+    expect(v({ dont: "오늘 일지와 맞는 날이라 서두르지 않아요." })).toEqual(expect.arrayContaining(['dont: 금지어 "일지"', 'dont: 전문용어 "일지"']));
   });
 
-  test("v4.1 ⑤ 구조 서술: '글자'·'짝이 되'·'부딪히'… 는 body·areas·do·dont에서 탈락 (jargon과 별개). v4.2: '짝이 맞'·'위아래' 추가", () => {
+  test("v4.1 ⑤ 구조 서술: body·영역·do·dont에서 탈락, headline은 보지 않는다. '한편' 부사는 통과", () => {
     expect(STRUCTURE_WORDS).toEqual(["글자", "짝이 되", "짝이 맞", "부딪히", "맞서", "한편이", "위아래", "윗글", "아랫글"]);
-    expect(validateFortuneText({ ...OK, dont: "짝이 맞는 날이라 서두르지 않아요." }, brief)).toEqual(['구조 서술 "짝이 맞"']);
-    expect(validateFortuneText({ ...OK, do: "위아래가 같은 날이라 하나만 해요." }, brief)).toEqual(['구조 서술 "위아래"']);
-    // 윗글자·아랫글자·천간·지지는 jargon(brief.jargon)으로도 걸린다
-    expect(validateFortuneText({ ...OK, do: "윗글자를 믿어요." }, brief)).toEqual(expect.arrayContaining(['전문용어 "윗글자"', '구조 서술 "글자"', '구조 서술 "윗글"']));
-    expect(validateFortuneText({ ...OK, do: "천간이 좋은 날이에요." }, brief)).toEqual(['전문용어 "천간"']);
-    const r1 = validateFortuneText({ ...OK, body: OK.body.replace("힘이 덜 들어요", "태어난 해 글자와 짝이 되는 날이라 힘이 덜 들어요") }, brief);
-    expect(r1).toEqual(expect.arrayContaining(['구조 서술 "글자"', '구조 서술 "짝이 되"']));
-    expect(r1.some((x) => x.startsWith("전문용어"))).toBe(false);
-    const r2 = validateFortuneText({ ...OK, areas: OK.areas.map((a, i) => (i === 2 ? { ...a, line: "올해 운과 부딪히는 날이라 말을 아껴요." } : a)) }, brief);
-    expect(r2).toEqual(['구조 서술 "부딪히"']);
-    expect(validateFortuneText({ ...OK, dont: "윗글과 아랫글이 맞서니 서두르지 않아요." }, brief)).toEqual(expect.arrayContaining(['구조 서술 "맞서"', '구조 서술 "윗글"', '구조 서술 "아랫글"']));
-    // headline은 보지 않는다. "한편" 단독(부사)은 통과, "한편이"만 탈락
-    expect(validateFortuneText({ ...OK, headline: "글자가 또렷한 날" }, brief)).toEqual([]);
-    expect(validateFortuneText({ ...OK, dont: "한편 서두르지는 않아요." }, brief)).toEqual([]);
-    expect(validateFortuneText({ ...OK, dont: "그 사람과 한편이 되니 서두르지 않아요." }, brief)).toEqual(['구조 서술 "한편이"']);
-    // v4.4: 맥락 문장 없는 날의 "올해 운" 언급은 따로 걸린다
-    expect(validateFortuneText({ ...OK, dont: "올해 운과 한편이 되니 서두르지 않아요." }, brief)).toEqual(expect.arrayContaining(['구조 서술 "한편이"', "오늘만: facts에 없는 올해·10년 단위 운을 말함"]));
+    expect(v({ dont: "짝이 맞는 물건만 서둘러 사지 않아요." })).toEqual(['dont: 구조 서술 "짝이 맞"']);
+    expect(v({ do: "위아래 서랍 하나만 정리해요." })).toEqual(['do: 구조 서술 "위아래"']);
+    expect(v({ do: "천간 이야기는 접어 두고 하나만 해요." })).toEqual(['do: 전문용어 "천간"']);
+    expect(v({ areaLines: [OK.areaLines[0]!, { area: "연애", text: "가까운 사람과 부딪히는 말은 아껴요." }] })).toEqual(['areaLines[1]: 구조 서술 "부딪히"']);
+    expect(v({ headline: "글자가 또렷한 날" })).toEqual([]);
+    expect(v({ dont: "한편 서두르지는 않아요." })).toEqual([]);
+    expect(v({ dont: "그 사람과 한편이 되니 서두르지 않아요." })).toEqual(['dont: 구조 서술 "한편이"']);
+    // v4.4·4.19: 계획에 맥락이 없는 날의 "올해 운"·"이달 운" 언급
+    expect(v({ dont: "올해 운을 믿고 서두르지 않아요." })).toEqual(["dont: 오늘만: 계획에 없는 올해·10년 단위 운을 말함"]);
+    expect(v({ dont: "이달 운을 믿고 서두르지 않아요." })).toEqual(["dont: 이달 운 재료가 없는데 이달 운을 말함"]);
   });
 
-  test("v4.13 추상어·생극·이름 검사: 이름 없는 말과 생·극 설명은 탈락, 오늘 이름이 본문에 없거나 오늘 것이 아니거나 3번이면 탈락, 이달 한 줄이 없으면 탈락", () => {
-    for (const bad of ["평소 아쉽던 부분이 채워지는 날이에요.", "내게 부족한 쪽이 채워져요.", "원래 나에게 넘치는 힘이 더해져요.", "힘이 한곳에 모이지 않아요.", "지금 나와 박자가 안 맞아요.", "그 힘이 돈 쪽으로 작용해요.", "채워 주는 힘이 들어와요."]) {
-      expect(validateFortuneText({ ...OK, dont: bad }, brief).filter((x) => x.startsWith("추상어")), bad).toHaveLength(1);
+  test("v4.13 추상어·생극·판정·비유·성격 이름", () => {
+    for (const bad of ["평소 아쉽던 부분이 채워지는 날이에요.", "원래 나에게 넘치는 힘이 더해져요.", "힘이 한곳에 모이지 않아요.", "지금 나와 박자가 안 맞아요.", "그 힘이 돈 쪽으로 작용해요."]) {
+      expect(v({ dont: bad }).filter((x) => x.includes("추상어")), bad).toHaveLength(1);
     }
-    // 이름이 앞에 있으면("금을 거들어 주는 쪽") 추상어가 아니다
-    expect(validateFortuneText({ ...OK, dont: "모자란 금을 거들어 주는 쪽이니 돈을 급히 쓰지 않아요." }, brief)).toEqual([]);
-    // 이달 한 줄·이름 문장·판정 문장은 예시와 같아도 베낌이 아니다 (장면 문장은 그대로 걸린다)
-    const ex = SYSTEM_EXAMPLES[0]!.text.body;
-    const exSents = splitSentences(ex.replace(/\n+/g, " "));
-    const withFormula = { ...OK, body: OK.body.replace("이달 갑오월은 내게 조심할 편이지만, ", "이달 갑오월은 내게 조심할 편이에요. ").replace("오늘 경신일은 기회와 확장을 뜻하는 편재가 아주 센 날이고 내게 모자란 금을 채우는 쪽이라 평소보다 힘이 덜 들어요.", "오늘 경신일에는 기회와 확장을 뜻하는 편재가 아주 세게 와요. 내게 모자란 금, 그러니까 실속을 챙기는 힘을 거드는 쪽이라 오늘은 맞는 날이에요.") };
-    expect(validateFortuneText(withFormula, brief).filter((x) => x.startsWith("예시"))).toEqual([]);
-    expect(validateFortuneText({ ...OK, body: OK.body + " " + exSents[3] }, brief).filter((x) => x.startsWith("예시"))).toHaveLength(0);   // v4.16: 옛 꼴 글은 예시(v4.16 꼴) 베낌을 보지 않는다
     for (const bad of ["오늘 수 기운이 내 화를 누르고 있어요.", "금이 목을 극해요.", "토가 금을 생해요."]) {
-      expect(validateFortuneText({ ...OK, dont: bad }, brief).filter((x) => x.startsWith("생·극")), bad).toHaveLength(1);
+      expect(v({ dont: bad }).filter((x) => x.includes("생·극")), bad).toHaveLength(1);
     }
-    // 일상어는 통과: "발생해요", "눌러요"(버튼)
-    expect(validateFortuneText({ ...OK, dont: "문제가 발생해도 버튼을 눌러요." }, brief)).toEqual([]);
-    // 이름을 빼면 "이름 없음"과, 홀로 남은 성격 이름("기회와 확장")의 추상 검사가 같이 걸린다
-    expect(validateFortuneText({ ...OK, body: OK.body.replace("편재가", "그 성격이") }, brief)).toEqual([expect.stringContaining('추상 이름 "기회와 확장"')]);   // v4.16: 이름이 꼭 있어야 한다는 규칙은 없어졌다
-    expect(validateFortuneText({ ...OK, body: OK.body.replace("편재가", "편재가 편재답게 편재로 편재처럼") }, brief)).toEqual(['이름 "편재"이 4번 (용어는 한 번, 바로 뒤에 뜻 한 줄)']);   // v4.15: TERM_MAX 3
-    expect(validateFortuneText({ ...OK, body: OK.body.replace("이달 갑오월은 내게 조심할 편이지만, ", "") }, brief)).toEqual([]);   // v4.15: 이달 한 줄은 더 이상 필수가 아니다
-    // 성격 이름("기회와 확장")은 기운 이름 바로 뒤의 뜻으로는 쓸 수 있고(OK가 그렇다), 이름 없는 문장에 홀로 오면 추상
-    expect(validateFortuneText({ ...OK, body: OK.body + " 기회와 확장이 눈에 들어와요." }, brief)).toEqual([expect.stringContaining('추상 이름 "기회와 확장"')]);
-    // 10-b: 주의인 날이어도 이달 한 줄의 "수월한 편"은 반전 말로 보지 않는다. 오늘 문장의 "수월"은 그대로 걸린다
-    const care = { ...brief, score: { ...brief.score, band: "주의" }, month: { ...brief.month!, line: "이달 갑오월은 수월한 편이에요." } };
-    const careText = { ...OK, body: OK.body.replace("이달 갑오월은 내게 조심할 편이지만", "이달 갑오월은 내게 수월한 편이지만") };
-    expect(validateFortuneText(careText, care).filter((x) => x.includes("반전 말"))).toEqual([]);
-    expect(validateFortuneText({ ...careText, body: careText.body.replace("하루 묵히는 쪽이 편해요", "일이 수월하게 가요") }, care).filter((x) => x.includes("반전 말"))).toEqual(['주의인 날 본문에 반전 말 "수월"']);
+    expect(v({ dont: "문제가 발생해도 버튼을 눌러요." })).toEqual([]);
+    expect(v({ body: b3("오늘은 내게 맞는 편이라 그 자리에서 정해도 괜찮아요.") }).some((x) => x.includes("판정 문장"))).toBe(true);
+    expect(v({ body: b3("오늘은 일이 손에 잘 붙어서 적어 두기만 해도 정리가 돼요.") }).some((x) => x.includes("비유"))).toBe(true);
+    expect(v({ body: b3("기회와 확장이 눈에 들어오니 그 자리에서 정하지 않는 편이 좋아요.") }).some((x) => x.includes('성격 이름 "기회와 확장"'))).toBe(true);
+    // 주의인 날 반전 말은 오늘 문장만 (이달·올해 문장은 예외)
+    const care = { ...brief, score: { ...brief.score, band: "주의" } };
+    expect(validateFortuneText({ ...OK, body: b3("마음에 든 것을 고르는 일은 생각보다 수월하게 끝나요.") }, care).filter((x) => x.includes("반전 말"))).toEqual(['본문 4번째 문장: 주의인 날 반전 말 "수월"']);
   });
 
-  test("숫자 날조: brief에 없는 숫자 / v4.17 내 기록 숫자 문장이 있으면 탈락", () => {
-    const r = validateFortuneText({ ...OK, do: "30분만 혼자 있는 시간을 만들어요." }, brief);
-    expect(r).toEqual(expect.arrayContaining([expect.stringContaining("사실에 없는 숫자 30")]));
-    const r2 = validateFortuneText({ ...OK, body: OK.body.replace("다만 예정이", "경이나 신이 든 날에 5번 기록했고 평균 8점이었어요. 다만 예정이") }, brief);
-    expect(r2.some((x) => x.includes("기록·평균 이야기"))).toBe(true);
-    expect(validateFortuneText({ ...OK, dont: "지난 3번 기록처럼 혼자 결정하지 않아요." }, brief).some((x) => x.includes("기록·평균 이야기"))).toBe(true);
+  test("숫자 날조 · 점수 숫자 · 기록 이야기", () => {
+    expect(v({ do: "30분만 혼자 있는 시간을 만들어요." })).toEqual(expect.arrayContaining([expect.stringContaining("사실에 없는 숫자 30")]));
+    expect(v({ body: b3("오늘은 9.2점짜리 날이라 그 자리에서 정하지 않는 편이 좋아요.") })).toEqual(["본문 4번째 문장: 점수 숫자 9.2 (점수는 화면에 있으니 글에 쓰지 않기)"]);
+    expect(v({ headline: "10점 만점에 가까운 날" })).toEqual(expect.arrayContaining([expect.stringContaining('"N점 만점" 꼴')]));
+    expect(v({ dont: "지난 3번 기록처럼 혼자 결정하지 않아요." }).some((x) => x.includes("기록·평균 이야기"))).toBe(true);
+    expect(v({ body: b3("비슷한 날의 평균 행복도가 높았으니 그 자리에서 정하지 않아요.") }).some((x) => x.includes("기록·평균 이야기"))).toBe(true);
   });
 
-  test("영역 불일치: 개수·순서·줄 문장 수 · v4.2 period 불일치 · 본문 첫 문장과 겹침", () => {
-    expect(validateFortuneText({ ...OK, areas: OK.areas.slice(0, 2) }, brief).some((x) => x.startsWith("areas 불일치"))).toBe(true);
-    expect(validateFortuneText({ ...OK, areas: [OK.areas[1]!, OK.areas[0]!, OK.areas[2]!, OK.areas[3]!] }, brief).some((x) => x.startsWith("areas 불일치"))).toBe(true);
-    expect(validateFortuneText({ ...OK, areas: OK.areas.map((a) => ({ ...a, line: "한 문장이에요. 두 문장이에요." })) }, brief).some((x) => x.includes("1문장"))).toBe(true);
-    // period가 다르면 탈락, 빠져 있으면 brief 것으로 보고 통과
-    expect(validateFortuneText({ ...OK, areas: OK.areas.map((a, i) => (i === 2 ? { ...a, period: "올해" as const } : a)) }, brief)).toEqual(["areas period 불일치: 기대 [오늘,오늘,이달,올해] / 받음 [오늘,오늘,올해,올해]"]);
-    expect(validateFortuneText({ ...OK, areas: OK.areas.map(({ area, line }) => ({ area, line })) }, brief)).toEqual([]);
-    // 영역 줄이 본문 첫 문장과 60% 이상 겹치면 탈락
+  test("영역 줄: 1문장 · 본문 첫 문장과 겹침", () => {
+    expect(v({ areaLines: [{ area: "재물", text: "한 문장이에요. 두 문장이에요." }, OK.areaLines[1]!] }).some((x) => x.includes("1문장"))).toBe(true);
     expect(AREA_OVERLAP_MAX).toBe(0.6);
-    expect(tokenOverlap("아침에 메일함을 열면 미뤄 둔 제안 하나가 눈에 들어와요.", OK.body)).toBeGreaterThanOrEqual(0.6);
-    expect(tokenOverlap("돈 쓰는 일은 계획대로 가요.", OK.body)).toBe(0);
-    const dup = validateFortuneText({ ...OK, areas: OK.areas.map((a, i) => (i === 0 ? { ...a, line: "아침에 메일함을 열면 미뤄 둔 제안 하나가 눈에 들어와요." } : a)) }, brief);
-    expect(dup).toEqual(["areas[0] line이 본문 첫 문장과 겹침"]);
+    expect(v({ areaLines: [{ area: "재물", text: "평소라면 그냥 넘겼을 할인 소식이나 제안이 자꾸 눈에 들어와요." }, OK.areaLines[1]!] })).toEqual(["areaLines[0]: 본문 첫 문장과 겹침"]);
+    expect(tokenOverlap("돈 쓰는 일은 계획대로 가요.", OK.body.join(" "))).toBe(0);
   });
 
-  test("v4.2 점수 숫자: 점수(9.2)나 'N점 만점'이 글에 있으면 탈락 — 기록 평균(8점)은 그대로", () => {
-    expect(validateFortuneText({ ...OK, body: OK.body.replace("힘이 덜 들어요", "9.2점짜리 날이에요") }, brief)).toEqual(["점수 숫자 9.2 (점수는 화면에 있으니 글에 쓰지 않기)"]);
-    expect(validateFortuneText({ ...OK, headline: "10점 만점에 가까운 날" }, brief)).toEqual(expect.arrayContaining([expect.stringContaining('"N점 만점" 꼴')]));
-    expect(validateFortuneText({ ...OK, dont: "오늘은 7점이에요." }, brief)).toEqual(expect.arrayContaining([expect.stringContaining("사실에 없는 숫자 7")]));
-    expect(validateFortuneText(OK, brief)).toEqual([]); // "평균 8점이었어요"는 통과
+  test("문장 수: 본문 3문장·7문장은 전체 이슈(다시 쓰기) / 기간 약속 · 한자", () => {
+    expect(v({ body: OK.body.slice(0, 3) })).toEqual(["본문 3문장 (4~5문장)"]);
+    expect(v({ body: [...OK.body, "하나 더 있는 문장이에요.", "또 하나 더 있는 문장이에요.", "셋째로 더 있는 문장이에요."] })).toEqual(expect.arrayContaining(["본문 7문장 (4~5문장)"]));
+    expect(v({ dont: "3일 더 쓰면 달라지지 않아요." }).some((x) => x.includes("기간 약속"))).toBe(true);
+    expect(v({ headline: "庚申의 아침" }).some((x) => x.includes("한자"))).toBe(true);
   });
 
-  test("문장 수: 본문 3문장 또는 7문장은 탈락", () => {
-    const three = "아침에 메일함을 열어요. 경이나 신이 든 날에 5번 기록했고 평균 8점이었어요. 저녁엔 제안을 묵혀요.";
-    expect(validateFortuneText({ ...OK, body: three }, brief)).toEqual(expect.arrayContaining([expect.stringContaining("본문 3문장")]));
-    const seven = OK.body + " 하나 더요. 또 하나 더요. 셋째도 더요.";
-    expect(validateFortuneText({ ...OK, body: seven }, brief)).toEqual(expect.arrayContaining([expect.stringContaining("본문 7문장")]));
-  });
-
-  test("기간 약속 · 기록 없는데 기록 언급 · 한자", () => {
-    expect(validateFortuneText({ ...OK, dont: "3일 더 쓰면 달라져요." }, brief).some((x) => x.includes("기간 약속"))).toBe(true);
-    expect(validateFortuneText({ ...OK, headline: "庚申의 아침" }, brief).some((x) => x.includes("한자"))).toBe(true);
-    const r = validateFortuneText({ ...OK, body: OK.body.replace("다만 예정이", "경이나 신이 든 날에 5번 기록했고 평균 8점이었어요. 다만 예정이") }, briefOf(NONE));
-    expect(r.some((x) => x.includes("기록·평균 이야기"))).toBe(true);
-    expect(r.some((x) => x.includes("사실에 없는 숫자"))).toBe(true);
-  });
-
-  test("템플릿 문장은 금지어·전문용어 검사를 통과한다 (문장 수만 다름)", () => {
+  test("템플릿 문장은 금지어·전문용어 검사를 통과한다", () => {
     const t = templateText(templateInputFromCore(core), NONE, today);
-    const r = validateFortuneText({ headline: t.headline, body: t.body, areas: (t.areas ?? []).map((a) => ({ area: a.area, line: a.line })), do: t.do, dont: t.dont }, briefOf(NONE));
-    expect(r.filter((x) => !x.startsWith("본문"))).toEqual([]);
+    const r = validateFortuneText({ headline: t.headline, body: t.body, areas: [], do: t.do, dont: t.dont }, brief);
+    expect(r.filter((x) => /금지어|전문용어|십신|판정|구조/.test(x))).toEqual([]);
   });
 });
 
-describe("3단계 파이프라인 (모델은 가짜)", () => {
-  const today = { ko: "경신", hanja: "庚申", stemKo: "경", branchKo: "신" };
-  const NONE = { n: 0, mean: null, sameGanjiCount: 0, sameGanjiMean: null, weight: 0, score: 0.5 };
-  const input: BriefInput = { core: v4(PROFILE_A, "2026-06-15"), personal: NONE, today, date: "2026-06-15", weekday: "월요일", score10: 9.2, band: "좋음" };
-  const fallback = templateText(templateInputFromCore(input.core), input.personal, today);
-  const good: ModelText = {
-    headline: "제안이 눈에 들어오는 월요일",
-    body: "아침에 메일함을 열면 미뤄 둔 제안 하나가 다시 눈에 들어와요. 이달 갑오월은 내게 조심할 편이지만, 오늘 경신일은 기회와 확장을 뜻하는 편재가 아주 센 날이고 내게 모자란 금을 채우는 쪽이라 평소보다 힘이 덜 들어요. 다만 예정이 한 번쯤 틀어지기 쉬운 날이라 여유를 두는 게 좋아요. 저녁엔 들어온 제안을 적어 두고 하루 묵히는 쪽이 편해요.",
-    areas: [
-      { period: "오늘", area: "재물", line: "돈 쓰는 일은 계획대로 가요." },
-      { period: "오늘", area: "연애", line: "가까운 사람에게 마음을 보이기 좋아요." },
-      { period: "이달", area: "대인", line: "이달엔 사람 사이 말이 엇갈리기 쉬워 짧게 말해요." },
-      { period: "올해", area: "대인", line: "올해는 내 속도만 고집하면 사람이 멀어지기 쉬워요." },
-    ],
-    do: "오랜만에 산책길을 바꿔 걸어 봐요.",
-    dont: "충동 지출을 하지 않아요.",
-  };
-  const fakeClient = (answers: ModelText[]) => {
-    const calls: unknown[] = [];
-    const client = {
-      messages: {
-        create: async (params: unknown) => {
-          calls.push(params);
-          const a = answers[calls.length - 1]!;
-          return { stop_reason: "end_turn", content: [{ type: "text", text: JSON.stringify(a) }], usage: { input_tokens: 100, output_tokens: 50, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 } };
-        },
-      },
-    };
-    return { client: client as never, calls };
-  };
-
-  test("첫 글이 통과하면 llm, attempts 1, 영역 줄은 모델 것 + brief의 신호, 요청 모양", async () => {
-    const { client, calls } = fakeClient([good]);
-    const r = await generateFortuneText(input, fallback, { client, model: "claude-sonnet-5" });
-    expect(r.source).toBe("llm");
-    expect(r.attempts).toBe(1);
-    expect(r.model).toBe("claude-sonnet-5");
-    expect(r.text.areas).toEqual([
-      { period: "오늘", area: "재물", signal: "↑", line: "돈 쓰는 일은 계획대로 가요." },
-      { period: "오늘", area: "연애", signal: "↑", line: "가까운 사람에게 마음을 보이기 좋아요." },
-      { period: "이달", area: "대인", signal: "↓", line: "이달엔 사람 사이 말이 엇갈리기 쉬워 짧게 말해요." },
-      { period: "올해", area: "대인", signal: "↓", line: "올해는 내 속도만 고집하면 사람이 멀어지기 쉬워요." },
-    ]);
-    expect(OUTPUT_SCHEMA.properties.areas.items.required).toEqual(["period", "area", "line"]);
-    const p = calls[0] as { model: string; temperature?: unknown; max_tokens: number; thinking: unknown; output_config: { effort: string; format: { type: string; schema: unknown } }; system: { cache_control: unknown }[]; messages: { role: string }[] };
-    expect(p.model).toBe("claude-sonnet-5");
-    expect(p.max_tokens).toBe(4096);
-    expect(p.temperature).toBeUndefined();
-    expect(p.thinking).toEqual({ type: "adaptive" });
-    expect(p.output_config.effort).toBe("low");
-    expect(p.output_config.format).toEqual({ type: "json_schema", schema: OUTPUT_SCHEMA });
-    expect(p.system[0]!.cache_control).toEqual({ type: "ephemeral" });
-    expect(p.messages.map((m) => m.role)).toEqual(["user"]); // prefill 없음
-  });
-
-  test("탈락 → 재작성 1회 통과: attempts 2, 재작성 요청에 이전 글과 사유가 붙는다", async () => {
-    const bad = { ...good, headline: "흐름이 좋은 날" };
-    const { client, calls } = fakeClient([bad, good]);
-    const r = await generateFortuneText(input, fallback, { client });
-    expect(r.source).toBe("llm");
-    expect(r.attempts).toBe(2);
-    expect(r.issues[0]).toEqual(expect.arrayContaining([expect.stringContaining("흐름")]));
-    expect(r.issues[1]).toEqual([]);
-    const second = calls[1] as { messages: { content: string }[] };
-    expect(second.messages[0]!.content).toContain("[재작성]");
-    expect(second.messages[0]!.content).toContain("흐름이 좋은 날");
-    expect(second.messages[0]!.content).toContain('금지어 "흐름"');
-  });
-
-  test("v4.5: 세 번 탈락 → 템플릿, attempts 3, model null", async () => {
-    const bad = { ...good, headline: "흐름이 좋은 날" };
-    const { client } = fakeClient([bad, bad, bad]);
-    const r = await generateFortuneText(input, fallback, { client });
-    expect(r.source).toBe("template");
-    expect(r.attempts).toBe(3);
-    expect(r.model).toBeNull();
-    expect(r.text).toEqual(fallback);
-  });
-
-  test("refusal이면 바로 템플릿", async () => {
-    const client = { messages: { create: async () => ({ stop_reason: "refusal", content: [], usage: { input_tokens: 1, output_tokens: 0, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 } }) } } as never;
-    const r = await generateFortuneText(input, fallback, { client });
-    expect(r).toMatchObject({ source: "template", attempts: 1, model: null });
-    expect(r.issues[0]![0]).toContain("refusal");
-  });
-
-  test("A-5: max_tokens에 잘리면 다음 시도로 넘어가고, 그다음 통과하면 llm", async () => {
-    const calls: unknown[] = [];
-    const client = {
-      messages: {
-        create: async (params: unknown) => {
-          calls.push(params);
-          const usage = { input_tokens: 10, output_tokens: 5, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 };
-          if (calls.length === 1) return { stop_reason: "max_tokens", content: [{ type: "text", text: '{"headline":"잘' }], usage };
-          return { stop_reason: "end_turn", content: [{ type: "text", text: JSON.stringify(good) }], usage };
-        },
-      },
-    } as never;
-    const r = await generateFortuneText(input, fallback, { client });
-    expect(r.source).toBe("llm");
-    expect(r.attempts).toBe(2);
-    expect(r.issues[0]![0]).toContain("max_tokens");
-    expect(r.transient).toBeUndefined();
-    const second = calls[1] as { messages: { content: string }[] };
-    expect(second.messages[0]!.content).toContain("끊겨");
-  });
-
-  test("A-3: API 오류(타임아웃·5xx)면 템플릿이되 transient=api — 캐시에 쓰지 않는 신호", async () => {
-    const client = { messages: { create: async () => { throw new Error("Request timed out."); } } } as never;
-    const r = await generateFortuneText(input, fallback, { client });
-    expect(r).toMatchObject({ source: "template", attempts: 1, transient: "api" });
-    // 장애 템플릿은 retryAfter까지만 캐시로 쓰고, 지나면 다시 만든다
+describe("3단계 캐시 정책 (A-3·B-H1)", () => {
+  test("A-3: API 장애 템플릿은 retryAfter까지만 캐시로 쓰고, 지나면 다시 만든다", () => {
     const now = Date.now();
     const cached = { headline: "x", transient: "api", retryAfter: retryAfterFor(now) };
     expect(usableCachedContent(cached, now + 1000)).not.toBeNull();
@@ -884,17 +710,6 @@ describe("3단계 파이프라인 (모델은 가짜)", () => {
     expect(regenPolicy({ content: { regen: REGEN_LIMIT - 1 } })).toEqual({ regen: REGEN_LIMIT, useModel: true });
     expect(regenPolicy({ content: { regen: REGEN_LIMIT } })).toEqual({ regen: REGEN_LIMIT + 1, useModel: false });
     expect(regenCountOf({ content: { regen: "x" } })).toBe(0);
-  });
-
-  test("키가 없으면 모델을 부르지 않고 템플릿", async () => {
-    const prev = process.env.ANTHROPIC_API_KEY;
-    delete process.env.ANTHROPIC_API_KEY;
-    try {
-      const r = await generateFortuneText(input, fallback);
-      expect(r).toMatchObject({ source: "template", attempts: 0, model: null });
-    } finally {
-      if (prev !== undefined) process.env.ANTHROPIC_API_KEY = prev;
-    }
   });
 });
 

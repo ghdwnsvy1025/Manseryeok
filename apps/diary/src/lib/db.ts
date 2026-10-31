@@ -385,11 +385,34 @@ export async function getFortuneVote(sb: SupabaseClient, userId: string, date: s
   return (data?.vote as 1 | -1 | undefined) ?? null;
 }
 
-export async function saveFortuneVote(sb: SupabaseClient, userId: string, date: string, vote: 1 | -1): Promise<void> {
-  const { error } = await sb
-    .from("night_fortune_feedback")
-    .upsert({ user_id: userId, fortune_date: date, vote }, { onConflict: "user_id,fortune_date" });
+/** "아니에요"의 이유 (0006_vote_reason.sql, 2026-10-31) */
+export const VOTE_REASONS = ["content", "obvious", "awkward"] as const;
+export type VoteReason = (typeof VOTE_REASONS)[number];
+
+/** reason: undefined = 건드리지 않음, null = 지움. 맞아요로 바꾸면 이유는 지운다. 열이 아직 없으면(0006 적용 전) 이유 없이 다시 저장 */
+export async function saveFortuneVote(sb: SupabaseClient, userId: string, date: string, vote: 1 | -1, reason?: VoteReason | null): Promise<void> {
+  const row: Record<string, unknown> = { user_id: userId, fortune_date: date, vote };
+  if (vote === 1) row.reason = null;
+  else if (reason !== undefined) row.reason = reason;
+  const upsert = (r: Record<string, unknown>) => sb.from("night_fortune_feedback").upsert(r, { onConflict: "user_id,fortune_date" });
+  let { error } = await upsert(row);
+  if (error && isMissingColumnError(error) && "reason" in row) {
+    const { reason: _r, ...rest } = row;
+    ({ error } = await upsert(rest));
+  }
   if (error) fail("운세 피드백 저장", error);
+}
+
+/** 나 탭 "운세 적중률" (2026-10-31): 내가 답한 날의 맞아요(+1)·아니에요(−1) 전부. 날짜 역순 */
+export async function listFortuneVotes(sb: SupabaseClient, userId: string): Promise<{ fortune_date: string; vote: 1 | -1 }[]> {
+  const { data, error } = await sb
+    .from("night_fortune_feedback")
+    .select("fortune_date, vote")
+    .eq("user_id", userId)
+    .order("fortune_date", { ascending: false })
+    .limit(2000);
+  if (error) fail("운세 피드백 목록 읽기", error);
+  return (data ?? []) as { fortune_date: string; vote: 1 | -1 }[];
 }
 
 /** 투표 취소: 눌린 쪽을 다시 누르면 그 날짜 행을 지운다. 없는 날짜는 0 rows — 오류가 아니다 */
