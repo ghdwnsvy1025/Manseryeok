@@ -92,7 +92,7 @@ import { templateText } from "@/lib/fortune/text";
 
 describe("v4.21 작가가 짐작하던 뜻을 사실로 준다", () => {
   const b = buildBrief({ core, personal: NONE, today: { ko: "경신", hanja: "庚申", stemKo: "경", branchKo: "신" }, date: DATE, weekday: "월요일", score10: 5, band: "주의", recent: [{ date: "2026-06-14", headline: "어제 제목", start: "문장이에요.", lines: ["문장이에요."], actions: ["하면이에요."], vote: -1 as const, voteReason: "content" as const }] });
-  const j = JSON.parse(renderBrief(b)) as Record<string, unknown> & { 행동대상: { 대상: string; 쪽: string }[]; 핵심: { 오늘: string; 관점?: string; 표현?: unknown }; 숫자: number[]; 피할것?: Record<string, unknown> };
+  const j = JSON.parse(renderBrief(b)) as Record<string, unknown> & { 영역: { 신호: string; 뜻: string }[]; 핵심: { 오늘: string }; 숫자: number[]; 피할것?: Record<string, unknown> };
   test("방향 칸이 없다 — 행동의 종류는 단계에서 나오지 않는다", () => {
     expect(j).not.toHaveProperty("방향");
     expect(j).toHaveProperty("말투");
@@ -101,19 +101,8 @@ describe("v4.21 작가가 짐작하던 뜻을 사실로 준다", () => {
     for (const w of Object.values(READ_WORD)) expect(w).not.toMatch(/지나치/);
     expect(Object.values(READ_WORD)).toContain(j.핵심.오늘);
   });
-  test("영역은 본문 재료가 아니라 행동대상 칸 — v4.22b: 대상과 쪽만, 상태 문장은 싣지 않는다", () => {
-    expect(j).not.toHaveProperty("영역");
-    expect(j.행동대상.length).toBeGreaterThan(0);
-    for (const a of j.행동대상) {
-      expect(Object.keys(a).sort()).toEqual(["대상", "쪽"]);
-      expect(["해 볼 만함", "조심"]).toContain(a.쪽);
-    }
-    expect(JSON.stringify(j.행동대상)).not.toMatch(/쉬운 쪽|순한 쪽|차분한 쪽|실리는 쪽/);
-  });
-  test("v4.22 핵심은 표현 후보 넷이 아니라 코드가 고른 관점 하나", () => {
-    expect(j.핵심.관점).toBe(b.plan.core.focus);
-    expect(j.핵심).not.toHaveProperty("표현");
-    expect(b.plan.core.focus).toBe(b.plan.core.expressions[0]);
+  test("영역마다 화면 상태말과 같은 뜻이 간다", () => {
+    for (const a of j.영역) expect(a.뜻).toMatch(/쪽$/);
   });
   test("숫자에 날짜(연·월·일)가 없다", () => {
     expect(j.숫자).not.toContain(2026);
@@ -149,29 +138,10 @@ test("v4.21 템플릿 본문에 lead와 거의 같은 표현이 두 번 나오�
   }
 });
 
-// ---------- v4.22 (ChatGPT 4차): 작가에게 무엇을 보내지 않을지 ----------
-test("v4.22 보조는 중요할 때만 — 다른 쪽 기운은 핵심 점수의 70% 이상, 복음·먼 자리 충은 보조로 쓰지 않는다", () => {
-  const weak: CoreFortune = { ...core, relations: { ...core.relations, hits: core.relations.hits.filter((h) => h.kind !== "충") }, dayLuck: { ...core.dayLuck, stem: { ...core.dayLuck.stem, tenGod: "정관", score: 3 }, branch: { ...core.dayLuck.branch, tenGod: "편재", score: -1.5 } } };
-  expect(buildPlan({ core: weak, personal: NONE, date: DATE, band: "무난" }).support).toBeNull();
-  const strong: CoreFortune = { ...weak, dayLuck: { ...weak.dayLuck, branch: { ...weak.dayLuck.branch, score: -2.5 } } };
-  expect(buildPlan({ core: strong, personal: NONE, date: DATE, band: "무난" }).support).toMatchObject({ kind: "기운" });
-  const far = { pos: "연" as const, kind: "충" as const, direction: "불리" as const, strength: 1, chars: "子", fact: "오늘은 바깥 쪽 일이 흔들려 예정이 틀어지기 쉬워요." };
-  const farOnly: CoreFortune = { ...weak, relations: { ...weak.relations, hits: [far] } };
-  expect(buildPlan({ core: farOnly, personal: NONE, date: DATE, band: "무난" }).support).toBeNull();
-});
-
-test("v4.22 맥락 문장 조사는 한글 읽기 받침대로 (병오는, 무술은)", () => {
+test("v4.21b 맥락 문장 조사는 한글 읽기 받침대로 (병오는, 무술은)", () => {
   const c = computeCoreFortune({ pillars: pr.value.pillars, profile: PROFILE_A, date: "2026-02-04", todayHanja: dayGanji("2026-02-04").hanja });
   const all = [...c.contextFacts, ...c.facts].join(" ");
   expect(all).not.toMatch(/[甲乙丙丁戊己庚辛壬癸][子卯巳午未酉亥]은 /);
   expect(all).not.toMatch(/[甲乙丙丁戊己庚辛壬癸][丑寅辰申戌]는 /);
   expect(all).toMatch(/운 [甲乙丙丁戊己庚辛壬癸][子丑寅卯辰巳午未申酉戌亥](은|는) /);
-});
-
-test("v4.22 작가 지시: 본문은 관점 하나를 한 줄기로, 행동대상은 본문에 쓰지 않음, 피해요는 조심할 행동", async () => {
-  const { SYSTEM } = await import("@/lib/fortune/llm");
-  expect(SYSTEM).toContain("핵심.관점 하나를 한 줄기로");
-  expect(SYSTEM).toContain("본문에서는 다루지 않습니다");
-  expect(SYSTEM).not.toContain('dont는 "~않아요" 꼴');
-  expect(SYSTEM).not.toContain("맥락이 있으면");
 });

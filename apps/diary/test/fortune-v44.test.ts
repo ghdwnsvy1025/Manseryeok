@@ -175,14 +175,12 @@ describe("v4.4 brief·SYSTEM·검사 — 요일·절기 재료, 금지어, 맥�
     expect(hasContextFact(termDay.facts)).toBe(true);
     expect(plain.context).toEqual([]);
     expect(plain.month).toBeNull();
-    // v4.22 (ChatGPT 4차 6항): 맥락은 계획에만 남고 작가·검사기에는 가지 않는다 (점수는 이미 단계에 들어 있다)
-    expect(termDay.plan.context).toContain("이달 운 무술은 힘이 드는 편이에요.");
-    expect(termDay.context).toEqual([]);
-    expect(termDay.month).toBeNull();
+    expect(termDay.context).toContain("이달 운 무술은 힘이 드는 편이에요.");
+    expect(termDay.month).not.toBeNull();
     const pj = JSON.parse(renderBrief(plain)) as Record<string, unknown>;
     const tj = JSON.parse(renderBrief(termDay)) as Record<string, unknown>;
     expect(pj).not.toHaveProperty("맥락");
-    expect(tj).not.toHaveProperty("맥락");
+    expect(tj.맥락).toContain("이달 운 무술은 힘이 드는 편이에요.");
     // v4.20: 요일·날짜·절기 라벨은 보내지 않는다. 절기 첫날에만 이름 하나
     expect(pj).not.toHaveProperty("오늘");
     expect(pj).not.toHaveProperty("절기첫날");
@@ -224,9 +222,9 @@ describe("v4.4 brief·SYSTEM·검사 — 요일·절기 재료, 금지어, 맥�
     }
     expect(validateFortuneText({ ...OKC, body: [...OKC.body, "이달 운은 조심할 편이라 서두르지 않아요."] }, plain)).toEqual(["본문 5번째 문장: 이달 운 재료가 없는데 이달 운을 말함"]);
     expect(validateFortuneText({ ...OKC, dont: "올해 운만 믿고 벌이지 않아요." }, plain)).toEqual(["dont: 오늘만: 계획에 없는 올해·10년 단위 운을 말함"]);
-    // v4.22: 절기일에도 맥락을 작가에게 주지 않으니, 이달 운을 말하면 같은 사유로 걸린다
+    // 절기일(맥락에 이달 운 문장)엔 같은 글이 이 사유로는 걸리지 않는다
     const onTermDay = validateFortuneText({ ...OKC, body: [...OKC.body, "이달 운은 힘이 드는 쪽이라 서두르지 않아요."] }, termDay);
-    expect(onTermDay).toContain("본문 5번째 문장: 이달 운 재료가 없는데 이달 운을 말함");
+    expect(onTermDay.filter((x) => x.includes("오늘만") || x.includes("이달 운 재료"))).toEqual([]);
     // 템플릿(모델 실패 대체)은 새 금지어에 걸리지 않는다
     const fallback = templateText(templateInputFromCore(v4(PROFILE_C, "2026-10-07")), NONE, { ko: "갑인", stemKo: "갑", branchKo: "인" });
     expect(findBanned([fallback.headline, fallback.body, fallback.do, fallback.dont].join(" "))).toEqual([]);

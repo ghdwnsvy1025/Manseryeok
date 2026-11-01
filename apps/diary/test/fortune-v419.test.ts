@@ -145,7 +145,7 @@ describe("v4.19 brief·SYSTEM 줄이기", () => {
   test("모델에게 가는 brief: 계획 칸만, 십신 이름·판정 사실 문장·금지어 목록·태그·rules 없음", () => {
     const json = renderBrief(brief);
     const o = JSON.parse(json) as Record<string, unknown>;
-    expect(Object.keys(o)).toEqual(expect.arrayContaining(["단계", "말투", "핵심", "행동대상", "숫자"]));
+    expect(Object.keys(o)).toEqual(expect.arrayContaining(["단계", "말투", "핵심", "영역", "숫자"]));
     expect(o).not.toHaveProperty("오늘");   // v4.20: 날짜·요일·절기는 보내지 않는다
     for (const k of ["inside", "rules", "banned", "jargon", "personal", "mine", "facts", "맥락", "tags", "avoid"]) expect(o).not.toHaveProperty(k);
     for (const n of TEN_GOD_NAMES) expect(json).not.toContain(n);
@@ -163,7 +163,7 @@ describe("v4.19 brief·SYSTEM 줄이기", () => {
     expect(OUTPUT_SCHEMA.properties).not.toHaveProperty("areaLines");
     expect(OUTPUT_SCHEMA.properties.body.type).toBe("array");
     expect(REPAIR_SCHEMA.properties.fixes.items.properties.action.enum).toEqual(["replace", "delete"]);
-    expect(PROMPT_VERSION).toMatch(/^v4\.22-[0-9a-f]{8}$/);
+    expect(PROMPT_VERSION).toMatch(/^v4\.21b-[0-9a-f]{8}$/);
   });
 });
 

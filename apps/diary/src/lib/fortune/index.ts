@@ -24,7 +24,8 @@ import { dailyCap, regenPolicy, retryAfterFor, usableCachedContent } from "./pol
 export { REGEN_LIMIT, TRANSIENT_RETRY_MS, dailyCap, regenCountOf, regenPolicy, retryAfterFor, usableCachedContent } from "./policy";
 
 /** 캐시 지문에 들어간다. 올리면 기존 캐시가 전부 무효 */
-export const FORTUNE_VERSION = "v4.22";
+// v4.21b (2026-11-01): v4.22b(재료 줄이기)를 되돌렸다 — 앱 주인 블라인드 20쌍에서 v4.21(4~5문장, 여러 면) 15 : v4.22b 4. 맥락 문장 조사 수정(core.ts)만 남긴다
+export const FORTUNE_VERSION = "v4.21b";
 
 export type FortuneOwner = { userId: string; guestKey?: undefined } | { guestKey: string; userId?: undefined };
 

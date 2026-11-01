@@ -8,7 +8,7 @@
 import { TEN_GOD_THEME } from "./base";
 import { buildPlan, CONTEXT_FACT_RE, daySeed, hanjaToKo, READ_WORD, stripTenGodNames, type FortunePlan } from "./plan";
 import { solarTermOf } from "./solarTerms";
-import { BANNED, namesFromCore } from "./text";
+import { areaStateOf, BANNED, namesFromCore } from "./text";
 import type { AreaName, AreaPeriod, AreaSignal, CoreFortune, PersonalAdjustment } from "./types";
 
 export { CONTEXT_FACT_RE, daySeed, hanjaToKo } from "./plan";
@@ -154,8 +154,9 @@ export function buildBrief(input: BriefInput): FortuneBrief {
   const caveats = core.caveats.map(hanjaToKo);
   const term = solarTermOf(input.date);
   const names = namesFromCore(core);
+  const hasMonth = plan.context.some((c) => c.startsWith("이달 운"));
   // v4.21 (ChatGPT 3차 10항): 날짜·절기 날수는 작가에게 보내지 않으니 숫자 허용 목록에서도 뺀다 — 계획(보조·맥락·참고)에 실린 숫자만
-  const shown = [plan.support && plan.support.kind !== "기운" ? plan.support.text : "", ...caveats];
+  const shown = [plan.support && plan.support.kind !== "기운" ? plan.support.text : "", ...plan.context, ...caveats];
 
   const recentAll = [...(input.recent ?? [])].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
   const within = (days: number) => recentAll.filter((r) => daySeed(input.date) - daySeed(r.date) <= days);
@@ -167,10 +168,8 @@ export function buildBrief(input: BriefInput): FortuneBrief {
     today: { date: input.date, weekday: input.weekday, ganji: `${today.ko}일`, solarTerm: term.label, useSolarTerm: term.isTermDay, solarTermName: term.name },
     score: { value: input.score10, band: input.band, word: BAND_WORD[input.band] },
     tone: input.band === "좋음" ? "경쾌하고 가볍게, 들뜨지 않게" : input.band === "주의" ? "차분하게, 기대를 낮춰 주는 위로로" : "담담하게, 일상의 말투로",
-    // v4.22 (ChatGPT 4차 6항): 맥락은 작가에게 보내지 않는다 — "올해 전체적인 기운이 조심스러운 편이라…" 같은 빈말이 됐다. 맥락 점수는 이미 단계(밴드)에 들어 있다.
-    //   그래서 검사기 쪽 맥락도 비운다(올해·이달 운을 말하면 계획에 없는 말로 막는다). plan.context는 기록용으로 남는다
-    context: [],
-    month: null,
+    context: plan.context,
+    month: hasMonth ? names.month : null,
     facts,
     areas: plan.areas,
     caveats,
@@ -182,20 +181,11 @@ export function buildBrief(input: BriefInput): FortuneBrief {
   };
 }
 
-/**
- * v4.22b: 하면·피해요가 향할 대상 (영역마다 생활 속 대상 하나). 상태 문장("지출이 불어나기 쉬운 쪽")은 싣지 않는다 —
- * v4.22에서 상태 문장을 주자 작가가 본문에 옮기고(96%) 핵심 마음의 결과처럼 이어 붙였다("그 조급함이 말을 앞세워 뜻이 어긋나요").
- * 쪽: ↑ = 해 볼 만함, ↓ = 조심
- */
-export const AREA_TARGET: Record<AreaName, string> = { 대인: "사람과 나누는 말", 재물: "돈 쓰는 결정", 직업: "손에 든 일", 학업: "배우는 일", 연애: "마음을 표현하는 일", 가족: "집안 사람과의 말", 건강: "몸 돌보기" };
-
 /** 모델(작가)에게 보내는 user 메시지 본문 — 계획을 한국어 칸 이름으로. 검사기용 칸(facts·banned·jargon·recent 문장)은 보내지 않는다 */
 export function renderBrief(b: FortuneBrief): string {
   const p = b.plan;
   // 사실 문장("내게 모자란 … 채워져요")은 판정 말투라 보내지 않는다 — 읽기(오늘)와 표현 후보로 충분하다 (v4.18까지 판정 문장이 본문에 새던 1위 경로)
-  // v4.22 (ChatGPT 4차 3·4항): 표현 후보 넷 대신 코드가 고른 관점 하나만 — 넷을 주면 한 문장씩 나열했다(12월 문맥 2.61). 보조는 뜻과 읽기만
-  const part = (x: FortunePlan["core"]) => ({ 뜻: x.meaning, 오늘: READ_WORD[x.read], 관점: x.focus });
-  const sub = (x: FortunePlan["core"]) => ({ 뜻: x.meaning, 오늘: READ_WORD[x.read] });
+  const part = (x: FortunePlan["core"]) => ({ 뜻: x.meaning, 오늘: READ_WORD[x.read], 표현: x.expressions });
   const av = p.avoid;
   // v4.20 (Q2): 장면·동작·첫 어절·제목 끝맺음 회피는 보내지 않는다 — 중요한 명사를 못 쓰게 하고 억지 장면을 부르던 압박. 거의 같은 문장·제목은 검사기가 막는다
   // v4.21 (ChatGPT 3차 8항): "내용이 안 맞음"(voteDown)은 작가에게 보내지 않는다 — 다음 날도 그 뜻이 실제로 세면 숨기는 게 더 틀린 글이다.
@@ -210,11 +200,10 @@ export function renderBrief(b: FortuneBrief): string {
     단계: `${b.score.band}(${b.score.word})`,
     말투: b.tone,
     핵심: part(p.core),
-    ...(p.support ? { 보조: p.support.kind === "기운" ? sub(p.support.part) : { 사실: stripTenGodNames(p.support.text) } } : {}),
-    // v4.21 (ChatGPT 3차 3항): 화살표만 주고 뜻을 짐작시키지 않는다 — 화면 상태말과 같은 뜻.
-    // v4.22 (ChatGPT 4차 2항): 본문 재료가 아니라 하면·피해요가 향할 곳 — 본문 마지막 문장이 이 뜻을 그대로 옮겼다(70%), 화면에 같은 말이 따로 보인다
-    // v4.22b: 대상과 쪽만 (상태 문장은 화면에만)
-    행동대상: p.areas.map((a) => ({ 대상: AREA_TARGET[a.area], 쪽: a.signal === "↑" ? "해 볼 만함" : "조심" })),
+    ...(p.support ? { 보조: p.support.kind === "기운" ? part(p.support.part) : { 사실: stripTenGodNames(p.support.text) } } : {}),
+    ...(p.context.length ? { 맥락: p.context } : {}),
+    // v4.21 (ChatGPT 3차 3항): 화살표만 주고 뜻을 짐작시키지 않는다 — 화면 상태말과 같은 뜻 (오늘 영역 옆에 보이는 그 말)
+    영역: p.areas.map((a) => ({ 영역: a.area, 말: a.word, 기간: a.period, 신호: a.signal, 뜻: areaStateOf(a.area, a.signal as "↑" | "↓") })),
     ...(Object.keys(avoid).length ? { 피할것: avoid } : {}),
     숫자: b.allowedNumbers,
     ...(b.caveats.length ? { 참고: b.caveats } : {}),
