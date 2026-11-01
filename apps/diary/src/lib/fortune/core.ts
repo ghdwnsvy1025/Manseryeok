@@ -51,6 +51,7 @@ import { batchim } from "./text";
 import type {
   AreaName,
   AreaPeriod,
+  AreaProfileEntry,
   AreaSignal,
   CoreFortune,
   CoreLuckContextItem,
@@ -338,9 +339,10 @@ export function computeCoreFortune(input: CoreInput): CoreFortune {
   /** 내 용신 그룹의 생활 속 힘 (v4.9). 용신이 없으면 null */
   const gp = y ? GROUP_POWER[y.용신그룹] : null;
   /** 한 운(luck)의 luckAreas 신호를 영역별로 합산해 |합|이 큰 순으로 max개. 한신은 0으로 들어가 "→" (v4.1 ②), 코어가 올린(Y-12) 한신 관성은 점수 그대로 */
-  const areasOf = (lk: Luck, unit: "일운" | "월운" | "세운", period: AreaPeriod, max: number): CoreFortune["areas"] => {
+  /** 한 운(luck)의 luckAreas 신호를 영역별로 합산한 원자료 (자르기 전) */
+  const accumulate = (lk: Luck, unit: "일운" | "월운" | "세운") => {
     const assistedHere = lk.플래그.some((f) => f.includes("(Y-12)"));
-    const acc = new Map<AreaName, { sum: number; mixed: boolean; whys: string[] }>();
+    const acc = new Map<AreaName, { sum: number; mixed: boolean; whys: string[]; contributions: AreaProfileEntry["contributions"] }>();
     for (const row of luckAreas(lk, unit).신호) {
       const part = row.글자 === lk.천간.글자 ? lk.천간 : lk.지지;
       if (part.점수 === 0) continue;
@@ -354,13 +356,18 @@ export function computeCoreFortune(input: CoreInput): CoreFortune {
         else if (name === "연애(여·전통)") area = gender === "female" ? "연애" : null;
         else area = name as AreaName;
         if (!area) continue;
-        const cur = acc.get(area) ?? { sum: 0, mixed: false, whys: [] };
+        const cur = acc.get(area) ?? { sum: 0, mixed: false, whys: [], contributions: [] };
         if (cur.sum !== 0 && eff !== 0 && Math.sign(cur.sum) !== Math.sign(eff)) cur.mixed = true;
         cur.sum += eff;
         cur.whys.push(why);
+        cur.contributions.push({ part: part === lk.천간 ? "천간" : "지지", tenGod: row.십신, label: boostedHere ? "희" : part.라벨, score: eff });
         acc.set(area, cur);
       }
     }
+    return acc;
+  };
+  const areasOf = (lk: Luck, unit: "일운" | "월운" | "세운", period: AreaPeriod, max: number): CoreFortune["areas"] => {
+    const acc = accumulate(lk, unit);
     const out: CoreFortune["areas"] = [];
     for (const [area, v] of [...acc.entries()].sort((a, c) => Math.abs(c[1].sum) - Math.abs(a[1].sum))) {
       const signal: AreaSignal = v.sum >= 1 ? "↑" : v.sum <= -1 ? "↓" : "→";
@@ -370,6 +377,17 @@ export function computeCoreFortune(input: CoreInput): CoreFortune {
     return out;
   };
   const areas: CoreFortune["areas"] = [];
+  // Phase 1: 오늘 7개 영역 전부 (신호가 없는 영역도 strength 0으로)
+  let todayAreaProfile: CoreFortune["todayAreaProfile"];
+  if (l) {
+    const acc = accumulate(l, "일운");
+    const names: AreaName[] = ["대인", "재물", "직업", "학업", "연애", "가족", "건강"];
+    todayAreaProfile = Object.fromEntries(names.map((n) => {
+      const v = acc.get(n);
+      const strength = v ? round2(v.sum) : 0;
+      return [n, { strength, active: Math.abs(strength) >= 1, mixed: v?.mixed ?? false, contributions: v?.contributions ?? [] }];
+    })) as Record<AreaName, AreaProfileEntry>;
+  }
   if (l) {
     areas.push(...areasOf(l, "일운", "오늘", 2));
     const wl = wol ? ctxLucks.get(wol.간지) : undefined;
@@ -475,6 +493,7 @@ export function computeCoreFortune(input: CoreInput): CoreFortune {
     need: y ? { 오행: y.용신오행, 그룹: y.용신그룹 } : null,
     context: { ...(daeun ? { daeun } : {}), seun: seunItem, ...(wolun ? { wolun } : {}), 입춘전: seun.입춘전 },
     areas,
+    ...(todayAreaProfile ? { todayAreaProfile } : {}),
     facts,
     contextFacts,
     keywords,

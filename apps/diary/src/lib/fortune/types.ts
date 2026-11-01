@@ -85,6 +85,13 @@ export interface CoreLuckContextItem {
 }
 
 export type AreaName = "대인" | "재물" | "직업" | "학업" | "연애" | "가족" | "건강";
+/** 오늘 한 영역의 원자료. contributions = 그 영역에 닿은 글자(천간·지지)마다 십신·라벨·실제로 더한 점수 */
+export interface AreaProfileEntry {
+  strength: number;
+  active: boolean;
+  mixed: boolean;
+  contributions: { part: "천간" | "지지"; tenGod: string; label: string | null; score: number }[];
+}
 export type AreaSignal = "↑" | "→" | "↓";
 /** v4.2: 영역 줄의 기간. 오늘 = 일진(최대 2), 이달 = 월운(1), 올해 = 세운(1) */
 export type AreaPeriod = "오늘" | "이달" | "올해";
@@ -114,6 +121,12 @@ export interface CoreFortune {
   };
   /** 영역 신호. 순서는 오늘(≤2) → 이달(1) → 올해(1). 코어 luckAreas(일운·월운·세운) */
   areas: { period: AreaPeriod; area: AreaName; signal: AreaSignal; why: string }[];
+  /**
+   * 운세 개편 Phase 1 (2026-11-01, ChatGPT 개편 검토 7항): 오늘(일운) 7개 영역의 원자료 — areas처럼 |합| 큰 2개로 자르기 전 전부.
+   * strength = 영역 합(한신은 0), active = |합| ≥ 1(areas의 ↑/↓와 같은 기준), mixed = 다른 방향 기여가 섞임.
+   * strength 0은 "그 영역이 보통일 것"이 아니라 "오늘 계산에서 위아래로 움직이는 신호가 없음"이다. 옛 캐시엔 없다
+   */
+  todayAreaProfile?: Record<AreaName, AreaProfileEntry>;
   /**
    * 글 재료. 사용자용 낱말로 바꾼 오늘의 사실 문장 3~10개 (금지어 없음).
    * v4.4: 대운·세운·월운 문장은 기본적으로 없고, 바뀌는 날(월운 = 절기 입절일, 세운 = 입춘, 대운 = 교체일)과 그 운이 오늘과 충인 날에만 한 문장씩 들어간다
