@@ -209,11 +209,11 @@ describe("v4.1 보강 (乙亥 丙戌 己丑 辛未 × 2026-10-07 甲寅: 천간�
     expect(r.context.daeun?.플래그).toEqual(expect.arrayContaining([expect.stringContaining("용신 손상"), expect.stringContaining("개두")]));
     // v4.4: 2026-10-07(추분 보름째, 충 없음)은 평일 — 맥락 문장은 contextFacts에만
     expect(r.contextFacts).toEqual([
-      "지금 10년 단위 운 癸未은 수월한 편이에요.",
+      "지금 10년 단위 운 癸未는 수월한 편이에요.",
       expect.stringMatching(/^지금 10년 단위 운은 내게 모자란 .+힘이 더 약해지는 때예요\.$/), // v4.13: "누르고"(생·극 말) 대신
       "지금 10년 단위 운은 겉과 속이 달라요.",
-      "올해 운 丙午은 조심할 편이에요.",
-      "이달 운 丁酉은 조심할 편이에요.",
+      "올해 운 丙午는 조심할 편이에요.",
+      "이달 운 丁酉는 조심할 편이에요.",
     ]);
     expect(hasContextFact(r.facts)).toBe(false);
     expect(r.facts.some((f) => f.includes("10년 단위 운"))).toBe(false);

@@ -393,6 +393,8 @@ export function computeCoreFortune(input: CoreInput): CoreFortune {
 
   // ---- 사실 문장 (글 재료, 6~10개) ----
   const ko = (gj: string) => gj; // 간지는 한자 그대로 둔다. 한글로 바꾸는 건 3단계(글)의 일
+  // v4.22: 조사는 한글 읽기의 받침으로 고른다 — 늘 "은"을 붙여 "병오은"이 됐다. 지지 한글 읽기 가운데 받침이 있는 것: 축·인·진·신·술
+  const eunNeun = (gj: string) => ("丑寅辰申戌".includes(gj.slice(-1)) ? "은" : "는");
   // v4.2: 첫 문장은 구조(윗글자·아랫글자·위아래) 없이 성격만. 같은 십신이면 "아주 강해요"(v4.3, 전엔 "두 번 겹쳐요"), 다르면 "함께 와요"
   const st = TEN_GOD_THEME[stem.tenGod], bt = TEN_GOD_THEME[branch.tenGod];
   if (stem.tenGod === branch.tenGod) facts.push(`오늘은 '${st}'(${stem.tenGod})의 성격이 아주 강해요.`);
@@ -436,10 +438,10 @@ export function computeCoreFortune(input: CoreInput): CoreFortune {
   // ---- 맥락 문장 (v4.4): 근거 표시용 contextFacts에는 항상, 글 재료 facts에는 바뀌는 날·충인 날에만 ----
   const contextFacts: string[] = [];
   const daeunFact = daeun
-    ? `지금 10년 단위 운 ${ko(daeun.간지)}은 ${daeun.판정 ? VERDICT_WORD[daeun.판정] : "판정 보류"}${daeun.clash ? "이고, 오늘과 어긋나 변동이 커지기 쉬운 날이에요" : "이에요"}.`
+    ? `지금 10년 단위 운 ${ko(daeun.간지)}${eunNeun(daeun.간지)} ${daeun.판정 ? VERDICT_WORD[daeun.판정] : "판정 보류"}${daeun.clash ? "이고, 오늘과 어긋나 변동이 커지기 쉬운 날이에요" : "이에요"}.`
     : null;
-  const seunFact = `올해 운 ${ko(seunItem.간지)}은 ${seunItem.판정 ? VERDICT_WORD[seunItem.판정] : "판정 보류"}${seunItem.clash ? "이고, 오늘과 어긋나 변동이 생기기 쉬워요" : "이에요"}.`;
-  const wolunFact = wolun ? `이달 운 ${ko(wolun.간지)}은 ${wolun.판정 ? VERDICT_WORD[wolun.판정] : "판정 보류"}${wolun.clash ? "이고, 오늘과 어긋나 변동이 생기기 쉬워요" : "이에요"}.` : null;
+  const seunFact = `올해 운 ${ko(seunItem.간지)}${eunNeun(seunItem.간지)} ${seunItem.판정 ? VERDICT_WORD[seunItem.판정] : "판정 보류"}${seunItem.clash ? "이고, 오늘과 어긋나 변동이 생기기 쉬워요" : "이에요"}.`;
+  const wolunFact = wolun ? `이달 운 ${ko(wolun.간지)}${eunNeun(wolun.간지)} ${wolun.판정 ? VERDICT_WORD[wolun.판정] : "판정 보류"}${wolun.clash ? "이고, 오늘과 어긋나 변동이 생기기 쉬워요" : "이에요"}.` : null;
   if (daeunFact) {
     contextFacts.push(daeunFact);
     // 대운 플래그(용신 손상 · 운 내부 상충) 문장은 근거에만 (v4.1 ③ → v4.4)

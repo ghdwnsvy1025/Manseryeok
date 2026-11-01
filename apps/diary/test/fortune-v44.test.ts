@@ -78,13 +78,13 @@ describe("v4.4 facts — 대운·세운·월운 문장은 바뀌는 날·충인 
     expect(C_1008.facts.slice(0, 3)).toEqual(["오늘은 '압박과 책임'(편관)의 성격이 아주 강해요.", expect.stringMatching(/^'압박과 책임'\(편관\) 쪽은 내게 모자란 .+힘을 옆에서 거들어 줘요\.$/), "둘을 합치면 오늘은 수월한 편이에요."]);
     // contextFacts는 두 날 모두 대운(+플래그)·세운·월운 전부
     expect(C_1008.contextFacts).toEqual([
-      "지금 10년 단위 운 癸未은 수월한 편이에요.",
+      "지금 10년 단위 운 癸未는 수월한 편이에요.",
       expect.stringMatching(/^지금 10년 단위 운은 내게 모자란 .+힘이 더 약해지는 때예요\.$/),
       "지금 10년 단위 운은 겉과 속이 달라요.",
-      "올해 운 丙午은 조심할 편이에요.",
+      "올해 운 丙午는 조심할 편이에요.",
       "이달 운 戊戌은 힘이 드는 편이에요.",
     ]);
-    expect(C_1007.contextFacts[4]).toBe("이달 운 丁酉은 조심할 편이에요.");
+    expect(C_1007.contextFacts[4]).toBe("이달 운 丁酉는 조심할 편이에요.");
     // 점수·영역은 맥락 문장과 무관 (10-07은 v4.1 ③의 값 그대로 — v4.18에서 Y-15로 0.69 → 0.65)
     expect(C_1007.parts.score01).toBe(0.65);
   });
@@ -97,7 +97,7 @@ describe("v4.4 facts — 대운·세운·월운 문장은 바뀌는 날·충인 
   });
 
   test("(b) 입춘일 2026-02-04엔 올해 운 1문장 (입절일이기도 해서 이달 운도 1문장). 전날엔 없음", () => {
-    expect(onlyContext(v4(PROFILE_A, "2026-02-04"))).toEqual(["올해 운 丙午은 힘이 드는 편이에요.", "이달 운 庚寅은 수월한 편이에요."]);
+    expect(onlyContext(v4(PROFILE_A, "2026-02-04"))).toEqual(["올해 운 丙午는 힘이 드는 편이에요.", "이달 운 庚寅은 수월한 편이에요."]);
     expect(onlyContext(v4(PROFILE_B, "2026-02-04")).map((f) => f.slice(0, 4))).toEqual(["올해 운", "이달 운"]);
     expect(onlyContext(v4(PROFILE_B, "2026-02-03"))).toEqual([]);
   });
@@ -109,7 +109,7 @@ describe("v4.4 facts — 대운·세운·월운 문장은 바뀌는 날·충인 
     expect(fromBirth(toBirthInput(PROFILE_B)).대운.목록.find((d) => d.순서 === 4)?.시작일?.slice(0, 10)).toBe("2026-05-10");
     expect(day.context.daeun).toMatchObject({ 순서: 4, 간지: "己巳" });
     expect(eve.context.daeun).toMatchObject({ 순서: 3, 간지: "戊辰" });
-    expect(onlyContext(day)).toEqual(["지금 10년 단위 운 己巳은 꽤 수월한 편이에요."]);
+    expect(onlyContext(day)).toEqual(["지금 10년 단위 운 己巳는 꽤 수월한 편이에요."]);
     expect(onlyContext(eve)).toEqual([]);
     // 대운 플래그 문장(모자란 쪽을 누르고 / 겉과 속)은 어느 날이든 facts에 없고 contextFacts에만 (C는 대운 癸未에 플래그 둘)
     for (const r of [day, eve, C_1007, C_1008, C_1009, v4(PROFILE_C, "2026-03-20")]) {
@@ -121,10 +121,10 @@ describe("v4.4 facts — 대운·세운·월운 문장은 바뀌는 날·충인 
   test("(d) 운↔일진 충: 대운 충(A 2027-03-01 최고경보) · 세운 충(A 2026-10-05) · 월운 충(C 2026-10-09)인 날엔 그 운 1문장만", () => {
     const daeunClash = v4(PROFILE_A, "2027-03-01");
     expect(daeunClash.context.daeun?.clash?.최고경보).toBe(true);
-    expect(onlyContext(daeunClash)).toEqual(["지금 10년 단위 운 癸酉은 꽤 수월한 편이고, 오늘과 어긋나 변동이 커지기 쉬운 날이에요."]);
+    expect(onlyContext(daeunClash)).toEqual(["지금 10년 단위 운 癸酉는 꽤 수월한 편이고, 오늘과 어긋나 변동이 커지기 쉬운 날이에요."]);
     const seunClash = v4(PROFILE_A, "2026-10-05");
     expect(seunClash.context.seun.clash).toBeDefined();
-    expect(onlyContext(seunClash)).toEqual(["올해 운 丙午은 힘이 드는 편이고, 오늘과 어긋나 변동이 생기기 쉬워요."]);
+    expect(onlyContext(seunClash)).toEqual(["올해 운 丙午는 힘이 드는 편이고, 오늘과 어긋나 변동이 생기기 쉬워요."]);
     expect(C_1009.context.wolun?.clash).toBeDefined();
     expect(C_1009.context.seun.clash ?? C_1009.context.daeun?.clash).toBeUndefined();
     expect(onlyContext(C_1009)).toEqual(["이달 운 戊戌은 힘이 드는 편이고, 오늘과 어긋나 변동이 생기기 쉬워요."]);
@@ -175,12 +175,14 @@ describe("v4.4 brief·SYSTEM·검사 — 요일·절기 재료, 금지어, 맥�
     expect(hasContextFact(termDay.facts)).toBe(true);
     expect(plain.context).toEqual([]);
     expect(plain.month).toBeNull();
-    expect(termDay.context).toContain("이달 운 무술은 힘이 드는 편이에요.");
-    expect(termDay.month).not.toBeNull();
+    // v4.22 (ChatGPT 4차 6항): 맥락은 계획에만 남고 작가·검사기에는 가지 않는다 (점수는 이미 단계에 들어 있다)
+    expect(termDay.plan.context).toContain("이달 운 무술은 힘이 드는 편이에요.");
+    expect(termDay.context).toEqual([]);
+    expect(termDay.month).toBeNull();
     const pj = JSON.parse(renderBrief(plain)) as Record<string, unknown>;
     const tj = JSON.parse(renderBrief(termDay)) as Record<string, unknown>;
     expect(pj).not.toHaveProperty("맥락");
-    expect(tj.맥락).toContain("이달 운 무술은 힘이 드는 편이에요.");
+    expect(tj).not.toHaveProperty("맥락");
     // v4.20: 요일·날짜·절기 라벨은 보내지 않는다. 절기 첫날에만 이름 하나
     expect(pj).not.toHaveProperty("오늘");
     expect(pj).not.toHaveProperty("절기첫날");
@@ -222,9 +224,9 @@ describe("v4.4 brief·SYSTEM·검사 — 요일·절기 재료, 금지어, 맥�
     }
     expect(validateFortuneText({ ...OKC, body: [...OKC.body, "이달 운은 조심할 편이라 서두르지 않아요."] }, plain)).toEqual(["본문 5번째 문장: 이달 운 재료가 없는데 이달 운을 말함"]);
     expect(validateFortuneText({ ...OKC, dont: "올해 운만 믿고 벌이지 않아요." }, plain)).toEqual(["dont: 오늘만: 계획에 없는 올해·10년 단위 운을 말함"]);
-    // 절기일(맥락에 이달 운 문장)엔 같은 글이 이 사유로는 걸리지 않는다
+    // v4.22: 절기일에도 맥락을 작가에게 주지 않으니, 이달 운을 말하면 같은 사유로 걸린다
     const onTermDay = validateFortuneText({ ...OKC, body: [...OKC.body, "이달 운은 힘이 드는 쪽이라 서두르지 않아요."] }, termDay);
-    expect(onTermDay.filter((x) => x.includes("오늘만") || x.includes("이달 운 재료"))).toEqual([]);
+    expect(onTermDay).toContain("본문 5번째 문장: 이달 운 재료가 없는데 이달 운을 말함");
     // 템플릿(모델 실패 대체)은 새 금지어에 걸리지 않는다
     const fallback = templateText(templateInputFromCore(v4(PROFILE_C, "2026-10-07")), NONE, { ko: "갑인", stemKo: "갑", branchKo: "인" });
     expect(findBanned([fallback.headline, fallback.body, fallback.do, fallback.dont].join(" "))).toEqual([]);

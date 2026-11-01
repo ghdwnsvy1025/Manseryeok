@@ -3,7 +3,7 @@
 //   v4.16~4.18은 모델이 후보 3~5 → 핵심 → 이유 → 둘째 기운 → 운 맥락 → 구조 A~E → 태그 8칸을 먼저 정했다. 그 판단이 날마다 흔들렸고
 //   (같은 라벨의 날도 핵심이 달라짐), 출력 토큰의 절반이 판단·태그였다. 이제 그 자리를 이 파일이 맡는다:
 //   - 핵심 1개: 일진 천간·지지 가운데 |코어 점수|가 큰 쪽 (같으면 천간). 그 기운의 뜻·읽기·사실 문장·생활 표현 후보 4개
-//   - 보조 0~1개: 일·월 자리 충 > 다른 쪽 기운(|점수| ≥ 1) > 복음·다른 충 > 없음
+//   - 보조 0~1개: 일·월 자리 충 > 다른 쪽 기운(|점수| ≥ 1, 핵심의 70% 이상) > 없음 (v4.22: 복음·먼 충은 보조로 쓰지 않는다)
 //   - 맥락(이달·올해·10년 운): 운이 바뀌는 날·운↔일진 충인 날(core.facts에 그 문장이 있는 날), 또는 맥락 점수(ctx)를 빼면 밴드가 바뀌는 날만.
 //     아니면 맥락 재료를 brief에 아예 넣지 않는다
 //   - 글로 풀 영역 최대 2개(오늘 것을 코어 순서 = |합| 순으로 먼저. v4.21에서 ↑ 먼저 정렬과 밴드별 행동 방향을 뺐다)
@@ -53,8 +53,10 @@ export interface PlanPart {
   score: number;
   /** 코어 사실 문장(십신 이름 괄호를 뗀 것). 한신·용신 없음이면 null */
   fact: string | null;
-  /** 오늘 고를 생활 표현 후보 (최근 문장과 겹치는 것을 뺀 뒤 날짜로 돌려 4개) */
+  /** 오늘 고를 생활 표현 후보 (최근 문장과 겹치는 것을 뺀 뒤 날짜로 돌려 4개) — 템플릿·검사기·기록용 */
   expressions: string[];
+  /** v4.22 (ChatGPT 4차): 이번 글에서 풀어낼 관점 하나 = expressions[0]. 작가에게는 이것만 간다(후보 넷을 주면 넷을 한 문장씩 나열했다) */
+  focus: string;
 }
 export type PlanSupport = { kind: "기운"; part: PlanPart; text: string } | { kind: "충" | "복음"; text: string };
 export interface PlanArea { period: AreaPeriod; area: AreaName; word: string; signal: AreaSignal }
@@ -136,7 +138,7 @@ function partPlan(core: CoreFortune, p: CoreLuckPart, which: "천간" | "지지"
   const list = fresh.length >= 3 ? fresh : all;
   const start = seed % list.length;
   const rotated = [...list.slice(start), ...list.slice(0, start)];
-  return { part: which, tenGod: p.tenGod, meaning: TEN_GOD_THEME[p.tenGod], label: p.label, read, score: p.score, fact: factOf(core, p.tenGod), expressions: rotated.slice(0, 4) };
+  return { part: which, tenGod: p.tenGod, meaning: TEN_GOD_THEME[p.tenGod], label: p.label, read, score: p.score, fact: factOf(core, p.tenGod), expressions: rotated.slice(0, 4), focus: rotated[0]! };
 }
 
 /** 최근 글에서 찾을 장면 낱말 (생활 장면). 표현만 돌리려는 것이라 넉넉하지 않아도 된다 */
@@ -183,20 +185,17 @@ export function buildPlan(input: PlanInput): FortunePlan {
   const corePart = partPlan(core, coreIsStem ? stem : branch, coreIsStem ? "천간" : "지지", seed, recentLines);
   const other = coreIsStem ? branch : stem;
 
-  // 보조: 일·월 자리 충 > 다른 쪽 기운(|점수| ≥ 1, 다른 십신) > 복음·다른 충 > 없음
+  // 보조: 일·월 자리 충 > 다른 쪽 기운(|점수| ≥ 1, 다른 십신) > 없음.
+  // v4.22 (ChatGPT 4차 5항): 보조는 중요할 때만 — 있으면 작가가 한 문장으로 소비해 나열이 됐다(12월 180편 중 133편에 갔다).
+  //   다른 쪽 기운은 그 점수가 핵심의 70% 이상일 때만, 복음·먼 자리 충은 보조로 쓰지 않는다(점수에는 이미 들어가 있다)
   // v4.20: 관계 객체에 붙은 문장을 그대로 쓴다 (문장을 정규식으로 다시 찾지 않는다 — 충이 둘인 날 다른 자리 문장을 집었다)
   const clashFact = (pred: (pos: string) => boolean) => core.relations.hits.find((h) => h.kind === "충" && pred(h.pos) && h.fact)?.fact ?? null;
   let support: PlanSupport | null = null;
   const nearClash = clashFact((pos) => pos === "일" || pos === "월");
   if (nearClash) support = { kind: "충", text: nearClash };
-  else if (other.tenGod !== corePart.tenGod && Math.abs(other.score) >= 1) {
+  else if (other.tenGod !== corePart.tenGod && Math.abs(other.score) >= 1 && Math.abs(other.score) >= 0.7 * Math.abs(corePart.score)) {
     const part = partPlan(core, other, coreIsStem ? "지지" : "천간", seed + 1, recentLines);
     support = { kind: "기운", part: { ...part, expressions: part.expressions.slice(0, 2) }, text: part.fact ?? part.meaning };
-  } else {
-    const rep = core.relations.hits.find((h) => h.kind === "복음" && h.fact)?.fact ?? null;
-    const farClash = clashFact(() => true);
-    if (farClash) support = { kind: "충", text: farClash };
-    else if (rep) support = { kind: "복음", text: rep };
   }
 
   // 맥락: 바뀌는 날·충인 날(facts에 맥락 문장) 또는 ctx를 빼면 밴드가 바뀌는 날

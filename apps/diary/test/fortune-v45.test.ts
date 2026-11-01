@@ -99,7 +99,7 @@ describe("v4.5 이달·올해 줄은 그 운 문장이 있는 날만", () => {
     const areas = [{ period: "오늘" as const }, { period: "이달" as const }, { period: "올해" as const }];
     expect(visibleAreas(areas, []).map((a) => a.period)).toEqual(["오늘", "이달"]);   // v4.15: 이달 줄은 매일
     expect(visibleAreas(areas, ["이달 운 戊戌은 힘이 드는 편이에요."]).map((a) => a.period)).toEqual(["오늘", "이달"]);
-    expect(visibleAreas(areas, ["올해 운 丙午은 보통이에요."]).map((a) => a.period)).toEqual(["오늘", "이달", "올해"]);
+    expect(visibleAreas(areas, ["올해 운 丙午는 보통이에요."]).map((a) => a.period)).toEqual(["오늘", "이달", "올해"]);
   });
 });
 
