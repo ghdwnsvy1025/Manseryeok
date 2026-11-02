@@ -4460,3 +4460,242 @@ input:checked + .entry-happy__stamp::before,
     transition: none;
   }
 }
+
+/* ── v3.39 운세 카드: "오늘 흐름 N / 10" + 오늘의 영역 6줄 붓 막대 (명세 35 v2, 2026-11-01) ──────────────────────────
+   v1의 도장 5칸 × 2열은 폐기(사용자: "오행 막대처럼 눈에 보이기 쉽게 세련된 막대로"). 새 그림·새 토큰 없음 —
+   재료는 오행 분포 붓 막대와 같은 붓 가로획(brush-stroke 마스크)과 쓰기 도장의 단계 면(1~2 남색 · 4~5 금빛)뿐.
+   숫자·눈금 수치·게이지 글자는 영역에 쓰지 않는다. 빨강·틀 안의 틀 없음 */
+
+/* 1. 한 영역 = 한 줄(6줄 세로). 줄 = 이름(고정 폭 74px — "대인관계" 굵게 + 꺾쇠가 한 줄) + 가운데에서 갈라지는 막대 트랙(남은 폭 전부).
+   줄 높이 = 손가락 자리 44px, 칸 테두리·면 없음 */
+.area-grid {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.area-grid__item {
+  min-width: 0;
+}
+.area-grid__row {
+  display: grid;
+  grid-template-columns: 74px minmax(0, 1fr);
+  column-gap: 10px;
+  align-items: center;
+  min-height: 44px;
+  list-style: none;
+}
+.area-grid__row::-webkit-details-marker {
+  display: none;
+}
+.area-grid__details > .area-grid__row {
+  cursor: pointer;
+}
+/* 이름: 신호 있는 줄 먹 굵게 + 뒤 12px 꺾쇠(나 탭 서랍과 같은 SVG mask, 오른쪽 향함 → 펼치면 아래), 없는 줄 muted·꺾쇠 없음 */
+.area-grid__label {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 14px;
+  line-height: 1.3;
+  color: var(--color-muted);
+  word-break: keep-all;
+}
+.area-grid__item[data-active] .area-grid__label {
+  color: var(--color-ink);
+  font-weight: 700;
+}
+.area-grid__item[data-active] .area-grid__label::after {
+  content: "";
+  width: 12px;
+  height: 12px;
+  flex: none;
+  background: var(--color-muted);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 14' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 5.5l4 4 4-4'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 14' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 5.5l4 4 4-4'/%3E%3C/svg%3E") center / contain no-repeat;
+  transform: rotate(-90deg);
+}
+.area-grid__details[open] > .area-grid__row .area-grid__label::after {
+  transform: none;
+}
+/* 막대 트랙: 바탕 없음(한지 그대로), 높이 12px(하루 행복도 막대와 같다). 가운데 세로 눈금 하나 = "평소/특별한 신호 없음" 기준선 — 녹갈 45% 1px, 막대보다 위아래 4px 길다.
+   신호 없는 줄(섞임 포함)은 이 눈금만 — "보통일 것"처럼 보이는 가운데 막대·점은 만들지 않는다 */
+.area-grid__bar {
+  position: relative;
+  display: block;
+  height: 12px;
+}
+.area-grid__axis {
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  left: 50%;
+  width: 1px;
+  margin-left: -0.5px;
+  background: color-mix(in srgb, var(--color-frame) 45%, transparent);
+}
+/* 채움 = 오행 분포 막대(.elements__fill)와 같은 붓 가로획 마스크. 길이 = 반쪽 트랙 × --len — 실제 신호 세기 |합| ÷ 3이라 0.33 · 0.5 · 0.67 · 0.83 · 1 다섯 계단(375px에서 34 · 51 · 68 · 85 · 102px, 한 계단 17px).
+   마스크는 최소 40px·붓 끝 쪽 정렬 — 가장 짧은 34px도 붓 끝(마스크 뒤쪽 약 60%)이 통째로 살고 축 쪽 6px만 곧게 잘린다(오행 막대의 56px이면 34px 막대가 조각처럼 보인다).
+   up = 축에서 오른쪽으로 금빛(쓰기 도장 4~5와 같은 gold-wash 면). down = 같은 요소를 축(왼쪽 가장자리)에서 좌우 뒤집어 왼쪽으로 남색(도장 1~2와 같은 면) — 붓 끝도 왼쪽.
+   그려질 때 축에서 바깥으로 한 번 퍼지고(brush-in 0.9s, 오행 막대와 같은 리듬) 줄마다 70ms씩 늦게 */
+.area-grid__fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: calc(50% * var(--len, 1));
+  background: var(--color-gold) url("/ui/gold-wash.webp") center / 256px 256px;
+  -webkit-mask: url("/ui/brush-stroke.webp") no-repeat right center / max(100%, 40px) 100%;
+  mask: url("/ui/brush-stroke.webp") no-repeat right center / max(100%, 40px) 100%;
+  transform-origin: left center;
+  animation: brush-in 0.9s cubic-bezier(0.3, 0.7, 0.3, 1) both;
+}
+.area-grid__bar[data-dir="down"] .area-grid__fill {
+  background: color-mix(in srgb, var(--color-sky) 82%, var(--color-paper-2));
+  transform: scaleX(-1);
+  animation-name: brush-in-left;
+}
+.area-grid__item:nth-child(2) .area-grid__fill { animation-delay: 70ms; }
+.area-grid__item:nth-child(3) .area-grid__fill { animation-delay: 140ms; }
+.area-grid__item:nth-child(4) .area-grid__fill { animation-delay: 210ms; }
+.area-grid__item:nth-child(5) .area-grid__fill { animation-delay: 280ms; }
+.area-grid__item:nth-child(6) .area-grid__fill { animation-delay: 350ms; }
+@keyframes brush-in-left {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(-1);
+  }
+}
+/* 이유 한 줄: 그 줄 아래 전체 폭에 14px 먹 80%, 줄 아래 10px. 펼칠 때만 높이 0 → 글 높이로 180ms(운세 본문 펼침과 같은 ease-out), 닫힘은 즉시 */
+.area-grid__reason {
+  margin: -4px 0 10px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: color-mix(in srgb, var(--color-ink) 80%, transparent);
+  word-break: keep-all;
+  overflow: hidden;
+}
+.area-grid__details[open] > .area-grid__reason {
+  animation: area-reason-in 180ms ease-out;
+}
+@keyframes area-reason-in {
+  from {
+    max-height: 0;
+    opacity: 0;
+  }
+  to {
+    max-height: 96px;
+    opacity: 1;
+  }
+}
+/* 줄 전체 눌림(v3.20 규칙, 신호 있는 줄만 눌린다) */
+:where(.area-grid__details > .area-grid__row):active {
+  transform: scale(0.98);
+  transition: transform 120ms ease-out;
+}
+
+/* 2. 범례(처음 한 번): 13px muted, 세 항목이 줄바꿈으로 흐른다("조심할 쪽 · 좋은 쪽" 한 줄, "가운데 = 특별한 신호 없음" 다음 줄).
+   견본 = 짧은 붓 막대 조각 + 축 눈금 하나 — down은 눈금 오른쪽에 남색 조각이 왼쪽으로, up은 눈금 왼쪽에 금빛 조각이 오른쪽으로, quiet은 눈금만. 오른쪽 × 는 그대로 */
+.area-legend-row {
+  margin-top: 0;
+  margin-bottom: 10px;
+  align-items: flex-start;
+}
+.area-legend {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: 14px;
+  row-gap: 4px;
+  padding-top: 4px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--color-muted);
+}
+.area-legend__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  word-break: keep-all;
+}
+.area-legend__sample {
+  position: relative;
+  flex: none;
+  width: 26px;
+  height: 14px;
+}
+.area-legend__sample::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 1px;
+  margin-left: -0.5px;
+  background: color-mix(in srgb, var(--color-frame) 45%, transparent);
+}
+.area-legend__sample[data-tone="down"]::after,
+.area-legend__sample[data-tone="up"]::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  width: 13px;
+  -webkit-mask: url("/ui/brush-stroke.webp") no-repeat right center / 100% 100%;
+  mask: url("/ui/brush-stroke.webp") no-repeat right center / 100% 100%;
+}
+.area-legend__sample[data-tone="up"]::after {
+  left: 50%;
+  background: var(--color-gold) url("/ui/gold-wash.webp") center / 256px 256px;
+}
+.area-legend__sample[data-tone="down"]::after {
+  right: 50%;
+  background: color-mix(in srgb, var(--color-sky) 82%, var(--color-paper-2));
+  transform: scaleX(-1);
+}
+
+/* 3. 오늘의 개운 = 기본 접힘. 제목 줄(송명 18px + 금빛 세로선, v3.21 그대로)이 summary — 글 뒤 꺾쇠 14px muted(오른쪽 향함, 펼치면 아래, 전환 없음).
+   손가락 자리 44px은 위아래 패딩 10px로(섹션 사이 24px은 그대로: 14 + 10). 펼침 모션 없음 */
+details.gaewoon {
+  margin-top: 14px;
+}
+.gaewoon__summary {
+  margin: 0;
+  padding: 10px 0;
+  min-height: 44px;
+  list-style: none;
+  cursor: pointer;
+}
+.gaewoon__summary::-webkit-details-marker {
+  display: none;
+}
+.gaewoon__summary::after {
+  content: "";
+  width: 14px;
+  height: 14px;
+  flex: none;
+  background: var(--color-muted);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 14' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 5.5l4 4 4-4'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 14' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 5.5l4 4 4-4'/%3E%3C/svg%3E") center / contain no-repeat;
+  transform: rotate(-90deg);
+}
+.gaewoon[open] > .gaewoon__summary::after {
+  transform: none;
+}
+.gaewoon[open] > .gaewoon__grid {
+  margin-top: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .area-grid__fill {
+    animation: none;
+  }
+  .area-grid__details[open] > .area-grid__reason {
+    animation: none;
+  }
+  :where(.area-grid__details > .area-grid__row):active {
+    transform: none;
+  }
+}

@@ -5,6 +5,8 @@ import Link from "next/link";
 import { gaewoonOf } from "@/lib/fortune/gaewoon";
 import { SignalLegend } from "@/components/SignalLegend";
 import { AREA_WORD } from "@/lib/fortune/core";
+import { flowNumber, sixAreaView } from "@/lib/fortune/areaProfile";
+import { AreaSignalGrid } from "@/components/AreaSignalGrid";
 import type { AreaSignal, FortuneContent } from "@/lib/fortune/types";
 
 /** 화살표 색: ↑ 금색(사용자 결정 2026-10-15, v3.26 예외), → 보조, ↓ 먹색. 빨강 없음 (톤 결정표 "길흉을 색으로 말하지 않는다") */
@@ -145,7 +147,10 @@ function PersonalCompare({ personal, fortune }: { personal: ReturnType<typeof pe
 }
 
 export function FortuneCard({ fortune, ganjiKo, canVote, vote, defaultOpen, version }: Props) {
-  const scoreText = fortune.score.toFixed(1);
+  /** 운세 개편 Phase 2 (명세 35): "오늘 흐름 N / 10" — 반올림을 단계 범위 안으로 맞춘 정수(주의 ≤ 4 · 무난 5~6 · 좋음 ≥ 7). "예상 행복도"라고 부르지 않는다 */
+  const flow = flowNumber(fortune.score, fortune.band);
+  /** 6영역 도장(오늘 7영역 원자료가 있는 새 운세만). 없으면(옛 캐시) 예전 영역 줄·칩 */
+  const six = sixAreaView(fortune);
   const paragraphs = splitParagraphs(fortune.body);
   /** 영역 줄 최대 4 (오늘 ≤2 · 이달 1 · 올해 1). period는 기능 쪽이 곧 넣는다 — 없으면 "오늘" */
   const areas = (fortune.areas ?? []).slice(0, 4).map((a) => ({ ...a, period: (a as { period?: Period }).period ?? "오늘" }));
@@ -170,7 +175,7 @@ export function FortuneCard({ fortune, ganjiKo, canVote, vote, defaultOpen, vers
             점수는 그 옆 한 줄 15px muted — 점수는 판정 단계를 계수로 옮긴 값이라 크게 보이면 실제보다 정밀해 보인다. 숨기지는 않는다 */}
         <span className="score-brush mt-2" data-band={fortune.band}>
           <span className="score-brush__band font-serif text-[22px] text-ink">{fortune.band}</span>
-          <span className="score-brush__score text-[15px] tabular-nums text-muted">{scoreText} / 10</span>
+          <span className="score-brush__score text-[15px] tabular-nums text-muted">오늘 흐름 {flow} / 10</span>
         </span>
         <span className="fortune-headline">{fortune.headline}</span>
         {/* v3.18 (2026-10-11 Q2 = A): 핵심 문장 아래 오늘 영역 한 줄 — "사람 ↑ · 돈 ↓"를 작은 띠지로. 카드를 펼치기 전에도 보인다.
@@ -213,7 +218,7 @@ export function FortuneCard({ fortune, ganjiKo, canVote, vote, defaultOpen, vers
 
             {/* v3.14 (2026-10-10): 섹션 둘로 — "오늘의 특징"(영역 줄, ↑ → ↓ 순) / 붓선 / "오늘 해 볼 것"(하면 좋아요 · 피해요).
                 예전엔 좋은 쪽·조심 쪽 상자에 영역 줄과 행동이 섞여 뒤죽박죽이었다. 모양은 디자이너(.traits* / .actions*) */}
-            {(areas.length > 0 || power.length > 0) && (
+            {(areas.length > 0 || power.length > 0 || six) && (
               <section className="traits mt-6" aria-labelledby="traits-title">
                 <h3 id="traits-title" className="traits__title">오늘의 특징</h3>
                 {/* v3.36: 화살표 줄 위에 "오늘 힘이 되는 것" 띠지 칩 한 줄(긍정 tone = 금빛 선, 면은 한지). 모양은 디자이너(.power*) */}
@@ -229,11 +234,18 @@ export function FortuneCard({ fortune, ganjiKo, canVote, vote, defaultOpen, vers
                     </ul>
                   </div>
                 )}
+                {/* 운세 개편 Phase 2 (명세 35): 새 운세는 6영역 도장(이달·올해 칩 없음), 옛 캐시는 아래 예전 줄·칩 */}
+                {six && (
+                  <>
+                    <SignalLegend kind="stamps" />
+                    <AreaSignalGrid areas={six} />
+                  </>
+                )}
                 {/* 화살표 범례: 처음 한 번만 (닫으면 다시 안 뜸) */}
-                {areas.length > 0 && <SignalLegend />}
+                {!six && areas.length > 0 && <SignalLegend />}
                 {/* v3.37 (명세 33, 운세 v4.20): line이 있는 줄(오늘 = 코드가 정한 짧은 상태말, 옛 캐시 = 예전 문장)은 띠지 + 말 한 줄,
                     line이 빈 줄(이달·올해)은 문장 없이 화살표 띠지 칩만 한 줄. 행동은 "오늘 해 볼 것"이 맡는다. → 줄은 더 오지 않는다 */}
-                {areaRows.length > 0 && (
+                {!six && areaRows.length > 0 && (
                   <ul className="traits__list">
                     {areaRows.map((a) => (
                       <li key={`${a.period}-${a.area}`} className="trait break-keep" data-signal={a.signal}>
@@ -250,7 +262,7 @@ export function FortuneCard({ fortune, ganjiKo, canVote, vote, defaultOpen, vers
                     ))}
                   </ul>
                 )}
-                {areaChips.length > 0 && (
+                {!six && areaChips.length > 0 && (
                   <ul className="traits__chips" aria-label="이달과 올해">
                     {areaChips.map((a) => (
                       <li key={`${a.period}-${a.area}`} className="trait-chip" data-signal={a.signal}>
@@ -278,9 +290,10 @@ export function FortuneCard({ fortune, ganjiKo, canVote, vote, defaultOpen, vers
                 <p className="action__text">{fortune.dont}</p>
               </div>
               {/* v4.7 (2026-10-12): 오늘의 개운 네 칸(색·음식·시간·활동). 전통 오행 대응표로 앱이 고른다(모델 아님). 모양은 디자이너(.gaewoon*) */}
+              {/* v3.39 (명세 35): 기본 접힘 — 제목 한 줄이 summary, 누르면 네 칸. 내용·계산은 그대로, 펼침 모션 없음 */}
               {gaewoon ? (
-                <div className="gaewoon" aria-label="오늘 챙기면 좋은 것">
-                  <p className="gaewoon__title">오늘 챙기면 좋은 것</p>
+                <details className="gaewoon" aria-label="오늘 챙기면 좋은 것">
+                  <summary className="gaewoon__title gaewoon__summary">오늘 챙기면 좋은 것</summary>
                   <ul className="gaewoon__grid">
                     <li className="gaewoon__item" data-kind="color">
                       <span className="gaewoon__label">행운 색</span>
@@ -302,7 +315,7 @@ export function FortuneCard({ fortune, ganjiKo, canVote, vote, defaultOpen, vers
                       <span className="gaewoon__value break-keep">{gaewoon.activity}</span>
                     </li>
                   </ul>
-                </div>
+                </details>
               ) : (
                 fortune.core?.dayLuck.method === "용신 없음" && (
                   <p className="gaewoon__empty">

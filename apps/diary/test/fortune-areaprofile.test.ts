@@ -54,3 +54,45 @@ describe("6개 영역 병합", () => {
     expect(compareAreas(sixAreaSignals(prof({})), null).every((c) => c.recorded === null)).toBe(true);
   });
 });
+
+// ---------- Phase 2 화면 재료 ----------
+import { flowNumber, sixAreaView } from "@/lib/fortune/areaProfile";
+import { AREA_REASON, areaReason } from "@/lib/fortune/areaReasons";
+import { BANNED_ALL, JARGON, TEN_GOD_NAMES } from "@/lib/fortune/brief";
+import { bandOf } from "@/lib/fortune/personal";
+
+describe("Phase 2 재료", () => {
+  test("흐름 숫자는 단계 범위 안: 주의 ≤ 4, 무난 5~6, 좋음 ≥ 7 (경계 날만 오차 0.8 미만)", () => {
+    for (let s = 0; s <= 10.0001; s += 0.1) {
+      const t = Math.round(s * 10) / 10, band = bandOf(t), n = flowNumber(t, band);
+      if (band === "주의") expect(n).toBeLessThanOrEqual(4);
+      else if (band === "무난") expect([5, 6]).toContain(n);
+      else expect(n).toBeGreaterThanOrEqual(7);
+      expect(Math.abs(n - t)).toBeLessThan(0.8);
+    }
+    expect([flowNumber(4.7, "주의"), flowNumber(4.8, "무난"), flowNumber(6.7, "무난"), flowNumber(6.8, "좋음")]).toEqual([4, 5, 6, 7]);
+  });
+  test("이유 문구표 70줄: 사주 용어·십신 이름·금지어 없음, '쪽이에요'로 끝남, 서로 다름", () => {
+    const all = Object.values(AREA_REASON).flatMap((g) => Object.values(g).flatMap((p) => [p.up, p.down]));
+    expect(all).toHaveLength(70);
+    expect(new Set(all).size).toBe(70);
+    for (const s of all) {
+      expect(s).toMatch(/쪽이에요$/);
+      for (const w of [...BANNED_ALL, ...JARGON, ...TEN_GOD_NAMES]) expect(s, `${s} ⊃ ${w}`).not.toContain(w);
+    }
+  });
+  test("이유는 같은 방향의 가장 센 글자의 십신 그룹에서, 신호가 없으면 null", () => {
+    const entry = { strength: -1.5, active: true, mixed: true, contributions: [{ part: "천간" as const, tenGod: "정관", label: "희", score: 0.5 }, { part: "지지" as const, tenGod: "편재", label: "기", score: -2 }] };
+    expect(areaReason("재물", entry)).toBe(`${AREA_REASON.재물.재성.down}.`);
+    expect(areaReason("재물", { strength: 0, active: false, mixed: false, contributions: [] })).toBeNull();
+    expect(areaReason("재물", { strength: 0, active: true, mixed: false, contributions: [] })).toBeNull();   // 비정상 데이터 방어
+  });
+  test("실제 운세: 신호 있는 영역만 이유가 있고, 옛 캐시(원자료 없음)는 null", () => {
+    const c = coreOn("2026-12-02");
+    const v = sixAreaView({ core: c })!;
+    expect(v).toHaveLength(6);
+    for (const a of v) expect(Boolean(a.reason)).toBe(a.active);
+    expect(sixAreaView({ core: { ...c, todayAreaProfile: undefined } })).toBeNull();
+    expect(sixAreaView({})).toBeNull();
+  });
+});
