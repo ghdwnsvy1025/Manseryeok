@@ -13,6 +13,8 @@ const FINGERPRINTS: Record<string, string> = {
   "1.0.0": "2eebe4324076036f",
   // 2026-10-15: 음력을 한국천문연구원 음력(korean-lunar-calendar, 2050년까지)으로, 절입 시각을 寿星 고정밀 황경으로, 초 반올림 수정
   "1.1.0": "8ab0eba99426d3ae",
+  // 2026-11-05: 엔진 계산은 그대로(같은 지문). 일기 앱 원국 기준을 사주 코어 기준으로 맞춰서, 저장된 프로필을 다시 계산하려고 올렸다
+  "1.2.0": "8ab0eba99426d3ae",
 };
 
 function fingerprint(): string {

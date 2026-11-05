@@ -23,7 +23,7 @@
 ```
 
 ### 원국은 어느 쪽 pillars를 쓰나
-"나" 화면·격자·이관 검증이 모두 일기 앱 엔진(`@saju/engine`)의 `pillars` 스냅샷을 기준으로 하므로, **원국 네 기둥은 일기 앱 스냅샷을 쓴다.** `fromBirth`는 **대운 목록을 얻는 데만** 쓴다. 두 쪽 네 기둥이 다르면(경도 보정·자시 규칙 차이) 콘솔 경고를 남기고 일기 앱 스냅샷을 믿는다. 테스트에서 이관된 사주 샘플로 둘이 같은지 확인한다.
+"나" 화면·격자가 모두 `pillars` 스냅샷을 기준으로 하므로, **원국 네 기둥은 일기 앱 스냅샷을 쓴다.** 2026-11-05부터 스냅샷도 `computeProfile`이 코어 `fromBirth`로 계산해서 대운과 기준이 같다 (`test/profile-core-basis.test.ts`). 운세가 `fromBirth`를 다시 부르는 것은 대운 목록을 얻기 위해서다. 두 쪽 네 기둥이 다르면 콘솔 경고를 남기고 일기 앱 스냅샷을 믿는다.
 
 ### 입력 변환
 - `ProfileInput` → `BirthInput`: `{year, month, day, hour?, minute?, 달력: calendar==="lunar"?"음력":"양력", 윤달: isLeapMonth, 성별: gender==="male"?"남":"여", 출생지: CITIES[city].coreName}` — CITIES에 코어 출생지 이름(서울·부산…)을 매핑하는 필드가 없으면 `src/lib/profile.ts`에 추가. 매핑 안 되는 도시는 경도를 직접 넘긴다(`경도: city.longitude`).

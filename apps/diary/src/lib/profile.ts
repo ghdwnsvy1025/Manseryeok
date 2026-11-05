@@ -1,7 +1,9 @@
 // 사주 프로필 입력 규칙과 사주 계산. 화면과 서버가 같은 함수를 쓴다.
-import { calculateSaju, ENGINE_VERSION, lunarToSolar, type Pillar } from "@saju/engine";
+import { ENGINE_VERSION, lunarToSolar } from "@saju/engine";
+import { fromBirth, toKo } from "@saju/core-rules";
 import type { Validation } from "./entry";
 import { CITIES, type CityId } from "./cities";
+import { toBirthInput } from "./fortune/core";
 
 export { CITIES, type CityId };
 
@@ -128,39 +130,25 @@ export function validateProfile(raw: Record<string, unknown>): ProfileValidation
   };
 }
 
-function snap(p: Pillar): PillarSnapshot {
-  return { stem: p.stem.hanja, branch: p.branch.hanja, ko: p.ganjiKo };
+function snap(ganji: string): PillarSnapshot {
+  return { stem: ganji[0]!, branch: ganji[1]!, ko: toKo(ganji) };
 }
 
-/** 레거시와 같은 기준: 자정에 날 바뀜 · 진태양시 보정 · 출생지 경도 */
+/**
+ * 사주 코어와 같은 기준(fromBirth): 경도 보정(평균태양시) · 서머타임 · 동경 127.5° 기간 · 보정 시각 23시에 날 바뀜 · 연주와 월주는 실제 순간으로 판단.
+ * 앱 원국과 유료 풀이 원국을 같게 하려는 것이다 (2026-11-05 결정). 결과가 바뀌는 수정은 ENGINE_VERSION을 올려야 저장된 프로필이 다시 계산된다.
+ */
 export function computeProfile(input: ProfileInput): Validation<ComputedProfile> {
-  const city = CITIES.find((c) => c.id === input.city) ?? CITIES[0];
+  // fromBirth는 시각이 있으면 없는 양력 날짜(2월 30일)를 다음 달로 넘겨 버린다
+  if (!dateExists(input.calendar, input.birthYear, input.birthMonth, input.birthDay, input.isLeapMonth)) {
+    return { ok: false, error: "없는 날짜입니다." };
+  }
   try {
-    const r = calculateSaju({
-      year: input.birthYear,
-      month: input.birthMonth,
-      day: input.birthDay,
-      hour: input.birthHour ?? undefined,
-      minute: input.birthMinute ?? undefined,
-      gender: input.gender,
-      options: {
-        calendarType: input.calendar,
-        isLeapMonth: input.isLeapMonth,
-        timezone: "Asia/Seoul",
-        location: { name: city.coreName, longitude: city.longitude },
-        dayChangeRule: "midnight",
-        timeCorrection: "trueSolarTime",
-      },
-    });
+    const [year, month, day, hour] = fromBirth(toBirthInput(input)).pillars;
     return {
       ok: true,
       value: {
-        pillars: {
-          year: snap(r.pillars.year),
-          month: snap(r.pillars.month),
-          day: snap(r.pillars.day),
-          hour: r.pillars.hour ? snap(r.pillars.hour) : null,
-        },
+        pillars: { year: snap(year), month: snap(month), day: snap(day), hour: hour ? snap(hour) : null },
         engineVersion: ENGINE_VERSION,
       },
     };

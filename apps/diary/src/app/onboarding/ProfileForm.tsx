@@ -234,7 +234,7 @@ export function ProfileForm({ next, initial, serverAction = saveProfileAction, a
             ▾
           </span>
         </span>
-        {/* 지역은 진태양시 보정에만 쓰인다 (lib/profile.ts computeProfile) — 왜 묻는지 한 줄 */}
+        {/* 지역은 경도 보정에만 쓰인다 (lib/profile.ts computeProfile) — 왜 묻는지 한 줄 */}
         <p className="text-[13px] leading-[1.5] text-muted break-keep">태어난 곳의 경도로 시간을 보정해요. 시간을 모르면 영향이 없어요.</p>
         {errorAt("city")}
       </div>
