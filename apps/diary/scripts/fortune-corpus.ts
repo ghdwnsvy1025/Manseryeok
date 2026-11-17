@@ -35,6 +35,8 @@ const PROFILES: { name: string; p: BirthProfile }[] = [
   { name: "C-1984-11-03", p: { gender: "female", calendar: "solar", isLeapMonth: false, birthYear: 1984, birthMonth: 11, birthDay: 3, birthHour: 7, birthMinute: 30, city: "busan" } },
   // v4.15 (2026-10-23): 사용자가 고른 30일 모의 생성 사주
   { name: "D-1994-01-28", p: { gender: "female", calendar: "solar", isLeapMonth: false, birthYear: 1994, birthMonth: 1, birthDay: 28, birthHour: 12, birthMinute: 0, city: "seoul" } },
+  // 사용자 본인 사주(2026-10-23 채팅: 1995-10-25 양력 남, 시간 모름)
+  { name: "E-1995-10-25", p: { gender: "male", calendar: "solar", isLeapMonth: false, birthYear: 1995, birthMonth: 10, birthDay: 25, birthHour: null, birthMinute: null, city: "seoul" } },
 ];
 /** 환경변수 CORPUS_PROFILES="D" 또는 "A,B"로 사주를 고른다(이름의 첫 글자). 비우면 A·B·C */
 const pickProfiles = (): typeof PROFILES => { const want = (process.env.CORPUS_PROFILES ?? "A,B,C").split(",").map((x) => x.trim()); return PROFILES.filter((x) => want.includes(x.name[0]!)); };

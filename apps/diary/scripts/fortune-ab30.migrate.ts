@@ -68,7 +68,8 @@ test("ab30", async () => {
       const personal = adjustWithEntries(core.parts.score01, person.entries ?? [], { index: today.index, stemKo: today.stemKo, branchKo: today.branchKo });
       const score10 = toTenPoint(personal.score);
       const ymd = parseYmd(date)!;
-      const brief = buildBrief({ core, personal, today: { ko: today.ko, hanja: today.hanja, stemKo: today.stemKo, branchKo: today.branchKo }, date, weekday: WEEKDAYS[new Date(Date.UTC(ymd.year, ymd.month - 1, ymd.day)).getUTCDay()]!, score10, band: bandOf(score10), recent });
+      const { angleInputFor } = await import("@/lib/fortune/angle");
+      const brief = buildBrief({ ...angleInputFor({ date, pillars: person.pillars, profile: person.profile, entries: person.entries ?? [] }, core, bandOf(score10)), core, personal, today: { ko: today.ko, hanja: today.hanja, stemKo: today.stemKo, branchKo: today.branchKo }, date, weekday: WEEKDAYS[new Date(Date.UTC(ymd.year, ymd.month - 1, ymd.day)).getUTCDay()]!, score10, band: bandOf(score10), recent });
 
       const t = performance.now();
       const c = await computeFortune({ date, pillars: person.pillars, profile: person.profile, entries: person.entries ?? [], recent }, { useModel: true });
@@ -88,7 +89,8 @@ test("ab30", async () => {
     }
     return out;
   };
-  const rows = (await Promise.all(people.map(runPerson))).flat();
+  const only = process.env.AB_PEOPLE?.split(",");
+  const rows = (await Promise.all(people.filter((x) => !only || only.includes(x.id)).map(runPerson))).flat();
 
   const n = rows.length;
   const num = (k: string) => rows.map((r) => r[k] as number);

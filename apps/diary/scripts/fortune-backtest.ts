@@ -101,7 +101,7 @@ test("fortune backtest: v3 vs v4.2 피어슨 상관", async () => {
     `v4.2 (+대운·세운 판정, 합 점수 없음) r = ${r3(pearson(v4, happy))}`,
     `  v4 raw만             r = ${r3(pearson(raw, happy))}`,
     `  v4 raw+rel           r = ${r3(pearson(rawRel, happy))}`,
-    `  계수: scale ${COEF.scale}, 충 ±${COEF.rel}×강도(상한 ${COEF.relMax}; 합은 0), 대운충 ${COEF.daeunClash}/${COEF.daeunClashAlert}, 세운충 ${COEF.seunClash}, 월운충 ${COEF.wolunClash}, 대운 판정 ×${COEF.daeunVerdict}, 세운 판정 ×${COEF.seunVerdict}`,
+    `  계수: scale ${COEF.scale}, 충 ±${COEF.rel}×강도(상한 ${COEF.relMax}; 합은 0), 대운 판정 ×${COEF.daeunVerdict}, 세운 판정 ×${COEF.seunVerdict}`,
     `  v4 점수 분포: 평균 ${(v4.reduce((a, b) => a + b, 0) / n).toFixed(2)}, 최소 ${Math.min(...v4)}, 최대 ${Math.max(...v4)}`,
     `  행복도 분포: 평균 ${(happy.reduce((a, b) => a + b, 0) / n).toFixed(2)}`,
     ...(mismatchKinds.size ? [`  원국 불일치 종류 (일기 앱 / 코어): ${[...mismatchKinds].join(" | ")}`] : []),
