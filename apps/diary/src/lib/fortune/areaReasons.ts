@@ -60,13 +60,18 @@ export const AREA_REASON: Record<AreaName, Record<TenGodFamily, Pair>> = {
   },
 };
 
-/** 신호 있는 영역의 이유 한 줄. 그 영역 합과 같은 방향의 기여 가운데 가장 센 글자의 십신 그룹으로 고른다. 신호가 없으면 null */
-export function areaReason(area: AreaName, e: AreaProfileEntry): string | null {
+/** 신호 있는 영역을 그 방향으로 움직인 가장 센 글자 (이유 문구와 영역 장면이 같은 글자를 본다) */
+export function strongestContribution(e: AreaProfileEntry): AreaProfileEntry["contributions"][number] | null {
   if (!e.active || e.strength === 0) return null;
   const dir = Math.sign(e.strength);
-  const top = e.contributions.filter((c) => Math.sign(c.score) === dir).sort((a, b) => Math.abs(b.score) - Math.abs(a.score))[0];
+  return e.contributions.filter((c) => Math.sign(c.score) === dir).sort((a, b) => Math.abs(b.score) - Math.abs(a.score))[0] ?? null;
+}
+
+/** 신호 있는 영역의 이유 한 줄. 그 영역 합과 같은 방향의 기여 가운데 가장 센 글자의 십신 그룹으로 고른다. 신호가 없으면 null */
+export function areaReason(area: AreaName, e: AreaProfileEntry): string | null {
+  const top = strongestContribution(e);
   const fam = top ? FAMILY_OF[top.tenGod as TenGod] : undefined;
   if (!fam) return null;
   const pair = AREA_REASON[area][fam];
-  return `${dir > 0 ? pair.up : pair.down}.`;
+  return `${e.strength > 0 ? pair.up : pair.down}.`;
 }

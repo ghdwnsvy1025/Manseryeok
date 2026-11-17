@@ -2,7 +2,7 @@ import { describe, expect, test } from "vitest";
 import { STEMS, getTenGod, solarTermsOfYear } from "@saju/engine";
 import { fromBirth, toCorePillars } from "@saju/core-rules";
 import { branchRelation, computeBaseFortune, FAMILY_OF } from "@/lib/fortune/base";
-import { COEF, computeCoreFortune, ipchunDate, resolveYongsin, seunOf, toBirthInput, UNKNOWN_HOUR_MIN } from "@/lib/fortune/core";
+import { COEF, computeCoreFortune, FORTUNE_RULES, type RuleSwitch, ipchunDate, resolveYongsin, seunOf, toBirthInput, UNKNOWN_HOUR_MIN } from "@/lib/fortune/core";
 import { buildBrief, hanjaToKo, hasContextFact, plainFact, renderBrief, type BriefInput } from "@/lib/fortune/brief";
 import { ownerFilter, saveFortuneCache } from "@/lib/fortune/cache";
 import { REGEN_LIMIT, TRANSIENT_RETRY_MS, regenCountOf, regenPolicy, retryAfterFor, usableCachedContent } from "@/lib/fortune/policy";
@@ -35,9 +35,11 @@ function pillarsOf(p: BirthProfile): PillarsSnapshot {
   if (!c.ok) throw new Error(c.error);
   return c.value.pillars;
 }
-function v4(p: BirthProfile, date: string, pillars = pillarsOf(p)): CoreFortune {
-  return computeCoreFortune({ pillars, profile: p, date, todayHanja: dayGanji(date).hanja });
+function v4(p: BirthProfile, date: string, pillars = pillarsOf(p), rules?: Partial<RuleSwitch>): CoreFortune {
+  return computeCoreFortune({ pillars, profile: p, date, todayHanja: dayGanji(date).hanja, rules });
 }
+/** 판정 규칙(r1·r3·r4·r5)을 끈 계산 — 점수 분해 식처럼 기본 계산만 보는 시험용 */
+const RULES_OFF: RuleSwitch = { r1: false, r3: false, r4: false, r5: false };
 const score10 = (c: CoreFortune) => toTenPoint(c.parts.score01);
 
 describe("v4 입력 변환", () => {
@@ -84,17 +86,18 @@ describe("v4 점수·밴드·영역 스냅샷 (사주 2 × 날짜 5)", () => {
   // 2026-10-07 v4.2 합 점수 삭제: rel에는 충만 남고 합(육합·삼합·반합)·운 지지 합(union)은 0 → A 甲午 3.3→3.5(반합 寅午 제거), A 己酉 8.1→7.9(반합 巳酉 +0.25 제거), B 壬子 3.1→2.6(육합 子丑 +0.5·월운 합 제거), B 甲午 4.1→3.9, B 己酉 9.2→9.1, B 庚申 8.5→8.3.
   //   영역은 오늘(일운 ≤2) → 이달(월운 1) → 올해(세운 1)로 최대 4개, period가 붙는다.
   // 2026-10-31 v4.18 갱신(코어 4f795ca + 세력 방식 정기연속80엔진20): B 庚申 8.3→8 — 운 천간 庚이 원국 월간 乙(비겁)과 乙庚합이라 카드 013으로 천간 점수 절반(0.75 → 0.375). 나머지 9건은 그대로.
+  // 2026-11-15 v4.27: 앱 주인 판정 규칙 넷을 켰다 — A 壬子 7.9→8.7(r1 용신), A 己酉 7.9→8.6(r1), B 壬子 3.2→3.5, B 甲午 3.9→4, B 己酉 9.1→9.2, B 己卯 7.4→8. 단계는 열 건 모두 그대로.
   const CASES: { prof: BirthProfile; date: string; ganji: string; score: number; band: string; total: string; areas: string[] }[] = [
-    { prof: PROFILE_A, date: "2026-10-05", ganji: "壬子", score: 7.5, band: "좋음", total: "유리", areas: ["오늘:직업↑", "이달:연애↑", "올해:대인↓"] },
+    { prof: PROFILE_A, date: "2026-10-05", ganji: "壬子", score: 8.7, band: "좋음", total: "유리", areas: ["오늘:직업↑", "이달:연애↑", "올해:대인↓"] },
     { prof: PROFILE_A, date: "2026-01-20", ganji: "甲午", score: 3.6, band: "주의", total: "어려움", areas: ["오늘:대인↓", "오늘:재물↓", "이달:직업↑", "올해:대인↓"] },
-    { prof: PROFILE_A, date: "2026-02-04", ganji: "己酉", score: 7.9, band: "좋음", total: "매우 유리", areas: ["오늘:재물↑", "오늘:연애↑", "이달:재물↑", "올해:대인↓"] },
+    { prof: PROFILE_A, date: "2026-02-04", ganji: "己酉", score: 8.6, band: "좋음", total: "매우 유리", areas: ["오늘:재물↑", "오늘:연애↑", "이달:재물↑", "올해:대인↓"] },
     { prof: PROFILE_A, date: "2026-06-15", ganji: "庚申", score: 9.2, band: "좋음", total: "매우 유리", areas: ["오늘:재물↑", "오늘:연애↑", "이달:대인↓", "올해:대인↓"] },
-    { prof: PROFILE_A, date: "2027-03-01", ganji: "己卯", score: 4.8, band: "무난", total: "유리", areas: ["오늘:직업↑", "오늘:가족↓", "이달:직업↑", "올해:대인↓"] },
-    { prof: PROFILE_B, date: "2026-10-05", ganji: "壬子", score: 2.9, band: "주의", total: "주의", areas: ["오늘:학업↓", "오늘:가족↓", "이달:직업↑", "올해:직업↑"] },
-    { prof: PROFILE_B, date: "2026-01-20", ganji: "甲午", score: 3.9, band: "주의", total: "주의", areas: ["오늘:대인↓", "오늘:재물↓", "이달:재물↑", "올해:대인↓"] },
-    { prof: PROFILE_B, date: "2026-02-04", ganji: "己酉", score: 9.1, band: "좋음", total: "매우 유리", areas: ["오늘:재물↑", "오늘:대인↑", "이달:대인↓", "올해:직업↑"] },
+    { prof: PROFILE_A, date: "2027-03-01", ganji: "己卯", score: 5.7, band: "무난", total: "유리", areas: ["오늘:직업↑", "오늘:가족↓", "이달:직업↑", "올해:대인↓"] },
+    { prof: PROFILE_B, date: "2026-10-05", ganji: "壬子", score: 3.5, band: "주의", total: "주의", areas: ["오늘:학업↓", "오늘:가족↓", "이달:직업↑", "올해:직업↑"] },
+    { prof: PROFILE_B, date: "2026-01-20", ganji: "甲午", score: 4, band: "주의", total: "주의", areas: ["오늘:대인↓", "오늘:재물↓", "이달:재물↑", "올해:대인↓"] },
+    { prof: PROFILE_B, date: "2026-02-04", ganji: "己酉", score: 9.2, band: "좋음", total: "매우 유리", areas: ["오늘:재물↑", "오늘:대인↑", "이달:대인↓", "올해:직업↑"] },
     { prof: PROFILE_B, date: "2026-06-15", ganji: "庚申", score: 8, band: "좋음", total: "보통", areas: ["오늘:직업→", "오늘:연애→", "이달:대인↓", "올해:직업↑"] },
-    { prof: PROFILE_B, date: "2027-03-01", ganji: "己卯", score: 7.4, band: "좋음", total: "유리", areas: ["오늘:재물↑", "오늘:대인↑", "이달:대인↓", "올해:재물↑"] },
+    { prof: PROFILE_B, date: "2027-03-01", ganji: "己卯", score: 8, band: "좋음", total: "유리", areas: ["오늘:재물↑", "오늘:대인↑", "이달:대인↓", "올해:재물↑"] },
   ];
   for (const c of CASES) {
     test(`${c.prof === PROFILE_A ? "A" : "B"} ${c.date} ${c.ganji} → ${c.score} ${c.band}`, () => {
@@ -126,24 +129,25 @@ describe("v4 점수·밴드·영역 스냅샷 (사주 2 × 날짜 5)", () => {
     expect(bad.dayLuck.branch.label).toBe("기");
   });
 
-  test("대운 충 플래그: A의 대운 癸酉 × 己卯일 → 최고경보, ctx −1.2 (+ v4.1 판정 몫: 대운 3.5×0.2, 세운 −2×0.15) — v4.2: 酉 아닌 癸(관성)가 Y-12로 희신급이라 2.75 → 3.5", () => {
+  test("대운 충 플래그: A의 대운 癸酉 × 己卯일 → 최고경보 표시는 남고 점수에서는 빠짐 (2026-11-04), ctx = 판정 몫만: 대운 3.5×0.2, 세운 −2×0.15 — v4.2: 酉 아닌 癸(관성)가 Y-12로 희신급이라 2.75 → 3.5", () => {
     const r = v4(PROFILE_A, "2027-03-01");
     expect(r.context.daeun).toMatchObject({ 간지: "癸酉", 합계: 3.5, clash: { 강도: 3, 최고경보: true } });
     expect(r.context.daeun?.플래그).toEqual(expect.arrayContaining([expect.stringContaining("(Y-12)")]));
     expect(r.context.seun.합계).toBe(-2);
-    expect(r.parts.ctx).toBe(-0.8);
+    expect(r.parts.ctx).toBe(0.4);
     expect(r.facts.some((f) => f.includes("10년 단위 운") && f.includes("어긋나"))).toBe(true);
   });
 
-  test("세운 충: 丙午년 × 壬子일 → 세운 clash, ctx −0.5 (+ v4.1 판정 몫: 대운 3.5×0.2, 세운 −5×0.15)", () => {
+  test("세운 충: 丙午년 × 壬子일 → 세운 clash 표시는 남고 점수에서는 빠짐, ctx = 판정 몫만: 대운 3.5×0.2, 세운 −5×0.15", () => {
     const r = v4(PROFILE_A, "2026-10-05");
     expect(r.context.seun).toMatchObject({ 간지: "丙午", 합계: -5, clash: { 강도: 3, 최고경보: true } });
-    expect(r.parts.ctx).toBe(-0.55);
+    expect(r.parts.ctx).toBe(-0.05);
   });
 
-  test("점수 분해: score01 = 0.5 + (raw + rel + ctx) / 12 (범위 안)", () => {
+  test("점수 분해: score01 = 0.5 + (raw + rel + ctx) / 12 (범위 안) — 판정 규칙을 끈 기본 계산", () => {
+    expect(FORTUNE_RULES).toEqual({ r1: true, r3: true, r4: true, r5: true });   // 2026-11-15 앱 주인 "넷 다 켜줘"
     for (const c of CASES) {
-      const r = v4(c.prof, c.date);
+      const r = v4(c.prof, c.date, undefined, RULES_OFF);
       const expected = Math.max(0.12, Math.min(0.92, 0.5 + (r.parts.raw + r.parts.rel + r.parts.ctx) / 12));
       expect(r.parts.score01).toBeCloseTo(expected, 1); // parts는 소수 2자리로 반올림돼 있다
     }
@@ -205,7 +209,7 @@ describe("v4.1 보강 (乙亥 丙戌 己丑 辛未 × 2026-10-07 甲寅: 천간�
     expect(r.context.wolun).toMatchObject({ 간지: "丁酉", 판정: "주의", 합계: -0.5 });
     expect(r.context.daeun?.clash ?? r.context.seun.clash ?? r.context.wolun?.clash).toBeUndefined();
     expect(r.parts.ctx).toBe(-0.17); // 1×0.2 + (−2.5)×0.15 = −0.175 → 소수 2자리 (월운 −0.5는 0)
-    expect(r.parts.score01).toBe(0.65); // v4.2: raw 1.25 → 2.5 (Y-12), 寅亥 육합 +0.5는 합 점수 삭제로 0 (0.74 → 0.69). v4.18: raw 2 (Y-15) → 0.65
+    expect(r.parts.score01).toBe(0.77); // v4.27: 판정 규칙 r5(신강·비겁 우세 사주에 관성 운 +0.8, 지지 절반 깎기 되돌림) → 0.65 → 0.77. v4.2: raw 1.25 → 2.5 (Y-12), 寅亥 육합 +0.5는 합 점수 삭제로 0 (0.74 → 0.69). v4.18: raw 2 (Y-15) → 0.65
     expect(r.context.daeun?.플래그).toEqual(expect.arrayContaining([expect.stringContaining("용신 손상"), expect.stringContaining("개두")]));
     // v4.4: 2026-10-07(추분 보름째, 충 없음)은 평일 — 맥락 문장은 contextFacts에만
     expect(r.contextFacts).toEqual([
@@ -220,12 +224,11 @@ describe("v4.1 보강 (乙亥 丙戌 己丑 辛未 × 2026-10-07 甲寅: 천간�
     expect(r.facts.length).toBeLessThanOrEqual(10);
     // 월운 플래그(절각)는 문장이 되지 않는다
     expect(r.contextFacts.some((f) => f.includes("이달") && f.includes("겉과 속"))).toBe(false);
-    // v4.12: 시간 모름(1985-05-03, 금 7/12)은 다수결 용신으로 판정 몫을 내되 일치율 7/12만큼 줄인다 (충 몫은 그대로)
+    // v4.12: 시간 모름(1985-05-03, 금 7/12)은 다수결 용신으로 판정 몫을 내되 일치율 7/12만큼 줄인다
     const lowY = v4({ ...PROFILE_A, birthYear: 1985, birthMonth: 5, birthDay: 3, birthHour: null, birthMinute: null }, "2026-06-15");
     expect(lowY.context.seun.합계).toBeDefined();
-    const clashCtx = (lowY.context.daeun?.clash ? (lowY.context.daeun.clash.최고경보 ? COEF.daeunClashAlert : COEF.daeunClash) : 0) + (lowY.context.seun.clash ? COEF.seunClash : 0) + (lowY.context.wolun?.clash ? COEF.wolunClash : 0);
     const verdictCtx = ((lowY.context.daeun?.합계 ?? 0) * COEF.daeunVerdict + (lowY.context.seun.합계 ?? 0) * COEF.seunVerdict) * (7 / 12);
-    expect(lowY.parts.ctx).toBeCloseTo(clashCtx + verdictCtx, 2);
+    expect(lowY.parts.ctx).toBeCloseTo(verdictCtx, 2);
   });
 });
 
@@ -624,7 +627,8 @@ describe("3단계 검사 (validate) — v4.19 Draft", () => {
     expect(v({ headline: "용신이 들어오는 날" })).toEqual(['headline: 전문용어 "용신"']);
     expect(v({ headline: "일진이 좋은 날" }).some((x) => x.includes('전문용어 "일진"'))).toBe(true);
     expect(v({ dont: "편인 쪽으로 서두르지 않아요." }).some((x) => x.includes("십신 이름"))).toBe(true);
-    expect(v({ do: "제안은 적어 두세요." }).some((x) => x.includes("명령조"))).toBe(true);
+    expect(v({ do: "제안은 적어 둬라." }).some((x) => x.includes("명령조"))).toBe(true);   // v4.27: "~세요"는 허용, 반말만 막는다
+    expect(v({ do: "제안은 적어 두세요." })).toEqual([]);
     expect(v({ headline: "좋은 날 ✨" }).some((x) => x.includes("이모지"))).toBe(true);
     // "상관없어요", "힘이 드는 편인 병오", "고른 편인데", "무슨 일지 모르는"은 일상어 (실제 샘플에서 걸렸던 거짓 양성)
     expect(v({ dont: "작은 실수는 상관없어요." })).toEqual([]);
@@ -648,20 +652,20 @@ describe("3단계 검사 (validate) — v4.19 Draft", () => {
     expect(v({ dont: "이달 운을 믿고 서두르지 않아요." })).toEqual(["dont: 이달 운 재료가 없는데 이달 운을 말함"]);
   });
 
-  test("v4.13 추상어·생극·판정·비유·성격 이름", () => {
-    for (const bad of ["평소 아쉽던 부분이 채워지는 날이에요.", "원래 나에게 넘치는 힘이 더해져요.", "힘이 한곳에 모이지 않아요.", "지금 나와 박자가 안 맞아요.", "그 힘이 돈 쪽으로 작용해요."]) {
-      expect(v({ dont: bad }).filter((x) => x.includes("추상어")), bad).toHaveLength(1);
+  test("v4.13 추상어·생극·판정·비유·성격 이름 — v4.27: 추상어·생극·판정은 더 막지 않는다 (이론을 쉬운 말로 드러낸다)", () => {
+    for (const okNow of ["평소 아쉽던 부분이 채워지는 날이에요.", "원래 나에게 넘치는 힘이 더해져요.", "힘이 한곳에 모이지 않아요.", "지금 나와 박자가 안 맞아요.", "그 힘이 돈 쪽으로 작용해요."]) {
+      expect(v({ dont: okNow }).filter((x) => x.includes("추상어")), okNow).toHaveLength(0);
     }
-    for (const bad of ["오늘 수 기운이 내 화를 누르고 있어요.", "금이 목을 극해요.", "토가 금을 생해요."]) {
-      expect(v({ dont: bad }).filter((x) => x.includes("생·극")), bad).toHaveLength(1);
+    for (const okNow of ["오늘 수 기운이 내 화를 누르고 있어요.", "금이 목을 극해요.", "토가 금을 생해요."]) {
+      expect(v({ dont: okNow }).filter((x) => x.includes("생·극")), okNow).toHaveLength(0);
     }
     expect(v({ dont: "문제가 발생해도 버튼을 눌러요." })).toEqual([]);
-    expect(v({ body: b3("오늘은 내게 맞는 편이라 그 자리에서 정해도 괜찮아요.") }).some((x) => x.includes("판정 문장"))).toBe(true);
+    expect(v({ body: b3("오늘은 내게 맞는 편이라 그 자리에서 정해도 괜찮아요.") }).some((x) => x.includes("판정 문장"))).toBe(false);
     expect(v({ body: b3("오늘은 일이 손에 잘 붙어서 적어 두기만 해도 정리가 돼요.") }).some((x) => x.includes("비유"))).toBe(true);
     expect(v({ body: b3("기회와 확장이 눈에 들어오니 그 자리에서 정하지 않는 편이 좋아요.") }).some((x) => x.includes('성격 이름 "기회와 확장"'))).toBe(true);
-    // 주의인 날 반전 말은 오늘 문장만 (이달·올해 문장은 예외)
+    // v4.27: 주의인 날 반전 말 검사는 뺐다 — 주의 날도 해결법과 응원으로 닫는다
     const care = { ...brief, score: { ...brief.score, band: "주의" } };
-    expect(validateFortuneText({ ...OK, body: b3("마음에 든 것을 고르는 일은 생각보다 수월하게 끝나요.") }, care).filter((x) => x.includes("반전 말"))).toEqual(['본문 4번째 문장: 주의인 날 반전 말 "수월"']);
+    expect(validateFortuneText({ ...OK, body: b3("마음에 든 것을 고르는 일은 생각보다 수월하게 끝나요.") }, care).filter((x) => x.includes("반전 말"))).toEqual([]);
   });
 
   test("숫자 날조 · 점수 숫자 · 기록 이야기", () => {
@@ -679,9 +683,11 @@ describe("3단계 검사 (validate) — v4.19 Draft", () => {
     expect(tokenOverlap("돈 쓰는 일은 계획대로 가요.", OK.body.join(" "))).toBe(0);
   });
 
-  test("문장 수: 본문 2문장·7문장은 전체 이슈(다시 쓰기, v4.20) / 기간 약속 · 한자", () => {
-    expect(v({ body: OK.body.slice(0, 2) })).toEqual(["본문 2문장 (3~5문장)"]);   // v4.20: 3~5문장
-    expect(v({ body: [...OK.body, "하나 더 있는 문장이에요.", "또 하나 더 있는 문장이에요.", "셋째로 더 있는 문장이에요."] })).toEqual(expect.arrayContaining(["본문 7문장 (3~5문장)"]));
+  test("문장 수: 본문 2문장·15문장은 전체 이슈(다시 쓰기, 2026-11-17: 4~14문장), 11~14문장은 받는다 / 기간 약속 · 한자", () => {
+    expect(v({ body: OK.body.slice(0, 2) })).toEqual(["본문 2문장 (4~14문장)"]);   // 2026-11-17 앱 주인 "이상한 글보다 긴 글" — 받는 상한 10 → 14
+    const more = ["하나", "둘", "셋", "넷", "다섯", "여섯", "일곱", "여덟", "아홉", "열", "열하나"].map((w) => `${w} 더 있는 문장이에요.`);
+    expect(v({ body: [...OK.body, ...more.slice(0, 7)] }).some((x) => x.includes("문장 ("))).toBe(false);   // 11문장은 이제 통과
+    expect(v({ body: [...OK.body, ...more] })).toEqual(expect.arrayContaining(["본문 15문장 (4~14문장)"]));
     expect(v({ dont: "3일 더 쓰면 달라지지 않아요." }).some((x) => x.includes("기간 약속"))).toBe(true);
     expect(v({ headline: "庚申의 아침" }).some((x) => x.includes("한자"))).toBe(true);
   });

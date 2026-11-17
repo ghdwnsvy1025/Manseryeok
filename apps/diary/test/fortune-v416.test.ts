@@ -72,11 +72,11 @@ describe("v4.16 검사기 — 이론은 내부 판단으로만", () => {
     const ok = okText();
     const has = (d: Partial<Draft>, pre: string) => validateFortuneText({ ...ok, ...d }, brief).some((i) => i.includes(pre));
     expect(has({ dont: "정재가 들어온 날이라 서두르지 않아요." }, '십신 이름 "정재"')).toBe(true);
-    expect(has({ dont: "토 기운이 센 날이라 서두르지 않아요." }, "판정 문장")).toBe(true);
-    for (const bad of ["내게 맞는 편이라 서두르지 않아요.", "내게 모자란 토가 채워지는 날이라 서두르지 않아요.", "실속을 챙기는 힘이 들어오니 서두르지 않아요.", "오늘 기운이 나를 거들어 주니 서두르지 않아요.", "이미 넉넉한 쪽이라 과해지기 쉬워요."]) {
-      expect(has({ dont: bad }, "판정 문장"), bad).toBe(true);
+    // v4.27: 판정 문장("토 기운", "내게 맞는 편", "모자란 토가 채워지는")은 더 막지 않는다 — 이론을 쉬운 말로 드러낸다 (피드백/작가입력_재설계_2026-11-10.md §3)
+    for (const okNow of ["토 기운이 센 날이라 서두르지 않아요.", "내게 맞는 편이라 서두르지 않아요.", "내게 모자란 토가 채워지는 날이라 서두르지 않아요.", "실속을 챙기는 힘이 들어오니 서두르지 않아요.", "오늘 기운이 나를 거들어 주니 서두르지 않아요.", "이미 넉넉한 쪽이라 과해지기 쉬워요.", "돈 기운이 움직이는 날이라 서두르지 않아요."]) {
+      expect(has({ dont: okNow }, "판정 문장") || has({ dont: okNow }, "비유"), okNow).toBe(false);
     }
-    for (const bad of ["일이 손에 잘 붙는 날이라 서두르지 않아요.", "돈 기운이 움직이는 날이라 서두르지 않아요.", "흐름이 열리는 날이라 서두르지 않아요."]) {
+    for (const bad of ["일이 손에 잘 붙는 날이라 서두르지 않아요.", "흐름이 열리는 날이라 서두르지 않아요."]) {
       expect(has({ dont: bad }, "비유") || has({ dont: bad }, "금지어"), bad).toBe(true);
     }
     expect(has({ dont: "기회와 확장이 눈에 들어와도 서두르지 않아요." }, "성격 이름")).toBe(true);
@@ -87,8 +87,8 @@ describe("v4.16 검사기 — 이론은 내부 판단으로만", () => {
     const ok = okText();
     const at = (s: string, i = 3) => checkDraft({ ...ok, body: ok.body.map((x, j) => (j === i ? s : x)) }, brief).filter((x) => x.field === "body").map((x) => `${x.code}@${x.index}`);
     expect(at("짧아요.")).toEqual(["length@3"]);
-    expect(at("그러면 저녁에 남은 돈이 바로 보이게 돼요.")).toEqual(["promise_head@3"]);
-    expect(at("볕이 드는 자리처럼 오늘은 하나씩 끝내고 싶어요.")).toEqual(["metaphor@3"]);
+    expect(at("그러면 저녁에 남은 돈이 바로 보이게 돼요.")).toEqual([]);   // v4.27: 결과 약속 문장 머리 검사는 뺐다 (결과는 가능성으로 말해도 된다)
+    expect(at("볕이 드는 자리처럼 오늘은 하나씩 끝내고 싶어요.")).toEqual([]);   // v4.28: 사물 비유 검사는 뺐다 (앱 주인 글이 비유를 쓴다)
     expect(at("판정으로 나와요, 오늘은 하나씩 끝내고 싶은 날이에요.")).toEqual(["internal@3"]);
     expect(at("마음이 마음을 마음에 마음으로 흔들리는 날이에요.")).toEqual([]);   // v4.20: 같은 낱말 반복으로는 탈락시키지 않는다
   });

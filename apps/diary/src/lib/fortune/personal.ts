@@ -30,6 +30,9 @@ export interface EntryLike {
   promise?: "kept" | "missed" | "na" | null;
   /** 기록 날짜 (YYYY-MM-DD). 통계·공유에서 "가장 최근 기록"을 고를 때만 쓴다 */
   entry_date?: string;
+  /** 2026-11-17: 글 속 기록 한 줄(recall.ts recordLineOf)이 쓴다. 점수 보정에는 쓰지 않는다 */
+  moods?: string[] | null;
+  states?: import("../entry").States | null;
 }
 
 function mean(xs: number[]): number | null {

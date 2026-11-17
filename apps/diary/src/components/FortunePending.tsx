@@ -3,8 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { fortuneReadyAction } from "@/app/actions";
-import { FortuneLoading } from "./FortuneLoading";
-import { RetryButton } from "./RetryButton";
+import { FortuneFailed, FortuneLoading } from "./FortuneLoading";
 
 /** 첫 확인까지 2.5초, 그 뒤 3초마다. 모델 호출은 보통 5~20초, 재시도·검수까지 길면 40초 남짓 */
 const FIRST_MS = 2500;
@@ -66,14 +65,8 @@ export function FortunePending({ character, date, fingerprint }: { character?: s
     };
   }, [date, fingerprint, router]);
 
-  if (gaveUp) {
-    return (
-      <section className="card-frame card-light card-paper p-5 text-muted">
-        <h2 className="text-lg font-bold text-ink">오늘의 운세</h2>
-        <p className="mt-2 text-[15px]">운세를 불러오지 못했어요. 잠시 뒤 다시 열어 주세요.</p>
-        <RetryButton className="mt-1" />
-      </section>
-    );
-  }
-  return <FortuneLoading character={character} ready={ready} />;
+  // 2026-11-15 (명세 44): 실패 카드도 로딩과 같은 섞은 톤 틀·같은 높이 — 로딩 → 실패로 바뀌어도 화면이 튀지 않는다
+  if (gaveUp) return <FortuneFailed />;
+  // 2026-11-15 앱 주인이 로딩 시안 다섯 중 "창에 불 켜기"를 골랐다(명세 45) — 남색 달이 "조심할 것" 색으로 읽혀서
+  return <FortuneLoading character={character} ready={ready} look="window" />;
 }

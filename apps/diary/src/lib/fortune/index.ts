@@ -3,7 +3,11 @@
 // 2) 없으면 코어 판정(v4: core.ts) → 10점 환산 → 내 기록 보정 → 글(3단계 llm.ts: 계획 → 초안 → 검사 → 걸린 문장만 수리 → 템플릿) → 캐시에 쓴다.
 // v4.19: content.metrics에 시간·호출·토큰을 남긴다(본문은 로그에 따로 남기지 않는다). 영역 신호는 코어 것 전부(areaSignals), 모델 문장은 areaNarratives.
 // v3의 computeBaseFortune(base.ts)은 더 쓰지 않는다 (백테스트·테스트가 참조하므로 파일은 둔다).
+import { angleInputFor } from "./angle";
 import { composeAreas } from "./visible";
+import { composeV5 } from "./compose";
+import { sealsOf } from "./seals";
+import { recallOf, recordLineOf, type RecallEntry } from "./recall";
 import { buildBrief, recentFromRows, type RecentFortune, daySeed } from "./brief";
 import { planSummary } from "./plan";
 import "server-only";
@@ -25,7 +29,15 @@ export { REGEN_LIMIT, TRANSIENT_RETRY_MS, dailyCap, regenCountOf, regenPolicy, r
 
 /** 캐시 지문에 들어간다. 올리면 기존 캐시가 전부 무효 */
 // v4.21b (2026-11-01): v4.22b(재료 줄이기)를 되돌렸다 — 앱 주인 블라인드 20쌍에서 v4.21(4~5문장, 여러 면) 15 : v4.22b 4. 맥락 문장 조사 수정(core.ts)만 남긴다
-export const FORTUNE_VERSION = "v4.21b";
+// v4.27 (2026-11-15): 앱 주인 판정 규칙 r1·r3·r4·r5를 켰다(core.ts FORTUNE_RULES) — 점수가 바뀌므로 캐시를 새로 만든다
+// v5.0 (2026-11-17): 글을 v5 단락 사전 편집자로 바꿨다(FORTUNE_V5) — 글이 바뀌므로 캐시를 새로 만든다
+export const FORTUNE_VERSION = "v5.0";
+
+/**
+ * v5(단락 사전 편집자)를 실제 화면 글에 쓸지 — 2026-11-17 앱 주인이 시안 6을 읽고 확정해 켰다.
+ * 켜면 기록 한 줄(recall.ts recordLineOf, 기록 반영 설계 Q5·Q7)도 글감으로 간다.
+ */
+export const FORTUNE_V5 = true;
 
 export type FortuneOwner = { userId: string; guestKey?: undefined } | { guestKey: string; userId?: undefined };
 
@@ -195,7 +207,11 @@ export async function computeFortune(
   const weekday = WEEKDAYS[new Date(Date.UTC(p.year, p.month - 1, p.day)).getUTCDay()]!;
 
   const band = bandOf(score10);
-  const briefInput = { core, personal, today: todayInfo, date: req.date, weekday, score10, band, recent: req.recent ?? [] };
+  const { angle, quietNotes } = angleInputFor(req, core, band);
+  // 2026-11-17 기록 반영: 지난 기록에서 사실 한 줄 — 같은 줄은 7일에 한 번(Q7). v5일 때만 글감으로 간다
+  const recentRecordKeys = (req.recent ?? []).filter((r) => daySeed(req.date) - daySeed(r.date) <= 7).flatMap((r) => (r.recordKey ? [r.recordKey] : []));
+  const record = FORTUNE_V5 ? recordLineOf(recallOf(req.entries as RecallEntry[], req.date, [core.dayLuck.stem.family, core.dayLuck.branch.family], req.pillars.day.stem), recentRecordKeys) : null;
+  const briefInput = { core, personal, today: todayInfo, date: req.date, weekday, score10, band, recent: req.recent ?? [], angle, quietNotes, dayMaster: req.pillars.day.stem, ...(FORTUNE_V5 ? { v5: true, recordLine: record?.text ?? null } : {}) };
   // v4.20: 템플릿도 모델과 같은 계획에서 — 계획이 지지를 핵심으로 고른 날 템플릿이 천간 이야기를 하던 문제
   const basePlan = buildBrief(briefInput).plan;
   const tmplInput = { ...templateInputFromCore(core, basePlan.core), seed: daySeed(req.date) };
@@ -225,7 +241,7 @@ export async function computeFortune(
   const calls = r?.metrics.calls ?? [];
   const usage = r && calls.length ? r.usage : undefined;   // 템플릿으로 떨어져도 그때까지 쓴 토큰은 남긴다
   const metrics: FortuneMetrics = {
-    promptVersion: PROMPT_VERSION,
+    promptVersion: r?.metrics.promptVersion ?? PROMPT_VERSION,   // v5면 llm.ts가 v5 판본(promptVersionV5)을 돌려준다
     totalMs: Date.now() - t0,
     coreMs,
     briefMs: r?.metrics.briefMs ?? 0,
@@ -234,6 +250,10 @@ export async function computeFortune(
     ...(llm ? {} : { fallback: failWhy ?? r?.metrics.fallback ?? (useModel ? "unresolved" : "no_model") }),
   };
   const plan = r?.plan ?? planSummary(basePlan);
+  // 2026-11-15 카드 인장(명세 38·39): 그날 두 글자의 성격을 낱말 둘로. 모델을 부르지 않고 코어 판정과 단락 사전의 고르기 규칙(compose.ts)만 쓴다.
+  // 제목이 정해진 뒤에 고른다 — 제목과 같은 말이면 같은 쪽의 다른 낱말로(그릴링 Q1)
+  const sealRecent = (req.recent ?? []).filter((r) => daySeed(req.date) - daySeed(r.date) <= 7).flatMap((r) => r.seals ?? []);
+  const seals = sealsOf(composeV5({ core, band, date: req.date }), text.headline, sealRecent);
 
   return {
     version: "v4",
@@ -251,6 +271,8 @@ export async function computeFortune(
     areaSignals,
     areaNarratives,
     keywords: core.keywords,
+    seals,
+    ...(record ? { record } : {}),
     source,
     attempts: r?.attempts ?? 0,
     ...(llm ? { model: llm.model! } : {}),

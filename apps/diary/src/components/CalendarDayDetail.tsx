@@ -1,12 +1,12 @@
 import Link from "next/link";
 import { characterOfGanji } from "@/lib/character";
-import { AREA_LEVELS, AREAS, happinessTier, moodTone, type Areas } from "@/lib/entry";
+import { AREA_LEVELS, AREAS, happinessTier, moodTone, stateWords, type Areas, type States } from "@/lib/entry";
 
 interface Props {
   date: string;
   /** 그날 간지 한글 ("병진") — 서버가 계산해 넘긴다(클라이언트에서 엔진을 부르지 않게) */
   ganjiKo: string;
-  entry: { happiness: number; moods: string[]; note: string | null; areas?: Areas | null; tomorrowNote?: string | null } | null;
+  entry: { happiness: number; moods: string[]; note: string | null; areas?: Areas | null; states?: States | null; tomorrowNote?: string | null } | null;
 }
 
 /**
@@ -37,6 +37,17 @@ export function CalendarDayDetail({ date, ganjiKo, entry }: Props) {
               {entry.moods.map((m) => (
                 <li key={m} data-tone={moodTone(m)} className="tag tag--on h-8 px-1 text-[14px] text-paper-2">
                   {m}
+                </li>
+              ))}
+            </ul>
+          )}
+          {/* 2026-11-14 오늘 있었던 일: 보통이 아닌 단계와 세부 낱말만 ("바쁨", "돈 많이 나감", "사 줬음").
+              기분(색 면 띠지 32px) 아래 한 단계 조용한 줄 — 무색, 녹갈 테두리만 있는 띠지 28px·13px (톤 v3.41 .day-detail__states · .state-tag) */}
+          {stateWords(entry.states).length > 0 && (
+            <ul className="day-detail__states" aria-label="있었던 일">
+              {stateWords(entry.states).map((w) => (
+                <li key={w} className="tag state-tag">
+                  {w}
                 </li>
               ))}
             </ul>

@@ -13,8 +13,12 @@ import type { TenGod } from "@saju/engine";
 import { TEN_GOD_THEME } from "./base";
 import { AREA_WORD, toScore01 } from "./core";
 import type { FortuneTags } from "./examples";
+import type { DayAngle } from "./angle";
+import { areaScene, type AreaSceneNote } from "./areaScenes";
+import { SCENES } from "./exemplars";
 import { TEN_GOD_EXPRESSIONS } from "./expressions";
 import { bandOf, toTenPoint } from "./personal";
+import { typeNoteOf } from "./typeNotes";
 import type { AreaName, AreaPeriod, AreaSignal, CoreFortune, CoreLuckPart, FortunePlanSummary, PersonalAdjustment, RoleLabel } from "./types";
 
 // ---------- 공용 (brief.ts가 다시 내보낸다) ----------
@@ -55,9 +59,11 @@ export interface PlanPart {
   fact: string | null;
   /** 오늘 고를 생활 표현 후보 (최근 문장과 겹치는 것을 뺀 뒤 날짜로 돌려 4개) */
   expressions: string[];
+  /** 설명 층: 이 글자가 오늘 이 사람에게 왜 그렇게 작용하는지 한 줄 (typeNotes.ts). 시간 모름으로 불확실하면 null */
+  typeNote: string | null;
 }
 export type PlanSupport = { kind: "기운"; part: PlanPart; text: string } | { kind: "충" | "복음"; text: string };
-export interface PlanArea { period: AreaPeriod; area: AreaName; word: string; signal: AreaSignal }
+export interface PlanArea { period: AreaPeriod; area: AreaName; word: string; signal: AreaSignal; /** 설명 층: 오늘 영역의 생활 장면 (가족·이달·올해는 없음) */ scene?: AreaSceneNote }
 export interface PlanAvoid {
   /** 최근 7일 글에 나온 장면 낱말 */
   scenes: string[];
@@ -86,6 +92,8 @@ export interface FortunePlan {
   avoid: PlanAvoid;
   /** 핵심이 본문에 들어갔는지 볼 어간 (검사기용) */
   coreStems: string[];
+  /** v4.26: 그날 실제로 있는 근거 하나 (angle.ts). 없으면 null */
+  angle: DayAngle | null;
 }
 
 export interface PlanInput {
@@ -94,9 +102,13 @@ export interface PlanInput {
   date: string;
   band: "좋음" | "무난" | "주의";
   recent?: RecentLike[];
+  /** v4.26: 오늘의 각도 (angle.ts). 옛 테스트처럼 없으면 null로 본다 */
+  angle?: DayAngle | null;
+  /** v4.26: 이번 14일 묶음에 이미 보낸 설명 층 문구 */
+  quietNotes?: ReadonlySet<string>;
 }
 
-const readOf = (role: RoleLabel, method: CoreFortune["dayLuck"]["method"]): PartRead =>
+export const readOf = (role: RoleLabel, method: CoreFortune["dayLuck"]["method"]): PartRead =>
   method === "용신 없음" || role === null ? "보류" : role === "용" || role === "희" ? "활용" : role === "한" ? "보통" : "과함";
 /** v4.21 (ChatGPT 3차 2항): 작가에게 가는 내부 말은 자연스러움보다 뜻이 하나여야 한다. "지나치기 쉬운 쪽"은 "그냥 지나쳐 버리기 쉽다"로도 읽혀
  *  "그 마음이 쉽게 지나쳐지는 날"처럼 반대로 쓰였다(B 119편 중 3~4편) */
@@ -136,7 +148,7 @@ function partPlan(core: CoreFortune, p: CoreLuckPart, which: "천간" | "지지"
   const list = fresh.length >= 3 ? fresh : all;
   const start = seed % list.length;
   const rotated = [...list.slice(start), ...list.slice(0, start)];
-  return { part: which, tenGod: p.tenGod, meaning: TEN_GOD_THEME[p.tenGod], label: p.label, read, score: p.score, fact: factOf(core, p.tenGod), expressions: rotated.slice(0, 4) };
+  return { part: which, tenGod: p.tenGod, meaning: TEN_GOD_THEME[p.tenGod], label: p.label, read, score: p.score, fact: factOf(core, p.tenGod), expressions: rotated.slice(0, 4), typeNote: typeNoteOf(core, p) };
 }
 
 /** 최근 글에서 찾을 장면 낱말 (생활 장면). 표현만 돌리려는 것이라 넉넉하지 않아도 된다 */
@@ -182,19 +194,21 @@ export function buildPlan(input: PlanInput): FortunePlan {
   const coreIsStem = Math.abs(stem.score) >= Math.abs(branch.score);
   const corePart = partPlan(core, coreIsStem ? stem : branch, coreIsStem ? "천간" : "지지", seed, recentLines);
   const other = coreIsStem ? branch : stem;
+  const quiet = <T extends { typeNote: string | null }>(x: T): T => (x.typeNote && input.quietNotes?.has(x.typeNote) ? { ...x, typeNote: null } : x);
 
   // 보조: 일·월 자리 충 > 다른 쪽 기운(|점수| ≥ 1, 다른 십신) > 복음·다른 충 > 없음
   // v4.20: 관계 객체에 붙은 문장을 그대로 쓴다 (문장을 정규식으로 다시 찾지 않는다 — 충이 둘인 날 다른 자리 문장을 집었다)
   const clashFact = (pred: (pos: string) => boolean) => core.relations.hits.find((h) => h.kind === "충" && pred(h.pos) && h.fact)?.fact ?? null;
   let support: PlanSupport | null = null;
-  const nearClash = clashFact((pos) => pos === "일" || pos === "월");
+  // v4.26: 각도가 충이면 같은 이야기를 보조로 또 주지 않는다
+  const nearClash = input.angle?.kind === "충" ? null : clashFact((pos) => pos === "일" || pos === "월");
   if (nearClash) support = { kind: "충", text: nearClash };
   else if (other.tenGod !== corePart.tenGod && Math.abs(other.score) >= 1) {
     const part = partPlan(core, other, coreIsStem ? "지지" : "천간", seed + 1, recentLines);
-    support = { kind: "기운", part: { ...part, expressions: part.expressions.slice(0, 2) }, text: part.fact ?? part.meaning };
+    support = { kind: "기운", part: quiet({ ...part, expressions: part.expressions.slice(0, 2) }), text: part.fact ?? part.meaning };
   } else {
     const rep = core.relations.hits.find((h) => h.kind === "복음" && h.fact)?.fact ?? null;
-    const farClash = clashFact(() => true);
+    const farClash = input.angle?.kind === "충" ? null : clashFact(() => true);
     if (farClash) support = { kind: "충", text: farClash };
     else if (rep) support = { kind: "복음", text: rep };
   }
@@ -218,15 +232,20 @@ export function buildPlan(input: PlanInput): FortunePlan {
   const areas: PlanArea[] = [];
   for (const a of ordered) {
     if (areas.some((x) => x.area === a.area)) continue;
-    areas.push({ period: a.period, area: a.area, word: AREA_WORD[a.area], signal: a.signal });
+    const prof = a.period === "오늘" ? core.todayAreaProfile?.[a.area] : undefined;
+    const found = prof ? areaScene(a.area, prof) : null;
+    // v4.26: 이번 14일 묶음에 이미 보낸 장면은 쉬게 한다 (angle.ts quietNotes)
+    const scene = found && input.quietNotes?.has("좋은" in found ? found.좋은 : found.조심) ? null : found;
+    areas.push({ period: a.period, area: a.area, word: AREA_WORD[a.area], signal: a.signal, ...(scene ? { scene } : {}) });
     if (areas.length === 2) break;
   }
 
   const allPool = TEN_GOD_EXPRESSIONS[corePart.tenGod];
-  const coreStems = [...new Set([corePart.meaning, ...allPool.경향, ...allPool.과할때, ...allPool.활용, ...(support?.kind === "기운" ? [support.part.meaning, ...TEN_GOD_EXPRESSIONS[support.part.tenGod].경향] : [])].flatMap((s) => [...stemSet(s)]))];
+  // v4.28: 작가에게는 표현 문장 대신 장면 명사(exemplars.SCENES)가 가므로 핵심 어간에 장면도 넣는다
+  const coreStems = [...new Set([corePart.meaning, ...allPool.경향, ...allPool.과할때, ...allPool.활용, ...SCENES[corePart.tenGod].장면, ...(support?.kind === "기운" ? [support.part.meaning, ...TEN_GOD_EXPRESSIONS[support.part.tenGod].경향, ...SCENES[support.part.tenGod].장면] : [])].flatMap((s) => [...stemSet(s)]))];
 
   return {
-    core: corePart,
+    core: quiet(corePart),
     support,
     includeContext,
     contextReason: !includeContext ? null : factLines.length ? "운이 바뀌거나 오늘과 어긋나는 날" : "운 맥락이 단계를 바꾸는 날",
@@ -234,6 +253,7 @@ export function buildPlan(input: PlanInput): FortunePlan {
     areas,
     avoid: avoidFromRecent(input.date, input.recent ?? []),
     coreStems,
+    angle: input.angle ?? null,
   };
 }
 
@@ -244,6 +264,7 @@ export function planSummary(p: FortunePlan): FortunePlanSummary {
     includeContext: p.includeContext,
     contextReason: p.contextReason,
     areas: p.areas.map(({ period, area, signal }) => ({ period, area, signal })),
+    ...(p.angle ? { angle: p.angle.kind } : {}),
   };
 }
 

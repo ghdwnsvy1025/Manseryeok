@@ -23,8 +23,9 @@ function pillarsOf(p: BirthProfile): PillarsSnapshot {
   if (!c.ok) throw new Error(c.error);
   return c.value.pillars;
 }
+// 2026-11-15: 이 파일은 맥락 문장·계획 동작을 본다 — 점수를 움직이는 앱 주인 판정 규칙은 끄고 v4.26 점수에서 본다(규칙 효과는 fortune.test.ts 스냅샷)
 function v4(p: BirthProfile, date: string, pillars = pillarsOf(p)): CoreFortune {
-  return computeCoreFortune({ pillars, profile: p, date, todayHanja: dayGanji(date).hanja });
+  return computeCoreFortune({ pillars, profile: p, date, todayHanja: dayGanji(date).hanja, rules: { r1: false, r3: false, r4: false, r5: false } });
 }
 const onlyContext = (c: CoreFortune) => c.facts.filter((f) => hasContextFact([f]));
 
@@ -202,10 +203,10 @@ describe("v4.4 brief·SYSTEM·검사 — 요일·절기 재료, 금지어, 맥�
     expect(findBanned("오늘은 특별한 날이에요")).toEqual(["특별한"]);
   });
 
-  test("SYSTEM: 절기 첫날 규칙·금지어·생·극이 한 번씩, '운과 어떻게 겹치는지' 요구는 없다", () => {
+  test("SYSTEM: 절기 첫날 규칙·금지어가 한 번씩, '운과 어떻게 겹치는지' 요구는 없다 (v4.27: 생·극 금지는 뺐다)", () => {
     expect(SYSTEM).toContain("절기첫날");
     expect(SYSTEM).toContain("비견·겁재");
-    expect(SYSTEM).toContain("생·극");
+    expect(SYSTEM).toContain("[본보기에서 배울 것]");   // v4.28: 규칙 대신 본보기
     expect(SYSTEM).toMatch(/특별한·남다른·다른 날과 달리·차별/);
     expect(SYSTEM).not.toContain("어떻게 겹치는지");
     expect(SYSTEM).not.toContain("올해 운과 겹쳐");

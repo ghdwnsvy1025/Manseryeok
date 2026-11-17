@@ -45,12 +45,12 @@ const fakeClient = (answers: unknown[]) => {
 };
 
 describe("v4.10 이음말 검사", () => {
-  test("첫 문장이 '그래서'로 시작하면 탈락, '그래서' 두 번이면 탈락, 한 번은 통과", () => {
+  test("첫 문장이 '그래서'로 시작하면 탈락, 본문 안의 '그래서'는 횟수에 상관없이 통과 (v4.27)", () => {
     expect(validateFortuneText(good, brief)).toEqual([]);
     const a = validateFortuneText({ ...good, body: ["그래서 마음이 앞서는 날이라 이것저것 눈에 들어와요.", ...good.body.slice(1)] }, brief);
     expect(a.some((x) => x.includes("첫 문장이 이음말로 시작"))).toBe(true);
     const b = validateFortuneText({ ...good, body: [good.body[0]!, good.body[1]!, "그래서 " + good.body[2]!, FIXED_LAST] }, brief);
-    expect(b).toEqual(["본문 4번째 문장: '그래서'가 두 번째 (본문에 한 번까지)"]);
+    expect(b).toEqual([]);   // v4.27: '그래서' 횟수는 막지 않는다 (지적 원장 뿌리 2 — 접속사로 잇기)
     expect(validateFortuneText({ ...good, body: [...good.body.slice(0, 3), FIXED_LAST] }, brief)).toEqual([]);
   });
 });

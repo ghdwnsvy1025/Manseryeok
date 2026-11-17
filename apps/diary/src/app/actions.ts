@@ -26,7 +26,7 @@ import { usableCachedContent } from "@/lib/fortune/policy";
 import { parseYmd } from "@/lib/time";
 import { isAllowedRemindHour } from "@/lib/remind";
 import { validatePushSubscription } from "@/lib/pushSubscription";
-import { AREAS, validateEntry, validateEntryDate } from "@/lib/entry";
+import { AREAS, STATE_AXES, validateEntry, validateEntryDate } from "@/lib/entry";
 import { dayGanji } from "@/lib/ganji";
 import { COMPUTE_ERROR, computeProfile, validateName, validateProfile, type ProfileField } from "@/lib/profile";
 
@@ -75,6 +75,8 @@ export async function saveEntryAction(_prev: FormState, form: FormData): Promise
     note: form.get("note"),
     // 영역별 5단계 (2026-10-31). 안 매긴 영역은 폼에 없다
     areas: Object.fromEntries(AREAS.map((a) => [a.key, form.get(`area_${a.key}`)])),
+    // 오늘 있었던 일 (2026-11-14): state_<축>=1~3, state_tags=세부 낱말 키 여러 개
+    states: { ...Object.fromEntries(STATE_AXES.map((a) => [a.key, form.get(`state_${a.key}`)])), tags: form.getAll("state_tags") },
     tomorrowNote: form.get("tomorrow_note"),
     // 오늘의 작은 약속은 2026-10-31 쓰기 화면에서 뺐다 — 보내지 않으면(undefined) 지난 값을 건드리지 않는다
     promise: form.has("promise") ? form.get("promise") : undefined,

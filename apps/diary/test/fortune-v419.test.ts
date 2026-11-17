@@ -145,25 +145,31 @@ describe("v4.19 brief·SYSTEM 줄이기", () => {
   test("모델에게 가는 brief: 계획 칸만, 십신 이름·판정 사실 문장·금지어 목록·태그·rules 없음", () => {
     const json = renderBrief(brief);
     const o = JSON.parse(json) as Record<string, unknown>;
-    expect(Object.keys(o)).toEqual(expect.arrayContaining(["단계", "말투", "핵심", "영역", "숫자"]));
+    expect(Object.keys(o)).toEqual(expect.arrayContaining(["단계", "말투", "나", "오늘글자", "까닭", "장면", "영역", "숫자"]));   // v4.28
     expect(o).not.toHaveProperty("오늘");   // v4.20: 날짜·요일·절기는 보내지 않는다
     for (const k of ["inside", "rules", "banned", "jargon", "personal", "mine", "facts", "맥락", "tags", "avoid"]) expect(o).not.toHaveProperty(k);
-    for (const n of TEN_GOD_NAMES) expect(json).not.toContain(n);
-    expect(json).not.toMatch(/채워져요|넉넉한/);
-    expect(json.length).toBeLessThan(1200);
+    // v4.28: 까닭 줄에 십신 이름이 괄호로 있다(글에서는 검사기가 막는다). 장면은 명사구이고 "~요" 문장이 아니다
+    const reasons = o.까닭 as string[], scenes = o.장면 as string[];
+    expect(reasons.length).toBeGreaterThan(0);
+    expect(TEN_GOD_NAMES.some((n) => reasons[0]!.includes(`(${n})`))).toBe(true);
+    for (const s of scenes) expect(s).not.toMatch(/요\.?$/);
+    expect(JSON.stringify(o.영역)).not.toMatch(/채워져요|넉넉한/);
+    expect(json.length).toBeLessThan(2500);
     expect(brief.allowedNumbers).toEqual([]);   // v4.21: 날짜 숫자 없음
   });
   test("SYSTEM: 글쓰기 철학 + 절대 금지 한 번, 예시 세 편 없음, 2,500자 안. 스키마는 작가 칸만", () => {
     expect(SYSTEM).toContain("[절대 쓰지 않는 것]");
-    expect(SYSTEM.length).toBeLessThan(2500);
+    expect(SYSTEM.length).toBeLessThan(12000);   // v4.28: 앱 주인 본보기 6편이 들어 있다 (캐시됨)
+    expect(SYSTEM).toContain("[본보기");
     for (const e of FORTUNE_EXAMPLES) expect(SYSTEM).not.toContain(e.text.headline);
     expect(SYSTEM).not.toContain("판단.후보");
     expect(SYSTEM.split("흐름").length - 1).toBeLessThanOrEqual(2);   // 금지 낱말은 목록에 한 번 (+ 비유 예 한 번)
-    expect(OUTPUT_SCHEMA.required).toEqual(["headline", "body", "do", "dont"]);   // v4.20: 영역 줄은 모델이 쓰지 않는다
+    expect(OUTPUT_SCHEMA.required).toEqual(["headline", "first", "second", "do", "dont"]);   // v4.20: 영역 줄은 모델이 쓰지 않는다. v4.27: 두 문단
     expect(OUTPUT_SCHEMA.properties).not.toHaveProperty("areaLines");
-    expect(OUTPUT_SCHEMA.properties.body.type).toBe("array");
+    expect(OUTPUT_SCHEMA.properties.first.type).toBe("array");
+    expect(OUTPUT_SCHEMA.properties.second.type).toBe("array");
     expect(REPAIR_SCHEMA.properties.fixes.items.properties.action.enum).toEqual(["replace", "delete"]);
-    expect(PROMPT_VERSION).toMatch(/^v4\.21b-[0-9a-f]{8}$/);
+    expect(PROMPT_VERSION).toMatch(/^v4.28-[0-9a-f]{8}$/);
   });
 });
 
@@ -175,14 +181,14 @@ describe("v4.19 검사기 — 구조화 이슈", () => {
     const r = checkDraft(replaceBody(GOOD, 2, "가까운 사람과의 흐름이 바뀌면 피하지 말고 들어 봐요."), brief);
     expect(r).toEqual([expect.objectContaining({ code: "banned", field: "body", index: 2 })]);
     expect(checkDraft({ ...GOOD, headline: "편재가 들어오는 날" }, brief)).toEqual([expect.objectContaining({ code: "tengod", field: "headline" })]);
-    expect(checkDraft({ ...GOOD, do: "제안은 적어 두세요." }, brief)).toEqual([expect.objectContaining({ code: "ending", field: "do" })]);
+    expect(checkDraft({ ...GOOD, do: "제안은 적어 둔다." }, brief)).toEqual([expect.objectContaining({ code: "ending", field: "do" })]);   // v4.27: "~세요"는 허용, 반말만 막는다
     const area = checkDraft({ ...GOOD, areaLines: [GOOD.areaLines[0]!, { area: "연애", text: "선물은 짝이 맞게 두 개 골라 봐요." }] }, brief);
     expect(area).toEqual([expect.objectContaining({ code: "structure", field: "area", index: 1 })]);
     expect(needsRewrite(area)).toBe(false);
   });
   test("다시 쓰기는 JSON 아님·문장이 너무 적음·핵심 누락일 때만", () => {
     expect(needsRewrite(checkDraft(null, brief))).toBe(true);
-    expect(checkDraft({ ...GOOD, body: GOOD.body.slice(0, 3) }, brief)).toEqual([]);   // v4.20: 3문장도 받는다
+    expect(checkDraft({ ...GOOD, body: GOOD.body.slice(0, 4) }, brief)).toEqual([]);   // v4.27: 초안은 4문장부터 받는다 (두 문단을 요청)
     const short = checkDraft({ ...GOOD, body: GOOD.body.slice(0, 2) }, brief);
     expect(short).toEqual([expect.objectContaining({ code: "body_count", field: "whole" })]);
     const off = checkDraft({ ...GOOD, body: ["오늘은 몸이 조금 무겁게 느껴질 수 있어요.", "밥을 거르지 말고 쉬는 시간을 먼저 챙겨 봐요.", "운동은 가볍게 걷는 정도로 줄여도 괜찮아요.", "잠들기 전에는 화면을 조금 일찍 꺼 두는 편이 좋아요."] }, brief);
@@ -267,7 +273,7 @@ describe("v4.19 파이프라인 — 초안 1 + 수리 최대 2라운드, 측정"
     expect(content).toContain('금지어 \\"흐름\\"');
   });
   test("FORTUNE_PATCH_MODEL이 없으면 수리도 글쓰기 모델, 있으면 그 모델", async () => {
-    const bad = { ...GOOD, do: "제안은 적어 두세요." };
+    const bad = { ...GOOD, do: "제안은 적어 둔다." };
     const fix = { fixes: [{ id: "do", action: "replace", text: "눈에 띈 제안 하나를 메모장에 적어 둬요." }] };
     const a = fakeClient([bad, fix]);
     await generateFortuneText(input, fallback, { client: a.client, model: "claude-sonnet-5", reviewModel: null });
@@ -370,7 +376,7 @@ describe("v4.19 content (computeFortune) — metrics·영역 신호 분리·키�
     const { client } = fakeClient([GOOD]);
     const c = await computeFortune(req, { useModel: true, generate: (i, f) => generateFortuneText(i, f, { client, reviewModel: null }) });
     expect(c.source).toBe("llm");
-    expect(c.metrics).toMatchObject({ promptVersion: PROMPT_VERSION, firstPass: true, calls: [expect.objectContaining({ kind: "draft", issueCodes: [] })] });
+    expect(c.metrics).toMatchObject({ promptVersion: expect.stringMatching(/^v5\.0-[0-9a-f]{8}$/), firstPass: true, calls: [expect.objectContaining({ kind: "draft", issueCodes: [] })] });
     expect(c.metrics!.fallback).toBeUndefined();
     for (const k of ["totalMs", "coreMs", "briefMs"] as const) expect(c.metrics![k]).toBeGreaterThanOrEqual(0);
     expect(c.areaSignals!.map((a) => `${a.period}${a.area}${a.signal}`)).toEqual(core.areas.map((a) => `${a.period}${a.area}${a.signal}`));
@@ -389,7 +395,7 @@ describe("v4.19 content (computeFortune) — metrics·영역 신호 분리·키�
   });
   test("템플릿으로 떨어져도 usage·metrics가 남고, 모델을 안 쓰면 no_model", async () => {
     const { computeFortune } = await import("@/lib/fortune");
-    const { client } = fakeClient([{ ...GOOD, headline: "흐름이 좋은 날" }, { fixes: [] }, { fixes: [] }]);
+    const { client } = fakeClient([{ ...GOOD, headline: "편재가 좋은 날" }, { fixes: [] }, { fixes: [] }]);   // v5.0: 실제 화면 글이 v5라 문체 검사("흐름이 좋은")는 안 본다 — 사주 원어로 떨어뜨린다
     const c = await computeFortune(req, { useModel: true, generate: (i, f) => generateFortuneText(i, f, { client, reviewModel: null }) });
     expect(c.source).toBe("template");
     expect(c.usage).toEqual({ input: 300, output: 150, cacheRead: 30, cacheWrite: 60 });

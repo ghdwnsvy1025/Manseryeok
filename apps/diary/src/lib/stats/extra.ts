@@ -1,7 +1,7 @@
 // 행복도 말고 보여 주는 지표 (2026-10-09 사용자 결정 Q4: 포인트 실행률 · 기분 분포 · 연속 기록) + 30일 그래프 데이터 (Q7).
 // 전부 이미 저장된 기록에서 읽을 때 계산한다. 행복도 자체는 바꾸지 않는다 (Q3: 사용자가 매긴 숫자 그대로).
 import { addDays } from "../time";
-import { AREAS, type AreaKey, type Areas } from "../entry";
+import { AREAS, canonicalMood, type AreaKey, type Areas } from "../entry";
 
 export interface StatEntry {
   entry_date: string;
@@ -59,10 +59,10 @@ export interface MoodCount {
   mean: number | null;
 }
 
-/** 자주 고른 기분 상위 limit개. 같은 횟수면 평균 행복도가 높은 쪽 먼저 */
+/** 자주 고른 기분 상위 limit개. 같은 횟수면 평균 행복도가 높은 쪽 먼저. 2026-11-14: 예전 기분은 지금 고르기의 이름으로 묶어 센다(행복함·즐거움 → 기쁨) */
 export function moodTop(entries: StatEntry[], limit = 3): MoodCount[] {
   const acc = new Map<string, number[]>();
-  for (const e of entries) for (const m of e.moods ?? []) acc.set(m, [...(acc.get(m) ?? []), e.happiness]);
+  for (const e of entries) for (const m of new Set((e.moods ?? []).map(canonicalMood))) acc.set(m, [...(acc.get(m) ?? []), e.happiness]);
   return [...acc.entries()]
     .map(([mood, hs]) => ({ mood, n: hs.length, mean: mean(hs) }))
     .sort((a, b) => b.n - a.n || (b.mean ?? 0) - (a.mean ?? 0))

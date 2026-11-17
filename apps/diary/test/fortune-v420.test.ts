@@ -64,7 +64,7 @@ describe("v4.20 P1 규칙 완화", () => {
     const recent = [1, 2].map((n) => ({ date: `2026-06-1${5 - n}`, headline: `제목 ${n}이 되는 날`, start: "답장을 미뤄요.", lines: ["답장을 미뤄요.", "결제는 확인해요."], actions: ["답장을 미뤄 봐요.", "결제를 서두르지 않아요."] }));
     const b = buildBrief({ core, personal: NONE, today: { ko: "경신", hanja: "庚申", stemKo: "경", branchKo: "신" }, date: DATE, weekday: "월요일", score10: 5, band: "무난", recent });
     const j = JSON.parse(renderBrief(b)) as { 피할것?: Record<string, unknown> };
-    expect(Object.keys(j.피할것 ?? {})).toEqual(["최근제목"]);
+    expect(Object.keys(j.피할것 ?? {})).toEqual(expect.arrayContaining(["최근제목", "최근하면"])); // v4.26: 최근 3일 하면은 보여 준다(낱말을 막지는 않는다)
     // 최근 3일 하면·피해요와 거의 같은 하면은 그 칸만 고친다
     const draft = { headline: "새 제목이에요", body: ["오늘은 사고 싶은 것이 여러 개 눈에 들어올 수 있어요.", "예정에 없던 구매라면 바로 정하지 않는 편이 좋아요.", "필요한 것부터 고르면 마음이 편해요."], areaLines: [], do: "답장을 미뤄 봐요.", dont: "새로 벌이지 않아요." };
     expect(checkDraft(draft, b).map((i) => `${i.field}:${i.code}`)).toContain("do:recent_action");
@@ -92,17 +92,20 @@ import { templateText } from "@/lib/fortune/text";
 
 describe("v4.21 작가가 짐작하던 뜻을 사실로 준다", () => {
   const b = buildBrief({ core, personal: NONE, today: { ko: "경신", hanja: "庚申", stemKo: "경", branchKo: "신" }, date: DATE, weekday: "월요일", score10: 5, band: "주의", recent: [{ date: "2026-06-14", headline: "어제 제목", start: "문장이에요.", lines: ["문장이에요."], actions: ["하면이에요."], vote: -1 as const, voteReason: "content" as const }] });
-  const j = JSON.parse(renderBrief(b)) as Record<string, unknown> & { 영역: { 신호: string; 뜻: string }[]; 핵심: { 오늘: string }; 숫자: number[]; 피할것?: Record<string, unknown> };
+  const j = JSON.parse(renderBrief(b)) as Record<string, unknown> & { 영역: string[]; 까닭: string[]; 장면: string[]; 숫자: number[]; 피할것?: Record<string, unknown> };
   test("방향 칸이 없다 — 행동의 종류는 단계에서 나오지 않는다", () => {
     expect(j).not.toHaveProperty("방향");
     expect(j).toHaveProperty("말투");
   });
   test("읽기 말은 뜻이 하나다 (\"지나치기\" 없음)", () => {
     for (const w of Object.values(READ_WORD)) expect(w).not.toMatch(/지나치/);
-    expect(Object.values(READ_WORD)).toContain(j.핵심.오늘);
+    // v4.28: 작가에게는 읽기 말 대신 까닭 두세 줄과 장면 명사가 간다
+    expect(j.까닭.length).toBeGreaterThan(0);
+    expect(j.장면.length).toBeGreaterThanOrEqual(4);
+    for (const r of j.까닭) expect(r).not.toMatch(/지나치/);
   });
   test("영역마다 화면 상태말과 같은 뜻이 간다", () => {
-    for (const a of j.영역) expect(a.뜻).toMatch(/쪽$/);
+    for (const a of j.영역) expect(a).toMatch(/\((.*쪽)(, (이달|올해))?\)$/);   // v4.28: "사람↓ (말이 엇갈리기 쉬운 쪽)" 꼴
   });
   test("숫자에 날짜(연·월·일)가 없다", () => {
     expect(j.숫자).not.toContain(2026);
@@ -121,9 +124,9 @@ test("v4.21 영역: 맥락을 쓰는 날에도 오늘 영역이 먼저 (↑ 먼�
   expect(p.areas.map((a) => `${a.period}${a.area}${a.signal}`)).toEqual(["오늘대인↓", "오늘건강↑"]);
 });
 
-test("v4.21 표현 후보와 템플릿 본문이 결과를 약속하지 않는다", () => {
+test("v4.21 표현 후보와 템플릿 본문이 결과를 단정하지 않는다 (v4.27: 가능성 '~기 쉬워요·~수 있어요'는 된다)", () => {
   const all = Object.values(TEN_GOD_EXPRESSIONS).flatMap((e) => [...e.경향, ...e.과할때, ...e.활용]);
-  for (const e of all) expect(e).not.toMatch(/결과가|성과가|일이 순해|수월해|잘 통해|하루가 편해|쓰면 남아/);
+  for (const e of all) expect(e).not.toMatch(/반드시|틀림없이|무조건|확실히 (좋|나쁘)|대박|망해/);
   const t = templateText(templateInputFromCore(core), NONE, { ko: "경신", stemKo: "경", branchKo: "신" });
   expect(t.body).not.toMatch(/새로 벌이기보다 하던 것을 지키는|손에 든 일부터 하나씩 끝내는 쪽이 편해요/);
 });

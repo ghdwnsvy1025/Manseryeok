@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { after } from "next/server";
 import { Booting } from "@/components/Booting";
 import { FortuneCard } from "@/components/FortuneCard";
+import { recallOf } from "@/lib/fortune/recall";
 import { FortunePending } from "@/components/FortunePending";
 import { LinkPromptCard } from "@/components/LinkPromptCard";
 import { RememberAccount } from "@/components/RememberAccount";
@@ -105,7 +106,7 @@ export default async function TodayPage() {
   const cachedFortune = cachedRaw ? withLivePersonal(cachedRaw, entries, today) : null;
   let fortuneCard;
   if (cachedFortune) {
-    fortuneCard = <FortuneCard fortune={cachedFortune} dateLabel={fortuneDateLabel} ganjiKo={ganji.ko} canVote vote={vote} defaultOpen={defaultOpen} version={FORTUNE_VERSION} />;
+    fortuneCard = <FortuneCard fortune={cachedFortune} dateLabel={fortuneDateLabel} ganjiKo={ganji.ko} canVote vote={vote} defaultOpen={defaultOpen} version={FORTUNE_VERSION} variant="seal" theme="blend" recall={recallOf(entries, today, cachedFortune.core ? [cachedFortune.core.dayLuck.stem.family, cachedFortune.core.dayLuck.branch.family] : [], profile.pillars.day.stem)} />;
   } else {
     startFortune({ date: today, pillars: profile.pillars, profile: birth, entries, owner: { userId: user.id }, cached: cachedRow });
     // 지문을 넘겨 "지금 원국·입력으로 만든 행"이 생겼을 때만 준비됐다고 본다 (옛 지문 행은 아직 아님)

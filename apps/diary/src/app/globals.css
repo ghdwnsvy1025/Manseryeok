@@ -3298,20 +3298,7 @@ input:checked + .entry-happy__stamp::before,
   padding-right: 2px;
 }
 
-/* 2. 쓰기 — 기분 세 무리: 머리(13px 굵게 muted) 오른쪽으로 녹갈 0.5px 괘선이 이어져 무리가 갈린다. 띠지 36px(h-9)·간격 6px(gap-1.5) */
-.entry-moods__head {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin: 0;
-  line-height: 1;
-}
-.entry-moods__head::after {
-  content: "";
-  flex: 1;
-  height: 0;
-  border-top: 0.5px solid color-mix(in srgb, var(--color-frame) 55%, transparent);
-}
+/* 2. 쓰기 — 기분 무리: v3.41에서 "머리 + 오른쪽 괘선"을 이름 열 + 띠지 열로 바꿨다(맨 아래 v3.41 블록 .entry-moods*). 띠지 36px(h-9)·간격 6px은 그대로 */
 
 /* 3. 쓰기 — 내일의 나에게: 쪽지(note-slip) 위에 바로 쓰는 손글씨 칸. 괘선 2줄(최대 3줄, 100자)이 글과 함께 움직인다 */
 .entry-tomorrow .note-slip__text {
@@ -4413,40 +4400,17 @@ input:checked + .entry-happy__stamp::before,
   --stamp-num: var(--color-paper-2);
 }
 
-/* 2. 영역 = 선택. 행복도(필수) 아래 녹갈 0.5px 괘선 한 줄이 필수/선택의 경계 — 틀 안의 틀이 아니라 선 하나. 카드 gap 28px 중 8px을 당겨
+/* 2. (v3.38 당시) 영역 = 선택. 행복도(필수) 아래 녹갈 0.5px 괘선 한 줄이 필수/선택의 경계 — 틀 안의 틀이 아니라 선 하나. 카드 gap 28px 중 8px을 당겨
    선 위 20px · 선 아래 16px. 머리 `.entry-areas__legend` 15px 굵게 먹(행복도 17px보다 한 단계 가볍게) + 같은 줄 안내 13px muted
    (넘치면 안내만 아래 줄). 여섯 줄·도장·양 끝 글은 v3.32 그대로 — 흐리게 죽이지 않는다 */
-.entry-areas {
-  margin-top: -8px;
-  padding-top: 16px;
-  border-top: 0.5px solid color-mix(in srgb, var(--color-frame) 45%, transparent);
-}
-/* legend를 float로 — 브라우저가 legend를 테두리 선 위에 얹는 특수 그리기를 끄고(HTML 표준: float된 legend는 "rendered legend"가 아니다)
-   보통 블록으로 흐르게 한다. 그래야 위 괘선이 끊기지 않고 머리 위로 한 줄 이어진다. 아래 여섯 줄은 clear로 그 밑에 */
-.entry-areas__legend {
-  float: left;
-  width: 100%;
-  margin-bottom: 12px;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  column-gap: 10px;
-  row-gap: 2px;
-  padding: 0;
-  font-size: 15px;
-  font-weight: 700;
-  line-height: 1.3;
-  color: var(--color-ink);
-}
+/* v3.41: 영역은 접힘(`details.entry-areas-fold`) 안으로 들어갔다 — 괘선과 머리는 접힌 줄(.entry-areas-fold, 맨 아래 v3.41 블록)이 맡고,
+   안쪽 fieldset의 legend는 보조 기술에만 남는다(.entry-areas__legend 규칙 삭제). 안내 글 .entry-areas__note는 접힌 줄이 그대로 쓴다 */
 .entry-areas__note {
   font-size: 13px;
   font-weight: 400;
   line-height: 1.3;
   color: var(--color-muted);
   word-break: keep-all;
-}
-.entry-areas__rows {
-  clear: both;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -4698,4 +4662,1985 @@ details.gaewoon {
   :where(.area-grid__details > .area-grid__row):active {
     transform: none;
   }
+}
+
+/* ── v3.40 운세 카드 머리 "엇갈리는 날 / 흔들리기 쉬운 날" (명세 36, 2026-11-04) ─────────────────
+   오늘 영역 띠지(.area-chips) 아래 10px. 숫자 하나로 뭉개지던 날("조심하라면서 왜 돈은 좋아요?")을 풀어 주는 조용한 주석이라
+   제목(.fortune-headline 26px)보다 눈에 띄지 않게: 표시 13px 먹 + 한 줄 15px muted, 모션·아이콘·빨강·금색 글자 없음.
+   표시는 영역 띠지와 같은 찢긴 한지 띠 실루엣이되 한 단계 가볍다 — 종이 면도 먹 가장자리도 없이 **녹갈(frame) 얇은 선만**
+   (tag-strip-paper 알파를 바깥·안쪽 두 번 깔아 뺀 1px 테, .area-chip::after와 같은 수법). 손가락으로 누르는 것이 아니다(summary가 카드를 열 뿐).
+   새 에셋·새 토큰 없음 */
+.day-shape {
+  display: block;
+  margin-top: 10px;
+}
+.day-shape__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.day-shape__tag {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 11px;
+  font-size: 13px;
+  line-height: 1;
+  white-space: nowrap;
+  color: var(--color-ink);
+}
+.day-shape__tag::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-color: var(--color-frame);
+  -webkit-mask-image: url("/ui/tag-strip-paper-clean.webp"), url("/ui/tag-strip-paper-clean.webp");
+  -webkit-mask-size: 100% 100%, calc(100% - 2px) calc(100% - 2px);
+  -webkit-mask-position: center, center;
+  -webkit-mask-repeat: no-repeat, no-repeat;
+  -webkit-mask-composite: source-out;
+  mask-image: url("/ui/tag-strip-paper-clean.webp"), url("/ui/tag-strip-paper-clean.webp");
+  mask-size: 100% 100%, calc(100% - 2px) calc(100% - 2px);
+  mask-position: center, center;
+  mask-repeat: no-repeat, no-repeat;
+  mask-composite: subtract;
+}
+.day-shape__line {
+  display: block;
+  margin-top: 6px;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--color-muted);
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+
+/* ── v3.41 쓰기: 오늘 있었던 일(상태) · 그래서 마음은(네 갈래) · 영역 접힘 / 날짜 상세 상태 줄 / 나 탭 "있었던 일" (명세 37, 2026-11-14) ──
+   새 그림·새 토큰·새 keyframe 없음 — 키트 재사용: tag-strip-paper(면·알파 마스크) · brush-stroke(마스크) · divider(마스크) · card-paper.
+   상태 단계는 좋고 나쁨이 아니라 묘사라 행복도 네 단계 색(남색·종이·금빛·moss)을 쓰지 않는다 — 고른 단계는 녹갈 괘선색(line) 한 가지 톤,
+   세기는 색이 아니라 자리(왼·가운데·오른)로 읽힌다. 금색 면은 여전히 저장 버튼 하나. 틀 안의 틀 없음(괘선·간격으로만) */
+
+/* 0. 카드 종이 안의 구역: 있었던 일 · 마음 · 영역 접힘은 녹갈 45% 0.5px 괘선 한 줄로 갈린다(v3.38 영역 괘선과 같은 선 — 카드 gap 28px 중 8px을 당겨 선 위 20px · 아래 16px).
+   이름 열 52px은 상태 여섯 줄과 마음 네 무리가 같이 쓴다 — 카드 한 장에 세로선 하나 */
+.entry-states,
+.entry-moods,
+.entry-areas-fold {
+  --entry-label: 52px;
+  --entry-gap: 6px;
+  position: relative;
+  min-width: 0;
+  margin-top: -8px;
+  padding-top: 16px;
+  border-top: 0.5px solid color-mix(in srgb, var(--color-frame) 45%, transparent);
+}
+/* 구역 머리: 17px 굵게(행복도·한 줄과 같은 급) + 아래 줄 안내 13px muted. legend는 float로 보통 블록처럼 흐르게 — 위 괘선이 머리에서 끊기지 않는다(v3.38과 같은 이유) */
+.entry-states__legend,
+.entry-moods__legend {
+  float: left;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  width: 100%;
+  padding: 0;
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--color-ink);
+}
+.entry-states__note,
+.entry-moods__note {
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.4;
+  color: var(--color-muted);
+  word-break: keep-all;
+}
+
+/* 1. "평범한 하루": 머리 줄 오른쪽의 작은 종이 띠지(그래프 칩과 같은 28px·13px) — 금색 면이 아니다. 손가락 자리는 ::after로 44px.
+   다 고르면(disabled) 흐리게. 누르면 안 고른 줄의 가운데가 한꺼번에 찍힌다(아래 찍힘) */
+.entry-states__plain {
+  position: absolute;
+  top: 13px;
+  right: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 28px;
+  padding: 0 3px;
+  border-style: solid;
+  border-width: 0 10px;
+  border-image: url("/ui/tag-strip-paper-clean.webp") 0 44 fill / 0 10px / 0 stretch;
+  background: none;
+  font-size: 13px;
+  line-height: 1;
+  color: var(--color-ink);
+  white-space: nowrap;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.entry-states__plain::after {
+  content: "";
+  position: absolute;
+  inset: -8px -12px;
+}
+.entry-states__plain:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* 2. 상태 여섯 줄: 이름 열 + 세 단계 세 열(1.2 : 1.05 : 1.2 — 가운데 "보통·무난·평소만큼"이 짧다). 줄 높이 = 손가락 자리 44px, 띠지는 36px.
+   속도 줄(공통 축)은 아래 다섯 갈래와 점선 괘선 한 줄(kv 줄과 같은 선)로만 갈린다 */
+.entry-states__rows {
+  clear: both;
+  display: flex;
+  flex-direction: column;
+  padding-top: 8px;
+}
+.entry-state {
+  position: relative;
+}
+.entry-state[data-axis="pace"] {
+  margin-bottom: 4px;
+  padding-bottom: 4px;
+  border-bottom: 0.5px dashed color-mix(in srgb, var(--color-frame) 40%, transparent);
+}
+.entry-state__main {
+  display: grid;
+  grid-template-columns: var(--entry-label) minmax(0, 1fr);
+  column-gap: var(--entry-gap);
+  align-items: center;
+  min-height: 44px;
+}
+.entry-state__label {
+  font-size: 14px;
+  line-height: 1.25;
+  color: var(--color-ink);
+  word-break: keep-all;
+}
+/* 갈래 줄의 이름은 칸 위쪽에 — 그 아래가 "더 적기" 자리 */
+.entry-state[data-group] .entry-state__label {
+  align-self: start;
+  padding-top: 5px;
+}
+.entry-state__levels {
+  display: grid;
+  grid-template-columns: 1.2fr 1.05fr 1.2fr;
+  column-gap: 4px;
+}
+.entry-state__level,
+.entry-state__tag {
+  position: relative;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.entry-state__level {
+  min-height: 44px;
+}
+
+/* 3. 상태 띠지 `.state-tag`: 기본 = 무색, 찢긴 띠 실루엣을 따라가는 녹갈(frame) 1px 테두리만(v3.40 .day-shape__tag와 같은 수법 — tag-strip-paper 알파를
+   바깥·안쪽 두 번 깔아 뺀 테). 날짜 상세·통계의 읽기 전용 낱말과 쓰기의 세부 낱말이 이 모양 — 기분(색 면 띠지)과 종류가 다르다는 것이 면의 있고 없음으로 갈린다.
+   .tag의 border-image(종이 띠)는 끈다 */
+.tag.state-tag {
+  position: relative;
+  isolation: isolate;
+  gap: 5px;
+  min-width: 52px;
+  height: 28px;
+  padding: 0 11px;
+  border: 0;
+  border-image: none;
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1;
+  white-space: nowrap;
+  color: var(--color-ink);
+}
+.tag.state-tag::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-color: var(--color-frame);
+  -webkit-mask-image: url("/ui/tag-strip-paper-clean.webp"), url("/ui/tag-strip-paper-clean.webp");
+  -webkit-mask-size: 100% 100%, calc(100% - 2px) calc(100% - 2px);
+  -webkit-mask-position: center, center;
+  -webkit-mask-repeat: no-repeat, no-repeat;
+  -webkit-mask-composite: source-out;
+  mask-image: url("/ui/tag-strip-paper-clean.webp"), url("/ui/tag-strip-paper-clean.webp");
+  mask-size: 100% 100%, calc(100% - 2px) calc(100% - 2px);
+  mask-position: center, center;
+  mask-repeat: no-repeat, no-repeat;
+  mask-composite: subtract;
+}
+/* 고른 띠지(세부 낱말, 단계 1·3): 녹갈 괘선색(line) 면을 한지 결 위에 얹어 띠지 모양으로 오려 낸다. 글자는 종이색 굵게(line 위 5.4:1) */
+input:checked + .tag.state-tag,
+.tag.state-tag.tag--on {
+  border-image: none;
+  color: var(--color-paper-2);
+  font-weight: 700;
+}
+input:checked + .tag.state-tag::before,
+.tag.state-tag.tag--on::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  background:
+    linear-gradient(color-mix(in srgb, var(--color-line) 90%, transparent), color-mix(in srgb, var(--color-line) 90%, transparent)),
+    url("/ui/card-paper.webp") center / 256px 256px;
+  -webkit-mask: url("/ui/tag-strip-paper-clean.webp") center / 100% 100% no-repeat;
+  mask: url("/ui/tag-strip-paper-clean.webp") center / 100% 100% no-repeat;
+}
+input:checked + .tag.state-tag::after,
+.tag.state-tag.tag--on::after {
+  content: none;
+}
+/* 쓰기의 세 단계: 칸 폭을 다 채우는 36px 띠지. 안 고른 단계 = 종이 띠지(기분·세그먼트와 같은 누르는 재료), 테두리 없음 */
+.entry-state__level > .tag.state-tag {
+  width: 100%;
+  height: 36px;
+  padding: 0;
+}
+.entry-state__level > .tag.state-tag::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  background: url("/ui/tag-strip-paper-clean.webp") center / 100% 100% no-repeat;
+}
+.entry-state__level > .tag.state-tag::after {
+  content: none;
+}
+/* 가운데(보통)는 골라도 가장 조용하게: 면을 칠하지 않고 종이 띠지 위에 녹갈 괘선색 1.5px 테두리 + 먹색 굵은 글자. "평범한 하루"는 이 조용한 표시 여섯 개 */
+.entry-state__level > input:checked + .tag.state-tag[data-level="2"],
+.entry-state__level > .tag.state-tag.tag--on[data-level="2"] {
+  color: var(--color-ink);
+}
+.entry-state__level > input:checked + .tag.state-tag[data-level="2"]::before,
+.entry-state__level > .tag.state-tag.tag--on[data-level="2"]::before {
+  background: url("/ui/tag-strip-paper-clean.webp") center / 100% 100% no-repeat;
+  -webkit-mask: none;
+  mask: none;
+}
+.entry-state__level > input:checked + .tag.state-tag[data-level="2"]::after,
+.entry-state__level > .tag.state-tag.tag--on[data-level="2"]::after {
+  content: "";
+  background-color: var(--color-line);
+  -webkit-mask-size: 100% 100%, calc(100% - 3px) calc(100% - 3px);
+  mask-size: 100% 100%, calc(100% - 3px) calc(100% - 3px);
+}
+/* 찍힘: 도장과 같은 눌림(stamp-press 120ms). 줄마다 16ms씩 늦어 "평범한 하루"로 여섯 줄이 한꺼번에 찍힐 때 위에서 아래로 번진다(끝까지 200ms).
+   색은 바로 바뀌고 눌림만 늦으므로 한 줄만 누를 때는 지연이 느껴지지 않는다 */
+input:checked + .tag.state-tag {
+  animation: stamp-press 120ms ease-out backwards;
+}
+.entry-state:nth-child(2) > .entry-state__main input:checked + .tag.state-tag { animation-delay: 16ms; }
+.entry-state:nth-child(3) > .entry-state__main input:checked + .tag.state-tag { animation-delay: 32ms; }
+.entry-state:nth-child(4) > .entry-state__main input:checked + .tag.state-tag { animation-delay: 48ms; }
+.entry-state:nth-child(5) > .entry-state__main input:checked + .tag.state-tag { animation-delay: 64ms; }
+.entry-state:nth-child(6) > .entry-state__main input:checked + .tag.state-tag { animation-delay: 80ms; }
+
+/* 4. "더 적기": 이름 아래 작은 글자 12px muted + 꺾쇠(서랍·개운과 같은 SVG mask, 닫힘 아래 → 열림 위). summary가 이름 칸 전체(52 × 44px)를 덮어 손가락 자리가 된다.
+   고른 수 "(n)"은 접혀 있을 때만 보인다(펼치면 아래 띠지가 말한다) — 그때는 꺾쇠 자리에 숫자가 온다(이름 칸 52px에 둘 다는 안 들어간다).
+   펼친 세부 낱말은 그 아래로 들여 쓰고 왼쪽에 녹갈 세로 괘선 한 줄 — 그 줄에 딸린 것. 띠지는 단계(36px)보다 한 단계 작은 30px 테두리 띠지, 손가락 자리 40px */
+.entry-state__more-head {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  width: var(--entry-label);
+  height: 44px;
+  padding-bottom: 5px;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--color-muted);
+  white-space: nowrap;
+  list-style: none;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.entry-state__more-head::-webkit-details-marker {
+  display: none;
+}
+.entry-state__more-head::after {
+  content: "";
+  flex: none;
+  width: 10px;
+  height: 16px;
+  background: var(--color-muted);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 14' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 5.5l4 4 4-4'/%3E%3C/svg%3E") center / 10px 10px no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 14' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 5.5l4 4 4-4'/%3E%3C/svg%3E") center / 10px 10px no-repeat;
+}
+.entry-state__more[open] > .entry-state__more-head::after {
+  transform: rotate(180deg);
+}
+.entry-state__more[open] .entry-state__more-n {
+  display: none;
+}
+.entry-state__more:not([open]) > .entry-state__more-head:has(.entry-state__more-n)::after {
+  content: none;
+}
+.entry-state__tags {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: 6px;
+  margin: 0 0 8px 4px;
+  padding-left: 10px;
+  border-left: 1px solid color-mix(in srgb, var(--color-frame) 40%, transparent);
+}
+.entry-state__tag {
+  min-height: 40px;
+}
+.entry-state__tag > .tag.state-tag {
+  height: 30px;
+}
+
+/* 5. 그래서 마음은: 무리 = 이름 열(상태 줄과 같은 52px 세로선, 14px 먹) + 오른쪽 띠지(36px·간격 6px, 색은 data-tone 그대로). 무리 사이 10px.
+   합친 말이 길어 한 줄 띠지 수가 줄어도 줄 간격(6px)은 같다 */
+.entry-moods__groups {
+  clear: both;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 12px;
+}
+.entry-moods__group {
+  display: grid;
+  grid-template-columns: var(--entry-label) minmax(0, 1fr);
+  column-gap: var(--entry-gap);
+  align-items: start;
+}
+.entry-moods__head {
+  margin: 0;
+  font-size: 14px;
+  line-height: 36px;
+  color: var(--color-ink);
+  white-space: nowrap;
+}
+.entry-moods__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* 6. 영역 점수 접힘: 화면에서 가장 가벼운 줄 — 괘선 아래 44px 한 줄, "영역 점수" 14px 먹(굵지 않게) + 안내 13px muted + 오른쪽 끝 꺾쇠 12px(오른쪽 → 펼치면 아래).
+   펼치면 v3.32·v3.38의 여섯 줄 그대로(흐리게 죽이지 않는다). 펼침 모션 없음 */
+.entry-areas-fold {
+  margin-bottom: -12px;
+  padding-top: 0;
+}
+.entry-areas-fold[open] {
+  margin-bottom: 0;
+}
+.entry-areas-fold__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  font-size: 14px;
+  line-height: 1.3;
+  color: var(--color-ink);
+  list-style: none;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.entry-areas-fold__head::-webkit-details-marker {
+  display: none;
+}
+.entry-areas-fold__head::after {
+  content: "";
+  flex: none;
+  width: 12px;
+  height: 12px;
+  margin-left: auto;
+  background: var(--color-muted);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 14' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 5.5l4 4 4-4'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 14' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 5.5l4 4 4-4'/%3E%3C/svg%3E") center / contain no-repeat;
+  transform: rotate(-90deg);
+}
+.entry-areas-fold[open] > .entry-areas-fold__head::after {
+  transform: none;
+}
+/* 펼친 여섯 줄의 이름 열도 카드의 세로선(52px + 6px)에 맞춘다 — v3.32의 58px + 8px에서 좁힘(도장 37 → 약 39px) */
+.entry-areas-fold .entry-areas {
+  --area-label: var(--entry-label);
+  --area-gap: var(--entry-gap);
+}
+.entry-areas-fold .entry-areas__rows {
+  margin-top: 2px;
+}
+
+/* 7. 달력 날짜 상세 — 있었던 일: 기분 띠지 줄 아래 8px, 가운데, 테두리 띠지 28px·13px·간격 6px. 낱말이 많으면 두 줄로 흐른다 */
+.day-detail__states {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* 8. 나 탭 "있었던 일" `.state-stats`: 다른 통계와 같은 card-light 카드. 머리 = 제목 15px 굵게 + "최근 30일" 13px muted.
+   축 한 줄 = 이름 58px(영역 막대와 같은 열) + 붓 가로획 한 줄 12px(오행 붓 막대의 brush-stroke 마스크) — 세 단계가 횟수만큼 너비를 나눠 갖고,
+   색은 녹갈 한 색의 세 농도(frame 30% · frame 65% · line). 사이 1.5px은 종이가 비친다. 그 아래 세 단계 말 12px muted + 횟수 송명 13px 먹이
+   왼·가운데·오른(막대의 순서 그대로). 횟수 0인 단계는 막대에서 빠지고 말만 faint */
+.state-stats__head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.state-stats__title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--color-ink);
+}
+.state-stats__sub {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.3;
+  color: var(--color-muted);
+}
+.state-stats__rows {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 14px 0 0;
+}
+.state-stats__row {
+  display: grid;
+  grid-template-columns: 58px minmax(0, 1fr);
+  column-gap: 8px;
+  align-items: start;
+}
+.state-stats__label {
+  margin-top: -3px;
+  font-size: 14px;
+  line-height: 18px;
+  color: var(--color-ink);
+  word-break: keep-all;
+}
+.state-stats__bar {
+  min-width: 0;
+  margin: 0;
+}
+.state-stats__stroke {
+  display: flex;
+  gap: 1.5px;
+  height: 12px;
+  -webkit-mask: url("/ui/brush-stroke.webp") no-repeat right center / 100% 100%;
+  mask: url("/ui/brush-stroke.webp") no-repeat right center / 100% 100%;
+}
+.state-stats__seg {
+  flex: 0 1 0px;
+  min-width: 4px;
+  height: 100%;
+}
+.state-stats__seg[data-level="1"] {
+  background: color-mix(in srgb, var(--color-frame) 30%, var(--color-paper-2));
+}
+.state-stats__seg[data-level="2"] {
+  background: color-mix(in srgb, var(--color-frame) 65%, var(--color-paper-2));
+}
+.state-stats__seg[data-level="3"] {
+  background: var(--color-line);
+}
+.state-stats__words {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--color-muted);
+  white-space: nowrap;
+}
+.state-stats__word:nth-child(2) {
+  text-align: center;
+}
+.state-stats__word:nth-child(3) {
+  text-align: right;
+}
+.state-stats__seg-n {
+  font-family: var(--font-serif);
+  font-size: 13px;
+  color: var(--color-ink);
+  font-variant-numeric: tabular-nums;
+}
+.state-stats__word[data-zero],
+.state-stats__word[data-zero] .state-stats__seg-n {
+  color: var(--color-faint);
+}
+/* 자주 있었던 세부 낱말: 테두리 띠지 한 줄(.state-tag) + 횟수 송명 12px muted */
+.state-stats__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.state-stats__tag-n {
+  font-family: var(--font-serif);
+  font-size: 12px;
+  color: var(--color-muted);
+  font-variant-numeric: tabular-nums;
+}
+/* 글자별로 보면 — 이 카드의 핵심이라 문장이 주인공: 갈래 이름 13px muted 한 줄, 그 아래 사실 문장 16px 먹(횟수가 먼저, 퍼센트는 괄호 안 13px muted).
+   굵은 말 아래 붓선(divider 마스크, 녹갈 괘선색) 한 줄 — 그래프 기간 탭의 밑줄과 같은 재료. 줄 사이는 kv와 같은 점선 괘선.
+   표본 5 미만([data-thin])은 한 단계 흐리게(15px muted, 밑줄 없음) — 틀렸다는 뜻이 아니라 아직 적다는 뜻 */
+.state-stats__groups {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 0.5px solid color-mix(in srgb, var(--color-frame) 55%, transparent);
+}
+.state-stats__groups-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--color-ink);
+}
+.state-stats__group-list {
+  display: flex;
+  flex-direction: column;
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.state-stats__group {
+  padding: 9px 0 10px;
+  border-bottom: 0.5px dashed color-mix(in srgb, var(--color-frame) 25%, transparent);
+  word-break: keep-all;
+}
+.state-stats__group:last-child {
+  border-bottom: 0;
+}
+.state-stats__group-name {
+  display: block;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--color-muted);
+}
+.state-stats__group-fact {
+  font-size: 16px;
+  line-height: 1.6;
+  color: var(--color-ink);
+}
+.state-stats__group-fact strong {
+  position: relative;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.state-stats__group-fact strong::after {
+  content: "";
+  position: absolute;
+  left: -2px;
+  right: -2px;
+  bottom: -4px;
+  height: 4px;
+  background: var(--color-line);
+  -webkit-mask: url("/ui/divider-clean.png") center / 100% 100% no-repeat;
+  mask: url("/ui/divider-clean.png") center / 100% 100% no-repeat;
+}
+.state-stats__group-vs {
+  font-size: 13px;
+  color: var(--color-muted);
+  white-space: nowrap;
+}
+.state-stats__group[data-thin] .state-stats__group-fact {
+  font-size: 15px;
+  color: var(--color-muted);
+}
+.state-stats__group[data-thin] .state-stats__group-fact strong {
+  font-weight: 600;
+  color: color-mix(in srgb, var(--color-ink) 75%, transparent);
+}
+.state-stats__group[data-thin] .state-stats__group-fact strong::after {
+  content: none;
+}
+.state-stats__note {
+  margin: 6px 0 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--color-muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  input:checked + .tag.state-tag {
+    animation: none;
+  }
+}
+
+/* ── v3.42 운세 카드 시험: 핵심 한 문장 + 인장(1안 seal) / 핵심 한 문장 + 영역 점수(2안 score) (명세 38, 2026-11-14) ──────────
+   시험이다 — FortuneCard의 variant가 seal·score일 때만 이 클래스들이 그려지고, 지금 카드(story)는 한 픽셀도 바뀌지 않는다(기존 규칙을 고치지 않았다).
+   새 그림·새 토큰·새 모션 없음 — 키트 재사용: seal-collected 알파(60갑자 인장의 바깥 테, 9조각 마스크) · gold-wash · brush-stroke(마스크) · divider(마스크).
+   두 안의 재료가 다르다: 1안 = 낙관(네모 도장), 2안 = 붓 자국(단계 붓 자국·영역 붓 막대와 같은 말). 좋은 쪽 금빛 면 · 조심할 쪽 남색 면(쓰기 도장 4~5 · 1~2와 같은 면),
+   인주 빨강·금색 글자 없음, 금색 면 버튼은 여전히 화면에 하나 */
+
+/* 0. 두 안 공통 — "풀어서 읽기": 긴 본문이 접혀 들어가는 한 줄. 15px muted + 꺾쇠 14px(개운 summary와 같은 SVG mask, 오른쪽 → 펼치면 아래, 전환 없음).
+   금색 버튼이 아니다. 손가락 자리는 줄 전체 44px. 펼침 모션 없음(글이 길다) */
+.fortune-more {
+  margin-top: 10px;
+}
+.fortune-more__summary {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 44px;
+  font-size: 15px;
+  line-height: 1.4;
+  color: var(--color-muted);
+  list-style: none;
+  cursor: pointer;
+}
+.fortune-more__summary::-webkit-details-marker {
+  display: none;
+}
+.fortune-more__summary::after {
+  content: "";
+  width: 14px;
+  height: 14px;
+  flex: none;
+  background: var(--color-muted);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 14' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 5.5l4 4 4-4'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 14' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 5.5l4 4 4-4'/%3E%3C/svg%3E") center / contain no-repeat;
+  transform: rotate(-90deg);
+}
+.fortune-more[open] > .fortune-more__summary::after {
+  transform: none;
+}
+.fortune-more__body {
+  padding: 2px 0 6px;
+}
+
+/* 1. 1안 — 인장 두세 개. 명세 38의 모양(높이 36px 면 도장 · seal-collected 테 마스크 · 안쪽 테 선 · 개마다 비뚤게)은 명세 39(v3.43)에서 정돈돼
+   맨 아래 v3.43 블록의 `.fortune-card--seal .fortune-seal*`로 옮겼다 — 앱 주인이 1안을 고른 뒤 "번잡스럽다"고 해서 면·테 마스크·기울임을 덜었다 */
+
+/* 2. 2안 — 영역 여섯 칸 숫자. 핵심 문장 아래 12px, 3열 × 2행. 칸 = 이름 13px(왼쪽) + 숫자 송명 24px(오른쪽) 한 줄 — 가계부 줄처럼 읽힌다.
+   칸에는 테두리도 면도 없다(틀 안의 틀 금지). 열 폭은 글자대로, 남는 폭은 열 사이로 — 이름과 숫자가 한 덩어리로 붙는다.
+   숫자 크기는 여섯이 같고 색·굵기로만 갈린다: 좋은 쪽(up) = 금빛 붓 자국 위 먹 굵게, 조심할 쪽(down) = 남색 붓 자국 위 종이색 굵게,
+   신호 없음(none, 숫자 5) = 붓 자국 없이 muted 보통. 붓 자국 = 영역 붓 막대와 같은 붓 가로획(brush-stroke)의 끝 토막(마스크 110px, 붓 끝 쪽 정렬 —
+   숫자 뒤는 획의 몸통이라 꽉 차고 오른쪽 끝만 갈라진다). 소수점·"/10"·게이지·눈금 없음 */
+.area-scores {
+  display: grid;
+  grid-template-columns: repeat(3, auto);
+  justify-content: space-between;
+  column-gap: 12px;
+  row-gap: 4px;
+  margin-top: 12px;
+}
+.area-score {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 9px;
+  min-height: 34px;
+}
+.area-score__label {
+  font-size: 13px;
+  line-height: 1.2;
+  white-space: nowrap;
+  color: var(--color-ink);
+}
+.area-score__num {
+  position: relative;
+  isolation: isolate;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 30px;
+  font-family: var(--font-serif);
+  font-size: 24px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-muted);
+}
+.area-score[data-dir="none"] .area-score__label {
+  color: var(--color-muted);
+}
+.area-score[data-dir="up"] .area-score__num,
+.area-score[data-dir="down"] .area-score__num {
+  font-weight: 700;
+  color: var(--color-gold-ink);
+}
+.area-score[data-dir="down"] .area-score__num {
+  color: var(--color-paper-2);
+}
+.area-score[data-dir="up"] .area-score__num::before,
+.area-score[data-dir="down"] .area-score__num::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: 1px -4px;
+  background: var(--color-gold) url("/ui/gold-wash.webp") center / 256px 256px;
+  -webkit-mask: url("/ui/brush-stroke.webp") no-repeat right center / 110px 100%, url("/ui/brush-stroke.webp") no-repeat left center / 110px 100%;
+  -webkit-mask-composite: source-in;
+  mask: url("/ui/brush-stroke.webp") no-repeat right center / 110px 100%, url("/ui/brush-stroke.webp") no-repeat left center / 110px 100%;
+  mask-composite: intersect;
+}
+.area-score[data-dir="down"] .area-score__num::before {
+  background: color-mix(in srgb, var(--color-sky) 82%, var(--color-paper-2));
+}
+/* 칸 아래 한 줄 주석 — 흐린 5가 "보통 점수"가 아니라는 말. 13px muted */
+.area-scores__note {
+  display: block;
+  margin-top: 6px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--color-muted);
+}
+/* 펼친 "오늘의 특징"(2안): 6줄 붓 막대 대신 신호 있는 영역의 이유 한 줄씩. 이름 열 74px(붓 막대 줄과 같은 열) 14px 굵게 + 아래 붓선 밑줄
+   (divider 마스크 — 좋은 쪽 금빛, 조심할 쪽 남색: 머리 숫자의 붓 자국과 같은 색), 이유 14px 먹 80% */
+.area-scores__reasons {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 2px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.area-scores__reason {
+  display: grid;
+  grid-template-columns: 74px minmax(0, 1fr);
+  column-gap: 10px;
+  align-items: baseline;
+}
+.area-scores__reason-label {
+  position: relative;
+  justify-self: start;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.5;
+  color: var(--color-ink);
+  white-space: nowrap;
+}
+.area-scores__reason-label::after {
+  content: "";
+  position: absolute;
+  left: -2px;
+  right: -2px;
+  bottom: -3px;
+  height: 4px;
+  background: var(--color-gold) url("/ui/gold-wash.webp") center / 256px 256px;
+  -webkit-mask: url("/ui/divider-clean.png") center / 100% 100% no-repeat;
+  mask: url("/ui/divider-clean.png") center / 100% 100% no-repeat;
+}
+.area-scores__reason[data-dir="down"] .area-scores__reason-label::after {
+  background: color-mix(in srgb, var(--color-sky) 82%, var(--color-paper-2));
+}
+.area-scores__reason-text {
+  font-size: 14px;
+  line-height: 1.5;
+  color: color-mix(in srgb, var(--color-ink) 80%, transparent);
+  word-break: keep-all;
+}
+
+/* ── v3.43 운세 카드(인장안) 정돈: 여백과 가는 선 (명세 39, 2026-11-15) ──────────────────────────────────────────
+   앱 주인: "1안 인장으로. 그런데 UI가 번잡스러워, 깔끔하게 정렬하고 싶어." 재료를 보태지 않고 덜어 낸다 —
+   금색 이중 테 · 단계 붓 자국 · 비뚤게 찍힌 면 도장 · 찢긴 띠지 표시 · 리본 띠지 · 띠지 칩 · 붓선 구분 · 베이지 상자를 이 카드에서 벗기고,
+   (1) 왼쪽 축 하나 (2) 큰 제목 + 작은 라벨 한 가지 꼴 (3) 1px 가는 선 (4) 라벨 칸 | 내용 칸으로만 짠다.
+   전부 `.fortune-card--seal` 아래에만 걸린다 — 지금 카드(story)·2안(score)·다른 화면이 쓰는 규칙은 한 줄도 고치지 않았다.
+   세로 간격은 8 · 16 · 24 · 32px 넷뿐(구역: 선 → 16 → 라벨 → 16 → 내용 → 24 → 선). 글자 크기는 26 · 16 · 15 · 13px 넷.
+   남는 재료: 한지 결(card-paper), 영역 붓 막대(brush-stroke · gold-wash). 새 그림·새 토큰·새 모션 없음, 빨강·금색 면 버튼 없음 */
+
+/* 0. 카드 틀: 한지 면 + 녹갈 40% 1px 선 하나. 안쪽 여백 24px → 왼쪽 축은 카드 바깥에서 25px(375px 화면에서 x = 45px).
+   --fc-col + --fc-gap = 둘째 축(내용 칸 시작, x = 133px). --fc-gold = 한지 위에서 읽히는 금빛 글자색: gold와 gold-ink를 섞은 값
+   (card-paper 위 5.4:1 — v3.26이 금색 글자를 막은 까닭은 대비 1.73:1이었다). 인장·"하면 좋아요" 라벨에만 */
+.fortune-card--seal {
+  --fc-col: 80px;
+  --fc-gap: 8px;
+  --fc-rule: color-mix(in srgb, var(--color-frame) 40%, transparent);
+  --fc-gold: color-mix(in srgb, var(--color-gold) 45%, var(--color-gold-ink));
+  border: 1px solid var(--fc-rule);
+  border-radius: 2px;
+}
+.fortune-card--seal .fc-head {
+  display: block;
+  padding: 24px;
+}
+.fortune-card--seal .fc-body {
+  padding: 0 24px 8px;
+}
+
+/* 1. 작은 라벨 — 이 카드의 안내 글자는 전부 이 한 가지 꼴: 13px · 자간 0.08em · 줄높이 16px · muted(card-paper 위 5.2:1).
+   구역 제목, 줄 이름, 접힌 줄, 표시가 모두 같다. 색만 뜻에 따라 바뀐다(단계 말·피해요 = 먹, 하면 좋아요 = 금빛 글자) */
+.fortune-card--seal .fc-label,
+.fortune-card--seal .area-grid__label,
+.fortune-card--seal .compare__label,
+.fortune-card--seal .gaewoon__label,
+.fortune-card--seal .gaewoon__summary,
+.fortune-card--seal .fortune-more__summary,
+.fortune-card--seal .trait__tag,
+.fortune-card--seal .trait-chip,
+.fortune-card--seal .vote > span:first-child {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 16px;
+  letter-spacing: 0.08em;
+  color: var(--color-muted);
+  word-break: keep-all;
+}
+.fortune-card--seal .fc-label {
+  display: block;
+}
+
+/* 2. 닫힌 머리. 라벨 줄(왼쪽 "오늘의 운세" · 오른쪽 끝 꺾쇠) → 16 → 핵심 한 문장 → 16 → 가는 선 → 16 → 인장 두 줄. 끝.
+   v3.44(명세 40): "엇갈리는 날·흔들리기 쉬운 날" 주석은 닫힌 머리에서 뺐다. v3.45(명세 41): 단계 말(주의·무난·좋음)도 뺐다 — 점수는 카드에 없다.
+   열림 표시 = 꺾쇠 12px muted(이 카드의 접힘 줄 꺾쇠와 같은 SVG mask, 글자·그림이 아니다) —
+   닫힘 아래(⌄), 열리면 180° 돌아 위(⌃). 누르는 자리는 summary 전체라 꺾쇠는 표시일 뿐 */
+.fortune-card--seal .fc-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+}
+.fortune-card--seal .fc-toggle {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  background: var(--color-muted);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 14' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 5.5l4 4 4-4'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 14' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 5.5l4 4 4-4'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+/* 핵심 한 문장: 송명 26px 그대로 주인공. 두 줄이 고르게 나뉜다(balance) */
+.fortune-card--seal .fortune-headline {
+  margin-top: 16px;
+  text-wrap: balance;
+}
+.fortune-card--seal .fc-line {
+  display: block;
+  height: 1px;
+  margin-top: 16px;
+  background: var(--fc-rule);
+}
+
+/* 3. 인장 두 줄(v3.45, 명세 41): 두 칸 줄(§6) 그대로 — 라벨 칸 "힘이 되는 것" | 금빛 인장들, "조심할 것" | 남색 인장들.
+   한쪽이 없는 날은 그 줄이 없다(한 줄인 날 32px, 두 줄인 날 32 + 16 + 32px). 인장이 내용 칸에 안 들어가면 그 칸 안에서 줄바꿈(인장끼리 8px).
+   라벨은 작은 라벨 꼴 13px이고 글자색이 인장 색을 한 번 더 말한다(금빛 --fc-gold 5.4:1 · 남색 sky 11.5:1) — 노란 것과 파란 것이 무엇인지 글자로 읽힌다.
+   라벨 글자 밑선은 첫 인장 줄의 글자 밑선에 맞는다(§6의 baseline).
+   인장: 비뚤어짐 0°, 높이 32px · 송명 16px · 모서리 2px. 1px 선 + 같은 색 글자(주문 인장: 글자와 테만 찍히는 도장, shots/39-인장시안-가-나.jpg).
+   누르는 것이 아니다(summary가 카드를 열 뿐) — 모서리 2px 네모라 둥근 투표 버튼과 갈린다 */
+.fortune-card--seal .fc-seal-rows {
+  display: block;
+  margin-top: 16px;
+}
+.fortune-card--seal .fc-row.fc-seal-row[data-tone="care"] .fc-row__label {
+  color: var(--color-sky);
+}
+.fortune-card--seal .fortune-seals {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.fortune-card--seal .fortune-seal {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 32px;
+  min-width: 48px;
+  padding: 0 12px;
+  border: 1px solid currentColor;
+  border-radius: 2px;
+  font-family: var(--font-serif);
+  font-size: 16px;
+  line-height: 1;
+  white-space: nowrap;
+  color: var(--fc-gold);
+}
+.fortune-card--seal .fortune-seal[data-tone="care"] {
+  color: var(--color-sky);
+}
+
+/* 4. 펼친 "오늘의 특징" 라벨 아래, 영역 막대 위: (있는 날만) "흔들리기 쉬운 날 | 한 줄". 두 칸 줄(§6) 그대로 16px 먹.
+   v3.45(명세 41): "흐름 | N / 10" 줄과 "엇갈리는 날" 줄은 뺐다(점수와 빠진 단계 말을 다시 꺼낸다) — 흔들리지 않는 날은 이 자리가 없다.
+   아래 영역 막대와는 32px(영역 줄끼리의 간격과 같다 — §7). 문구가 두 줄이 될 때 끝 낱말 하나만 떨어지지 않게(pretty) */
+.fortune-card--seal .fc-facts {
+  margin-bottom: 16px;
+}
+.fortune-card--seal .fc-facts .fc-row__text {
+  text-wrap: pretty;
+}
+
+/* 5. 펼친 안: 구역마다 위 가는 선 + 작은 라벨 제목. 선 → 16 → 라벨 → 16 → 내용 → 24 → 다음 선.
+   접히는 구역(풀어서 읽기 · 오늘 챙기면 좋은 것)은 라벨 줄이 곧 손가락 자리(위아래 16px 패딩 = 48px)라 닫혔을 때 아래 8px만 보탠다 */
+.fortune-card--seal .fc-body > * {
+  margin: 0;
+  padding: 16px 0 24px;
+  border-top: 1px solid var(--fc-rule);
+}
+.fortune-card--seal .fc-body > :last-child {
+  padding-bottom: 16px;
+}
+.fortune-card--seal .fc-body > details {
+  padding: 0 0 8px;
+}
+.fortune-card--seal .fc-body > details[open] {
+  padding-bottom: 24px;
+}
+.fortune-card--seal .fc-body > details:last-child {
+  padding-bottom: 0;
+}
+.fortune-card--seal .fc-body > details[open]:last-child {
+  padding-bottom: 16px;
+}
+.fortune-card--seal .fc-section > .fc-label {
+  margin-bottom: 16px;
+}
+
+/* 6. 두 칸 줄: 왼쪽 라벨 칸 80px | 8px | 오른쪽 내용 칸. 첫 줄 글자 밑선을 맞춘다. 줄 사이 16px.
+   오늘 해 볼 것(하면 좋아요 · 피해요), 오늘 힘이 되는 것, 영역 6줄, 내 기록 막대, 챙기면 좋은 것 네 줄이 모두 이 칸을 쓴다 — 내용의 시작선이 카드 전체에서 한 줄 */
+.fortune-card--seal .fc-row,
+.fortune-card--seal .trait,
+.fortune-card--seal .gaewoon__item {
+  display: grid;
+  grid-template-columns: var(--fc-col) minmax(0, 1fr);
+  column-gap: var(--fc-gap);
+  align-items: baseline;
+}
+.fortune-card--seal .fc-row + .fc-row {
+  margin-top: 16px;
+}
+.fortune-card--seal .fc-row__text,
+.fortune-card--seal .trait__text,
+.fortune-card--seal .gaewoon__value {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.6;
+  color: var(--color-ink);
+  word-break: keep-all;
+}
+.fortune-card--seal .fc-row[data-tone="good"] .fc-row__label {
+  color: var(--fc-gold);
+}
+.fortune-card--seal .fc-row[data-tone="care"] .fc-row__label {
+  color: var(--color-ink);
+}
+/* 오늘 힘이 되는 것: 띠지 칩 대신 글자 한 줄. 낱말 사이는 16px 간격(가운뎃점 금지 v3.13), 낱말 안에서는 줄이 끊기지 않는다 */
+.fortune-card--seal .fc-power {
+  margin-bottom: 16px;
+}
+.fortune-card--seal .fc-words {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 16px;
+  padding: 0;
+  list-style: none;
+}
+.fortune-card--seal .fc-words > li {
+  white-space: nowrap;
+}
+
+/* 7. 영역 6줄 붓 막대: 재료(붓 가로획 · 금빛/남색 · 가운데 눈금)는 그대로, 이름 칸만 라벨 칸과 같은 폭으로.
+   줄 = 16 + 글자 16 + 16 = 48px(손가락 자리) — 이름과 이름 사이 32px. 목록 위아래를 16px 당겨 줄 패딩이 구역 간격을 겸한다(구역 라벨 → 첫 이름 16px, 끝 이름 → 선 24px).
+   "오늘 힘이 되는 것"이나 범례가 앞에 있으면 위는 당기지 않는다(앞 줄 → 첫 이름 32px — 영역 줄끼리의 간격과 같아 한 표로 읽힌다).
+   이유 한 줄은 내용 칸에서 시작한다(15px 먹 80%, 이름 아래 8px) */
+.fortune-card--seal .area-grid {
+  margin-block: -16px;
+}
+.fortune-card--seal .fc-power ~ .area-grid,
+.fortune-card--seal .fc-facts ~ .area-grid,
+.fortune-card--seal .area-legend-row ~ .area-grid {
+  margin-top: 0;
+}
+.fortune-card--seal .area-grid__row {
+  grid-template-columns: var(--fc-col) minmax(0, 1fr);
+  column-gap: var(--fc-gap);
+  min-height: 48px;
+}
+.fortune-card--seal .area-grid__reason {
+  margin: -8px 0 16px;
+  padding-left: calc(var(--fc-col) + var(--fc-gap));
+  font-size: 15px;
+}
+/* 범례(처음 한 번): 13px muted 그대로, 위아래만 간격 체계로. 닫기 ×는 글자 16px */
+.fortune-card--seal .area-legend-row {
+  margin: 0 0 16px;
+  font-size: 13px;
+}
+.fortune-card--seal .area-legend {
+  column-gap: 16px;
+  row-gap: 8px;
+  padding-top: 0;
+}
+.fortune-card--seal .area-legend-row > button {
+  align-self: center;
+  font-size: 16px;
+}
+/* 옛 운세(영역 원자료 없음)의 영역 줄·칩: 먹 테두리 띠지 대신 라벨 칸 글자(기간 muted · 영역 먹 굵게 · 화살표), 문장은 내용 칸 */
+.fortune-card--seal .traits__list {
+  gap: 16px;
+}
+.fortune-card--seal .trait__tag,
+.fortune-card--seal .trait-chip {
+  display: inline-flex;
+  justify-content: flex-start;
+  gap: 4px;
+  height: auto;
+  padding: 0;
+  background: none;
+  -webkit-mask: none;
+  mask: none;
+}
+.fortune-card--seal .trait__tag::after,
+.fortune-card--seal .trait-chip::after {
+  content: none;
+}
+.fortune-card--seal .trait__arrow,
+.fortune-card--seal .trait-chip__arrow {
+  font-size: 13px;
+  font-weight: 700;
+}
+.fortune-card--seal .trait__arrow.text-gold,
+.fortune-card--seal .trait-chip__arrow.text-gold {
+  color: var(--fc-gold);
+}
+.fortune-card--seal .traits__chips {
+  display: grid;
+  grid-template-columns: var(--fc-col) minmax(0, 1fr);
+  justify-items: start;
+  gap: 8px var(--fc-gap);
+}
+.fortune-card--seal .traits__list + .traits__chips {
+  margin-top: 16px;
+}
+
+/* 8. 접히는 구역 둘 — "풀어서 읽기" · "오늘 챙기면 좋은 것": 라벨 꼴 한 줄 + 꺾쇠 12px(오른쪽 → 펼치면 아래, 전환 없음). 줄 전체가 손가락 자리 48px.
+   소제목의 금빛 세로선과 송명 18px은 이 카드에서 쓰지 않는다 */
+.fortune-card--seal .fortune-more__summary,
+.fortune-card--seal .gaewoon__summary {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 48px;
+  padding: 16px 0;
+}
+.fortune-card--seal .gaewoon__title::before {
+  content: none;
+}
+.fortune-card--seal .fortune-more__summary::after,
+.fortune-card--seal .gaewoon__summary::after {
+  width: 12px;
+  height: 12px;
+}
+.fortune-card--seal .fortune-more__body {
+  gap: 16px;
+  padding: 0;
+}
+/* 오늘 챙기면 좋은 것: 베이지 칸 넷 대신 두 칸 줄 넷(이름 라벨 | 값 16px). 칸 면·아이콘 없음, 색 점만 남는다 */
+.fortune-card--seal .gaewoon__grid {
+  grid-template-columns: minmax(0, 1fr);
+  grid-auto-rows: auto;
+  gap: 16px;
+  margin: 0;
+}
+.fortune-card--seal .gaewoon__item {
+  padding: 0;
+  border-radius: 0;
+  background: none;
+}
+.fortune-card--seal .gaewoon__label {
+  display: block;
+}
+.fortune-card--seal .gaewoon__label::before {
+  content: none;
+}
+.fortune-card--seal .gaewoon__value {
+  display: block;
+  overflow: visible;
+  -webkit-line-clamp: unset;
+}
+.fortune-card--seal .gaewoon__item[data-kind="color"] .gaewoon__value {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.fortune-card--seal .gaewoon__empty {
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+/* 9. 내 기록으로 본 오늘: 베이지 상자 면을 벗기고 구역 선·라벨 아래에 바로. 막대 두 줄도 두 칸 줄(이름 라벨 | 막대 | 값 송명 16px),
+   판정은 띠지가 아니라 내용 칸의 글자 15px(차이 커요 = 굵게), 기준 한 줄은 13px muted. 기록이 없으면 한 줄 15px muted */
+.fortune-card--seal .compare {
+  margin: 0;
+  padding: 0;
+  border-radius: 0;
+  background: none;
+}
+.fortune-card--seal .compare__bars {
+  gap: 16px;
+}
+.fortune-card--seal .compare__row {
+  grid-template-columns: var(--fc-col) minmax(0, 1fr) auto;
+  gap: var(--fc-gap);
+}
+.fortune-card--seal .compare__verdict,
+.fortune-card--seal .compare__sub,
+.fortune-card--seal .compare__sub + .compare__note {
+  display: block;
+  height: auto;
+  margin: 8px 0 0;
+  padding: 0 0 0 calc(var(--fc-col) + var(--fc-gap));
+  border: 0;
+  border-image: none;
+}
+.fortune-card--seal .compare__verdict {
+  margin-top: 16px;
+  font-size: 15px;
+  line-height: 1.5;
+}
+.fortune-card--seal .compare__empty {
+  margin: 0;
+  font-size: 15px;
+  color: var(--color-muted);
+}
+/* v3.45(명세 41): 지난 기록 두 칸 줄 — 비교 한 줄·막대 아래 16px. "같은 날 | 날짜(15px muted) / 행복도 · 기분 · 있었던 일(16px 먹)",
+   "이런 날 | 경향 한 줄(16px 먹)". 가운뎃점 대신 무리 사이 16px 간격(v3.13), 무리 안 여럿은 쉼표. 숫자는 키우지 않는다. 항목 사이 16px */
+.fortune-card--seal .fc-recall {
+  margin-top: 16px;
+}
+.fortune-card--seal .fc-recall__list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 0;
+  list-style: none;
+}
+.fortune-card--seal .fc-recall__date {
+  display: block;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--color-muted);
+}
+.fortune-card--seal .fc-recall .fc-words > :first-child {
+  white-space: nowrap;
+}
+
+/* 10. 투표·버전: 붓선 대신 구역 선. 물음이 구역 라벨, 16px 아래 왼쪽 축에서 버튼 둘(둥근 44px 그대로 — 동작·눌림 그대로, 글자 15px).
+   "아니에요" 뒤 이유 셋은 띠지 대신 같은 녹갈 1px 선의 작은 버튼 32px. 버전은 13px muted 왼쪽 축 */
+.fortune-card--seal .vote {
+  margin: 0;
+  gap: 8px;
+}
+.fortune-card--seal .vote > span:first-child {
+  flex-basis: 100%;
+  margin: 0 0 8px;
+}
+.fortune-card--seal .vote__btn,
+.fortune-card--seal .vote > .basis-full:not(.vote__reasons) {
+  font-size: 15px;
+}
+.fortune-card--seal .vote__reasons,
+.fortune-card--seal .vote > .basis-full:not(.vote__reasons) {
+  margin-top: 8px;
+}
+.fortune-card--seal .vote__reason {
+  padding: 0 12px;
+  border: 1px solid color-mix(in srgb, var(--color-frame) 50%, transparent);
+  border-image: none;
+  border-radius: 9999px;
+}
+.fortune-card--seal .fc-version {
+  margin: 16px 0 0;
+  font-size: 13px;
+  line-height: 16px;
+  color: var(--color-muted);
+}
+.fortune-card--seal .fc-foot > .fc-version:first-child {
+  margin-top: 0;
+}
+
+/* 열림 표시가 도는 전환(지금 카드와 같은 150ms)만 있다 — 움직임 줄이기면 없음. 새 모션 없음 */
+@media (prefers-reduced-motion: reduce) {
+  .fortune-card--seal .fc-toggle {
+    transition: none;
+  }
+}
+
+/* ── v3.44 운세 카드(인장안) 닫힌 머리 덜기 · 로딩 카드 같은 틀 (명세 40, 2026-11-15) ─────────────────────────────
+   앱 주인 걱정 "규칙이 너무 많아져서 이전처럼 이상해질까" — 더하지 않고 덜어 내고 옮긴다. 닫힌 머리에서 뺀 흐름 숫자·주석은 §2·§4,
+   로딩 카드 틀은 아래 11, 개운 근거 한 줄은 12. 새 그림·새 토큰·새 모션 없음 */
+
+/* 11. 로딩 카드(FortuneLoading) = 인장 카드와 같은 틀: 같은 1px 선 · 모서리 2px(.fortune-card--seal) · 안쪽 여백 24px · 같은 라벨 줄.
+   높이 = 닫힌 인장 카드 = 테 2 + 여백 48 + 라벨 줄 16 + 16 + 제목 두 줄 67.6(26px × 1.3 × 2) + 16 + 선 1 + 16 + 인장 32 + 8 + 32 = 254.6px(375px).
+   v3.45(명세 41): 인장이 두 줄(힘이 되는 것 · 조심할 것)이 되면서 닫힌 카드가 날마다 214.6 · 254.6 · 262.6px로 갈린다(375px 14일 중 3 · 3 · 7일).
+   인장 자리 32 + 8 + 32px에 맞추면 14일 중 11일이 8px 안(262.6은 +8, 214.6은 −40) — 214.6에 두면 7일이 +48px 튄다.
+   달 + 진행 말(v3.31 그대로)은 라벨 줄 아래 남은 높이의 세로 가운데. 금색 이중 테(card-gold)는 쓰지 않는다 */
+.fortune-card--seal.fortune-loading {
+  min-height: calc(2px + 48px + 16px + 16px + 2 * 26px * 1.3 + 16px + 1px + 16px + 32px + 8px + 32px);
+  padding: 24px;
+}
+
+/* 12. 개운 근거 한 줄(접힘을 연 뒤 네 칸 위): 15px muted. 지금 카드(story)는 칸 그리드 위 왼쪽 정렬, 인장안은 내용 칸 시작선(x = 133px)에서 */
+.gaewoon__why {
+  margin: 0 0 8px;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--color-muted);
+}
+.fortune-card--seal .gaewoon__why {
+  margin: 0 0 16px;
+  padding-left: calc(var(--fc-col) + var(--fc-gap));
+}
+
+/* ── v3.46 운세 카드(인장안) 영역 가로 게이지 · 등불 톤 시안 (명세 42, 2026-11-15) ─────────────────────────────────
+   앱 주인: "막대그래프가 세로로 있는 게 아니라 가로로, − 없이 +로만. 50을 보통으로." — A(게이지)는 확정, 인장안 기본 모습.
+   B(등불 톤)는 `.fc--lantern` 아래로만 묶인 시안이고 화면(page.tsx)에는 아직 켜지 않는다. 새 그림·새 토큰·새 모션 없음 */
+
+/* 13. 가로 게이지: 줄 = 이름 라벨 칸 80px | 8px | 트랙(내용 칸 전부). 채움은 언제나 왼쪽 0에서 gauge %까지 한 방향 — 가운데에서 갈라지지 않는다.
+   트랙 8px · 모서리 1px · 녹갈 10% 면, 50 자리에 세로 눈금 하나(녹갈 70% 1px, 트랙 위아래 4px 더 길다). 눈금 위 "보통" 작은 라벨이 첫 줄 위에 한 번.
+   채움 색은 인장과 같은 짝: 50보다 높음 = 금빛 면(gold-wash, "힘이 되는 것"), 낮음 = 남색 면("조심할 것"), 신호 없음 = 녹갈 흐린 면으로 50까지("특별한 신호 없음").
+   채움 끝은 곧다(붓 끝 마스크 없음) — 눈금과 견줘 읽는 막대라 끝이 갈라지면 어디까지인지 흐려진다. 숫자 없음, 퍼지는 모션 없음.
+   줄 높이 48px · 이름 꺾쇠 · 누르면 이유 한 줄(180ms)은 영역 줄 그대로(AreaSignalGrid). 길이와 색 갈래는 FortuneCard가 줄 순서대로 --fc-g-N · --fc-gc-N으로 넘긴다 */
+.fortune-card--seal {
+  --fc-gauge-track: color-mix(in srgb, var(--color-frame) 10%, transparent);
+  --fc-gauge-tick: color-mix(in srgb, var(--color-frame) 70%, transparent);
+  --fc-gauge-up: var(--color-gold) url("/ui/gold-wash.webp") center / 256px 256px;
+  --fc-gauge-down: color-mix(in srgb, var(--color-sky) 82%, var(--color-paper-2));
+  --fc-gauge-none: color-mix(in srgb, var(--color-frame) 26%, transparent);
+}
+.fortune-card--seal .fc-gauge__scale {
+  display: grid;
+  grid-template-columns: var(--fc-col) minmax(0, 1fr);
+  column-gap: var(--fc-gap);
+}
+.fortune-card--seal .fc-gauge__mid {
+  grid-column: 2;
+  justify-self: center;
+  /* 자간이 끝 글자 뒤에도 붙어 가운데가 0.5px 밀리는 것을 되돌린다 — 글자 가운데가 눈금 위에 */
+  margin-right: -0.08em;
+  font-size: 13px;
+  line-height: 16px;
+  letter-spacing: 0.08em;
+  color: var(--color-muted);
+}
+/* 라벨 → 4px → 첫 줄 눈금 위끝(줄 48px 안에서 트랙 위 20px, 눈금은 그보다 4px 위). 끝 줄 아래는 §7처럼 줄 패딩이 구역 간격을 겸한다 */
+.fortune-card--seal .fc-gauge .area-grid {
+  margin: -12px 0 -16px;
+}
+.fortune-card--seal .fc-gauge .area-grid__bar {
+  height: 8px;
+  border-radius: 1px;
+  background: var(--fc-gauge-track);
+}
+.fortune-card--seal .fc-gauge .area-grid__fill {
+  display: none;
+}
+.fortune-card--seal .fc-gauge .area-grid__bar::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: var(--g, 50%);
+  border-radius: 1px;
+  background: var(--gc, var(--fc-gauge-none));
+}
+.fortune-card--seal .fc-gauge .area-grid__axis {
+  z-index: 1;
+  top: -4px;
+  bottom: -4px;
+  background: var(--fc-gauge-tick);
+}
+.fortune-card--seal .fc-gauge .area-grid__item:nth-child(1) { --g: var(--fc-g-1); --gc: var(--fc-gc-1); }
+.fortune-card--seal .fc-gauge .area-grid__item:nth-child(2) { --g: var(--fc-g-2); --gc: var(--fc-gc-2); }
+.fortune-card--seal .fc-gauge .area-grid__item:nth-child(3) { --g: var(--fc-g-3); --gc: var(--fc-gc-3); }
+.fortune-card--seal .fc-gauge .area-grid__item:nth-child(4) { --g: var(--fc-g-4); --gc: var(--fc-gc-4); }
+.fortune-card--seal .fc-gauge .area-grid__item:nth-child(5) { --g: var(--fc-g-5); --gc: var(--fc-gc-5); }
+.fortune-card--seal .fc-gauge .area-grid__item:nth-child(6) { --g: var(--fc-g-6); --gc: var(--fc-gc-6); }
+
+/* 14. 등불 톤 시안(.fc--lantern, 인장안에서만). 참고 포스터의 판짜기를 카드 한 장으로: 맨 위 짙은 남색 문양 띠 → 띠 가운데에서 내려오는 남색 줄과 작은 주홍 술 →
+   넓은 크림 종이에 작은 라벨 · 제목 · 인장. 색은 셋 — 남색(판의 무게: 띠 · 테 · 구역 선 · 조심할 것 · 제목),
+   주홍(점처럼: 띠 아랫단 테 · 띠 안 고리 · 술 · "힘이 되는 것" 인장과 라벨 · 높은 게이지), 크림(빈 자리). 띠 안 금빛 가는 선은 창살 격자.
+   문양은 그림이 아니라 기하 선(창살 마름모 사슬 · 반복 구름 고리 · 겹선)이고, 색은 토큰 면을 인라인 SVG 마스크로 오려 낸다(마스크 안의 검정은 알파일 뿐 색이 아니다).
+   등불 몸통·꽃문양·영문 글자는 없다. 금빛 이중 테 대신 남색 가는 테 하나. 새 모션 없음 */
+.fortune-card--seal.fc--lantern {
+  --fc-rule: color-mix(in srgb, var(--color-sky) 28%, transparent);
+  --fc-gauge-track: color-mix(in srgb, var(--color-sky) 8%, transparent);
+  --fc-gauge-tick: color-mix(in srgb, var(--color-sky) 70%, transparent);
+  --fc-gauge-up: var(--color-seal);
+  --fc-gauge-down: var(--color-sky);
+  --fc-gauge-none: color-mix(in srgb, var(--color-sky) 20%, transparent);
+  border-color: color-mix(in srgb, var(--color-sky) 55%, transparent);
+  overflow: hidden;
+}
+.fc--lantern .fc-head {
+  position: relative;
+  padding-top: 0;
+}
+/* 머리 띠 60px, 카드 테 안쪽 끝에서 끝까지(여백 24px을 음수 여백으로 넘는다). 위에서부터:
+   남색 3 · 금 겹선 1 · 창살 마름모 사슬 28(가운데마다 주홍 점) · 금 겹선 1 · 남색 2 · 구름 고리 14(주홍) · 남색 2 · 금 겹선 1 · 남색 6 · 주홍 테 2.
+   마름모 한 칸은 띠 가운데에 놓여(position center) 어느 폭에서나 좌우가 같고, 술이 그 칸 바로 아래로 떨어진다 */
+.fc--lantern .fc-lantern__band {
+  position: relative;
+  display: block;
+  height: 60px;
+  margin: 0 -24px 20px;
+  background: var(--color-sky-2);
+}
+.fc--lantern .fc-lantern__band::before,
+.fc--lantern .fc-lantern__band::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+}
+/* 금빛 가는 선: 겹선 셋 + 창살 사슬(바깥 마름모 + 안 마름모, 칸끼리 가로 이음) */
+.fc--lantern .fc-lantern__band::before {
+  background: var(--color-gold);
+  opacity: 0.85;
+  -webkit-mask:
+    linear-gradient(#000 0 0) 0 3px / 100% 1px no-repeat,
+    linear-gradient(#000 0 0) 0 32px / 100% 1px no-repeat,
+    linear-gradient(#000 0 0) 0 51px / 100% 1px no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 28' fill='none' stroke='%23000' stroke-width='1'%3E%3Cpath d='M14 3.5L24.5 14 14 24.5 3.5 14z M14 8L20 14 14 20 8 14z M14 0v3.5 M14 24.5V28 M0 14h3.5 M24.5 14H28'/%3E%3C/svg%3E") center 4px / 28px 28px repeat-x;
+  mask:
+    linear-gradient(#000 0 0) 0 3px / 100% 1px no-repeat,
+    linear-gradient(#000 0 0) 0 32px / 100% 1px no-repeat,
+    linear-gradient(#000 0 0) 0 51px / 100% 1px no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 28' fill='none' stroke='%23000' stroke-width='1'%3E%3Cpath d='M14 3.5L24.5 14 14 24.5 3.5 14z M14 8L20 14 14 20 8 14z M14 0v3.5 M14 24.5V28 M0 14h3.5 M24.5 14H28'/%3E%3C/svg%3E") center 4px / 28px 28px repeat-x;
+}
+/* 주홍: 마름모 가운데 작은 점 · 구름 고리 줄 · 아랫단 테 2px */
+.fc--lantern .fc-lantern__band::after {
+  background: var(--color-seal);
+  -webkit-mask:
+    linear-gradient(#000 0 0) 0 100% / 100% 2px no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 28'%3E%3Ccircle cx='14' cy='14' r='2' fill='%23000'/%3E%3C/svg%3E") center 4px / 28px 28px repeat-x,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 14' fill='none' stroke='%23000' stroke-width='1.1' stroke-linecap='round'%3E%3Cpath d='M1 12.5A6 6 0 0 1 13 12.5 M13 12.5A3 3 0 0 0 7 12.5 M7 12.5A1.3 1.3 0 0 1 9.6 12.5'/%3E%3C/svg%3E") center 35px / 14px 14px repeat-x;
+  mask:
+    linear-gradient(#000 0 0) 0 100% / 100% 2px no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 28'%3E%3Ccircle cx='14' cy='14' r='2' fill='%23000'/%3E%3C/svg%3E") center 4px / 28px 28px repeat-x,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 14' fill='none' stroke='%23000' stroke-width='1.1' stroke-linecap='round'%3E%3Cpath d='M1 12.5A6 6 0 0 1 13 12.5 M13 12.5A3 3 0 0 0 7 12.5 M7 12.5A1.3 1.3 0 0 1 9.6 12.5'/%3E%3C/svg%3E") center 35px / 14px 14px repeat-x;
+}
+/* 세로축: 띠 가운데에서 남색 가는 줄(1px) 14px → 주홍 매듭 → 주홍 술 22px. 절대 위치라 내용 칸을 밀지 않고,
+   라벨 줄 가운데의 빈 자리(왼쪽 "오늘의 운세"와 오른쪽 꺾쇠 사이)를 지나 제목보다 위에서 끝난다. 보조 기술에 읽히지 않는다 */
+.fc--lantern .fc-lantern__tassel {
+  position: absolute;
+  top: 60px;
+  left: 50%;
+  width: 9px;
+  height: 40px;
+  margin-left: -4.5px;
+  pointer-events: none;
+  background:
+    linear-gradient(var(--color-sky), var(--color-sky)) center 0 / 1px 14px no-repeat,
+    radial-gradient(circle, var(--color-seal) 0 2.4px, transparent 2.9px) center 12px / 9px 7px no-repeat;
+}
+.fc--lantern .fc-lantern__tassel::after {
+  content: "";
+  position: absolute;
+  top: 18px;
+  left: 0;
+  width: 9px;
+  height: 22px;
+  background:
+    linear-gradient(var(--color-seal), var(--color-seal)) 0 0 / 100% 3px no-repeat,
+    repeating-linear-gradient(90deg, var(--color-seal) 0 1px, transparent 1px 2px);
+  clip-path: polygon(28% 0, 72% 0, 100% 100%, 0 100%);
+}
+/* 제목: 같은 송명 26px, 먹 대신 짙은 남색(sky-2, card-paper 위 12.6:1)과 자간 0.02em — 포스터 제목처럼 한 자씩 놓인다. 송명은 무게가 하나라 그대로.
+   0.03em은 시안 4의 14일 중 하루(375px)·하루(320px)를 세 줄로 밀었다 — 0.02em은 기본 카드와 줄 수가 같다 */
+.fc--lantern .fortune-headline {
+  color: var(--color-sky-2);
+  letter-spacing: 0.02em;
+}
+/* 인장: 힘이 되는 것 = 인주 계열 글자색 el-fire-ink(card-paper 위 6.3:1, 바탕 한지 위 5.6:1)의 1px 테 + 같은 색 글자, 조심할 것 = 남색 그대로.
+   줄 라벨도 같은 짝 — 주홍 글자는 이 라벨 하나와 인장뿐이다 */
+.fc--lantern .fortune-seal {
+  color: var(--color-el-fire-ink);
+}
+.fc--lantern .fortune-seal[data-tone="care"] {
+  color: var(--color-sky);
+}
+.fc--lantern .fc-row.fc-seal-row[data-tone="good"] .fc-row__label {
+  color: var(--color-el-fire-ink);
+}
+/* 게이지: 구조는 기본과 같고(§13) 채움 색만 높음 주홍 · 낮음 남색 · 신호 없음 남색 20%. 트랙을 8 → 5px로 가늘게 — 주홍이 여러 줄 굵게 깔리면
+   "점처럼 몇 군데만"이 깨진다(시안에서 8px 주홍 세 줄이 띠보다 무거웠다). 눈금은 트랙 위아래 4px 그대로 */
+.fc--lantern .fc-gauge .area-grid__bar {
+  height: 5px;
+}
+/* "하면 좋아요" 라벨: 금빛 글자 대신 먹(주홍 글자는 인장 라벨에만) */
+.fc--lantern .fc-row[data-tone="good"]:not(.fc-seal-row) .fc-row__label {
+  color: var(--color-ink);
+}
+
+/* ── 운세 카드(인장안) 도화 톤 · 섞은 톤 시안 (명세 43, 2026-11-15) ─────────────────────────────────────────────
+   앱 주인: 참고 그림 두 장(도화 소설 표지 · 등불 포스터)으로 "두 가지 시안과, 두 가지의 장점을 섞어서 만든 시안도".
+   전부 `.fc--dohwa` · `.fc--blend` 아래로만 묶였다 — 기본 인장안 · 등불(.fc--lantern) · story · score 규칙은 한 줄도 고치지 않았다. 화면(page.tsx)에는 켜지 않는다.
+   문양(뇌문 · 창살 · 청해파 · 동심결 매듭 · 술)은 그림이 아니라 기하 선이고, 색은 토큰 면을 인라인 SVG 마스크로 오려 낸다(마스크 안의 검정은 알파일 뿐 색이 아니다).
+   꽃 · 나비 · 복숭아 · 구름 그림, 영문 글자, 새 그림 · 새 토큰 · 새 모션 없음 */
+
+/* 15. 두 시안이 같이 쓰는 것.
+   카드는 겹쳐 그리는 장식의 기준(relative)이자 쌓임 맥락(isolation) — 머리 면(z −2) · 워터마크(z −1)가 카드 종이 위, 글자 아래에 깔린다.
+   --fc-gold-line = 금빛 가는 선(장식 선 전용, 글자 아님): 금 80% + gold-ink 20% — 금 그대로는 한지 위에서 선이 녹아 버린다.
+   테: 바깥 1px 금빛 선(카드 테) + 안쪽 3px 들어온 1px 금빛 선 = 겹선 */
+.fortune-card--seal:is(.fc--dohwa, .fc--blend) {
+  --fc-gold-line: color-mix(in srgb, var(--color-gold) 80%, var(--color-gold-ink));
+  --fc-rule: color-mix(in srgb, var(--color-gold) 55%, transparent);
+  --fc-lattice: color-mix(in srgb, var(--color-gold) 14%, transparent);
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  border-color: var(--fc-gold-line);
+}
+:is(.fc--dohwa, .fc--blend) .fc-frame {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: var(--fc-gold-line);
+}
+:is(.fc--dohwa, .fc--blend) .fortune-headline {
+  position: relative;
+}
+/* 워터마크: 그날 일진 한자 두 글자(壬 · 子)를 머리 양 귀퉁이에 아주 흐리게. 송명 72px — 장식이라 글자 크기 26px 상한에 걸리지 않는다(aria-hidden).
+   왼쪽 위에 천간, 오른쪽 위에 지지. 글자 뒤(z −1)라 제목 · 라벨 대비를 거의 바꾸지 않는다(보고의 실측) */
+:is(.fc--dohwa, .fc--blend) .fc-mark {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  z-index: -1;
+  display: flex;
+  justify-content: space-between;
+  pointer-events: none;
+  font-family: var(--font-serif);
+  font-size: 72px;
+  line-height: 1;
+}
+/* 세로축: 위에서 내려오는 줄 → 금빛 동심결 매듭(겹고리 선 기호 20px) → 짧은 술. 절대 위치 — 라벨 줄 가운데의 빈 자리를 지나 제목보다 위에서 끝난다.
+   줄 = 요소 바탕, 매듭 = ::before(마스크), 술 = ::after(머리 띠 + 가는 실, 사다리꼴로 자른다). 색은 시안마다 --knot-* 로 */
+:is(.fc--dohwa, .fc--blend) .fc-knot {
+  position: absolute;
+  left: 50%;
+  z-index: 1;
+  width: 20px;
+  margin-left: -10px;
+  pointer-events: none;
+  background: linear-gradient(var(--knot-cord), var(--knot-cord)) center 0 / 1px var(--knot-cord-h) no-repeat;
+}
+:is(.fc--dohwa, .fc--blend) .fc-knot::before,
+:is(.fc--dohwa, .fc--blend) .fc-knot::after {
+  content: "";
+  position: absolute;
+}
+:is(.fc--dohwa, .fc--blend) .fc-knot::before {
+  top: var(--knot-cord-h);
+  left: 0;
+  width: 20px;
+  height: 20px;
+  background: var(--knot-color);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%23000' stroke-width='1.1'%3E%3Cpath d='M10 4L16 10L10 16L4 10Z M6 8L12 14 M8 6L14 12 M6 12L12 6 M8 14L14 8'/%3E%3Ccircle cx='2.4' cy='10' r='1.7'/%3E%3Ccircle cx='17.6' cy='10' r='1.7'/%3E%3Ccircle cx='10' cy='2.4' r='1.7'/%3E%3Ccircle cx='10' cy='17.6' r='1.7'/%3E%3C/svg%3E") center / 20px 20px no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%23000' stroke-width='1.1'%3E%3Cpath d='M10 4L16 10L10 16L4 10Z M6 8L12 14 M8 6L14 12 M6 12L12 6 M8 14L14 8'/%3E%3Ccircle cx='2.4' cy='10' r='1.7'/%3E%3Ccircle cx='17.6' cy='10' r='1.7'/%3E%3Ccircle cx='10' cy='2.4' r='1.7'/%3E%3Ccircle cx='10' cy='17.6' r='1.7'/%3E%3C/svg%3E") center / 20px 20px no-repeat;
+}
+:is(.fc--dohwa, .fc--blend) .fc-knot::after {
+  top: calc(var(--knot-cord-h) + 19px);
+  left: 5px;
+  width: 10px;
+  height: var(--knot-tassel-h);
+  background:
+    linear-gradient(var(--knot-tassel), var(--knot-tassel)) 0 0 / 100% 3px no-repeat,
+    repeating-linear-gradient(90deg, var(--knot-tassel) 0 1px, transparent 1px 2px);
+  clip-path: polygon(30% 0, 70% 0, 100% 100%, 0 100%);
+}
+
+/* 16. 도화 톤 시안(.fc--dohwa). 참고 표지에서 가져온 것: 크림 판을 두른 금빛 겹선과 그 사이 뇌문 띠, 산호 분홍이 위에서 아래로 옅어지는 가운데 패널,
+   패널 맨 위 금빛 매듭과 술, 패널 아랫단 청해파, 창살 격자, 귀퉁이의 흐린 큰 한자. 남색은 쓰지 않는다 — 크림 · 금갈색 선 · 산호 분홍 셋.
+   --fc-coral = 산호 분홍(행복도 분홍 happy 70% + 주황 fortune 30% — 둘 다 있는 토큰, 새 hex 없음). 면 · 인장 테 · 높은 게이지에만.
+   --fc-coral-ink = 짙은 산호 글자(산호 45% + 인주 글자색 el-fire-ink에 먹을 30% 섞은 것 — 먹만 섞으면 갈색으로 죽었다): 인장 글자 · "힘이 되는 것" · "하면 좋아요" 라벨.
+   --fc-coral-line = 인장 테(산호 85% + 먹): 산호 그대로는 종이 위 2.8:1이라 테가 흐려 3.5:1로 한 단계 눌렀다.
+   --fc-brown = 제목 금갈색(금 35% + gold-ink): 패널 면 위에서도 4.5:1을 넘게 --fc-gold보다 한 단계 짙다 */
+.fortune-card--seal.fc--dohwa {
+  --fc-coral: color-mix(in srgb, var(--color-happy) 70%, var(--color-fortune));
+  --fc-coral-ink: color-mix(in srgb, var(--fc-coral) 45%, color-mix(in srgb, var(--color-el-fire-ink) 70%, var(--color-ink)));
+  --fc-coral-line: color-mix(in srgb, var(--fc-coral) 85%, var(--color-ink));
+  --fc-brown: color-mix(in srgb, var(--color-gold) 35%, var(--color-gold-ink));
+  --fc-gauge-track: color-mix(in srgb, var(--color-gold) 12%, transparent);
+  --fc-gauge-tick: color-mix(in srgb, var(--fc-gold) 70%, transparent);
+  --fc-gauge-up: var(--fc-coral);
+  --fc-gauge-down: var(--fc-gold);
+  --fc-gauge-none: color-mix(in srgb, var(--fc-gold) 22%, transparent);
+  --knot-cord: var(--fc-gold);
+  --knot-color: var(--fc-gold);
+  --knot-tassel: var(--fc-gold);
+  --knot-cord-h: 4px;
+  --knot-tassel-h: 15px;
+}
+/* 테: 바깥 카드 테(1px) — 2px — 뇌문 띠 9px — 2px — 안쪽 선(1px, 위 · 아래는 13px · 양옆은 3px 들어옴).
+   뇌문은 回 꼴 나선이 바닥선에서 올라가는 10px 반복(위 띠는 바닥선이 안쪽, 아래 띠는 뒤집어 역시 안쪽). 닫힌 카드도 펼친 카드도 위 · 아래 가장자리에만 */
+.fc--dohwa .fc-frame {
+  -webkit-mask:
+    linear-gradient(#000 0 0) 3px 13px / calc(100% - 6px) 1px no-repeat,
+    linear-gradient(#000 0 0) 3px calc(100% - 13px) / calc(100% - 6px) 1px no-repeat,
+    linear-gradient(#000 0 0) 3px 13px / 1px calc(100% - 26px) no-repeat,
+    linear-gradient(#000 0 0) calc(100% - 3px) 13px / 1px calc(100% - 26px) no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 9' fill='none' stroke='%23000' stroke-width='1'%3E%3Cpath d='M0 8.5H10 M8.5 8.5V0.5H1.5V6.5H6.5V2.5H3.5V4.5'/%3E%3C/svg%3E") center 2px / 10px 9px repeat-x,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 9' fill='none' stroke='%23000' stroke-width='1'%3E%3Cpath d='M0 0.5H10 M8.5 0.5V8.5H1.5V2.5H6.5V6.5H3.5V4.5'/%3E%3C/svg%3E") center calc(100% - 2px) / 10px 9px repeat-x;
+  mask:
+    linear-gradient(#000 0 0) 3px 13px / calc(100% - 6px) 1px no-repeat,
+    linear-gradient(#000 0 0) 3px calc(100% - 13px) / calc(100% - 6px) 1px no-repeat,
+    linear-gradient(#000 0 0) 3px 13px / 1px calc(100% - 26px) no-repeat,
+    linear-gradient(#000 0 0) calc(100% - 3px) 13px / 1px calc(100% - 26px) no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 9' fill='none' stroke='%23000' stroke-width='1'%3E%3Cpath d='M0 8.5H10 M8.5 8.5V0.5H1.5V6.5H6.5V2.5H3.5V4.5'/%3E%3C/svg%3E") center 2px / 10px 9px repeat-x,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 9' fill='none' stroke='%23000' stroke-width='1'%3E%3Cpath d='M0 0.5H10 M8.5 0.5V8.5H1.5V2.5H6.5V6.5H3.5V4.5'/%3E%3C/svg%3E") center calc(100% - 2px) / 10px 9px repeat-x;
+}
+/* 머리: 위 여백 24 → 36px(매듭과 술이 라벨 줄 가운데를 지나 제목 위 16px에서 끝날 자리), 아래 32px(아래 뇌문 띠 14px 위로 여백) */
+.fc--dohwa .fc-head {
+  padding: 36px 24px 32px;
+}
+.fc--dohwa .fc-body {
+  padding-bottom: 20px;
+}
+/* 패널: 라벨 줄 · 제목이 놓인 머리 영역을 안쪽 선 안에 꽉 채우는 면(제목의 ::before, 글자 뒤 z −2).
+   위 = 안쪽 선 바로 아래(카드 위에서 14px), 아래 = 제목 아래 28px에 금빛 1px 선 — 이 선이 기본 인장안의 "제목 | 인장" 가는 선을 대신한다(.fc-line 숨김).
+   면 = 산호 분홍 20% → 4%(위에서 아래로 옅어짐) 위에 창살 격자(금 14% 1px, 20px 칸). 왼쪽 축(x = 45px)은 그대로.
+   패널 위의 "오늘의 운세" 라벨과 꺾쇠는 muted 대신 제목과 같은 금갈색 — muted는 분홍 면 위에서 4.5:1이 안 나왔다(실측 3.5:1) */
+.fc--dohwa .fortune-headline,
+.fc--dohwa .fc-top .fc-label {
+  color: var(--fc-brown);
+}
+.fc--dohwa .fc-toggle {
+  background: var(--fc-brown);
+}
+.fc--dohwa .fortune-headline::before,
+.fc--dohwa .fortune-headline::after {
+  content: "";
+  position: absolute;
+  left: -20px;
+  right: -20px;
+  pointer-events: none;
+}
+.fc--dohwa .fortune-headline::before {
+  top: -54px;
+  bottom: -28px;
+  z-index: -2;
+  border-bottom: 1px solid var(--fc-gold-line);
+  background:
+    repeating-linear-gradient(90deg, var(--fc-lattice) 0 1px, transparent 1px 20px) 10px 0,
+    repeating-linear-gradient(180deg, var(--fc-lattice) 0 1px, transparent 1px 20px) 0 10px,
+    linear-gradient(180deg, color-mix(in srgb, var(--fc-coral) 20%, transparent), color-mix(in srgb, var(--fc-coral) 4%, transparent));
+}
+/* 청해파: 패널 아랫단, 금빛 선 바로 위 14px 한 줄. 겹친 물결 비늘(뒷줄은 앞줄 원에 가려진다 — SVG 안의 mask), 금빛 선 45% */
+.fc--dohwa .fortune-headline::after {
+  bottom: -27px;
+  height: 14px;
+  z-index: -1;
+  background: var(--fc-gold-line);
+  opacity: 0.45;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 14' fill='none' stroke='%23000' stroke-width='0.9'%3E%3Cdefs%3E%3Cmask id='m'%3E%3Crect width='16' height='14' fill='%23fff'/%3E%3Ccircle cx='0' cy='14' r='8' fill='%23000'/%3E%3Ccircle cx='16' cy='14' r='8' fill='%23000'/%3E%3C/mask%3E%3C/defs%3E%3Cg mask='url(%23m)'%3E%3Ccircle cx='8' cy='9' r='7.5'/%3E%3Ccircle cx='8' cy='9' r='5'/%3E%3Ccircle cx='8' cy='9' r='2.5'/%3E%3C/g%3E%3Ccircle cx='0' cy='14' r='7.5'/%3E%3Ccircle cx='0' cy='14' r='5'/%3E%3Ccircle cx='0' cy='14' r='2.5'/%3E%3Ccircle cx='16' cy='14' r='7.5'/%3E%3Ccircle cx='16' cy='14' r='5'/%3E%3Ccircle cx='16' cy='14' r='2.5'/%3E%3C/svg%3E") center bottom / 16px 14px repeat-x;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 14' fill='none' stroke='%23000' stroke-width='0.9'%3E%3Cdefs%3E%3Cmask id='m'%3E%3Crect width='16' height='14' fill='%23fff'/%3E%3Ccircle cx='0' cy='14' r='8' fill='%23000'/%3E%3Ccircle cx='16' cy='14' r='8' fill='%23000'/%3E%3C/mask%3E%3C/defs%3E%3Cg mask='url(%23m)'%3E%3Ccircle cx='8' cy='9' r='7.5'/%3E%3Ccircle cx='8' cy='9' r='5'/%3E%3Ccircle cx='8' cy='9' r='2.5'/%3E%3C/g%3E%3Ccircle cx='0' cy='14' r='7.5'/%3E%3Ccircle cx='0' cy='14' r='5'/%3E%3Ccircle cx='0' cy='14' r='2.5'/%3E%3Ccircle cx='16' cy='14' r='7.5'/%3E%3Ccircle cx='16' cy='14' r='5'/%3E%3Ccircle cx='16' cy='14' r='2.5'/%3E%3C/svg%3E") center bottom / 16px 14px repeat-x;
+}
+.fc--dohwa .fc-line {
+  display: none;
+}
+/* 패널 아래 금빛 선(제목 아래 28px) → 16px → 인장 줄. 인장이 없는 옛 운세는 제목이 머리의 끝이라 패널 아래 여백만큼 비운다 */
+.fc--dohwa .fc-seal-rows {
+  margin-top: 45px;
+}
+.fc--dohwa .fortune-headline:last-child {
+  margin-bottom: 29px;
+}
+.fc--dohwa .fc-knot {
+  top: 14px;
+  height: 38px;
+}
+.fc--dohwa .fc-mark {
+  top: 18px;
+  color: var(--fc-gold);
+  opacity: 0.1;
+}
+/* 인장: 힘이 되는 것 = 산호 분홍 1px 테 + 짙은 산호 글자, 조심할 것 = 금갈색 테 + 먹 글자(남색 없음). 줄 라벨도 같은 짝 */
+.fc--dohwa .fortune-seal {
+  border-color: var(--fc-coral-line);
+  color: var(--fc-coral-ink);
+}
+.fc--dohwa .fortune-seal[data-tone="care"] {
+  border-color: var(--fc-gold);
+  color: var(--color-ink);
+}
+.fc--dohwa .fc-row.fc-seal-row[data-tone="good"] .fc-row__label,
+.fc--dohwa .fc-row[data-tone="good"]:not(.fc-seal-row) .fc-row__label {
+  color: var(--fc-coral-ink);
+}
+.fc--dohwa .fc-row.fc-seal-row[data-tone="care"] .fc-row__label {
+  color: var(--fc-gold);
+}
+
+/* 17. 섞은 시안(.fc--blend) — 등불의 무게 + 도화의 섬세함.
+   등불에서: 맨 위 짙은 남색 띠(60 → 40px), 주홍은 점처럼(술 · "힘이 되는 것" 인장과 라벨 · 높은 게이지), 세로축 하나, 큰 여백, 남색 제목, 인장 · 게이지 색.
+   도화에서: 띠 안 문양 = 금빛 뇌문(등불의 창살 사슬 · 구름 고리 대신), 줄 끝 = 금빛 매듭 + 주홍 술, 머리 뒤 일진 한자 워터마크(남색 아주 흐리게),
+   종이 위 창살 격자(아주 옅게, 아래로 사라진다), 카드 테 = 금빛 가는 겹선. 산호 분홍 면은 쓰지 않는다. 금빛은 선에만 */
+/* v3.50(명세 46): 좋음 · 조심의 색 짝을 주홍 · 남색에서 옥색 · 주홍으로 — 제목(남색)과 조심할 점(남색)이 같은 색이었다.
+   --fc-jade = 옥색(깊은 청록, 이 카드 안 지역 변수 — 다른 화면에 쓰지 않는다). card-paper #f8ecd1 위 5.8:1 · 바탕 한지 #f1debb 위 5.2:1.
+   오행 나무 el-wood #2f6b4f와 색상각 200° · 160°(Lab), ΔE 18.6으로 푸른 쪽에 기울여 나무 기운으로 읽히지 않게, 남색 sky와는 ΔE 30.6.
+   유리한 점 = 옥색(인장 테 · 글자 · 줄 이름 · 높은 게이지), 조심할 점 = 주홍(글자 el-fire-ink 6.3:1 · 5.6:1, 채움 seal). 남색은 띠 · 제목 · 투표 눌림 = "이 카드의 색", 뜻 없음.
+   술은 주홍 → 금(매듭과 같은 --fc-gold): 장식이 뜻을 갖지 않게 — 이 카드에서 주홍은 "조심할 점" 하나만 뜻한다. 로딩 · 실패 카드는 같은 클래스라 같이 바뀐다 */
+.fortune-card--seal.fc--blend {
+  --fc-jade: #1f6466;
+  --fc-gauge-track: color-mix(in srgb, var(--color-sky) 8%, transparent);
+  --fc-gauge-tick: color-mix(in srgb, var(--color-sky) 70%, transparent);
+  --fc-gauge-up: var(--fc-jade);
+  --fc-gauge-down: var(--color-seal);
+  --fc-gauge-none: color-mix(in srgb, var(--color-sky) 20%, transparent);
+  --knot-cord: var(--color-sky);
+  --knot-color: var(--fc-gold);
+  --knot-tassel: var(--fc-gold);
+  --knot-cord-h: 5px;
+  --knot-tassel-h: 17px;
+}
+.fc--blend .fc-head {
+  padding-top: 0;
+}
+/* 띠 40px, 테 안쪽 끝에서 끝까지. 위에서부터: 금 겹선(3 · 6px) — 뇌문 15px(16px 반복, 바닥선 포함) — 금 겹선(31 · 34px). 아랫단에 주홍 테는 두지 않는다(점처럼만) */
+.fc--blend .fc-blend__band {
+  position: relative;
+  display: block;
+  height: 40px;
+  margin: 0 -24px 20px;
+  background: var(--color-sky-2);
+}
+.fc--blend .fc-blend__band::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--color-gold);
+  opacity: 0.9;
+  -webkit-mask:
+    linear-gradient(#000 0 0) 0 3px / 100% 1px no-repeat,
+    linear-gradient(#000 0 0) 0 6px / 100% 1px no-repeat,
+    linear-gradient(#000 0 0) 0 31px / 100% 1px no-repeat,
+    linear-gradient(#000 0 0) 0 34px / 100% 1px no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 15' fill='none' stroke='%23000' stroke-width='1'%3E%3Cpath d='M0 14.5H16 M14.5 14.5V0.5H1.5V11.5H11.5V3.5H4.5V8.5H8.5V6.5'/%3E%3C/svg%3E") center 12px / 16px 15px repeat-x;
+  mask:
+    linear-gradient(#000 0 0) 0 3px / 100% 1px no-repeat,
+    linear-gradient(#000 0 0) 0 6px / 100% 1px no-repeat,
+    linear-gradient(#000 0 0) 0 31px / 100% 1px no-repeat,
+    linear-gradient(#000 0 0) 0 34px / 100% 1px no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 15' fill='none' stroke='%23000' stroke-width='1'%3E%3Cpath d='M0 14.5H16 M14.5 14.5V0.5H1.5V11.5H11.5V3.5H4.5V8.5H8.5V6.5'/%3E%3C/svg%3E") center 12px / 16px 15px repeat-x;
+}
+/* 테: 바깥 금빛 1px + 안쪽 3px 들어온 1px(띠 아래에서 시작) = 겹선. 뇌문은 띠가 맡으니 테에는 두지 않는다 */
+.fc--blend .fc-frame {
+  -webkit-mask:
+    linear-gradient(#000 0 0) 3px 40px / 1px calc(100% - 43px) no-repeat,
+    linear-gradient(#000 0 0) calc(100% - 3px) 40px / 1px calc(100% - 43px) no-repeat,
+    linear-gradient(#000 0 0) 3px calc(100% - 3px) / calc(100% - 6px) 1px no-repeat;
+  mask:
+    linear-gradient(#000 0 0) 3px 40px / 1px calc(100% - 43px) no-repeat,
+    linear-gradient(#000 0 0) calc(100% - 3px) 40px / 1px calc(100% - 43px) no-repeat,
+    linear-gradient(#000 0 0) 3px calc(100% - 3px) / calc(100% - 6px) 1px no-repeat;
+}
+/* 줄: 띠 아랫단(40px)에서 남색 1px 5px → 금빛 매듭 20px → 술 17px(v3.50부터 금 — 전엔 주홍). 제목 위 12px에서 끝난다 */
+.fc--blend .fc-knot {
+  top: 40px;
+  height: 41px;
+}
+/* 워터마크는 라벨 줄 아래(제목 뒤)에서 시작한다 — 라벨 뒤에 깔리면 muted 라벨이 4.4:1로 떨어졌다. 남색 제목은 그 위에서도 9:1 넘게 남는다 */
+.fc--blend .fc-mark {
+  top: 80px;
+  color: var(--color-sky);
+  opacity: 0.06;
+}
+/* 창살: 띠 아래부터 제목 아래까지, 금 14% 1px 20px 칸 — 위에서 짙고 아래로 사라진다(제목 둘째 줄 뒤에서는 거의 없다) */
+.fc--blend .fortune-headline::before {
+  content: "";
+  position: absolute;
+  top: -52px;
+  bottom: -8px;
+  left: -20px;
+  right: -20px;
+  z-index: -2;
+  pointer-events: none;
+  background:
+    repeating-linear-gradient(90deg, var(--fc-lattice) 0 1px, transparent 1px 20px) 10px 0,
+    repeating-linear-gradient(180deg, var(--fc-lattice) 0 1px, transparent 1px 20px) 0 10px;
+  -webkit-mask: linear-gradient(#000, transparent);
+  mask: linear-gradient(#000, transparent);
+}
+.fc--blend .fortune-headline {
+  color: var(--color-sky-2);
+  letter-spacing: 0.02em;
+}
+/* 인장(v3.50): 유리한 점 = 옥색 1px 테 + 옥색 글자, 조심할 점 = 주홍(el-fire-ink) 테 + 같은 색 글자. 줄 이름도 같은 짝 */
+.fc--blend .fortune-seal {
+  color: var(--fc-jade);
+}
+.fc--blend .fortune-seal[data-tone="care"] {
+  color: var(--color-el-fire-ink);
+}
+.fc--blend .fc-row.fc-seal-row[data-tone="good"] .fc-row__label {
+  color: var(--fc-jade);
+}
+.fc--blend .fc-row.fc-seal-row[data-tone="care"] .fc-row__label {
+  color: var(--color-el-fire-ink);
+}
+.fc--blend .fc-gauge .area-grid__bar {
+  height: 5px;
+}
+.fc--blend .fc-row[data-tone="good"]:not(.fc-seal-row) .fc-row__label {
+  color: var(--color-ink);
+}
+
+/* ── v3.48 운세 카드: 섞은 톤 확정 · 로딩 카드 맞추기 (명세 44, 2026-11-15) ─────────────────────────────────────────
+   앱 주인이 비교판(shots/43-나란히-*.jpg)에서 "섞은 것"을 골랐다 — 오늘 화면(page.tsx)의 FortuneCard가 theme="blend"를 넘긴다.
+   여기는 그 뒤의 마무리 둘: 로딩 · 실패 카드가 같은 틀을 입고(18), 섞은 톤 안에 남아 있던 기본 색을 같은 짝으로 맞춘다(19).
+   색의 짝은 v3.47 그대로 — 금빛은 선, 주홍은 점(술 · 힘이 되는 것 · 높은 게이지), 남색은 띠 · 조심할 것 · 제목. 새 그림 · 새 토큰 · 새 모션 없음 */
+
+/* 18. 로딩 카드(FortuneLoading)와 실패 카드(FortuneFailed) = 섞은 카드와 같은 틀: §15 · §17의 테(금빛 겹선) · 남색 뇌문 띠 40px · 줄 → 금빛 매듭 → 주홍 술을
+   같은 클래스로 그대로 얹는다(마크업도 FortuneCard와 같은 aria-hidden 조각). 머리 위 여백 24px 대신 띠 40 + 20px — 섞은 카드와 같은 +36px.
+   높이 = 닫힌 섞은 카드(제목 두 줄 · 인장 두 줄) = §11의 254.6 + 36 = 290.6px(375px). 시안 4의 14일 닫힌 카드는 250.6 · 284.4 · 290.6 · 298.6 · 324.4px라
+   290.6에 두면 11일이 8px 안(298.6 +8 · 290.6 0 · 284.4 −6.2), 3일 −40 · 1일 +33.8 — v3.45와 같은 기준 · 같은 날 수.
+   달 + 진행 말(v3.31)은 라벨 줄 아래 남은 높이의 세로 가운데 그대로 — 술(띠 아래 41px에서 끝)은 라벨 줄 가운데의 빈 자리를 지나 달보다 위에서 끝난다 */
+.fortune-card--seal.fc--blend.fortune-loading {
+  min-height: calc(2px + 40px + 20px + 24px + 16px + 16px + 2 * 26px * 1.3 + 16px + 1px + 16px + 32px + 8px + 32px);
+  padding-top: 0;
+}
+/* 실패 카드: 달 자리에 안내 한 줄(15px 먹, 가운데) + "다시 시도"(RetryButton 그대로 — 14px muted 밑줄, 손가락 자리 44px). 같은 높이라 로딩 → 실패에서 튀지 않는다 */
+.fortune-loading__failed {
+  max-width: 100%;
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.5;
+  text-align: center;
+  color: var(--color-ink);
+  word-break: keep-all;
+  text-wrap: balance;
+}
+.fortune-loading--failed .fortune-loading__body {
+  gap: 4px;
+}
+
+/* 19. 섞은 톤 안에 남아 있던 기본 색.
+   (1) 내 기록 비교 막대: 운세 막대의 금색 면(gold-wash)을 남색(sky-2, 제목과 같은 "운세가 말한 것")으로, 트랙은 게이지와 같은 남색 8% 5px(녹갈 테 없음),
+       내 기록 막대는 먹 70% 그대로. 금색 면은 이 카드에서 빠진다.
+   (2) 투표: 안 눌린 테 녹갈 50% → 금빛 선(--fc-gold-line, 카드 테와 같은 선). 눌림의 금색 면(gold-wash) → 남색 1px 테 + 남색 8% 면 + 남색 굵은 글자
+       (금색 면 버튼이 하나 줄고, 눌림 1.04 · 반대쪽 .55 · 120ms는 그대로). "아니에요" 뒤 이유 셋도 같은 금빛 선.
+   (3) 옛 운세(영역 원자료 없음)의 ↑ 화살표: 금빛 글자 → 주홍 글자(el-fire-ink — 힘이 되는 것 인장과 같은 짝) */
+.fc--blend .compare__track {
+  height: 5px;
+  border-radius: 1px;
+  background: var(--fc-gauge-track);
+  box-shadow: none;
+}
+.fc--blend .compare__fill {
+  border-radius: 1px;
+}
+.fc--blend .compare__row[data-kind="fortune"] .compare__fill {
+  background: var(--color-sky-2);
+}
+.fc--blend .vote__btn,
+.fc--blend .vote__reason {
+  border-color: var(--fc-gold-line);
+}
+.fc--blend .vote__btn[aria-pressed="true"] {
+  border-color: var(--color-sky);
+  color: var(--color-sky-2);
+  background: color-mix(in srgb, var(--color-sky) 8%, transparent);
+}
+/* v3.50: ↑ = 옥색(유리한 점과 같은 짝), ↓ = 주홍(조심할 점) — v3.48의 ↑ 주홍은 이제 조심 색이라 뜻이 거꾸로 읽혔다 */
+.fc--blend .trait__arrow.text-gold,
+.fc--blend .trait-chip__arrow.text-gold {
+  color: var(--fc-jade);
+}
+.fc--blend .trait__arrow.text-ink,
+.fc--blend .trait-chip__arrow.text-ink {
+  color: var(--color-el-fire-ink);
+}
+
+/* ── v3.49 로딩 카드 시안 · "내 기록으로 본 오늘" 숫자 빼기 (명세 45, 2026-11-15) ─────────────────────────────────────────
+   앱 주인: "로딩 중의 달이 파란색인데 점수에서 파란색이 안 좋은 거여서 조금 이상해" · "숫자를 빼 줘".
+   섞은 톤에서 남색은 "조심할 것"(인장 · 낮은 게이지), 주홍은 "힘이 되는 것"이라, 로딩 그림에는 둘 다 면으로 차오르지 않는다 — 금(선) · 먹 · 크림만.
+   시안은 FortuneLoading의 look(카드에 data-look)로만 켜진다. 기본(look 없음 = now)의 마크업과 규칙은 한 줄도 바뀌지 않는다.
+   진척 --moon-p(0~1)는 시안이면 카드(section)에 달려 띠 · 매듭 · 창 · 달이 같은 값을 읽는다. 모션은 기존 자리(진척 300ms linear · ready 300ms ease-out · 문구 120ms)뿐 */
+
+/* 20. 금빛 달(gold) · 먹 달(ink): 같은 두 겹(옅은 보름달 18% 그대로 + 가림 원으로 깎은 달)에 색만 바꾼다.
+   원판 그림(moon-ink-disc, 측정 지배색 #152a4b 남색)은 여기서 모양(알파)으로만 쓴다 — 마스크 두 층(원판 알파 ∩ 가림 원)으로 마른 붓 가장자리를 살리고, 면은
+   gold = 키트 gold-wash(손 그림 금빛 물감, 측정 평균 = 토큰 gold #d8a332) 위에 달창 금빛 측정색 moon-gold #d3a555를 55% 얹은 것,
+   ink  = 원판의 수채 얼룩(밝기)은 그대로 두고 색상만 먹 ink #2b2417로 바꾼 것(background-blend-mode: color) — 같은 붓 결의 검갈색 달 */
+.fortune-loading:is([data-look="gold"], [data-look="ink"]) .fortune-loading__moon::after {
+  -webkit-mask-image: url("/ui/moon-ink-disc-512.webp"), radial-gradient(circle var(--moon-r) at 128px 50%, transparent calc(var(--moon-r) - 0.5px), #000 calc(var(--moon-r) + 0.5px));
+  mask-image: url("/ui/moon-ink-disc-512.webp"), radial-gradient(circle var(--moon-r) at 128px 50%, transparent calc(var(--moon-r) - 0.5px), #000 calc(var(--moon-r) + 0.5px));
+  -webkit-mask-size: contain, 256px var(--moon-s);
+  mask-size: contain, 256px var(--moon-s);
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center, calc(var(--moon-x) - 128px) 0;
+  mask-position: center, calc(var(--moon-x) - 128px) 0;
+  -webkit-mask-composite: source-in;
+  mask-composite: intersect;
+}
+.fortune-loading[data-look="gold"] .fortune-loading__moon::after {
+  background:
+    linear-gradient(color-mix(in srgb, var(--color-moon-gold) 55%, transparent), color-mix(in srgb, var(--color-moon-gold) 55%, transparent)),
+    url("/ui/gold-wash.webp") center / 160px 160px,
+    var(--color-gold);
+}
+.fortune-loading[data-look="ink"] .fortune-loading__moon::after {
+  background: linear-gradient(var(--color-ink), var(--color-ink)), url("/ui/moon-ink-disc-512.webp") center / contain no-repeat;
+  background-blend-mode: color, normal;
+}
+
+/* 21. 매듭 짓기(knot): 카드 머리의 동심결 매듭(20px 선 기호)을 60px로 키워 72px 자리 위쪽 가운데에. 아래 겹 = 다 그려진 매듭의 옅은 자리(금빛 선 28%, 움직이지 않는다),
+   위 겹 = 같은 획이 진척만큼 그려진다 — 획마다 맡은 구간 [--a, --b] 안에서 stroke-dashoffset 1 → 0(pathLength 1). 선 1.6px(사용자 단위 0.54) 금빛 --fc-gold(한지 위 5.4:1).
+   ready: 다 그려지고 주홍 술(카드 술과 같은 모양 · 같은 seal 색)이 매듭 아래에서 한 번 떨어진다(300ms, 반복 없음). 술 끝은 진행 말 위 6px에서 멈춘다 */
+.fortune-loading__knot {
+  --knot-f: calc(0.04 + 0.96 * var(--moon-p, 0));
+  position: relative;
+  display: block;
+  flex: none;
+  width: 72px;
+  height: 72px;
+}
+.fortune-loading__knot-svg {
+  position: absolute;
+  top: 0;
+  left: 6px;
+  width: 60px;
+  height: 60px;
+  overflow: visible;
+}
+.fortune-loading__knot-svg path {
+  stroke-width: 0.54; /* 사용자 단위 — 60px / viewBox 20 = 3배라 화면 1.6px */
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.fortune-loading__knot-ghost {
+  stroke: var(--fc-gold-line);
+  opacity: 0.28;
+}
+.fortune-loading__knot-ink path {
+  stroke: var(--fc-gold);
+  stroke-dasharray: 1 1;
+  stroke-dashoffset: calc(1 - clamp(0, (var(--knot-f) - var(--a)) / (var(--b) - var(--a)), 1));
+  transition: stroke-dashoffset 300ms linear;
+}
+.fortune-loading__knot[data-ready] .fortune-loading__knot-ink path {
+  transition: stroke-dashoffset 300ms cubic-bezier(0.3, 0.7, 0.3, 1);
+}
+.fortune-loading__tassel {
+  position: absolute;
+  top: 57.5px;
+  left: 50%;
+  width: 12px;
+  height: 18px;
+  margin-left: -6px;
+  /* v3.50: 카드 머리 술과 같은 --knot-tassel(금) — 주홍은 섞은 톤에서 "조심할 점"의 색이다 */
+  background:
+    linear-gradient(var(--knot-tassel), var(--knot-tassel)) 0 0 / 100% 3px no-repeat,
+    repeating-linear-gradient(90deg, var(--knot-tassel) 0 1px, transparent 1px 2px);
+  clip-path: polygon(30% 0, 70% 0, 100% 100%, 0 100%);
+  transform-origin: 50% 0;
+  transform: scaleY(0);
+  opacity: 0;
+}
+.fortune-loading__knot[data-ready] .fortune-loading__tassel {
+  transform: none;
+  opacity: 1;
+  animation: knot-tassel-drop 300ms cubic-bezier(0.3, 0.7, 0.3, 1) both;
+}
+@keyframes knot-tassel-drop {
+  from {
+    transform: translateY(-3px) scaleY(0.15);
+    opacity: 0;
+  }
+}
+
+/* 22. 창에 불 켜기(window): 키트 달창(moon-window-gold-512, 알파 측정 안지름 77% · 바깥 97%, 지배색 moon-gold #d3a555) 72px.
+   창 안(지름 78% — 창틀 안쪽 테 밑으로 0.5px 들어간다)에 따뜻한 빛이 아래에서 위로 차오른다: 아래 moon-gold 85% → 위 금 35%를 섞은 크림, 키트 gold-wash 결이 비친다.
+   빛 윗선은 10px 번진 가장자리(마스크 층 3배 높이를 mask-position으로 올린다 — 300ms linear 하나로 이어진다). 창살 = 창 안 3 × 3 칸 금빛 1px 선, 빛 위에 놓여 "창살 뒤의 빛"이 된다.
+   빛이 없는 쪽은 한지 그대로 — 남색 · 주홍 면 없음 */
+.fortune-loading__window {
+  --win-s: 72px;
+  --win-d: calc(var(--win-s) * 0.78);
+  --win-lat: color-mix(in srgb, var(--fc-gold) 75%, transparent);
+  position: relative;
+  display: block;
+  flex: none;
+  width: var(--win-s);
+  height: var(--win-s);
+}
+.fortune-loading__window::before,
+.fortune-loading__window::after {
+  content: "";
+  position: absolute;
+}
+.fortune-loading__window::before {
+  top: calc((var(--win-s) - var(--win-d)) / 2);
+  left: calc((var(--win-s) - var(--win-d)) / 2);
+  width: var(--win-d);
+  height: var(--win-d);
+  border-radius: 50%;
+  background:
+    linear-gradient(0deg, color-mix(in srgb, var(--color-moon-gold) 85%, transparent), color-mix(in srgb, var(--color-gold) 35%, var(--color-paper-2))),
+    url("/ui/gold-wash.webp") center / 128px 128px;
+  -webkit-mask: linear-gradient(transparent calc(100% / 3 - 5px), #000 calc(100% / 3 + 5px)) 0 calc(5px - (0.06 + 0.94 * var(--moon-p, 0)) * (var(--win-d) + 10px)) / 100% 300% no-repeat;
+  mask: linear-gradient(transparent calc(100% / 3 - 5px), #000 calc(100% / 3 + 5px)) 0 calc(5px - (0.06 + 0.94 * var(--moon-p, 0)) * (var(--win-d) + 10px)) / 100% 300% no-repeat;
+  transition: mask-position 300ms linear, -webkit-mask-position 300ms linear;
+}
+.fortune-loading__window[data-ready]::before {
+  transition: mask-position 300ms cubic-bezier(0.3, 0.7, 0.3, 1), -webkit-mask-position 300ms cubic-bezier(0.3, 0.7, 0.3, 1);
+}
+.fortune-loading__window::after {
+  inset: 0;
+  background:
+    url("/ui/moon-window-gold-512.webp") center / contain no-repeat,
+    linear-gradient(90deg, transparent calc(100% / 3 - 0.5px), var(--win-lat) 0 calc(100% / 3 + 0.5px), transparent 0 calc(200% / 3 - 0.5px), var(--win-lat) 0 calc(200% / 3 + 0.5px), transparent 0) center / var(--win-d) var(--win-d) no-repeat,
+    linear-gradient(180deg, transparent calc(100% / 3 - 0.5px), var(--win-lat) 0 calc(100% / 3 + 0.5px), transparent 0 calc(200% / 3 - 0.5px), var(--win-lat) 0 calc(200% / 3 + 0.5px), transparent 0) center / var(--win-d) var(--win-d) no-repeat;
+}
+
+/* 23. 띠 이어 그리기(band): 가운데 그림 없이 머리 띠(§17)의 금빛 겹선 · 뇌문이 왼쪽에서 오른쪽으로 이어져 그려진다. 같은 마스크(띠의 금 선) 안에서
+   그려진 쪽 = 금 그대로, 아직인 쪽 = 금 22%(남색 띠 위의 옅은 자리). 그려진 폭 = background-size 300ms linear. 띠의 남색 바탕은 원래 띠라 차오르지 않는다.
+   진행 말은 라벨 줄 아래 남은 높이의 세로 가운데 한 줄 — 그림이 없으니 다른 시안보다 41px 위 */
+.fortune-loading[data-look="band"] .fc-blend__band::before {
+  background:
+    linear-gradient(var(--color-gold), var(--color-gold)) 0 0 / calc((0.04 + 0.96 * var(--moon-p, 0)) * 100%) 100% no-repeat,
+    color-mix(in srgb, var(--color-gold) 22%, transparent);
+  transition: background-size 300ms linear;
+}
+.fortune-loading[data-look="band"][data-ready] .fc-blend__band::before {
+  transition: background-size 300ms cubic-bezier(0.3, 0.7, 0.3, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fortune-loading:is([data-look="gold"], [data-look="ink"]) .fortune-loading__moon::after,
+  .fortune-loading__knot-ink path,
+  .fortune-loading__knot[data-ready] .fortune-loading__knot-ink path,
+  .fortune-loading__window::before,
+  .fortune-loading__window[data-ready]::before,
+  .fortune-loading[data-look="band"] .fc-blend__band::before {
+    transition: none;
+  }
+  .fortune-loading__knot[data-ready] .fortune-loading__tassel {
+    animation: none;
+  }
+}
+
+/* 24. "내 기록으로 본 오늘" 숫자 빼기(인장안 · compare--bare): 막대 옆 값 열을 지우고 막대가 그 자리까지 뻗는다. 막대 두 줄 · 판정 말 · 기준 줄은 그대로.
+   섞은 톤의 운세 막대는 남색(sky-2) → 금빛 선 테만 있는 빈 막대(--fc-gold 1px, 한지 위 5.4:1): 남색은 게이지의 "조심할 것"과 겹쳤다.
+   금은 이 카드에서 뜻 없는 선 색이라 "운세가 그린 선"으로 읽히고, 내 기록 막대(먹 70% 면)와는 면 · 빈 선 + 색(금갈 · 먹)으로 두 번 갈린다.
+   빈 막대가 선으로 읽히도록 섞은 톤의 두 막대 트랙을 5 → 7px로 키운다(속 5px). 트랙 바탕은 남색 8% → 금 10%(남색 면 없음) */
+.fortune-card--seal .compare--bare .compare__row {
+  grid-template-columns: var(--fc-col) minmax(0, 1fr);
+}
+.fc--blend .compare--bare .compare__track {
+  height: 7px;
+  background: color-mix(in srgb, var(--color-gold) 10%, transparent);
+}
+.fc--blend .compare--bare .compare__row[data-kind="fortune"] .compare__fill {
+  background: none;
+  box-shadow: inset 0 0 0 1px var(--fc-gold);
 }

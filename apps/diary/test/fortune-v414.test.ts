@@ -36,10 +36,12 @@ describe("v4.14 되풀이 사유는 어느 문장과 겹치는지 인용한다 (
   test("do가 본문 마지막 문장을 되풀이하면 그 문장을 사유에 인용", () => {
     expect(validateFortuneText(good, brief)).toEqual([]);
     expect(stemOverlap(REPEAT_DO, good.body[3]!)).toBeGreaterThanOrEqual(0.5);
-    const issues = checkDraft({ ...good, do: REPEAT_DO }, brief);
+    // v4.27: 하면·피해요는 거의 베낀 것(0.8)만 건다 — 뜻이 겹치는 REPEAT_DO는 통과하고, 본문 문장을 그대로 옮기면 걸린다
+    expect(checkDraft({ ...good, do: "오늘은 가벼운 일 하나를 먼저 끝내 봐요." }, brief)).toEqual([]);
+    const issues = checkDraft({ ...good, do: good.body[3]! }, brief);
     expect(issues).toHaveLength(1);
     expect(issues[0]).toMatchObject({ code: "repeat", field: "do" });
-    expect(issues[0]!.msg).toMatch(/^do: 본문 문장을 되풀이함 \(본문 "오늘은 하나만 골라/);
+    expect(issues[0]!.msg).toMatch(/^do: 본문 문장을 거의 그대로 옮김 \(본문 "오늘은 하나만 골라/);
     expect(issues[0]!.msg).toContain("다른 장면·다른 행동으로");
   });
   test("영역 줄이 본문을 되풀이하면 그 줄(area index) 사유에 인용", () => {
@@ -52,9 +54,8 @@ describe("v4.14 추상어 검사 오탐 — 목적어와 동사 사이의 부사
   test("이름을 댄 문장은 부사가 끼어도 통과, 이름 없는 꼴은 여전히 탈락, 걸린 문장을 가리킨다", () => {
     for (const ok of ["실속을 챙기는 힘을 옆에서 거들어 주는 쪽이라 오늘은 맞는 날이에요.", "내게 모자란 목을 든든하게 채워 주는 쪽이에요.", "금을 받쳐 주는 힘이에요."]) expect(ok, ok).not.toMatch(ABSTRACT_RE);
     for (const bad of ["아쉽던 자리를 옆에서 채워 주는 힘이에요.", "힘을 옆에서 조용히 거들어 주는 쪽이에요.", "부족한 쪽을 채워 주는 힘이에요.", "채워 주는 쪽이에요."]) expect(bad, bad).toMatch(ABSTRACT_RE);
+    // v4.27: 추상어 검사는 검사기에서 뺐다 (이론을 쉬운 말로 드러낸다 — 피드백/작가입력_재설계_2026-11-10.md §3). 정규식은 측정용으로만 남는다
     const issues = checkDraft({ ...good, body: good.body.map((s, i) => (i === 1 ? "채워 주는 쪽이라 이것저것 둘러보고 싶어져요." : s)) }, brief).filter((i) => i.code === "abstract");
-    expect(issues).toHaveLength(1);
-    expect(issues[0]).toMatchObject({ field: "body", index: 1 });
-    expect(issues[0]!.msg).toContain('추상어 "채워 주는 쪽"');
+    expect(issues).toHaveLength(0);
   });
 });

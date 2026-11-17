@@ -1,6 +1,7 @@
 import type { TenGod } from "@saju/engine";
 
 export type TenGodFamily = "비겁" | "식상" | "재성" | "관성" | "인성";
+export type StrengthKind = "신강" | "중화" | "신약";
 export type BranchRelation = "육합" | "삼합" | "충" | "복음" | null;
 export type YongsinHit = "용신" | "기신" | null;
 
@@ -113,6 +114,8 @@ export interface CoreFortune {
   luckEls?: { 용: "목" | "화" | "토" | "금" | "수"; 희: "목" | "화" | "토" | "금" | "수" | null } | null;
   /** v4.13 (2026-10-15): 내게 필요한 기운의 이름 — 용신 오행과 그 그룹. 글(brief.me.need)·템플릿이 "내게 모자란 금(실속을 챙기는 힘)"으로 쓴다. 용신이 없으면 null, 옛 캐시엔 없다 */
   need?: { 오행: "목" | "화" | "토" | "금" | "수"; 그룹: TenGodFamily } | null;
+  /** 설명 층 (2026-11-02): 글 재료를 사주 유형으로 고르기 위한 원국 분석값. 옛 캐시엔 없다 */
+  chartType?: { 신강약: StrengthKind; 중심기운: TenGodFamily };
   context: {
     daeun?: CoreLuckContextItem & { 순서: number };
     seun: CoreLuckContextItem & { 해: number };
@@ -142,7 +145,7 @@ export interface CoreFortune {
   /** "시간 모름", "입춘 전" 등 */
   caveats: string[];
   /** 점수 분해. raw + rel + ctx → score01 */
-  parts: { raw: number; rel: number; ctx: number; score01: number };
+  parts: { raw: number; rel: number; ctx: number; score01: number; /** 2026-11-15: 켜진 판정 규칙이 더한 값(r3·r5h = 합계 단위, r1·r4·r5 = 10점 단위). 꺼져 있으면 없음 */ rules?: Record<string, number> };
 }
 
 /** v4.19: 모델 호출 한 번의 측정 */
@@ -184,6 +187,8 @@ export interface FortunePlanSummary {
   contextReason: string | null;
   /** 글로 풀 영역 (최대 2) */
   areas: { period: AreaPeriod; area: AreaName; signal: AreaSignal }[];
+  /** v4.26: 오늘의 각도 종류 */
+  angle?: string;
 }
 
 export interface FortuneContent {
@@ -230,6 +235,10 @@ export interface FortuneContent {
   tags?: { 주제: string; 감정: string; 상황: string; 영역: string; 장면: string; 권장: string; 피할: string; 제목뜻: string };
   /** v4.19: 코드가 고른 내용 계획 요약 */
   plan?: FortunePlanSummary;
+  /** 2026-11-14 카드 시험 1안: 그날의 성격을 찍는 인장 두세 개 (seals.ts sealsOf). good = 힘이 되는 쪽, care = 조심할 쪽. 없으면 카드가 인장 줄을 그리지 않는다 */
+  seals?: { word: string; tone: "good" | "care" }[];
+  /** 2026-11-17 기록 반영(Q5·Q7): 글감으로 준 기록 한 줄. key로 같은 줄을 7일에 한 번만 쓴다. 기록이 없거나 쉬는 날은 없음 */
+  record?: { key: string; text: string };
   /** v4.19: 시간·호출·토큰 측정 (본문 없음) */
   metrics?: FortuneMetrics;
   /** v4.16~4.18: 모델이 글보다 먼저 정한 판단(후보·핵심·이유·구조·둘째 기운·운 맥락). v4.19부터는 쓰지 않는다(옛 캐시 호환) */

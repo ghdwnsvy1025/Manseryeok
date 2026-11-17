@@ -69,10 +69,10 @@ describe("v4.5 검사 항목", () => {
   it("직장 장면", () => {
     expect(validateFortuneText({ ...base, do: "거래처에 먼저 연락해요." }, b()).some((i) => i.includes("직장 장면"))).toBe(true);
   });
-  it("주의인 날 반전 말", () => {
+  it("주의인 날 반전 말 — v4.27: 더 막지 않는다 (주의 날도 해결법과 응원으로 닫는다, 피드백/작가입력_재설계_2026-11-10.md 뿌리 3)", () => {
     const care = { ...briefFor("2026-10-10", "주의"), areas: [] };
     const t = { ...base, body: base.body.replace("무리 없이 지나가요", "일이 술술 풀려요") };
-    expect(validateFortuneText(t, care).some((i) => i.includes("반전 말"))).toBe(true);
+    expect(validateFortuneText(t, care).some((i) => i.includes("반전 말"))).toBe(false);
     // 위로("긴장이 풀려요")는 괜찮다
     const ok = { ...base, body: base.body.replace("무리 없이 지나가요", "긴장이 조금 풀려요") };
     expect(validateFortuneText(ok, care).some((i) => i.includes("반전 말"))).toBe(false);
@@ -150,10 +150,10 @@ describe("v4.9 칸마다 같은 말 반복", () => {
     const b = { ...briefFor("2026-10-10", "무난"), areas: [] };
     expect(validateFortuneText(base, b).some((i) => i.includes("되풀이"))).toBe(false);
     const t = { ...base, do: "혼자 정답을 찾으려고 너무 오래 붙잡지 않아요." };   // v4.16 예시 2의 본문 문장을 되풀이
-    expect(validateFortuneText(t, b).some((i) => i.includes("do: 본문 문장을 되풀이"))).toBe(true);
+    expect(validateFortuneText(t, b).some((i) => i.includes("do: 본문 문장을 거의 그대로 옮김"))).toBe(true);   // v4.27: 하면·피해요는 거의 베낀 것만
   });
   it("SYSTEM이 칸 역할과 '아니에요' 기억을 말한다", () => {
-    expect(SYSTEM).toContain("본문 문장을 되풀이하지 않고");
+    expect(SYSTEM).toContain("본문 문장을 그대로 옮기지 않고");   // v4.27
     expect(SYSTEM).not.toContain("피할것.아니에요");   // v4.21: "내용이 안 맞음"은 작가에게 보내지 않는다
   });
 });

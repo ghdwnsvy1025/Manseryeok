@@ -3,6 +3,7 @@
 // active가 아닌 영역의 level 3은 "보통일 것"이 아니라 "특별한 신호 없음"이다. 기록하지 않은 영역도 3으로 채우지 않는다(missing ≠ neutral).
 import { AREAS, type AreaKey, type Areas } from "../entry";
 import { areaReason } from "./areaReasons";
+import { batchim } from "./text";
 import type { AreaName, AreaProfileEntry, FortuneContent } from "./types";
 
 /** 기록 영역 → 운세 영역 (일·공부 = 직업 + 학업) */
@@ -70,11 +71,71 @@ export function flowNumber(score10: number, band: "좋음" | "무난" | "주의"
   return band === "주의" ? Math.min(n, 4) : band === "무난" ? Math.min(Math.max(n, 5), 6) : Math.max(n, 7);
 }
 
-export interface SixAreaView extends SixAreaSignal { reason: string | null }
+export interface SixAreaView extends SixAreaSignal { reason: string | null; /** 0~100, 50 = 보통 (areaGaugeOf) */ gauge: number }
+
+/**
+ * 2026-11-04 (앱 주인 결정): 숫자 하나로 뭉개지던 날을 카드에 말해 준다. 전부 코드가 정하는 문구이고 AI를 부르지 않는다.
+ * 엇갈리는 날 = 단계와 영역 막대가 어긋나거나 좋은 막대와 조심 막대가 함께 있는 날("조심하라면서 왜 돈은 좋아요?"가 생기는 날).
+ * 흔들리기 쉬운 날 = 오늘이 대운·세운·월운과 충인 날. 코어 답_Q72-Q75대로 사건을 말하지 않고 체감이 들쭉날쭉할 수 있다고만 한다.
+ */
+export interface DayShape {
+  crossed: boolean;
+  shaky: boolean;
+  /** 카드에 보일 한 줄. 둘 다 아니면 이 값 자체가 null */
+  line: string;
+  /** 2026-11-15 (명세 40): 엇갈리고 흔들리기도 하는 날, 흔들림 쪽 한 줄 — 펼친 카드가 두 줄로 보여 준다 */
+  shakyLine?: string;
+}
+const joinAreas = (labels: readonly string[]): string =>
+  labels.length < 2 ? (labels[0] ?? "") : `${labels[0]}${batchim(labels[0]!) ? "과" : "와"} ${labels[1]}`;
+
+export function dayShapeView(content: Pick<FortuneContent, "core" | "band">): DayShape | null {
+  const { core, band } = content;
+  if (!core?.todayAreaProfile) return null;
+  const active = sixAreaSignals(core.todayAreaProfile).filter((s) => s.active).sort((a, b) => Math.abs(b.strength) - Math.abs(a.strength));
+  const up = joinAreas(active.filter((s) => s.strength > 0).slice(0, 2).map((s) => s.label));
+  const down = joinAreas(active.filter((s) => s.strength < 0).slice(0, 2).map((s) => s.label));
+  const crossLine =
+    band === "주의" && up ? `전체로는 조심할 편이지만 ${up} 쪽은 괜찮아요.`
+    : band === "좋음" && down ? `전체로는 수월한 편이지만 ${down} 쪽은 조심해요.`
+    : band === "무난" && up && down ? `${up} 쪽은 괜찮고 ${down} 쪽은 조심해요.`
+    : null;
+  const shaky = !!(core.context.daeun?.clash || core.context.seun.clash || core.context.wolun?.clash);
+  if (!crossLine && !shaky) return null;
+  const shakyText = "큰 흐름과 오늘이 어긋나 평소보다 들쭉날쭉하게 느껴질 수 있어요.";
+  return { crossed: !!crossLine, shaky, line: crossLine ?? shakyText, ...(crossLine && shaky ? { shakyLine: shakyText } : {}) };
+}
+
+/**
+ * 2026-11-14 카드 시험 2안: 6개 영역을 10점 숫자로. 신호 세기(영역 합, ±3에서 끝)를 5점을 가운데로 옮긴 것 — +1 → 7, +2 → 8, +3 이상 → 10, −1 → 3, −2 → 2, −3 이하 → 1.
+ * 신호 없는 영역은 5이고 active가 거짓이다("보통일 것"이 아니라 "특별한 신호 없음" — 화면이 흐리게 그리도록).
+ * 주의: 이 숫자는 예측 점수가 아니라 신호 세기를 옮긴 값이다. 실제 기록 96편과 견줬을 때 운세 점수는 기록과 상관이 없었다(시험용)
+ */
+export function areaScoreOf(strength: number, active: boolean): number {
+  if (!active) return 5;
+  return Math.max(1, Math.min(10, Math.round(5 + (Math.max(-3, Math.min(3, strength)) * 5) / 3)));
+}
+export interface AreaScoreView extends SixAreaView { score: number }
+
+/**
+ * 2026-11-15 앱 주인: "막대를 세로(가운데에서 양쪽)가 아니라 가로로, − 없이 +로만. 50을 보통으로."
+ * 신호 세기(영역 합)를 0~100 게이지로 옮긴다 — 신호 없음 50, 한 단계마다 15: +1 → 65, +2 → 80, +3 이상 → 95, −1 → 35, −2 → 20, −3 이하 → 5.
+ * 0과 100은 쓰지 않는다(막대가 비거나 꽉 차 "확실하다"로 읽히지 않게). 예측 점수가 아니라 신호 세기다 — 숫자로 보여 주지 않는다
+ */
+export function areaGaugeOf(strength: number, active: boolean): number {
+  if (!active) return 50;
+  // 좋은 쪽과 조심할 쪽을 같은 길이로: 절댓값을 반올림한다(Math.round는 −1.5를 −1로 올려 +1.5 → 80, −1.5 → 35로 어긋났다 — 디자이너 보고 42)
+  const step = Math.sign(strength) * Math.min(3, Math.round(Math.abs(strength)));
+  return 50 + step * 15;
+}
+export function areaScoreView(content: Pick<FortuneContent, "core">): AreaScoreView[] | null {
+  const six = sixAreaView(content);
+  return six ? six.map((s) => ({ ...s, score: areaScoreOf(s.strength, s.active) })) : null;
+}
 
 /** 카드용 6개 영역 (+ 신호 있는 영역의 이유 한 줄). todayAreaProfile이 없는 옛 캐시는 null — 카드가 예전 영역 줄을 그린다 */
 export function sixAreaView(content: Pick<FortuneContent, "core">): SixAreaView[] | null {
   const prof = content.core?.todayAreaProfile;
   if (!prof) return null;
-  return sixAreaSignals(prof).map((s) => ({ ...s, reason: s.active && s.sources[0] ? areaReason(s.sources[0], prof[s.sources[0]]) : null }));
+  return sixAreaSignals(prof).map((s) => ({ ...s, reason: s.active && s.sources[0] ? areaReason(s.sources[0], prof[s.sources[0]]) : null, gauge: areaGaugeOf(s.strength, s.active) }));
 }

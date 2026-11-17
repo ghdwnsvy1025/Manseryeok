@@ -95,7 +95,7 @@ export default async function WritePage({ searchParams }: { searchParams: Promis
         notePlaceholder={isToday ? "오늘 기억하고 싶은 일 하나" : carried ? "어젯밤까지의 하루, 기억하고 싶은 일 하나" : "그날 기억하고 싶은 일 하나"}
         initial={
           existing
-            ? { happiness: existing.happiness, areas: existing.areas ?? null, moods: existing.moods, note: existing.note ?? "", tomorrowNote: existing.tomorrow_note ?? "" }
+            ? { happiness: existing.happiness, areas: existing.areas ?? null, states: existing.states ?? null, moods: existing.moods, note: existing.note ?? "", tomorrowNote: existing.tomorrow_note ?? "" }
             : null
         }
       />

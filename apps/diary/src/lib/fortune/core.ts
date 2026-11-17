@@ -70,10 +70,6 @@ export const COEF = {
   relMax: 1.5,
   /** 용신이 확정되지 않았을 때(시간 모름) 충을 방향 없이 빼는 크기 */
   relNoYongsin: 0.25,
-  daeunClash: -0.8,
-  daeunClashAlert: -1.2,
-  seunClash: -0.5,
-  wolunClash: -0.3,
   /** v4.1 ③: 대운·세운 자체의 판정(luck 합계점수)을 소폭 반영. 월운은 0 */
   daeunVerdict: 0.2,
   seunVerdict: 0.15,
@@ -137,7 +133,23 @@ const labelShort = (l: Exclude<RoleLabel, null>, gp: string | null): string =>
   l === "용" ? `내게 모자란 ${gp ?? "힘"}을 채워요` : l === "희" ? `내게 모자란 ${gp ?? "힘"}을 거들어요` : l === "한" ? "그 성격대로 가요" : l === "구" ? "지금 나와 맞지 않아요" : "내게 이미 넉넉한 쪽이라 과해지기 쉬워요";
 const AREA_WORD: Record<AreaName, string> = { 대인: "사람", 재물: "돈", 직업: "일", 학업: "배움", 연애: "연애", 가족: "가족", 건강: "몸" };
 
+/**
+ * 2026-11-15 앱 주인 판정 규칙 (운세 지적 원장 rule_1·3·4·5 — 주인이 확정한 문장, 숫자는 [시험]). 기본은 모두 꺼짐.
+ * 켜기 전에 scripts/fortune-rules-dist.migrate.ts로 가상 200명 × 1년 단계 분포와 주인 12월 14일 점수를 견준다(물음 11: 분포가 함께 맞아야 한다).
+ *   r1 — 가장 필요한 기운(용)이 천간 또는 지지에 오면 +0.6점, 둘 다면 +0.9점
+ *   r3 — 지지로 온 재성의 군겁쟁재 감점(코어 Y-15, [가설])을 뺀다. 물음 13 답: "군겁쟁재는 같은 음양의 천간끼리, 지지는 충·극으로 설명"
+ *   r4 — 필요한 오행(용·희)으로 모이는 합: 삼합 +0.6, 육합 +0.3, 반합 +0.1, 하루 +0.8까지. 방해 오행으로 모이거나 묶이기만 하는 합은 없음
+ *   r5 — 신강·비겁 우세·관성이 지나치지 않은(25% 이하) 사주에 관성 운: +0.5점(천간·지지 함께 +0.8), 지지 비겁을 누른다고 절반 깎던 것(Y-15) 되돌림
+ * 공유 코어(@saju/core-rules)는 고치지 않는다 — 사주 코어 유료 풀이와 같이 쓰는 규칙이라 일기 앱 점수에서만 덧붙인다.
+ */
+export interface RuleSwitch { r1: boolean; r3: boolean; r4: boolean; r5: boolean }
+// 2026-11-15 앱 주인이 분포표(피드백/운세개편/판정규칙_분포표_2026-11-15.md)를 보고 "넷 다 켜줘" — 200명 기준 주의 38.8→34.4%, 좋음 29.2→36%
+export const FORTUNE_RULES: RuleSwitch = { r1: true, r3: true, r4: true, r5: true };
+const ROLE_SCORE: Record<string, number> = { 용: 2, 희: 1, 한: 0.5, 구: -1, 기: -2 };
+
 export interface CoreInput {
+  /** 판정 규칙 스위치 (없으면 FORTUNE_RULES) — 분포표 스크립트가 켜고 끈다 */
+  rules?: Partial<RuleSwitch>;
   /** 원국. 일기 앱 엔진 스냅샷을 믿는다 */
   pillars: PillarsSnapshot;
   /** 대운 목록용. 없으면 대운 없이 세운·월운만 */
@@ -324,15 +336,52 @@ export function computeCoreFortune(input: CoreInput): CoreFortune {
   const wol = monthGanjiList(input.date, 1)[0];
   const wolun = wol ? ctxItem(wol.간지) : undefined;
   let ctxScore = 0;
-  if (daeun?.clash) ctxScore += daeun.clash.최고경보 ? COEF.daeunClashAlert : COEF.daeunClash;
-  if (seunItem.clash) ctxScore += COEF.seunClash;
-  if (wolun?.clash) ctxScore += COEF.wolunClash;
+  // 2026-11-04 (앱 주인 결정, 코어 답_Q72-Q75): 운끼리의 충은 사건이 아니라 그 기운이 얼마나 체감될지 보는 보조 판단이다. 방향 없이 −0.3~−1.2를 빼던 것을 점수에서 뺐다.
+  // 글(맥락 문장)과 카드("흔들리기 쉬운 날", areaProfile.ts dayShapeView)에는 남는다. 원국과의 충(rel)은 코어 카드 020·024가 갈려 그대로 둔다
   // v4.2: 운 지지 ↔ 오늘 지지의 합(union)은 점수에 넣지 않는다 (합은 플래그만)
   // v4.1 ③: 대운·세운 자체 판정을 소폭 반영 (월운은 0)
   ctxScore += ((daeun?.합계 ?? 0) * COEF.daeunVerdict + (seunItem.합계 ?? 0) * COEF.seunVerdict) * w;
 
+  // ---- 앱 주인 판정 규칙 (FORTUNE_RULES, 2026-11-15부터 넷 다 켜짐) ----
+  const rules = { ...FORTUNE_RULES, ...(input.rules ?? {}) };
+  const ruleAdj: Record<string, number> = {};
+  let rawAdj = 0;   // 합계 단위(용 +2 …)
+  let ptsAdj = 0;   // 10점 단위
+  if (l && y) {
+    const flagsOf = (ch: string) => l.플래그.filter((f) => f.startsWith(`운 ${ch} `));
+    const bf = flagsOf(g[1]!);
+    if (rules.r3 && branch.family === "재성" && bf.some((f) => f.includes("군겁쟁재") && f.includes("Y-15"))) {
+      const half = bf.some((f) => f.includes("양날의 검"));
+      const d = (ROLE_SCORE[branch.label ?? ""] ?? 0) / (half ? 2 : 1) - branch.score;
+      if (d) { rawAdj += d; ruleAdj.r3 = round2(d); }
+    }
+    if (rules.r5 && b.신강약 === "신강" && b.그룹퍼센트.비겁 >= b.그룹퍼센트.관성 && b.그룹퍼센트.관성 <= 25) {
+      const gw = [stem, branch].filter((x) => x.family === "관성" && x.label !== null && ROLE_SCORE[x.label]! > 0);
+      if (gw.length) {
+        const pts = gw.length === 2 ? 0.8 : 0.5;
+        ptsAdj += pts; ruleAdj.r5 = pts;
+        if (branch.family === "관성" && branch.score > 0 && bf.some((f) => f.includes("지지 비겁") && f.includes("Y-15"))) { rawAdj += branch.score; ruleAdj.r5h = round2(branch.score); }
+      }
+    }
+    if (rules.r1) {
+      const n = [stem, branch].filter((x) => x.label === "용").length;
+      if (n) { const pts = n === 2 ? 0.9 : 0.6; ptsAdj += pts; ruleAdj.r1 = pts; }
+    }
+    if (rules.r4) {
+      let pts = 0;
+      for (const h of lr.합) {
+        if (h.단계 === "불성립" || !h.오행) continue;
+        const role = y.오행역할[h.오행];
+        if (role !== "용" && role !== "희") continue;
+        pts += h.종류 === "삼합" ? 0.6 : h.종류 === "육합" ? 0.3 : h.종류 === "반합" ? 0.1 : 0;
+      }
+      pts = Math.min(0.8, round2(pts));
+      if (pts) { ptsAdj += pts; ruleAdj.r4 = pts; }
+    }
+  }
+
   // ---- 점수 ----
-  const score01 = toScore01(raw * w + relScore + ctxScore);
+  const score01 = Math.min(COEF.max, toScore01((raw + rawAdj) * w + relScore + ctxScore) + (ptsAdj / 10) * w);
 
   // ---- 영역 (숫자 없음, 신호만) — v4.2: 오늘(일운 ≤2) → 이달(월운 1) → 올해(세운 1), 전부 코어 luckAreas ----
   const gender = input.profile?.gender;
@@ -491,6 +540,7 @@ export function computeCoreFortune(input: CoreInput): CoreFortune {
     luckEls: y && (!hourUnknown || (votes ?? 0) >= UNKNOWN_HOUR_MIN) ? { 용: y.용신오행, 희: (Object.entries(y.오행역할).find(([, r]) => r === "희")?.[0] as "목" | "화" | "토" | "금" | "수" | undefined) ?? null } : null,
     // v4.13: 글·템플릿이 "내게 필요한 기운"의 이름을 대기 위한 재료. 판정에 쓴 용신(v4.12 다수결 포함)이 있으면 늘 있다
     need: y ? { 오행: y.용신오행, 그룹: y.용신그룹 } : null,
+    chartType: { 신강약: b.신강약, 중심기운: b.중심기운 },
     context: { ...(daeun ? { daeun } : {}), seun: seunItem, ...(wolun ? { wolun } : {}), 입춘전: seun.입춘전 },
     areas,
     ...(todayAreaProfile ? { todayAreaProfile } : {}),
@@ -498,7 +548,7 @@ export function computeCoreFortune(input: CoreInput): CoreFortune {
     contextFacts,
     keywords,
     caveats,
-    parts: { raw: round2(raw * w), rel: round2(relScore), ctx: round2(ctxScore), score01: round2(score01) },
+    parts: { raw: round2((raw + rawAdj) * w), rel: round2(relScore), ctx: round2(ctxScore), score01: round2(score01), ...(Object.keys(ruleAdj).length ? { rules: ruleAdj } : {}) },
   };
 }
 

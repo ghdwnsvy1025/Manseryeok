@@ -9,11 +9,14 @@
 import { createHash } from "node:crypto";
 import Anthropic from "@anthropic-ai/sdk";
 import { BANNED_ALL, buildBrief, JARGON, renderBrief, TEN_GOD_NAMES, type BriefInput, type FortuneBrief } from "./brief";
+import { renderExemplars } from "./exemplars";
 import { planSummary, tagsFromPlan } from "./plan";
 import { parseReview, problemLine, problemTarget, REVIEW_SYSTEM, reviewModel, reviewUser } from "./review";
 import type { TemplateText } from "./text";
 import type { FortuneTags } from "./examples";
 import type { AreaName, AreaPeriod, FortuneCallMetric, FortuneMetrics, FortunePlanSummary } from "./types";
+import { promptVersionV5, renderBriefV5, SYSTEM_V5 } from "./v5";
+import { placeRecordLine } from "./recall";
 import { checkDraft, joinBody, LIMITS, needsRewrite, normalizeDraft, trimTail, type Draft, type Issue } from "./validate";
 
 export { trimTail };
@@ -28,44 +31,45 @@ export const MAX_ATTEMPTS = 3;
 
 const BAN_WORDS = [...new Set([...BANNED_ALL, ...JARGON, ...TEN_GOD_NAMES].map((w) => w.trim()))].join("·");
 
-/** 고정 규칙. 바꾸면 캐시가 다시 만들어진다 (날짜·사용자 정보는 넣지 않는다). v4.19: 글쓰기 철학 + 절대 금지 한 번만. 예시 세 편은 빠졌다(examples.ts는 베낌 검사용) */
-export const SYSTEM = `당신은 일기 앱 "사주읽는밤"의 오늘 운세 작가입니다. 오늘 무엇을 말할지는 코드가 이미 정해 user의 JSON 계획으로 보냅니다. 내용을 새로 해석하지 말고, 그 계획을 자연스러운 한국어로 설명합니다.
+/** 고정 규칙. 바꾸면 캐시가 다시 만들어진다 (날짜·사용자 정보는 넣지 않는다). v4.19: 글쓰기 철학 + 절대 금지 한 번만. 예시 세 편은 빠졌다(examples.ts는 베낌 검사용)
+ *  v4.28 (2026-11-10): 앱 주인이 직접 쓴 글 6편을 본보기로 넣는다(exemplars.ts). "작가는 좋은 글을 한 편도 본 적이 없다"가 시안 7편이 규칙 모양으로 나온 까닭이었다.
+ *  규칙은 "본보기에서 배울 것" 8조로 줄였고, 입력은 까닭·장면·비유(renderBrief)로 바뀌었다. 본보기가 캐시되므로 토큰 부담은 작다
+ *  v4.27 (2026-11-10, 지적 원장 묶음 1 — 피드백/작가입력_재설계_2026-11-10.md): 두 문단(사주 층 → 생활 층+해결+응원), 문장마다 무엇을·어디서, 접속사로 잇기,
+ *  이론을 쉬운 말로 드러내기, 결과는 가능성으로, 읽는 사람을 깎는 말 금지. 출력은 first·second 두 배열 */
+export const SYSTEM = `당신은 일기 앱 "사주읽는밤"의 오늘 운세 작가입니다. 사주 계산은 코드가 하고 user의 JSON(단계·나·오늘글자·까닭·장면·비유·영역)으로 보냅니다. 당신은 맨 아래 [본보기]처럼 씁니다. 본보기는 이 앱 주인이 직접 쓴 글이고, 그 글의 문장 단위·순서·어조·길이가 기준입니다. 규칙보다 본보기가 먼저입니다.
 
-[지킬 것]
-1. 계획에 없는 사건·사람·시간·장소·원인·숫자·영역을 만들지 않습니다. 구체적으로 쓰되 계획의 뜻 안에서 일반적인 행동 수준으로 씁니다. "예정에 없던 구매를 바로 정하고 싶어질 수 있어요"는 되고, "퇴근길에 쇼핑몰을 지나다"처럼 장면을 지어내지는 않습니다.
-2. 핵심의 뜻과 오늘 읽기의 방향을 바꾸지 않습니다. 보조는 오늘 함께 나타날 수 있는 두 번째 신호입니다. 계획에 둘의 관계가 적혀 있지 않으니 보조를 핵심의 원인이나 결과처럼 잇지 않습니다. 맥락이 있으면 오늘 행동을 바꾸는 데만 씁니다.
-3. 행동의 결과를 약속하지 않습니다. 해 볼 만하다, 마음이 편하다까지는 말해도 "결과가 빨리 나와요", "반응이 좋아요", "사이가 가벼워져요"처럼 결과를 예언하지 않습니다.
-4. 읽는 사람은 사주를 모릅니다. 사주 요소가 아니라 그 결과로 오늘 생기기 쉬운 마음·판단·행동을 씁니다.
-
-[쓰는 법]
-- 핵심.표현은 그 기운이 생활에 나타나는 예입니다. 하나를 골라 내 말로 풀고, 그대로 옮기지 않습니다. 뜻·오늘·영역.뜻은 이해를 돕는 내부 재료라 그 말을 글에 그대로 쓰지 않습니다.
-- 단계와 말투는 얼마나 조심스럽게 말할지만 정합니다. 무엇을 하라는지는 핵심·보조·영역의 뜻에서 나옵니다. 아무 날에나 맞는 조언("한 번 더 확인", "결정은 하루 미뤄요", "힘내요", "무리하지 않아요")으로 채우지 않습니다.
-- 문장 순서와 길이는 자연스러움을 우선합니다. 앞 문장에서 뒤 문장으로 가는 까닭이 보여야 하고, "그것·그건·그럴 땐"이 가리키는 것이 바로 앞에 있어야 합니다. 뜻이 분명해진다면 같은 명사를 다시 써도 됩니다.
-- 피할것.최근제목·뻔했던조언과 같은 말은 쓰지 않습니다.
+[본보기에서 배울 것]
+1. 한 문장은 장면 하나와 그때의 마음입니다. "주변 사람들이 성취해 내는 것을 보면 조바심이 들 수 있는 하루예요"처럼. 기운 이름이나 판정("세지기 쉬운 날이에요")으로 문장을 만들지 않습니다. 문장마다 무엇을·어떤 일에서가 보입니다.
+2. 순서: 장면 → 마음 → 좋게 풀리면 / 나쁘게 가면 → 예를 들어 → 반대로 → 하지만 결론 → 응원 한마디. 접속사(그래서·그러다 보니·한편·하지만·예를 들어·즉·그렇기 때문에)로 사건을 잇습니다.
+3. 사주 까닭은 한 편에 한두 번, 결과 바로 앞에 짧게 씁니다. "재물의 기운이 약하기 때문에 돈이 나갈 일이", "고집이 강해지는 기운도 들어오지만 여유로운 기운도 같이". 까닭 칸의 문장을 그대로 옮기지 않고, 사주 용어 원어는 쓰지 않습니다.
+4. 장면·비유 재료는 문장 속에 녹입니다. 비유는 한 편에 하나면 충분합니다(스포츠카처럼 달리다 사고, 능구렁이처럼 빠져나가기, 벼락치기).
+5. 어조는 확신 있게. "강해져요", "유리한 날이에요", "분명 빛을 발할 수 있는 날", "~입니다", "~하세요"가 됩니다. "~기 쉬워요", "~수 있어요"를 문장마다 겹치지 않습니다. 단정("반드시·틀림없이")과 일어난 일처럼 지어내기("퇴근길에 쇼핑몰에 들렀어요")만 안 됩니다.
+6. 좋은 점은 부각하고 조심할 점은 해결법으로 닫습니다. 주의인 날도 마지막은 응원입니다. 읽는 사람을 깎는 말("남들", "거슬린다", "끼어든다")은 쓰지 않습니다.
+7. 같은 뜻은 한 번. 전체 6~8문장. first(첫째 문단) 3~5문장, second(둘째 문단) 2~4문장. 영역은 화면에 화살표로 따로 보이니 문장을 따로 쓰지 않고 둘째 문단에 녹입니다.
+8. 본보기 문장을 그대로 베끼지 않습니다. 같은 성격의 날이라도 오늘의 장면·영역·각도로 새로 씁니다. 오늘의각도가 있으면 첫째 문단에서 그 이야기를 꺼냅니다(문구 그대로는 아님). 피할것의 최근 제목·하면·마무리와 같은 말은 쓰지 않습니다.
 
 [출력]
-- headline: 20자 안, 오늘 체감할 내용 한 구절. 기운·이론을 말하는 제목("기회가 열리는 날")은 안 됩니다.
-- body: 문장 3~5개의 배열(원소 하나에 한 문장, 한 문장 85자 안). 필요한 만큼만 쓰고, 길이를 채우려고 내용을 더하지 않습니다. 오늘 나타나기 쉬운 마음·판단·행동 경향을 설명합니다. 권하거나 말리는 문장은 본문에 쓰지 않습니다(그건 do·dont의 일입니다). 첫 문장은 이음말로 시작하지 않습니다.
-- do·dont: 각 한 문장(45자 안)의 구체 행동. 본문이 설명한 경향에서 나온 행동이되 본문 문장을 되풀이하지 않고, dont는 do를 뒤집은 말이 아닙니다.
-- 영역은 화면에 화살표로 따로 보입니다. 영역마다 문장을 쓰지 않고, 필요하면 본문이나 do·dont에 녹입니다.
-- 모든 문장은 "~어요/~해요/~예요"로 끝납니다. 권유는 "~해 봐요/~하는 편이 좋아요", dont는 "~않아요" 꼴.
+- headline: 40자 안, 첫째 문단의 결론 한 구절. 본보기 제목처럼 단정형("고집이 강해지는 날", "바쁘지만 알찬 하루").
+- first, second: 문장 배열(원소 하나에 한 문장, 140자 안).
+- do: 해결법 한 줄 명령(60자 안, "계획한 것을 차근차근 해치워 보세요"). dont: 세지는 쪽을 누르는 한 줄(60자 안, "자신을 달달 볶지 마세요"). 본문 문장을 그대로 옮기지 않고, dont는 do를 뒤집은 말이 아닙니다.
 
 [절대 쓰지 않는 것]
 - 낱말: ${BAN_WORDS}.
-- 오행 이름을 기운으로("토 기운"), "A와 B"꼴 성격 이름("경쟁과 추진"), 판정 문장("맞는 편·모자란·넉넉한·실속을 챙기는·기운이 거들어·과해지기 쉬워"), 생·극·구조 설명("누르다·부딪히다·글자"), 비유("손에 붙어요·흐름이 열려요·신호가 들어와요", 볕·바위·불씨 같은 사물 그림), 속말("판정·원국·내부 판단").
-- 명령형("~하세요/~마세요")·반말·"~입니다", 기간 약속("3일 더 하면"), 넘겨짚기("~한 적 있으시죠"), 되받기("앞에서 말한"), 정의문("A와 B를 합쳐 C라 해요").
-- 질병·사고·돈 액수·연애 사건, 직장 장면(회의·출근·상사·동료·업무), 점수와 내 기록 이야기("N점", "기록했·평균·N번"), 계획.숫자에 없는 숫자, 이모지·한자.
-- 요일·날짜·시간대(아침·저녁 등)는 쓰지 않습니다. 계획.절기첫날이 있을 때만 그 이름을 분위기로 한 번 쓸 수 있고, 행동이나 결과의 까닭으로 삼지 않습니다.
-- 단계가 주의인 날엔 오늘 이야기에 "풀리다·수월하다·순조롭다·술술"을 쓰지 않습니다.`;
+- "A와 B"꼴 성격 이름("경쟁과 추진"), 속말("판정·원국·내부 판단·코드"), 명령형 반말·"~십시오", 기간 약속("3일 더 하면"), 넘겨짚기("~한 적 있으시죠"), 되받기("앞에서 말한"), 정의문("A와 B를 합쳐 C라 해요").
+- 질병·실제 사고의 단정·돈 액수·연애 사건, 직장 장면(회의·출근·상사·동료·업무), 점수와 내 기록 이야기("N점", "기록했·평균·N번"), 계획.숫자에 없는 숫자, 이모지·한자·영문자, 요일·날짜·시간대(아침·저녁 등). 계획.절기첫날이 있을 때만 그 이름을 분위기로 한 번.
+
+[본보기 — 앱 주인이 쓴 글. 입력은 지금 받는 JSON의 핵심 칸만 추린 것]
+${renderExemplars()}`;
 
 /** 구조화 출력 스키마 (v4.19: 작가 칸만. v4.20: 영역 줄은 모델이 쓰지 않는다 — 화면이 코드 상태말과 화살표로) */
 export const OUTPUT_SCHEMA = {
   type: "object",
   additionalProperties: false,
-  required: ["headline", "body", "do", "dont"],
+  required: ["headline", "first", "second", "do", "dont"],
   properties: {
     headline: { type: "string" },
-    body: { type: "array", items: { type: "string" } },
+    first: { type: "array", items: { type: "string" } },
+    second: { type: "array", items: { type: "string" } },
     do: { type: "string" },
     dont: { type: "string" },
   },
@@ -91,7 +95,7 @@ export const REPAIR_SCHEMA = {
 export interface RepairFix { id: string; action: "replace" | "delete"; text: string }
 
 /** 프롬프트 판본: 버전 + SYSTEM·스키마 지문. metrics에 남아 판본별 비교에 쓴다 */
-export const PROMPT_VERSION = `v4.21b-${createHash("sha256").update(SYSTEM + JSON.stringify(OUTPUT_SCHEMA) + JSON.stringify(REPAIR_SCHEMA)).digest("hex").slice(0, 8)}`;
+export const PROMPT_VERSION = `v4.28-${createHash("sha256").update(SYSTEM + JSON.stringify(OUTPUT_SCHEMA) + JSON.stringify(REPAIR_SCHEMA)).digest("hex").slice(0, 8)}`;
 
 export interface GenerateResult {
   text: TemplateText;
@@ -166,7 +170,7 @@ export async function callModel(
   usage: Usage,
   metric: FortuneCallMetric,
   schema: object = OUTPUT_SCHEMA,
-  opts: { timeoutMs?: number; maxTokens?: number; now?: () => number } = {},
+  opts: { timeoutMs?: number; maxTokens?: number; now?: () => number; /** v5: 편집자 지시(SYSTEM_V5). 없으면 SYSTEM */ system?: string } = {},
 ): Promise<unknown | null> {
   const now = opts.now ?? Date.now;
   const t0 = now();
@@ -177,7 +181,7 @@ export async function callModel(
         max_tokens: opts.maxTokens ?? MAX_TOKENS,
         thinking: { type: "adaptive" },
         output_config: { effort: "low", format: { type: "json_schema", schema: schema as Record<string, unknown> } },
-        system: [{ type: "text", text: SYSTEM, cache_control: { type: "ephemeral" } }],
+        system: [{ type: "text", text: opts.system ?? SYSTEM, cache_control: { type: "ephemeral" } }],
         messages,
       },
       opts.timeoutMs ? { timeout: opts.timeoutMs } : undefined,
@@ -224,7 +228,7 @@ export function repairMessages(briefJson: string, d: Draft, issues: Issue[]): An
   });
   return [{
     role: "user",
-    content: `${briefJson}\n\n[수리] 아래 글은 대부분 검사를 통과했고, 표시한 항목만 걸렸어요. 항목마다 사유를 없앤 새 문장으로 바꾸거나(replace), 본문 문장·영역 줄은 지울 수도 있어요(delete — text는 빈 문자열). 제목·do·dont는 지우지 않아요. 고친 문장은 앞뒤와 자연스럽게 이어지고, 낱말만 바꾸지 말고 걸린 까닭을 없애요. 표시하지 않은 칸은 돌려주지 않아요.\n제목: ${d.headline}\n고칠 항목: ${JSON.stringify(items)}`,
+    content: `${briefJson}\n\n[수리] 아래 글은 대부분 검사를 통과했고, 표시한 항목만 걸렸어요. (body.N은 첫째·둘째 문단을 이어 붙인 번호예요.) 항목마다 사유를 없앤 새 문장으로 바꾸거나(replace), 본문 문장·영역 줄은 지울 수도 있어요(delete — text는 빈 문자열). 제목·do·dont는 지우지 않아요. 고친 문장은 앞뒤와 자연스럽게 이어지고, 낱말만 바꾸지 말고 걸린 까닭을 없애요. 표시하지 않은 칸은 돌려주지 않아요.\n제목: ${d.headline}\n고칠 항목: ${JSON.stringify(items)}`,
   }];
 }
 
@@ -248,8 +252,10 @@ export function applyRepair(d: Draft, fixes: unknown, allowed: ReadonlySet<strin
     else if (field === "do") out.do = text;
     else if (field === "dont") out.dont = text;
   }
-  // 바꾼 문장에 문장이 둘 들었으면 나눈다 (normalizeDraft와 같은 규칙)
-  out.body = out.body.flatMap((s, i) => (dropBody.has(i) ? [] : normalizeDraft({ body: [s] })!.body));
+  // 바꾼 문장에 문장이 둘 들었으면 나눈다 (normalizeDraft와 같은 규칙). v4.27: 문단 경계(split)도 같이 옮긴다
+  const pieces = out.body.map((s, i) => (dropBody.has(i) ? [] : normalizeDraft({ body: [s] })!.body));
+  if (out.split !== undefined) { const before = pieces.slice(0, out.split).reduce((n, p) => n + p.length, 0); if (before > 0) out.split = before; else delete out.split; }
+  out.body = pieces.flat();
   out.areaLines = out.areaLines.filter((_, i) => !dropArea.has(i));
   return out;
 }
@@ -287,7 +293,9 @@ export async function generateFortuneText(input: BriefInput, fallback: TemplateT
   const now = opts.now ?? Date.now;
   const t0 = now();
   const brief: FortuneBrief = buildBrief(input);
-  const briefJson = renderBrief(brief);
+  // v5: 단락 사전 글감이 있으면 편집자 지시와 그 입력으로 (compose.ts · v5.ts). 호출·수리·검사의 틀은 같다
+  const system = brief.v5 ? SYSTEM_V5 : SYSTEM;
+  const briefJson = brief.v5 ? renderBriefV5(brief) : renderBrief(brief);
   const briefMs = now() - t0;
   const model = opts.model ?? fortuneModel();
   const fixModel = opts.patchModel ?? patchModel(model);
@@ -297,7 +305,7 @@ export async function generateFortuneText(input: BriefInput, fallback: TemplateT
   const calls: FortuneCallMetric[] = [];
   const result: GenerateResult = {
     text: fallback, source: "template", attempts: 0, patches: 0, model: null, issues: [], usage, plan: planSummary(brief.plan),
-    metrics: { promptVersion: PROMPT_VERSION, briefMs, llmMs: 0, calls, firstPass: false },
+    metrics: { promptVersion: brief.v5 ? promptVersionV5(brief.v5.dict) : PROMPT_VERSION, briefMs, llmMs: 0, calls, firstPass: false },
   };
   const finish = (fallbackWhy?: string): GenerateResult => {
     result.metrics.llmMs = now() - t0;
@@ -321,7 +329,7 @@ export async function generateFortuneText(input: BriefInput, fallback: TemplateT
     const metric: FortuneCallMetric = { kind, model: m, ms: 0, input: 0, output: 0, cacheRead: 0, cacheWrite: 0, issueCodes: [] };
     calls.push(metric);
     try {
-      const json = await callModel(client, m, messages, usage, metric, kind === "patch" ? REPAIR_SCHEMA : OUTPUT_SCHEMA, { timeoutMs: Math.max(1000, Math.min(CLIENT_OPTIONS.timeout, deadline - now())), maxTokens: kind === "patch" ? REPAIR_MAX_TOKENS : MAX_TOKENS, now });
+      const json = await callModel(client, m, messages, usage, metric, kind === "patch" ? REPAIR_SCHEMA : OUTPUT_SCHEMA, { timeoutMs: Math.max(1000, Math.min(CLIENT_OPTIONS.timeout, deadline - now())), maxTokens: kind === "patch" ? REPAIR_MAX_TOKENS : MAX_TOKENS, now, system });
       if (json === null) metric.issueCodes = ["refusal"];
       return { ok: true, json, metric };
     } catch (e) {
@@ -424,7 +432,9 @@ export async function generateFortuneText(input: BriefInput, fallback: TemplateT
     }
   }
 
-  const body = joinBody(out.body);
+  // 2026-11-17 기록 반영: 편집자가 기록 한 줄을 뺐으면 코드가 둘째 문단 마무리 앞에 그대로 넣는다(앱 주인 "빠지면 코드가 넣기")
+  if (brief.v5?.내기록) out = { ...out, body: placeRecordLine(out.body, out.split, brief.v5.내기록) };
+  const body = joinBody(out.body, out.split);
   result.text = { headline: out.headline, body, do: out.do, dont: out.dont };
   result.bodySentences = out.body;
   result.areaNarratives = out.areaLines.map((a) => ({ period: brief.areas.find((x) => x.area === a.area)!.period, area: a.area, text: a.text }));

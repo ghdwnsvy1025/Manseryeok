@@ -8,6 +8,8 @@ import { SaveBurst } from "@/components/SaveBurst";
 import { Booting } from "@/components/Booting";
 import { characterOf, characterOfGanji } from "@/lib/character";
 import { StatsSummary } from "@/components/StatsSummary";
+import { StateStats } from "@/components/StateStats";
+import { stateByGroup, stateSummary, stateTagTop } from "@/lib/stats/states";
 import { TrackOnMount } from "@/components/track/TrackOnMount";
 import { birthProfileOf, countEntries, getEntry, getSajuProfile, listEntries, listEntriesInMonth, listEntriesForStats, listFortuneScores, listFortuneVotes } from "@/lib/db";
 import { AreaRadar } from "@/components/AreaRadar";
@@ -89,7 +91,7 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
     const e = byDate.get(c.date);
     calDays[c.date] = {
       ganjiKo: dayGanji(c.date).ko,
-      entry: e ? { happiness: e.happiness, moods: e.moods, note: e.note, areas: e.areas ?? null, tomorrowNote: e.tomorrow_note ?? null } : null,
+      entry: e ? { happiness: e.happiness, moods: e.moods, note: e.note, areas: e.areas ?? null, states: e.states ?? null, tomorrowNote: e.tomorrow_note ?? null } : null,
     };
   }
   // 2026-10-09 Q4·Q7: 행복도 말고 보여 줄 지표 + 최근 30일 그래프(운세 점수 겹침, 빈 날은 비움)
@@ -144,6 +146,15 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
   const chart = sajuChart(profile.pillars, birthProfileOf(profile), today);
   // v3.10: 오늘 화면에서 뺀 "기록 N일째"를 여기로. 60칸 중 채운 칸 = 기록이 1건 이상인 간지 수
   const filledCells = cells.filter((c) => c.n > 0).length;
+  // 2026-11-14 있었던 일(상태) 통계: 최근 30일 + 십신 갈래가 온 날의 상태. 상태 기록이 없으면 안 그린다 (명세 37).
+  // 자리(톤 v3.41): 통계 묶음 안 — 가장 행복한 날·힘든 날 아래, "자주 고른 기분" 바로 위(쓰기 화면의 "있었던 일 → 그래서 마음은" 순서와 같다).
+  // StatsSummary의 days 자리에 함께 넘겨 통계 열의 간격을 그대로 받는다 — 접힌 "자세한 통계" 서랍 아래에 두면 화면 맨 끝에 혼자 남는다
+  const daysAndStates = (
+    <>
+      {dayCards}
+      <StateStats summary={stateSummary(all, today, 30)} tags={stateTagTop(all, today, 30, 5)} groups={stateByGroup(all, profile.pillars.day.stem)} />
+    </>
+  );
 
   return (
     <main className="flex flex-col gap-6">
@@ -300,7 +311,7 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
             pickedEntries={selected === null ? [] : all.filter((e) => e.day_ganji_index === selected)}
           />
         )}
-        <StatsSummary h={h} fitPercent={fitPercent(all.length)} stems={byStem(all)} branches={byBranch(all)} elements={byElement(all)} days={dayCards} areas={areaAvg} moods={moods} streak={streak} habit={habitOf(all, today)} chart={<HappinessChart series={series} yearSeries={yearSeries} emptyArt={me.characterSrc} />} chartReady={chartReady} unlock={unlock} accuracy={accuracy} areaDetail={areaDetail} writeHref="/write" />
+        <StatsSummary h={h} fitPercent={fitPercent(all.length)} stems={byStem(all)} branches={byBranch(all)} elements={byElement(all)} days={daysAndStates} areas={areaAvg} moods={moods} streak={streak} habit={habitOf(all, today)} chart={<HappinessChart series={series} yearSeries={yearSeries} emptyArt={me.characterSrc} />} chartReady={chartReady} unlock={unlock} accuracy={accuracy} areaDetail={areaDetail} writeHref="/write" />
       </section>
       {/* v3.16: "내 카드 공유" 섹션은 없앴다 — 공유는 오늘 화면 운세 카드의 "공유"(오늘의 운세 한 장)로 */}
 

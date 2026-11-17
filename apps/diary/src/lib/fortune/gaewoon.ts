@@ -48,7 +48,8 @@ export const GAEWOON_TABLE: Record<El, Table> = {
     activities: ["책상 위 정리", "가방 속 정리", "짧고 굵게 운동"],
   },
   수: {
-    colors: [{ name: "남색", hex: "#26365a" }, { name: "검정", hex: "#2b2b2e" }, { name: "짙은 파랑", hex: "#2f5d8a" }],
+    // 2026-11-15: 전통 오방색에서 파랑은 나무(청) 쪽이라 물은 검정 계열만 남긴다
+    colors: [{ name: "남색", hex: "#26365a" }, { name: "검정", hex: "#2b2b2e" }],
     taste: "짭짤한 맛",
     foods: ["미역국", "김 한 장", "된장국"],
     time: "밤 (21~23시)",
@@ -86,7 +87,8 @@ export function gaewoonOf(core: Pick<CoreFortune, "dayLuck" | "luckEls">, date: 
     { el: stemEl, label: core.dayLuck.stem.label },
     { el: branchEl, label: core.dayLuck.branch.label },
   ];
-  const helping = parts.find((p) => p.el && (p.label === "용" || p.label === "희"));
+  // 2026-11-15: 도움 되는 글자가 둘이면 가장 필요한 기운(용)을 먼저 — 12-03 신해일에 천간 금(희)을 먼저 집어 지지 물(용)을 놓쳤다
+  const helping = parts.find((p) => p.el && p.label === "용") ?? parts.find((p) => p.el && p.label === "희");
   const heavy = parts.find((p) => p.el && (p.label === "기" || p.label === "구"));
   let el: El;
   let reason: string;

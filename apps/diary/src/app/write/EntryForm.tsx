@@ -3,7 +3,7 @@
 import { startTransition, useActionState, useEffect, useRef, useState, type FormEvent } from "react";
 import { saveEntryAction, type FormState } from "@/app/actions";
 import { DeleteEntryButton } from "@/components/DeleteEntryButton";
-import { AREA_LEVELS, AREAS, MAX_NOTE, MAX_TOMORROW_NOTE, MOOD_GROUPS, MOODS, areaCount, moodTone, type AreaKey, type Areas } from "@/lib/entry";
+import { AREA_LEVELS, AREAS, MAX_NOTE, MAX_TOMORROW_NOTE, MOOD_PICK, STATE_AXES, areaCount, canonicalMood, isPickMood, moodTone, stateCount, type AreaKey, type Areas, type StateKey, type StateLevel, type States } from "@/lib/entry";
 import { track } from "@/lib/analytics";
 import { lengthBucket } from "@/lib/analytics/core";
 
@@ -15,7 +15,7 @@ interface Props {
   when?: WriteWhen;
   /** "한 줄" 안내 문구. 과거 날짜면 "그날…" (B7). 없으면 오늘 문구 */
   notePlaceholder?: string;
-  initial: { happiness: number; areas: Areas | null; moods: string[]; note: string; tomorrowNote: string } | null;
+  initial: { happiness: number; areas: Areas | null; states?: States | null; moods: string[]; note: string; tomorrowNote: string } | null;
   /**
    * 저장 버튼을 누르는 순간 미리 받아 둘 그림(팡 조각·카드·틀). 쓰기 화면이 열릴 때 preload하면 기록을 안 쓰고 나가는
    * 사람도 전부 받았다(전체검토 C-P1) — 저장을 누른 뒤 서버 왕복 동안 받으면 팡이 뜰 때쯤 이미 와 있다
@@ -23,11 +23,8 @@ interface Props {
   warmAssets?: readonly string[];
 }
 
-const MOOD_SECTIONS: { tone: keyof typeof MOOD_GROUPS; label: string }[] = [
-  { tone: "pos", label: "좋았어요" },
-  { tone: "neutral", label: "그저 그래요" },
-  { tone: "neg", label: "아쉬웠어요" },
-];
+/** 지난 기록의 기분을 지금 고르기의 이름으로 (행복함 → 기쁨). 묶이지 않는 이름(바쁨·생각 많음·아픔)은 그대로 두고 hidden으로 지킨다 */
+const toPick = (ms: readonly string[]): string[] => [...new Set(ms.map(canonicalMood))];
 
 const HAPPINESS_HINT: Record<number, string> = {
   1: "많이 힘들었어요",
@@ -46,17 +43,20 @@ function hint(n: number): string {
 /**
  * 쓰기 폼 — 일기장 페이지 한 장 (톤 v3, 2026-10-31 개편).
  * - 행복도: 1~10 도장 하나(필수). 2026-11-01 사용자 결정 — 영역 평균 × 2로 정하던 것을 되돌렸다(6줄이 다 채워야 하는 것처럼 보였고, 평균이 내 느낌과 어긋났다).
- * - 영역: 여섯 영역(일·공부/돈/건강/가족/연애/대인관계) 5단계 도장, 선택. 행복도를 바꾸지 않고 영역 통계(나 탭 육각형·영역 적중률)에만 쓴다.
- *   같은 도장을 다시 누르면 비운다.
- * - 기분: 좋았어요 / 그저 그래요 / 아쉬웠어요 세 무리, 개수 제한 없음.
+ * - 오늘 있었던 일 (2026-11-14): 하루의 속도 + 십신 다섯 갈래(사람·말·돈·책임·생각)를 세 단계로, 선택. 갈래마다 "더 적기"를 펼치면 세부 낱말.
+ *   영역 점수는 평가라 별일 없는 날엔 안 매기게 됐다 — 상태는 묘사라 매일 고를 수 있다. "평범한 하루"는 안 고른 줄을 전부 가운데로 채운다.
+ *   같은 단계를 다시 누르면 비운다.
+ * - 영역: 여섯 영역 5단계 도장, 선택. 2026-11-14부터 접어 둔다(지난 기록과 영역 통계는 그대로). 같은 도장을 다시 누르면 비운다.
+ * - 그래서 마음은: 기분 네 갈래(들뜸·편안·날카로움·가라앉음) 21개, 개수 제한 없음. 저장 이름은 예전 기분 이름 그대로.
  * - 한 줄 메모, 그리고 "내일의 나에게" 쪽지(100자, 다음 날 오늘 화면 위에 펼쳐진다) — "오늘의 포인트" 자리를 대신한다.
- * 폼 필드: happiness=1~10, area_<key>=1~5, moods, note, tomorrow_note.
+ * 폼 필드: happiness=1~10, state_<key>=1~3, state_tags(여러 개), area_<key>=1~5, moods, note, tomorrow_note.
  */
 export function EntryForm({ date, when = "today", notePlaceholder, initial, warmAssets = [] }: Props) {
   const [state, action, pending] = useActionState<FormState, FormData>(saveEntryAction, { error: null });
   const [happiness, setHappiness] = useState<number | null>(initial?.happiness ?? null);
   const [areas, setAreas] = useState<Areas>(initial?.areas ?? {});
-  const [moods, setMoods] = useState<string[]>(initial?.moods ?? []);
+  const [states, setStates] = useState<States>(initial?.states ?? {});
+  const [moods, setMoods] = useState<string[]>(toPick(initial?.moods ?? []));
   const [note, setNote] = useState(initial?.note ?? "");
   const [tomorrowNote, setTomorrowNote] = useState(initial?.tomorrowNote ?? "");
   // 행복도 없이 저장을 누르면 그 자리로 데려가 이유를 보여 준다 (버튼을 막아 두면 눌러도 반응이 없어 저장된 줄 안다)
@@ -89,6 +89,14 @@ export function EntryForm({ date, when = "today", notePlaceholder, initial, warm
       if (v >= 1 && v <= 5) picked[a.key] = v;
     }
     if (areaCount(picked)) setAreas((cur) => (areaCount(cur) ? cur : picked));
+    const st: States = {};
+    for (const a of STATE_AXES) {
+      const v = Number(fd.get(`state_${a.key}`));
+      if (v >= 1 && v <= 3) st[a.key] = v as StateLevel;
+    }
+    const tags = fd.getAll("state_tags").filter((t): t is string => typeof t === "string");
+    if (tags.length) st.tags = tags;
+    if (stateCount(st) || tags.length) setStates((cur) => (stateCount(cur) || cur.tags?.length ? cur : st));
     const ms = fd.getAll("moods").filter((m): m is string => typeof m === "string");
     if (ms.length) setMoods((cur) => (cur.length ? cur : ms));
     const n = fd.get("note");
@@ -108,6 +116,36 @@ export function EntryForm({ date, when = "today", notePlaceholder, initial, warm
       const next = { ...cur };
       if (next[key] === level) delete next[key];
       else next[key] = level;
+      return next;
+    });
+  }
+
+  function pickState(key: StateKey, level: StateLevel) {
+    // 같은 단계를 다시 누르면 비운다
+    setStates((cur) => {
+      const next = { ...cur };
+      if (next[key] === level) delete next[key];
+      else next[key] = level;
+      return next;
+    });
+  }
+
+  function toggleStateTag(tag: string) {
+    setStates((cur) => {
+      const tags = cur.tags ?? [];
+      const nextTags = tags.includes(tag) ? tags.filter((t) => t !== tag) : [...tags, tag];
+      const next = { ...cur };
+      if (nextTags.length) next.tags = nextTags;
+      else delete next.tags;
+      return next;
+    });
+  }
+
+  /** 평범한 하루: 아직 안 고른 줄을 전부 가운데(보통)로 */
+  function fillPlain() {
+    setStates((cur) => {
+      const next = { ...cur };
+      for (const a of STATE_AXES) if (typeof next[a.key] !== "number") next[a.key] = 2;
       return next;
     });
   }
@@ -133,6 +171,8 @@ export function EntryForm({ date, when = "today", notePlaceholder, initial, warm
       edit: Boolean(initial),
       happiness,
       areas_count: areaCount(areas),
+      states_count: stateCount(states),
+      state_tags_count: states.tags?.length ?? 0,
       mood: moods[0] ?? null,
       moods_count: moods.length,
       length_bucket: lengthBucket(note.trim().length),
@@ -148,6 +188,8 @@ export function EntryForm({ date, when = "today", notePlaceholder, initial, warm
   }
 
   const count = areaCount(areas);
+  const stCount = stateCount(states);
+  const stateTags = states.tags ?? [];
 
   return (
     <>
@@ -199,45 +241,101 @@ export function EntryForm({ date, when = "today", notePlaceholder, initial, warm
           </div>
         </fieldset>
 
-        {/* 영역은 선택 — 행복도보다 한 단계 가볍게: 위 녹갈 0.5px 괘선(필수/선택의 경계, 틀 안의 틀은 아님), 머리 15px 굵게 + 같은 줄 안내 13px muted (명세 34) */}
-        <fieldset className="entry-areas">
-          <legend className="entry-areas__legend">
-            영역
-            <span className="entry-areas__note">
-              오늘 있었던 것만, 안 골라도 돼요 {count > 0 && <span className="text-ganji">({count})</span>}
+        {/* 오늘 있었던 일 (2026-11-14, 명세 37 · 톤 v3.41): 하루의 속도 + 십신 다섯 갈래. 줄마다 세 단계 라디오(state_<key>), 갈래 줄은 "더 적기"를 펼치면 세부 낱말(state_tags).
+            한 줄 = 이름 열 52px + 세 단계 띠지 세 열(줄마다 같은 세로선). "더 적기"는 이름 아래 작은 글자 — 이름 칸 전체가 손가락 자리. 모양은 globals.css v3.41 블록 */}
+        <fieldset className="entry-states">
+          <legend className="entry-states__legend">
+            <span className="entry-states__title">오늘 있었던 일</span>
+            <span className="entry-states__note">
+              별일 없으면 안 골라도 돼요 {stCount > 0 && <span className="text-ganji">({stCount})</span>}
             </span>
           </legend>
-          <div className="entry-areas__rows mt-3 flex flex-col gap-2">
-            {AREAS.map((a) => (
-              <div key={a.key} className="entry-area" role="radiogroup" aria-label={a.label}>
-                <span className="entry-area__label">{a.label}</span>
-                <div className="entry-area__stamps">
-                  {AREA_LEVELS.map((word, i) => {
-                    const level = i + 1;
-                    const on = areas[a.key] === level;
+          <button type="button" className="entry-states__plain" onClick={fillPlain} disabled={stCount === STATE_AXES.length}>
+            평범한 하루
+          </button>
+          <div className="entry-states__rows">
+            {STATE_AXES.map((a) => {
+              const picked = a.tags.filter((t) => stateTags.includes(t.key)).length;
+              return (
+                <div key={a.key} className="entry-state" data-axis={a.key} data-group={a.group ?? undefined}>
+                  <div className="entry-state__main" role="radiogroup" aria-label={a.label}>
+                    <span className="entry-state__label">{a.label}</span>
+                    <div className="entry-state__levels">
+                      {a.levels.map((word, i) => {
+                        const level = (i + 1) as StateLevel;
+                        const on = states[a.key] === level;
+                        return (
+                          <label key={level} className="entry-state__level">
+                            <input
+                              type="radio"
+                              name={`state_${a.key}`}
+                              value={level}
+                              checked={on}
+                              onChange={() => pickState(a.key, level)}
+                              onClick={() => {
+                                // 이미 고른 단계를 누르면 change가 안 난다 — 여기서 비운다
+                                if (on) pickState(a.key, level);
+                              }}
+                              className="peer sr-only"
+                            />
+                            <span data-level={level} className={`tag state-tag cursor-pointer peer-focus-visible:outline-2 peer-focus-visible:outline-ink ${on ? "tag--on" : ""}`}>
+                              {word}
+                            </span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  {a.tags.length > 0 && (
+                    <details className="entry-state__more" open={picked > 0 || undefined}>
+                      <summary className="entry-state__more-head">
+                        <span className="entry-state__more-word">더 적기</span> {picked > 0 && <span className="entry-state__more-n text-ganji">({picked})</span>}
+                      </summary>
+                      <div className="entry-state__tags">
+                        {a.tags.map((t) => {
+                          const on = stateTags.includes(t.key);
+                          return (
+                            <label key={t.key} className="entry-state__tag">
+                              <input type="checkbox" name="state_tags" value={t.key} checked={on} onChange={() => toggleStateTag(t.key)} className="peer sr-only" />
+                              <span className={`tag state-tag state-tag--detail cursor-pointer peer-focus-visible:outline-2 peer-focus-visible:outline-ink ${on ? "tag--on" : ""}`}>{t.label}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </details>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </fieldset>
+
+        {/* 그래서 마음은 (2026-11-14, 명세 37): 기분 네 갈래 21개. value는 예전 기분 이름 그대로(name), 화면 말은 label */}
+        {/* 무리 = 이름 열(상태 줄과 같은 52px 세로선) + 오른쪽 띠지 — 무리 이름이 띠지와 섞이지 않는다 (톤 v3.41) */}
+        <fieldset className="entry-moods">
+          <legend className="entry-moods__legend">
+            <span className="entry-moods__title">그래서 마음은</span>
+            <span className="entry-moods__note">
+              몇 개든, 안 골라도 돼요 {moods.length > 0 && <span className="text-ganji">({moods.length})</span>}
+            </span>
+          </legend>
+          <div className="entry-moods__groups">
+            {MOOD_PICK.map((sec) => (
+              <div key={sec.key} className="entry-moods__group" data-group={sec.key}>
+                <p className="entry-moods__head">{sec.label}</p>
+                <div className="entry-moods__tags">
+                  {sec.moods.map((m) => {
+                    const on = moods.includes(m.name);
                     return (
-                      <label key={level} className="relative">
-                        <input
-                          type="radio"
-                          name={`area_${a.key}`}
-                          value={level}
-                          checked={on}
-                          onChange={() => pickArea(a.key, level)}
-                          onClick={() => {
-                            // 이미 고른 도장을 누르면 change가 안 난다 — 여기서 비운다
-                            if (on) pickArea(a.key, level);
-                          }}
-                          aria-label={`${a.label} ${word}`}
-                          className="peer sr-only"
-                        />
-                        {/* 단계 색은 data-level(1~2 남색 · 3 종이 · 4~5 금빛, 달력 네 단계와 같은 계열). 찍힘은 CSS `input:checked +`가 바로 그린다 */}
+                      <label key={m.name}>
+                        <input type="checkbox" name="moods" value={m.name} checked={on} onChange={() => toggleMood(m.name)} className="peer sr-only" />
                         <span
-                          data-level={level}
-                          className={`stamp entry-stamp flex aspect-square cursor-pointer items-center justify-center font-serif peer-focus-visible:outline-2 peer-focus-visible:outline-ink ${
-                            on ? "stamp--on" : ""
+                          data-tone={moodTone(m.name)}
+                          className={`tag mood-tag h-9 cursor-pointer text-[14px] peer-focus-visible:outline-2 peer-focus-visible:outline-ink ${
+                            on ? "tag--on font-bold text-paper-2" : "text-ink"
                           }`}
                         >
-                          {level}
+                          {m.label}
                         </span>
                       </label>
                     );
@@ -246,47 +344,73 @@ export function EntryForm({ date, when = "today", notePlaceholder, initial, warm
               </div>
             ))}
           </div>
-          <p className="entry-areas__ends mt-2 flex justify-between text-[12px] text-muted" aria-hidden>
-            <span>{AREA_LEVELS[0]}</span>
-            <span>{AREA_LEVELS[4]}</span>
-          </p>
-        </fieldset>
-
-        <fieldset className="entry-moods">
-          <legend className="text-[17px] font-bold">기분</legend>
-          <p className="mt-1 text-sm text-muted">
-            몇 개든, 안 골라도 돼요 {moods.length > 0 && <span className="text-ganji">({moods.length})</span>}
-          </p>
-          {MOOD_SECTIONS.map((sec) => (
-            <div key={sec.tone} className="entry-moods__group mt-4" data-tone={sec.tone}>
-              <p className="entry-moods__head text-[13px] font-bold text-muted">{sec.label}</p>
-              <div className="entry-moods__tags mt-2 flex flex-wrap gap-1.5">
-                {MOOD_GROUPS[sec.tone].map((m) => {
-                  const on = moods.includes(m);
-                  return (
-                    <label key={m}>
-                      <input type="checkbox" name="moods" value={m} checked={on} onChange={() => toggleMood(m)} className="peer sr-only" />
-                      <span
-                        data-tone={moodTone(m)}
-                        className={`tag mood-tag h-9 cursor-pointer text-[14px] peer-focus-visible:outline-2 peer-focus-visible:outline-ink ${
-                          on ? "tag--on font-bold text-paper-2" : "text-ink"
-                        }`}
-                      >
-                        {m}
-                      </span>
-                    </label>
-                  );
-                })}
-              </div>
-            </div>
-          ))}
-          {/* 지난 기록에 목록 밖 기분이 있으면(없어야 하지만) 잃지 않게 */}
+          {/* 지난 기록의 기분 가운데 지금 고르기에 없는 것(바쁨·생각 많음·아픔, 목록 밖)은 잃지 않게 그대로 보낸다 */}
           {moods
-            .filter((m) => !(MOODS as readonly string[]).includes(m))
+            .filter((m) => !isPickMood(m))
             .map((m) => (
               <input key={m} type="hidden" name="moods" value={m} />
             ))}
         </fieldset>
+
+        {/* 영역 점수는 접어 둔다 (2026-11-14): 좋았거나 힘들었던 날에만 펼쳐 매긴다. 지난 기록에 영역이 있으면 펼친 채로 */}
+        <details className="entry-areas-fold" open={count > 0 || undefined}>
+          <summary className="entry-areas-fold__head">
+            <span className="entry-areas-fold__title">영역 점수</span>{" "}
+            <span className="entry-areas__note">좋았거나 힘들었던 영역만 {count > 0 && <span className="text-ganji">({count})</span>}</span>
+          </summary>
+          {/* 영역은 선택 중의 선택 — 접힌 한 줄이 머리다(톤 v3.41). 펼친 안쪽의 legend는 같은 말이라 보조 기술에만 남긴다. 여섯 줄·도장·양 끝 글은 v3.32·v3.38 그대로 */}
+          <fieldset className="entry-areas">
+            <legend className="sr-only">
+              영역
+              <span>
+                오늘 있었던 것만, 안 골라도 돼요 {count > 0 && <span>({count})</span>}
+              </span>
+            </legend>
+            <div className="entry-areas__rows flex flex-col gap-2">
+              {AREAS.map((a) => (
+                <div key={a.key} className="entry-area" role="radiogroup" aria-label={a.label}>
+                  <span className="entry-area__label">{a.label}</span>
+                  <div className="entry-area__stamps">
+                    {AREA_LEVELS.map((word, i) => {
+                      const level = i + 1;
+                      const on = areas[a.key] === level;
+                      return (
+                        <label key={level} className="relative">
+                          <input
+                            type="radio"
+                            name={`area_${a.key}`}
+                            value={level}
+                            checked={on}
+                            onChange={() => pickArea(a.key, level)}
+                            onClick={() => {
+                              // 이미 고른 도장을 누르면 change가 안 난다 — 여기서 비운다
+                              if (on) pickArea(a.key, level);
+                            }}
+                            aria-label={`${a.label} ${word}`}
+                            className="peer sr-only"
+                          />
+                          {/* 단계 색은 data-level(1~2 남색 · 3 종이 · 4~5 금빛, 달력 네 단계와 같은 계열). 찍힘은 CSS `input:checked +`가 바로 그린다 */}
+                          <span
+                            data-level={level}
+                            className={`stamp entry-stamp flex aspect-square cursor-pointer items-center justify-center font-serif peer-focus-visible:outline-2 peer-focus-visible:outline-ink ${
+                              on ? "stamp--on" : ""
+                            }`}
+                          >
+                            {level}
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+            <p className="entry-areas__ends mt-2 flex justify-between text-[12px] text-muted" aria-hidden>
+              <span>{AREA_LEVELS[0]}</span>
+              <span>{AREA_LEVELS[4]}</span>
+            </p>
+          </fieldset>
+        </details>
 
         <div>
           <label htmlFor="note" className="text-[17px] font-bold">
