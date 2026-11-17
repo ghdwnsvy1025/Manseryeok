@@ -39,6 +39,16 @@ describe("만세력 한 장", () => {
     expect(chart.yongsin).not.toBeNull();
     expect(chart.daeun?.current).not.toBeNull();
   });
+  test("다섯 힘: 오행 다섯이 갈래 다섯에 하나씩, 합은 100 안팎, 비겁+인성이 인비와 같다", () => {
+    expect(chart.power.map((x) => x.ko)).toEqual(["목", "화", "토", "금", "수"]);
+    expect(new Set(chart.power.map((x) => x.group)).size).toBe(5);
+    const sum = chart.power.reduce((a, x) => a + x.pct, 0);
+    expect(sum).toBeGreaterThanOrEqual(98);
+    expect(sum).toBeLessThanOrEqual(102);
+    const inbi = chart.power.filter((x) => x.group === "비겁" || x.group === "인성").reduce((a, x) => a + x.pct, 0);
+    expect(Math.abs(inbi - chart.center.inbi)).toBeLessThanOrEqual(1);
+    expect(chart.power.find((x) => x.role === "용")?.el).toBe(chart.yongsin!.use);
+  });
   test("시간 모름이면 시주 칸이 비고 나머지는 그대로", () => {
     const c2 = computeProfile({ ...input, birthHour: null, birthMinute: null });
     if (!c2.ok) throw new Error("profile");

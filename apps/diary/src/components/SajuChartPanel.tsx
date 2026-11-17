@@ -1,5 +1,6 @@
 import type { Element } from "@saju/engine";
 import { TrackedLink } from "@/components/track/TrackedLink";
+import { PaidInvite } from "@/components/PaidInvite";
 import { GROUP_PLAIN, UNSEONG_NOTE, type ChartColumn, type SajuChart } from "@/lib/saju/chart";
 import { KAKAO_CHANNEL_URL, PAID_PRICE, sajucowCardUrl, sajucowHomeUrl, sajucowReadingUrl } from "@/lib/sajucow";
 
@@ -27,10 +28,10 @@ interface Props {
 }
 
 /**
- * 만세력 한 판 (2026-10-31 사용자 결정 → 같은 날 "따로 창이 아니라 나 탭 안에서 펼치고, 아래 접기"로 바꿈).
- * 나 탭 "내 사주" 요약 카드(details)를 펼치면 그 아래에 그려진다. 서버 컴포넌트, 계산은 lib/saju/chart.ts.
+ * 만세력 한 판 (2026-10-31 사용자 결정 → 명세 47: 나 탭의 여덟 글자 줄을 누르면 올라오는 만세력 낱장 안에 그려진다).
+ * 서버 컴포넌트, 계산은 lib/saju/chart.ts.
  * 순서: 만세력 표(시·일·월·연 × 십신/천간/지지/십신/지장간/십이운성/12신살) → 오행 분포 → 중심 기운 → 용신 → 신살 → 십이운성 →
- * 대운 → 바이럴(내 조선시대 직업 카드·궁합) → 유료 전체 풀이.
+ * 대운 → 바이럴(내 조선시대 직업 카드·궁합) → 유료 풀이 권유(PaidInvite, 한 곳).
  * 십이운성·신살은 이름과 한 줄 뜻만, 길흉 단정 없음. 모양은 디자이너(.saju-table*, 명세 31).
  */
 export function SajuChartPanel({ chart, ganjiKo, faceSrc, open }: Props) {
@@ -217,27 +218,9 @@ export function SajuChartPanel({ chart, ganjiKo, faceSrc, open }: Props) {
         </TrackedLink>
       </section>
 
-      {/* 유료 전체 풀이 — 결제가 열렸으면 풀이 페이지로, 닫혔으면 알림 받기 */}
-      {/* 다른 카드보다 한 단계 힘 있게: 운세 카드와 같은 금테(card-gold). 이 화면의 금색 면 버튼은 이 안의 하나뿐 */}
-      <section className="saju-paid card-gold card-paper flex flex-col gap-3 p-5" aria-label="전체 풀이">
-        <h2 className="font-serif text-[20px] leading-snug">내 사주 전체 풀이</h2>
-        <p className="text-[15px] leading-relaxed text-muted">성향, 일과 돈, 관계, 앞으로 10년의 흐름까지 한 사람을 위해 쓴 풀이예요.</p>
-        {open ? (
-          <TrackedLink event="paid_reading_click" eventProps={{ at: "saju", open: true }} href={sajucowReadingUrl()} target="_blank" rel="noopener" className="gold-plate flex h-14 items-center justify-center rounded-xl text-[17px] font-bold text-gold-ink">
-            전체 풀이 받기 {PAID_PRICE.toLocaleString("ko-KR")}원
-          </TrackedLink>
-        ) : (
-          <>
-            <p className="text-[14px] text-muted">지금은 초대받은 분만 먼저 보고 있어요. 열리면 카카오톡 채널로 가장 먼저 알려 드려요.</p>
-            <TrackedLink event="paid_reading_click" eventProps={{ at: "saju", open: false }} href={`${KAKAO_CHANNEL_URL}/friend`} target="_blank" rel="noopener" className="gold-plate flex h-14 items-center justify-center rounded-xl text-[17px] font-bold text-gold-ink">
-              열리면 알림 받기
-            </TrackedLink>
-            <TrackedLink event="paid_reading_click" eventProps={{ at: "saju", open: false, code: true }} href={sajucowReadingUrl()} target="_blank" rel="noopener" className="tap text-center text-[14px] text-muted underline underline-offset-4">
-              초대 코드가 있어요
-            </TrackedLink>
-          </>
-        )}
-      </section>
+      {/* 유료 풀이 권유 — 만세력 낱장 맨 끝 한 곳(명세 47). 결제가 열렸으면 풀이로, 닫혔으면 알림 받기. "다음에"로 30일 접힌다(PaidInvite).
+          낱장 안의 금색 면 버튼은 이 안의 하나뿐 */}
+      <PaidInvite open={open} readingHref={sajucowReadingUrl()} notifyHref={`${KAKAO_CHANNEL_URL}/friend`} price={PAID_PRICE} />
     </div>
   );
 }

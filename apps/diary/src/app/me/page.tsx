@@ -17,10 +17,13 @@ import { AreaGlyphBars } from "@/components/AreaGlyphBars";
 import { sajuChart } from "@/lib/saju/chart";
 import { paidReadingOpen } from "@/lib/sajucow";
 import { SajuChartPanel } from "@/components/SajuChartPanel";
-import { FoldButton } from "@/components/FoldButton";
+import { Sheet, SheetTrigger } from "@/components/Sheet";
+import { MeForecastChips } from "@/components/MeForecastChips";
+import { HappyAnswer, InsightSeals, VersusAnswer } from "@/components/InsightSeals";
 import { areaAverages, areaRadar, bestWorstDays, fortuneAccuracy, growingSeries, habitOf, happinessSeries, monthlySeries, moodTop, nextUnlock, streakOf, type PickedDay } from "@/lib/stats/extra";
 import { BestWorstDays, type DayCard, type ForecastCard } from "@/components/BestWorstDays";
-import { forecastMonth, nextMonthOf, type ForecastDay } from "@/lib/stats/forecast";
+import { forecastWindow, type ForecastDay } from "@/lib/stats/forecast";
+import { forecastVersus, happyWhen, INSIGHT_UNLOCK_DAYS } from "@/lib/stats/insight";
 import { HappinessChart } from "@/components/HappinessChart";
 import { MonthCalendar, type DayInfo } from "@/components/MonthCalendar";
 import { buildMonth, resolveMonth } from "@/lib/calendar";
@@ -102,22 +105,22 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
     return { date: p.date, label: formatKoreanDate(p.date).replace(/\s*\S+요일$/, ""), happiness: p.happiness, moods: p.moods, ganjiKo: g.ko, faceSrc: characterOfGanji(g.ko).faceSrc };
   };
   // 다음 달 좋은 날·조심할 날 예상 (2026-10-31): 오늘 운세 점수와 같은 계산을 다음 달 매일에 (코드만, 약 0.2초)
-  const nextYm = nextMonthOf(today.slice(0, 7));
-  const fc = forecastMonth({ pillars: profile.pillars, profile: birthProfileOf(profile), entries: all, ym: nextYm });
   const toForecast = (f: ForecastDay | null): ForecastCard | null =>
     f ? { date: f.date, label: formatKoreanDate(f.date).replace(/\s*\S+요일$/, ""), ganjiKo: f.ganjiKo, faceSrc: characterOfGanji(f.ganjiKo).faceSrc, reason: f.reason } : null;
+  // 명세 47 (2026-11-17): 오늘 다음 날부터 30일의 좋을 날·조심할 날 셋씩(칩은 [0]), 물음 인장 둘의 답. 계산만 해 둔다 — 화면은 디자인 쪽이 붙인다
+  const window30 = forecastWindow({ pillars: profile.pillars, profile: birthProfileOf(profile), entries: all, from: today, days: 30, pick: 3 });
+  const windowCards = { best: window30.best.map((f) => toForecast(f)!), worst: window30.worst.map((f) => toForecast(f)!) };
+  const happy = happyWhen(all, profile.pillars.day.stem);
+  const versus = forecastVersus(all, fortuneScores);
+  const insightOpen = all.length >= INSIGHT_UNLOCK_DAYS;
+  const insightLeft = Math.max(0, INSIGHT_UNLOCK_DAYS - all.length);
+  // 달력 도장(표시 재료): 앞으로 30일의 좋을 날 셋 · 조심할 날 셋 (명세 47 — 전에는 다음 달 하루씩 fc)
   const forecastMarks: Record<string, "best" | "worst"> = {};
-  if (fc.best) forecastMarks[fc.best.date] = "best";
-  if (fc.worst) forecastMarks[fc.worst.date] = "worst";
-  const monthPick = bestWorstDays(all, calYm);
+  for (const f of window30.best) forecastMarks[f.date] = "best";
+  for (const f of window30.worst) forecastMarks[f.date] = "worst";
   const allPick = bestWorstDays(all);
-  const dayCards = (
-    <BestWorstDays
-      month={{ label: `${Number(calYm.slice(5, 7))}월`, best: toCard(monthPick.best), worst: toCard(monthPick.worst) }}
-      all={{ best: toCard(allPick.best), worst: toCard(allPick.worst) }}
-      next={{ label: `${Number(nextYm.slice(5, 7))}월`, ym: nextYm, best: toForecast(fc.best), worst: toForecast(fc.worst) }}
-    />
-  );
+  // 명세 47: 가장 행복했던 날(+ 작게 힘든 날)은 "나는 언제 행복했지?" 낱장 안으로 — 전체 기록의 하루씩
+  const dayCards = <BestWorstDays best={toCard(allPick.best)} worst={toCard(allPick.worst)} />;
   const areaAvg = areaAverages(all, today, 30);
   const moods = moodTop(all, 3);
   const streak = streakOf(all, today);
@@ -147,14 +150,10 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
   // v3.10: 오늘 화면에서 뺀 "기록 N일째"를 여기로. 60칸 중 채운 칸 = 기록이 1건 이상인 간지 수
   const filledCells = cells.filter((c) => c.n > 0).length;
   // 2026-11-14 있었던 일(상태) 통계: 최근 30일 + 십신 갈래가 온 날의 상태. 상태 기록이 없으면 안 그린다 (명세 37).
-  // 자리(톤 v3.41): 통계 묶음 안 — 가장 행복한 날·힘든 날 아래, "자주 고른 기분" 바로 위(쓰기 화면의 "있었던 일 → 그래서 마음은" 순서와 같다).
-  // StatsSummary의 days 자리에 함께 넘겨 통계 열의 간격을 그대로 받는다 — 접힌 "자세한 통계" 서랍 아래에 두면 화면 맨 끝에 혼자 남는다
-  const daysAndStates = (
-    <>
-      {dayCards}
-      <StateStats summary={stateSummary(all, today, 30)} tags={stateTagTop(all, today, 30, 5)} groups={stateByGroup(all, profile.pillars.day.stem)} />
-    </>
-  );
+  // 자리(명세 47): "자세한 통계" 서랍 안 — "자주 고른 기분" 바로 아래(StatsSummary의 states 자리)
+  const stateStats = <StateStats summary={stateSummary(all, today, 30)} tags={stateTagTop(all, today, 30, 5)} groups={stateByGroup(all, profile.pillars.day.stem)} />;
+  // 명세 47 기록 한 줄에 쓰는 "이번 달 N일" — 전에는 StatsSummary에 넘기는 자리에서 바로 불렀다(같은 habitOf, 한 번만 부르게 올렸다)
+  const habit = habitOf(all, today);
 
   return (
     <main className="flex flex-col gap-6">
@@ -188,107 +187,44 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
           {profile.name !== "손님" ? <>{profile.name}의 카드, </> : <>나의 카드, </>}
           <span className="text-ganji">{me.ganjiKo}</span>
         </h1>
-        {/* v3.13: 점 대신 이름–값 줄맞춤. "이 기기에만 저장돼요"는 설정에만 (2026-10-10) */}
-        <dl className="kv me-progress mt-3 w-full max-w-[260px]">
-          <div className="kv__row">
-            <dt>기록</dt>
-            <dd>{total}일</dd>
-          </div>
-          <div className="kv__row">
-            <dt>모은 카드</dt>
-            <dd>
-              {filledCells} / 60장
-              <span className="kv__bar" aria-hidden>
-                <span style={{ width: `${(filledCells / 60) * 100}%` }} />
-              </span>
-            </dd>
-          </div>
-        </dl>
+        {/* 명세 47: 기록 한 줄(전에는 기록 · 모은 카드 두 줄 표). 가운뎃점 대신 간격(톤 v3.13). 모은 카드 수는 60갑자 보기 머리로 갔다 */}
+        <p className="me-line mt-2">
+          {insightOpen ? (
+            <>
+              <span>이번 달 {habit.thisMonth}일 기록</span>
+              {streak.current > 1 && <span>{streak.current}일째</span>}
+            </>
+          ) : (
+            <span>
+              {INSIGHT_UNLOCK_DAYS}일까지 {insightLeft}일 남았어요
+            </span>
+          )}
+        </p>
       </header>
 
-      {/* 2026-10-31 내 사주 요약 (나무패 서랍 대신): 여덟 글자 · 중심 기운 · 용신 한 줄씩. 누르면 바로 아래에 만세력 한 판이 펼쳐지고
-          맨 아래 "접기" — 따로 창으로 가지 않는다(사용자, 같은 날). 아래 달력·통계는 그대로 이어진다. 모양은 디자이너(.saju-summary*) */}
-      <details id="saju" className="saju-summary-fold group" open={saju === "open"}>
-        <summary className="saju-summary card-frame card-light card-paper flex cursor-pointer list-none flex-col gap-3 p-5 [&::-webkit-details-marker]:hidden">
-        <span className="flex items-center justify-between gap-3">
-          <h2 className="sec-tag">내 사주</h2>
-          <span className="saju-summary__preview font-serif text-[17px]" lang="zh-Hant" aria-label="내 사주 여덟 글자">
-            {chart.columns.map((c) =>
-              c.unknown ? (
-                <span key={c.pos} className="saju-summary__pillar text-muted">
-                  ??
-                </span>
-              ) : (
-                <span key={c.pos} className="saju-summary__pillar">
-                  <span className={c.stemElement ? ELEMENT_TEXT[c.stemElement] : undefined}>{c.stem}</span>
-                  <span className={c.branchElement ? ELEMENT_TEXT[c.branchElement] : undefined}>{c.branch}</span>
-                </span>
-              ),
-            )}
-          </span>
-        </span>
-        {/* 2026-10-31 사용자 Q5: 오행을 그림으로 — 다섯 동그라미, 크기·채움이 분포율(--pct 0~1). 모양은 디자이너(.saju-summary__elements) */}
-        <ul className="saju-summary__elements" aria-label="오행 분포">
-          {chart.elements.map((e) => (
-            <li key={e.el} className="saju-summary__element" data-el={e.el} data-zero={e.pct === 0 ? "" : undefined} style={{ "--pct": e.pct / 100 } as React.CSSProperties} aria-label={`${e.ko} ${e.pct}%`}>
-              <span className="saju-summary__el-dot" aria-hidden />
-              <span className={`saju-summary__el-label font-serif ${ELEMENT_TEXT[e.el]}`}>{e.ko}</span>
-              <span className="saju-summary__el-pct text-[12px] tabular-nums text-muted">{e.pct}%</span>
-            </li>
-          ))}
-        </ul>
-        {/* 중심 기운 · 용신 · 희신 — 이름 열과 값 열을 맞춘 세 줄. 용신·희신 오행은 만세력 안과 같은 오행 도장(.saju-yongsin__el) */}
-        <dl className="kv saju-summary__rows">
-          <div className="kv__row">
-            <dt>중심 기운</dt>
-            <dd>
-              {chart.center.centerGroup}, {chart.center.strengthPlain}
-            </dd>
-          </div>
-          {chart.yongsin && (
-            <>
-              <div className="kv__row">
-                <dt>용신</dt>
-                <dd>
-                  <span className="saju-yongsin__el" data-el={chart.yongsin.use} data-rank="use">
-                    {ELEMENT_KO[chart.yongsin.use]}
-                  </span>{" "}
-                  <span className="text-muted">{chart.yongsin.useGroup}</span>
-                </dd>
-              </div>
-              <div className="kv__row">
-                <dt>희신</dt>
-                <dd>
-                  <span className="saju-yongsin__el" data-el={chart.yongsin.hee} data-rank="hee">
-                    {ELEMENT_KO[chart.yongsin.hee]}
-                  </span>{" "}
-                  <span className="text-muted">{chart.yongsin.heeGroup}</span>
-                </dd>
-              </div>
-            </>
+      {/* 명세 47 여덟 글자 한 줄: 줄 전체가 버튼, 누르면 만세력 낱장. 중심 기운 · 용신 · 희신 · 오행 방울은 낱장 안으로.
+          id="saju"는 옛 주소(/me/saju → /me?saju=open#saju)가 닿는 자리 */}
+      <SheetTrigger id="saju" target="sheet-saju" className="saju-line card-light card-paper" aria-label="내 사주 여덟 글자, 만세력 열기">
+        <span className="saju-line__chars font-serif" lang="zh-Hant" aria-hidden>
+          {chart.columns.map((c) =>
+            c.unknown ? (
+              <span key={c.pos} className="saju-summary__pillar text-muted">
+                ??
+              </span>
+            ) : (
+              <span key={c.pos} className="saju-summary__pillar">
+                <span className={c.stemElement ? ELEMENT_TEXT[c.stemElement] : undefined}>{c.stem}</span>
+                <span className={c.branchElement ? ELEMENT_TEXT[c.branchElement] : undefined}>{c.branch}</span>
+              </span>
+            ),
           )}
-        </dl>
-        <span className="saju-summary__more self-end text-sm text-muted">
-          <span className="group-open:hidden">만세력 펼치기 ›</span>
-          <span className="hidden group-open:inline">펼쳐 보는 중 ▾</span>
         </span>
-      </summary>
-        <div className="saju-summary-fold__body mt-5 flex flex-col gap-5">
-          <p className="flex items-center justify-between px-1 text-sm text-muted">
-            <span>
-              {profile.calendar === "lunar" ? "음력" : "양력"} {profile.birth_year}.{profile.birth_month}.{profile.birth_day}
-              {profile.birth_hour !== null ? ` ${String(profile.birth_hour).padStart(2, "0")}:${String(profile.birth_minute).padStart(2, "0")}` : " 시간 모름"}
-            </span>
-            <Link href="/onboarding?next=/me" className="tap underline underline-offset-4">
-              고치기
-            </Link>
-          </p>
-          <SajuChartPanel chart={chart} ganjiKo={me.ganjiKo} faceSrc={me.faceSrc} open={paidOpen} />
-          <FoldButton />
-        </div>
-      </details>
+        <span className="saju-line__more">만세력</span>
+      </SheetTrigger>
 
       <section id="me-records" className="me-sep me-sep--wide flex flex-col gap-4">
+        {/* 명세 47 칩 둘: 앞으로 30일의 가장 좋을 날 · 조심할 날 — 누르면 아래 달력이 그 달로 넘어가 그 칸이 골라진다 */}
+        <MeForecastChips best={windowCards.best[0] ?? null} worst={windowCards.worst[0] ?? null} />
         <div>
           {/* v3.22: 머리표·설명 문장 없음 — 달력은 보면 안다. v3.13 Q6 = B: 같은 자리에서 60갑자 / 달력 전환 (링크, JS 없음). 모양은 디자이너(.view-switch) */}
           <nav className="view-switch" aria-label="보기">
@@ -301,18 +237,120 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
           </nav>
         </div>
         {isCal ? (
-          <MonthCalendar cal={calMonth} days={calDays} initialSelected={pickedDay} today={today} forecast={forecastMarks} />
+          <MonthCalendar cal={calMonth} days={calDays} initialSelected={pickedDay} today={today} forecast={forecastMarks} forecastCards={windowCards} />
         ) : (
-          <GanjiGrid
-            cells={cells}
-            selected={selected}
-            todayIndex={todayIndex}
-            basePath="/me?view=grid"
-            pickedEntries={selected === null ? [] : all.filter((e) => e.day_ganji_index === selected)}
-          />
+          <>
+            {/* 명세 47: 모은 카드 수는 머리에서 격자 보기 머리로 */}
+            <dl className="kv">
+              <div className="kv__row">
+                <dt>모은 카드</dt>
+                <dd>
+                  {filledCells} / 60장
+                  <span className="kv__bar" aria-hidden>
+                    <span style={{ width: `${(filledCells / 60) * 100}%` }} />
+                  </span>
+                </dd>
+              </div>
+            </dl>
+            <GanjiGrid
+              cells={cells}
+              selected={selected}
+              todayIndex={todayIndex}
+              basePath="/me?view=grid"
+              pickedEntries={selected === null ? [] : all.filter((e) => e.day_ganji_index === selected)}
+            />
+          </>
         )}
-        <StatsSummary h={h} fitPercent={fitPercent(all.length)} stems={byStem(all)} branches={byBranch(all)} elements={byElement(all)} days={daysAndStates} areas={areaAvg} moods={moods} streak={streak} habit={habitOf(all, today)} chart={<HappinessChart series={series} yearSeries={yearSeries} emptyArt={me.characterSrc} />} chartReady={chartReady} unlock={unlock} accuracy={accuracy} areaDetail={areaDetail} writeHref="/write" />
+        {/* 명세 47 물음 인장 둘: 기록 7일부터 열린다. 누르면 답 낱장 */}
+        <InsightSeals open={insightOpen} left={insightLeft} />
+        {/* 기록 0일 = 첫 기록 카드, 그 뒤 = 접힌 "자세한 통계" 서랍 하나(그래프 · 습관 · 영역 · 기분 · 있었던 일 · 맞춤도 · 글자별) */}
+        <StatsSummary h={h} fitPercent={fitPercent(all.length)} stems={byStem(all)} branches={byBranch(all)} elements={byElement(all)} states={stateStats} areas={areaAvg} moods={moods} streak={streak} habit={habit} chart={<HappinessChart series={series} yearSeries={yearSeries} emptyArt={me.characterSrc} />} chartReady={chartReady} unlock={unlock} accuracy={accuracy} areaDetail={areaDetail} writeHref="/write" />
       </section>
+
+      {/* ── 낱장 셋 (명세 47): 같은 틀(Sheet). 한 번에 하나만 열린다. 저장 직후(?saved=)에도 저절로 열리지 않는다 ── */}
+      {/* 만세력 낱장: 본문에서 옮겨 온 오행 방울 · 중심 기운 · 용신 · 희신 → 생년월일 → 만세력 한 판 → 맨 끝 유료 풀이 권유 한 곳. ?saju=open이면 열린 채 시작 */}
+      <Sheet id="sheet-saju" name="saju" title="만세력" initialOpen={saju === "open"}>
+        <div className="saju-sheet flex flex-col gap-5">
+          <div className="saju-sheet__summary flex flex-col gap-4">
+            <p className="saju-sheet__chars font-serif" lang="zh-Hant" aria-label="내 사주 여덟 글자">
+              {chart.columns.map((c) =>
+                c.unknown ? (
+                  <span key={c.pos} className="saju-summary__pillar text-muted">
+                    ??
+                  </span>
+                ) : (
+                  <span key={c.pos} className="saju-summary__pillar">
+                    <span className={c.stemElement ? ELEMENT_TEXT[c.stemElement] : undefined}>{c.stem}</span>
+                    <span className={c.branchElement ? ELEMENT_TEXT[c.branchElement] : undefined}>{c.branch}</span>
+                  </span>
+                ),
+              )}
+            </p>
+            {/* 2026-10-31 사용자 Q5: 오행을 그림으로 — 다섯 동그라미, 크기·채움이 분포율(--pct 0~1). 모양은 디자이너(.saju-summary__elements) */}
+            <ul className="saju-summary__elements" aria-label="오행 분포">
+              {chart.elements.map((e) => (
+                <li key={e.el} className="saju-summary__element" data-el={e.el} data-zero={e.pct === 0 ? "" : undefined} style={{ "--pct": e.pct / 100 } as React.CSSProperties} aria-label={`${e.ko} ${e.pct}%`}>
+                  <span className="saju-summary__el-dot" aria-hidden />
+                  <span className={`saju-summary__el-label font-serif ${ELEMENT_TEXT[e.el]}`}>{e.ko}</span>
+                  <span className="saju-summary__el-pct text-[12px] tabular-nums text-muted">{e.pct}%</span>
+                </li>
+              ))}
+            </ul>
+            {/* 중심 기운 · 용신 · 희신 — 이름 열과 값 열을 맞춘 세 줄. 용신·희신 오행은 만세력 안과 같은 오행 도장(.saju-yongsin__el) */}
+            <dl className="kv saju-summary__rows">
+              <div className="kv__row">
+                <dt>중심 기운</dt>
+                <dd>
+                  {chart.center.centerGroup}, {chart.center.strengthPlain}
+                </dd>
+              </div>
+              {chart.yongsin && (
+                <>
+                  <div className="kv__row">
+                    <dt>용신</dt>
+                    <dd>
+                      <span className="saju-yongsin__el" data-el={chart.yongsin.use} data-rank="use">
+                        {ELEMENT_KO[chart.yongsin.use]}
+                      </span>{" "}
+                      <span className="text-muted">{chart.yongsin.useGroup}</span>
+                    </dd>
+                  </div>
+                  <div className="kv__row">
+                    <dt>희신</dt>
+                    <dd>
+                      <span className="saju-yongsin__el" data-el={chart.yongsin.hee} data-rank="hee">
+                        {ELEMENT_KO[chart.yongsin.hee]}
+                      </span>{" "}
+                      <span className="text-muted">{chart.yongsin.heeGroup}</span>
+                    </dd>
+                  </div>
+                </>
+              )}
+            </dl>
+          </div>
+          <p className="saju-sheet__birth flex items-center justify-between text-sm text-muted">
+            <span>
+              {profile.calendar === "lunar" ? "음력" : "양력"} {profile.birth_year}.{profile.birth_month}.{profile.birth_day}
+              {profile.birth_hour !== null ? ` ${String(profile.birth_hour).padStart(2, "0")}:${String(profile.birth_minute).padStart(2, "0")}` : " 시간 모름"}
+            </span>
+            <Link href="/onboarding?next=/me" className="tap underline underline-offset-4">
+              고치기
+            </Link>
+          </p>
+          <SajuChartPanel chart={chart} ganjiKo={me.ganjiKo} faceSrc={me.faceSrc} open={paidOpen} />
+        </div>
+      </Sheet>
+      {/* 물음 인장의 답 낱장 둘 — 인장이 열렸을 때만 그린다 */}
+      {insightOpen && (
+        <Sheet id="sheet-happy" name="happy" title="나는 언제 행복했지?">
+          <HappyAnswer happy={happy} days={dayCards} chart={<HappinessChart series={series} variant="happy" emptyArt={me.characterSrc} />} />
+        </Sheet>
+      )}
+      {insightOpen && (
+        <Sheet id="sheet-versus" name="versus" title="예상은 맞았을까?">
+          <VersusAnswer versus={versus} />
+        </Sheet>
+      )}
       {/* v3.16: "내 카드 공유" 섹션은 없앴다 — 공유는 오늘 화면 운세 카드의 "공유"(오늘의 운세 한 장)로 */}
 
       {/* v3.17 정리: "내 기록" 목록은 뺐다 — 달력에서 날짜를 누르면 같은 내용(카드·행복도·기분·메모·고치기)이 나온다 */}

@@ -50,6 +50,41 @@ function reasonOf(kind: "best" | "worst", stem: CoreLuckPart, branch: CoreLuckPa
   return "흐름이 조금 무거운 날";
 }
 
+const addDay = (date: string, n: number): string => {
+  const [y, m, d] = date.split("-").map(Number) as [number, number, number];
+  return new Date(Date.UTC(y, m - 1, d + n)).toISOString().slice(0, 10);
+};
+
+/**
+ * 오늘 다음 날부터 days일 동안의 좋을 날·조심할 날 pick개씩 (2026-11-17 그릴링 Q9·Q10, 명세 47). 점수 순, 같은 점수면 이른 날.
+ * 점수 순으로 돌려준다 — best[0]이 가장 좋을 날, worst[0]이 가장 조심할 날(칩 둘이 쓴다). 달력 도장은 여섯 날 전부.
+ * 좋을 날과 조심할 날은 겹치지 않는다(점수가 모두 같으면 조심할 날은 비운다).
+ */
+export function forecastWindow(input: { pillars: PillarsSnapshot; profile: BirthProfile | null; entries: EntryLike[]; from: string; days?: number; pick?: number }): { best: ForecastDay[]; worst: ForecastDay[] } {
+  const n = input.days ?? 30;
+  const pick = input.pick ?? 3;
+  const rows = Array.from({ length: n }, (_, i) => addDay(input.from, i + 1)).map((date) => {
+    const g = dayGanji(date);
+    const core = computeCoreFortune({ pillars: input.pillars, profile: input.profile, date, todayHanja: g.hanja });
+    const personal = adjustWithEntries(core.parts.score01, input.entries, { index: g.index, stemKo: g.stemKo, branchKo: g.branchKo });
+    return { date, g, core, personal, score: toTenPoint(personal.score) };
+  });
+  const day = (r: (typeof rows)[number], kind: "best" | "worst"): ForecastDay => ({
+    date: r.date,
+    ganjiKo: r.g.ko,
+    score: r.score,
+    reason: reasonOf(kind, r.core.dayLuck.stem, r.core.dayLuck.branch, r.personal.shift ?? 0),
+    weight: (r.personal.shift ?? 0) !== 0 ? r.personal.weight : 0,
+  });
+  const desc = [...rows].sort((a, b) => b.score - a.score || (a.date < b.date ? -1 : 1));
+  const asc = [...rows].sort((a, b) => a.score - b.score || (a.date < b.date ? -1 : 1));
+  const best = desc.slice(0, pick);
+  const bestDates = new Set(best.map((r) => r.date));
+  const top = best[0]?.score ?? 0;
+  const worst = asc.filter((r) => !bestDates.has(r.date) && r.score < top).slice(0, pick);
+  return { best: best.map((r) => day(r, "best")), worst: worst.map((r) => day(r, "worst")) };
+}
+
 /**
  * 그 달의 가장 좋은 날·조심할 날. 같은 점수면 이른 날. 시간 모름으로 용신이 없으면(유불리 축 없음) 점수 차이가 작아도 그대로 고른다.
  * 계산은 날마다 한 번(약 30번) — 나 탭 한 번 그릴 때 수십 ms.

@@ -55,6 +55,10 @@
   /* v3.27 달창 창틀 측정값(ui-kit/analysis.json): moon-window-gold 지배 #d3a555, moon-window-moss 지배 #837347. 창틀 그림을 못 받을 때 창 테두리 1px 폴백색 */
   --color-moon-gold: #d3a555;
   --color-moon-moss: #837347;
+  /* v3.51 옥색 — "좋을 쪽"의 색(명세 47). 운세 카드 섞은 톤의 지역 변수 --fc-jade(v3.50, 명세 46)와 같은 값을 나 탭이 같이 쓰려고 토큰으로 올렸다.
+     card-paper #f8ecd1 위 5.8:1 · 바탕 한지 #f1debb 위 5.2:1. 좋을 날 칩 · 달력 앞날 도장 · 그래프 가장 높은 날 도장 · 1등 갈래 막대에만(다른 꾸밈 금지).
+     짝인 "조심할 쪽"은 글자 el-fire-ink · 면 seal */
+  --color-jade: #1f6466;
 
   /* 옛 이름 별칭. 01·03 명세가 끝나면 지운다. 새 코드에서 쓰지 않는다 (v3.26: night·lamp·lamp-ink는 사용처가 없어 지웠다) */
   --color-surface: var(--color-paper-2);
@@ -1393,24 +1397,20 @@ details[open] > .fortune-body {
   font-size: 10px;
   fill: var(--color-muted);
 }
-/* 2026-10-31 사용자: 점선 → 실선. 운세 점수 = 가는 녹갈 실선, 내 행복도 = 굵은 먹 실선 — 색과 굵기로 가른다 */
+/* v3.51(명세 47 + 같은 날 "그래프 더 다듬기"): 날마다의 점은 없다. 내 행복도 = 먹에 가까운 녹갈(괘선색 line) 2px, 예상 = 같은 색 1px · 32% —
+   뒤에 깔리고 더 옅고 가늘다(점선 아님). 주황(fortune) · 분홍은 그래프에 쓰지 않는다 */
 .hchart__fortune {
-  stroke: var(--color-fortune);
-  stroke-width: 1.5;
+  stroke: var(--color-line);
+  stroke-width: 1;
   stroke-linecap: round;
   stroke-linejoin: round;
-  opacity: 0.9;
+  opacity: 0.32;
 }
 .hchart__line {
-  stroke: var(--color-ink);
+  stroke: var(--color-line);
   stroke-width: 2;
   stroke-linecap: round;
   stroke-linejoin: round;
-}
-.hchart__dot {
-  fill: var(--color-ink);
-  stroke: var(--color-paper-2);
-  stroke-width: 1.5;
 }
 .hchart__key {
   display: inline-flex;
@@ -1422,19 +1422,12 @@ details[open] > .fortune-body {
   display: inline-block;
   flex: none;
 }
-/* 범례 v3.14: 내 행복도 = 선 위 점, 운세 점수 = 금 점선 */
-.hchart__key--dot::before {
-  width: 18px;
-  height: 8px;
-  background:
-    radial-gradient(circle, var(--color-ink) 2.5px, var(--color-paper-2) 3px, var(--color-paper-2) 3.75px, transparent 4.25px) center / 8px 8px no-repeat,
-    linear-gradient(var(--color-ink), var(--color-ink)) center / 100% 2px no-repeat;
-}
+/* 범례 v3.51: 내 행복도 = 굵은 선(.hchart__key--line, 아래 v3.51 절), 예상 = 같은 색 가늘고 옅은 선 */
 .hchart__key--fortune::before {
   width: 16px;
   height: 0;
-  border-top: 1.5px solid var(--color-fortune);
-  opacity: 0.9;
+  border-top: 1.25px solid var(--color-line);
+  opacity: 0.45;
 }
 
 /* 글자별 내 행복도 — 세로 막대. 트랙 paper-3 아래 정렬, fill 금빛(오행 줄은 오행 색) */
@@ -2889,28 +2882,7 @@ a[aria-current="page"] > .nav-label::after {
   font-weight: 700;
 }
 
-/* 그래프 점: 같은 네 색. 선·운세 점선은 그대로 */
-.hchart__dot[data-tier] {
-  r: 3.5px;
-  stroke-width: 1.5;
-}
-.hchart__dot[data-tier="top"] {
-  fill: var(--color-moss);
-  stroke: var(--color-paper-2);
-}
-.hchart__dot[data-tier="high"] {
-  fill: var(--color-gold);
-  stroke: var(--color-paper-2);
-}
-.hchart__dot[data-tier="mid"] {
-  fill: color-mix(in srgb, var(--color-frame) 28%, var(--color-paper-2));
-  stroke: var(--color-frame);
-  stroke-width: 1;
-}
-.hchart__dot[data-tier="low"] {
-  fill: color-mix(in srgb, var(--color-sky) 82%, var(--color-paper-2));
-  stroke: var(--color-paper-2);
-}
+/* (그래프 점 .hchart__dot의 네 단계 색은 v3.51에서 점과 함께 지웠다) */
 
 /* 2. 그래프 카드는 달력 바로 아래 한 덩어리: 위 간격 16 → 8px. 붓선 없음 */
 .hchart-wrap {
@@ -3392,19 +3364,18 @@ input:checked + .entry-happy__stamp::before,
   color: var(--color-paper-2);
   font-weight: 700;
 }
-/* 빈 날을 건너는 구간: 같은 색·같은 굵기, 불투명도만 — 범례 견본도 같은 옅은 선 */
+/* 빈 날을 건너는 구간(v3.51 다듬기): 점선은 없다. 예상 선이 없는 그림에서만 같은 색 가는 실선(1px · 45%)으로 이어 준다 — 굵은 토막 = 기록한 날, 가는 이음 = 건너뜀.
+   예상 선이 있는 그림에서는 잇지 않고 끊어 둔다(HappinessChart) — 선 모양은 한 그림에 둘까지. 범례에 풀이 줄이 없다 */
 .hchart__line--gap {
-  opacity: 0.35;
+  stroke-width: 1;
+  opacity: 0.45;
 }
-.hchart__fortune--gap {
-  opacity: 0.25;
-}
-.hchart__key--gap::before {
-  width: 16px;
-  height: 2px;
-  border-radius: 1px;
-  background: var(--color-ink);
-  opacity: 0.35;
+/* 행복도 선의 종이색 테: 예상 선과 겹치는 곳에서 예상 선을 끊어 행복도가 먼저 읽힌다 */
+.hchart__halo {
+  stroke: var(--color-paper-2);
+  stroke-width: 5.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 /* 6. 나 — 영역별 행복도 막대: 이름 58px · 트랙(옅은 녹갈) · 평균(송명 15px) · 매긴 날 수(12px). 채움은 네 단계 색, 매긴 날 없는 영역은 흐리게 */
@@ -6643,4 +6614,888 @@ input:checked + .tag.state-tag {
 .fc--blend .compare--bare .compare__row[data-kind="fortune"] .compare__fill {
   background: none;
   box-shadow: inset 0 0 0 1px var(--fc-gold);
+}
+
+/* ── v3.51 나 탭: 칩 둘 · 물음 인장 둘 · 낱장 셋 · 점 없는 그래프 (명세 47, 2026-11-17) ──────────────────────────────
+   본문은 내 카드 → 기록 한 줄 → 여덟 글자 한 줄 → 칩 둘 → 달력 → 물음 인장 둘 → 접힌 "자세한 통계" 뿐이다. 통계 카드는 서랍과 낱장으로 갔다.
+   옥색(--color-jade) = 좋을 쪽, 주홍(글자 el-fire-ink · 면 seal) = 조심할 쪽 — 운세 카드 섞은 톤(v3.50)과 같은 짝. 이 두 색은 그 뜻으로만 쓴다:
+   칩 둘 · 달력 앞날 도장 · 앞날 칸 인장 · 그래프의 가장 높은 날/낮은 날 도장 · 1등 갈래 막대 · 같은 쪽이었던 날 도장. 물음 인장 · 낱장 틀 · 선은 먹과 금.
+   금색 면은 만세력 낱장 끝의 권유 버튼 하나(.paid-invite__go). 금색은 글자·포커스에 쓰지 않는다(v3.26).
+   뇌문 띠 + 매듭은 낱장 머리(.sheet__band · .sheet__knot)에만 — 운세 카드의 .fc-blend__band · .fc-knot와 같은 문양을 새 클래스로 떼어 썼다(운세 카드 규칙은 그대로).
+   새 그림 없음 — 키트 재사용: card-paper · tag-strip-paper · stamp-inked-red 알파(마스크) · brush-stroke · gold-wash · 60갑자 얼굴.
+   새 모션은 낱장 오르내림(240ms · 180ms)뿐, 칩 → 달력의 "꽝"은 오늘 도장의 cal-stamp-in 그대로. reduced-motion이면 둘 다 없다 */
+
+/* 1. 기록 한 줄 `.me-line`: "이번 달 12일 기록" 15px 먹 + 연속 "5일째"는 한지 띠지(tag-strip-paper, 머리표 .sec-tag와 같은 재료 26px 13px 굵게).
+   가운뎃점 대신 간격 10px + 띠지(v3.13). 잠겨 있을 때는 "7일까지 N일 남았어요" 한 덩이 */
+.me-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 4px 10px;
+  min-height: 26px;
+  margin-bottom: 0;
+  font-size: 15px;
+  line-height: 1.4;
+  color: var(--color-ink);
+}
+.me-line > span + span {
+  display: inline-flex;
+  align-items: center;
+  height: 26px;
+  padding: 0 3px;
+  border-style: solid;
+  border-width: 0 10px;
+  border-image: url("/ui/tag-strip-paper-clean.webp") 0 44 fill / 0 10px / 0 stretch;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 2. 여덟 글자 한 줄 `.saju-line`: 줄 전체가 버튼(56px). 왼쪽 여덟 글자 송명 22px(오행 글자색 그대로, 기둥 사이 10px), 오른쪽 "만세력" 14px muted + 꺾쇠 12px.
+   틀은 보조 카드와 같은 녹갈 한 줄(card-light) + 한지 결. 누르면 .985 */
+.saju-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  min-height: 56px;
+  margin: 0;
+  padding: 0 14px 0 18px;
+  font: inherit;
+  color: var(--color-ink);
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 120ms ease-out;
+}
+.saju-line:active {
+  transform: scale(0.985);
+}
+.saju-line__chars {
+  display: inline-flex;
+  gap: 10px;
+  font-size: 22px;
+  line-height: 1;
+  white-space: nowrap;
+}
+.saju-line__more {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+  font-size: 14px;
+  line-height: 1;
+  color: var(--color-muted);
+}
+.saju-line__more::after {
+  content: "";
+  width: 12px;
+  height: 12px;
+  background: currentColor;
+  transform: rotate(-90deg);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 14' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 5.5l4 4 4-4'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 14' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 5.5l4 4 4-4'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+
+/* 3. 칩 둘 `.me-chips`: 머리말 13px muted 두 덩이(간격 10px) → 두 칸. 칩 = 얼굴 동그라미 40px + 이름 13px(테와 같은 색) + 날짜 송명 22px 먹.
+   테 1px + 같은 색 글자 · 모서리 2px = 운세 카드 인장의 말(옥색 좋을 쪽 5.8:1 · 주홍 조심할 쪽 6.3:1, card-paper 위). 칸 전체가 링크, 누르면 .98 */
+.me-chips__head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 10px;
+  margin: 0 0 8px;
+  padding: 0 2px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--color-muted);
+}
+.me-chips__list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.me-chip {
+  --chip: var(--color-jade);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 60px;
+  padding: 8px 10px 8px 9px;
+  border: 1px solid var(--chip);
+  border-radius: 2px;
+  background: var(--color-paper-2) url("/ui/card-paper.webp") center / 512px 512px;
+  color: var(--color-ink);
+  text-decoration: none;
+  transition: transform 120ms ease-out;
+}
+.me-chip[data-kind="worst"] {
+  --chip: var(--color-el-fire-ink);
+}
+.me-chip:active {
+  transform: scale(0.98);
+}
+.me-chip__face,
+.cal-forecast__face {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  padding: 3px;
+  border-radius: 50%;
+  object-fit: contain;
+  background: var(--color-paper) url("/ui/paper-bg.webp") center / 256px 256px;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-frame) 40%, transparent);
+}
+.me-chip__text {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+}
+.me-chip__title {
+  font-size: 13px;
+  line-height: 1.2;
+  color: var(--chip);
+  white-space: nowrap;
+}
+.me-chip__date {
+  font-family: var(--font-serif);
+  font-size: 22px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 4. 달력 앞날: 좋을 날 셋 = 옥색 도장, 조심할 날 셋 = 주홍 도장(v3.33의 금빛 · 남색 14px 점에서 바꿈 — 색의 뜻을 운세 카드와 맞췄다). 나머지 앞날은 빈 칸.
+   도장 찍힌 앞날 칸은 버튼: 날짜 숫자 12px 위 + 도장 18px 아래(키트 도장 알파로 오린 면). 고르면 먹 2px 테(지난 날과 같은 규칙).
+   칩을 눌러 넘어오면 그 칸의 도장만 한 번 "꽝"(cal-stamp-in — 흐린 칸 바탕 ::before는 움직이지 않는다) */
+.cal__cell[data-forecast] {
+  flex-direction: column;
+  gap: 3px;
+  cursor: pointer;
+}
+.cal__cell[data-forecast] .cal__day {
+  color: var(--color-muted);
+}
+.cal__forecast {
+  position: static;
+  width: 18px;
+  height: 18px;
+}
+.cal__cell[data-forecast="best"] {
+  --fc-face: var(--color-jade);
+}
+.cal__cell[data-forecast="worst"] {
+  --fc-face: var(--color-seal);
+}
+.cal__cell[data-forecast][data-stamp-in]::before {
+  animation: none;
+}
+.cal__cell[data-stamp-in] .cal__forecast {
+  animation: cal-stamp-in 420ms cubic-bezier(0.3, 0.7, 0.4, 1) both;
+}
+/* 앞날 칸 상세 `.cal-forecast`: 얼굴 48px + (인장 "좋을 날 / 조심할 날" · 날짜와 간지 14px muted) + 까닭 한 줄 15px 먹. 점수 없음 */
+.cal-forecast {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 2px;
+}
+.cal-forecast__face {
+  width: 48px;
+  height: 48px;
+  padding: 4px;
+}
+.cal-forecast__text {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 6px;
+}
+.cal-forecast__top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  margin: 0;
+}
+.cal-forecast__seal {
+  display: inline-flex;
+  align-items: center;
+  height: 26px;
+  padding: 0 9px;
+  border: 1px solid currentColor;
+  border-radius: 2px;
+  font-family: var(--font-serif);
+  font-size: 15px;
+  line-height: 1;
+  white-space: nowrap;
+  color: var(--color-jade);
+}
+.cal-forecast[data-kind="worst"] .cal-forecast__seal {
+  color: var(--color-el-fire-ink);
+}
+.cal-forecast__date {
+  font-size: 14px;
+  line-height: 1.3;
+  color: var(--color-muted);
+}
+.cal-forecast__reason {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--color-ink);
+  word-break: keep-all;
+}
+
+/* 5. 물음 인장 둘 `.ask-seals`: 나란히 두 칸, 칸 92px. 운세 카드 인장(네모 1px 테 + 명조)을 버튼 크기로 — 바깥 먹 1px + 안쪽 4px 들어온 먹 35% 1px 겹테(낙관),
+   물음 송명 19px 두 줄 가운데. 좋음 · 조심의 뜻이 없어 먹색. 누르면 .98.
+   잠김: 겹테 대신 옅은 녹갈 40% 한 줄, 물음 muted(5.2:1) + "기록 7일이면 열려요" 13px muted. 눌러도 움직이지 않는다 */
+.ask-seals {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 8px;
+}
+.ask-seal {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 92px;
+  margin: 0;
+  padding: 12px 8px;
+  border: 1px solid var(--color-ink);
+  border-radius: 2px;
+  background: var(--color-paper-2) url("/ui/card-paper.webp") center / 512px 512px;
+  font: inherit;
+  color: var(--color-ink);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 120ms ease-out;
+}
+.ask-seal::before {
+  content: "";
+  position: absolute;
+  inset: 3px;
+  border: 1px solid color-mix(in srgb, var(--color-ink) 35%, transparent);
+  border-radius: 1px;
+  pointer-events: none;
+}
+.ask-seal:active {
+  transform: scale(0.98);
+}
+.ask-seal__q {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-family: var(--font-serif);
+  font-size: 19px;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+.ask-seal[data-locked] {
+  border-color: color-mix(in srgb, var(--color-frame) 40%, transparent);
+  color: var(--color-muted);
+  cursor: default;
+}
+.ask-seal[data-locked]::before {
+  content: none;
+}
+.ask-seal[data-locked]:active {
+  transform: none;
+}
+.ask-seal__lock {
+  font-size: 13px;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+/* 6. 낱장 `.sheet` (<dialog>): 아래에서 올라오는 한지 낱장, 높이 화면의 9할, 안에서 세로로 민다. 셋(만세력 · 두 답)이 같은 틀.
+   dialog는 화면 전체를 덮는 투명 판이고 그 안에 어두운 막(.sheet__film, 밤 남색 50%)과 종이(.sheet__paper, card-paper)가 있다 — 막을 누르면 닫힌다.
+   머리: 남색 뇌문 띠 40px(금 겹선 사이 금빛 뇌문) → 띠 가운데에서 줄 5px → 금빛 매듭 20px → 술 17px(전부 aria-hidden) | 오른쪽 "닫기" 15px 먹 44px →
+   제목 송명 24px 왼쪽 축 24px → 금빛 1px 선. 띠를 잡고 아래로 밀면 닫힌다(touch-action none은 머리에만 — 안의 세로 밀기는 그대로).
+   안의 카드들은 카드 속 카드가 되지 않게 틀을 벗기고 녹갈 0.5px 괘선으로만 나눈다(자세한 통계 서랍과 같은 규칙) */
+html:has(dialog.sheet[open]) {
+  overflow: hidden;
+}
+dialog.sheet {
+  --sheet-gold: color-mix(in srgb, var(--color-gold) 45%, var(--color-gold-ink));
+  --sheet-gold-line: color-mix(in srgb, var(--color-gold) 80%, var(--color-gold-ink));
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  background: transparent;
+  color: var(--color-ink);
+}
+dialog.sheet[open] {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+}
+dialog.sheet::backdrop {
+  background: transparent;
+}
+.sheet__film {
+  position: absolute;
+  inset: 0;
+  background: color-mix(in srgb, var(--color-sky-2) 50%, transparent);
+  animation: sheet-film-in 240ms ease-out backwards;
+}
+.sheet__paper {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 28rem;
+  height: 90vh;
+  height: 90dvh;
+  overflow: hidden;
+  border-radius: 2px 2px 0 0;
+  animation: sheet-up 240ms cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+  transition: transform 160ms ease-out;
+}
+.sheet[data-closing] .sheet__paper {
+  animation: sheet-down 180ms ease-in both;
+}
+.sheet[data-closing] .sheet__film {
+  animation: sheet-film-out 180ms ease-in both;
+}
+@keyframes sheet-up {
+  from {
+    transform: translateY(100%);
+  }
+}
+@keyframes sheet-down {
+  from {
+    transform: translateY(var(--sheet-from, 0px));
+  }
+  to {
+    transform: translateY(100%);
+  }
+}
+@keyframes sheet-film-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes sheet-film-out {
+  to {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sheet__film,
+  .sheet__paper,
+  .sheet[data-closing] .sheet__film,
+  .sheet[data-closing] .sheet__paper {
+    animation: none;
+    transition: none;
+  }
+  .cal__cell[data-stamp-in] .cal__forecast {
+    animation: none;
+  }
+}
+.sheet__head {
+  position: relative;
+  flex: none;
+  padding-bottom: 14px;
+  border-bottom: 1px solid color-mix(in srgb, var(--color-gold) 55%, transparent);
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+/* 띠 40px: 위에서부터 금 겹선(3 · 6px) — 뇌문 15px(16px 반복) — 금 겹선(31 · 34px). 운세 카드 섞은 톤의 띠와 같은 문양 */
+.sheet__band {
+  position: relative;
+  display: block;
+  height: 40px;
+  background: var(--color-sky-2);
+}
+.sheet__band::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--color-gold);
+  opacity: 0.9;
+  -webkit-mask:
+    linear-gradient(#000 0 0) 0 3px / 100% 1px no-repeat,
+    linear-gradient(#000 0 0) 0 6px / 100% 1px no-repeat,
+    linear-gradient(#000 0 0) 0 31px / 100% 1px no-repeat,
+    linear-gradient(#000 0 0) 0 34px / 100% 1px no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 15' fill='none' stroke='%23000' stroke-width='1'%3E%3Cpath d='M0 14.5H16 M14.5 14.5V0.5H1.5V11.5H11.5V3.5H4.5V8.5H8.5V6.5'/%3E%3C/svg%3E") center 12px / 16px 15px repeat-x;
+  mask:
+    linear-gradient(#000 0 0) 0 3px / 100% 1px no-repeat,
+    linear-gradient(#000 0 0) 0 6px / 100% 1px no-repeat,
+    linear-gradient(#000 0 0) 0 31px / 100% 1px no-repeat,
+    linear-gradient(#000 0 0) 0 34px / 100% 1px no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 15' fill='none' stroke='%23000' stroke-width='1'%3E%3Cpath d='M0 14.5H16 M14.5 14.5V0.5H1.5V11.5H11.5V3.5H4.5V8.5H8.5V6.5'/%3E%3C/svg%3E") center 12px / 16px 15px repeat-x;
+}
+/* 매듭: 띠 아랫단에서 남색 줄 5px → 금빛 동심결 20px → 금빛 술 17px. "닫기" 줄의 빈 가운데를 지나 제목 위에서 끝난다 */
+.sheet__knot {
+  position: absolute;
+  top: 40px;
+  left: 50%;
+  width: 20px;
+  height: 42px;
+  margin-left: -10px;
+  pointer-events: none;
+  background: linear-gradient(var(--color-sky), var(--color-sky)) center 0 / 1px 5px no-repeat;
+}
+.sheet__knot::before,
+.sheet__knot::after {
+  content: "";
+  position: absolute;
+}
+.sheet__knot::before {
+  top: 5px;
+  left: 0;
+  width: 20px;
+  height: 20px;
+  background: var(--sheet-gold);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%23000' stroke-width='1.1'%3E%3Cpath d='M10 4L16 10L10 16L4 10Z M6 8L12 14 M8 6L14 12 M6 12L12 6 M8 14L14 8'/%3E%3Ccircle cx='2.4' cy='10' r='1.7'/%3E%3Ccircle cx='17.6' cy='10' r='1.7'/%3E%3Ccircle cx='10' cy='2.4' r='1.7'/%3E%3Ccircle cx='10' cy='17.6' r='1.7'/%3E%3C/svg%3E") center / 20px 20px no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%23000' stroke-width='1.1'%3E%3Cpath d='M10 4L16 10L10 16L4 10Z M6 8L12 14 M8 6L14 12 M6 12L12 6 M8 14L14 8'/%3E%3Ccircle cx='2.4' cy='10' r='1.7'/%3E%3Ccircle cx='17.6' cy='10' r='1.7'/%3E%3Ccircle cx='10' cy='2.4' r='1.7'/%3E%3Ccircle cx='10' cy='17.6' r='1.7'/%3E%3C/svg%3E") center / 20px 20px no-repeat;
+}
+.sheet__knot::after {
+  top: 24px;
+  left: 5px;
+  width: 10px;
+  height: 17px;
+  background:
+    linear-gradient(var(--sheet-gold), var(--sheet-gold)) 0 0 / 100% 3px no-repeat,
+    repeating-linear-gradient(90deg, var(--sheet-gold) 0 1px, transparent 1px 2px);
+  clip-path: polygon(30% 0, 70% 0, 100% 100%, 0 100%);
+}
+.sheet__bar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  height: 44px;
+  padding: 0 24px;
+}
+.sheet__close {
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 15px;
+  color: var(--color-ink);
+  cursor: pointer;
+}
+.sheet__title:focus {
+  outline: none;
+}
+.sheet__title {
+  margin: 2px 0 0;
+  padding: 0 24px;
+  font-family: var(--font-serif);
+  font-size: 24px;
+  font-weight: 400;
+  line-height: 1.3;
+  color: var(--color-sky-2);
+  word-break: keep-all;
+}
+.sheet__body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  padding: 20px 24px calc(40px + env(safe-area-inset-bottom));
+}
+.sheet .card-light {
+  border: 0;
+  border-top: 0.5px solid color-mix(in srgb, var(--color-frame) 55%, transparent);
+  border-radius: 0;
+  background: none;
+  padding: 16px 0 0;
+}
+
+/* 7. 만세력 낱장 `.saju-sheet`: 맨 위 = 본문에서 옮겨 온 요약(여덟 글자 송명 30px 가운데 · 오행 방울 · 중심 기운/용신/희신 세 줄 — v3.34 재료 그대로),
+   생년월일 줄, 만세력 한 판(SajuChartPanel), 맨 끝 권유 */
+.saju-sheet__chars {
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+  margin: 0;
+  font-size: 30px;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+.saju-sheet__birth {
+  margin: 0;
+  padding-top: 12px;
+  border-top: 0.5px solid color-mix(in srgb, var(--color-frame) 55%, transparent);
+}
+
+/* 8. 유료 풀이 권유 `.paid-invite`(만세력 낱장 맨 끝 한 곳): 괘선 → 한 줄 송명 20px → 작은 글씨 13px muted → [금색 면 버튼 56px | "다음에" 15px 먹 글자 버튼].
+   금색 면은 낱장 안에서 이것 하나. (닫혔을 때) 그 아래 "초대 코드가 있어요" 14px muted 밑줄 */
+.paid-invite {
+  display: flex;
+  flex-direction: column;
+  padding-top: 20px;
+  border-top: 0.5px solid color-mix(in srgb, var(--color-frame) 55%, transparent);
+}
+.paid-invite__line {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: 20px;
+  line-height: 1.4;
+  color: var(--color-ink);
+  word-break: keep-all;
+  text-wrap: balance;
+}
+.paid-invite__sub {
+  margin: 6px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--color-muted);
+  word-break: keep-all;
+}
+.paid-invite__actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 16px;
+}
+.paid-invite__go {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  height: 56px;
+  border-radius: 12px;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--color-gold-ink);
+  text-decoration: none;
+}
+.paid-invite__later {
+  flex: none;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 15px;
+  color: var(--color-ink);
+  cursor: pointer;
+}
+.paid-invite__code {
+  align-self: center;
+  margin-top: 4px;
+  font-size: 14px;
+  color: var(--color-muted);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+/* 9. 답 낱장 `.answer`: 한 문장 송명 22px(답이 주인공) → 24px 간격으로 아래 묶음들. 안내 문구(아직 없음)는 같은 자리 17px muted.
+   작은 글씨 한 줄 13px muted */
+.answer {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+.answer__lead {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: 22px;
+  line-height: 1.45;
+  color: var(--color-ink);
+  word-break: keep-all;
+  text-wrap: balance;
+}
+.answer__lead > p {
+  margin: 0;
+}
+.answer__lead > p + p {
+  margin-top: 10px;
+}
+.answer__lead[data-empty] {
+  font-family: var(--font-sans);
+  font-size: 17px;
+  line-height: 1.6;
+  color: var(--color-muted);
+}
+.answer__note {
+  margin: -12px 0 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--color-muted);
+  word-break: keep-all;
+}
+.answer__chart {
+  padding-top: 16px;
+  border-top: 0.5px solid color-mix(in srgb, var(--color-frame) 55%, transparent);
+}
+
+/* 다섯 갈래 줄 `.group-rows`: 줄 = 낱말 15px 먹 | 평균 송명 17px + 날 수 12px muted, 그 아래 붓 가로 막대 10px(오행 붓 막대와 같은 brush-stroke 마스크, 10이 끝).
+   1등 갈래만 옥색 막대 + 굵은 낱말, 나머지는 먹 72%. 3일 미만(data-thin)은 막대 없이 낱말 muted + "N일"만 — 틀렸다는 뜻이 아니라 아직 적다는 뜻 */
+.group-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.group-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 6px 12px;
+}
+.group-row__word {
+  font-size: 15px;
+  line-height: 1.3;
+  color: var(--color-ink);
+  word-break: keep-all;
+}
+.group-row__nums {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  font-variant-numeric: tabular-nums;
+}
+.group-row__avg {
+  font-family: var(--font-serif);
+  font-size: 17px;
+  line-height: 1;
+  color: var(--color-ink);
+}
+.group-row__n {
+  min-width: 26px;
+  font-size: 12px;
+  line-height: 1;
+  color: var(--color-muted);
+  text-align: right;
+}
+.group-row__track {
+  grid-column: 1 / -1;
+  display: block;
+  height: 10px;
+}
+.group-row__fill {
+  display: block;
+  height: 100%;
+  background: color-mix(in srgb, var(--color-ink) 72%, transparent);
+  -webkit-mask: url("/ui/brush-stroke.webp") no-repeat right center / max(100%, 56px) 100%;
+  mask: url("/ui/brush-stroke.webp") no-repeat right center / max(100%, 56px) 100%;
+}
+.group-row[data-top] .group-row__word {
+  font-weight: 700;
+}
+.group-row[data-top] .group-row__fill {
+  background: var(--color-jade);
+}
+.group-row[data-thin] .group-row__word {
+  color: var(--color-muted);
+}
+.group-row[data-thin] .group-row__track {
+  display: none;
+}
+
+/* 가장 행복했던 날 카드(낱장 안, v3.32 .day-pick 재료 그대로): 왼쪽 이름 · 얼굴 48px + 간지 · 날짜 · 기분 칩, 오른쪽 행복도 도장 52px. 금 1px 테.
+   그 아래 작게 힘든 날 한 줄 `.day-pick__low` 14px(이름 muted · 날짜 먹 · "행복도 N" 송명) — 손가락 자리 44px, 틀 없음 */
+.day-pick__link--wide {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.day-pick__main {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 6px;
+}
+.day-pick__who {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.day-pick__link--wide .metric__value {
+  flex: none;
+  margin: 0 4px 0 0;
+}
+.day-pick__link--wide .day-pick__num {
+  width: 52px;
+  height: 52px;
+  font-size: 22px;
+}
+.day-pick__low {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 12px;
+  margin: 6px 0 0;
+  padding-inline: 2px;
+  font-size: 14px;
+  line-height: 1.3;
+  color: var(--color-ink);
+  text-decoration: none;
+}
+.day-pick__low-label {
+  color: var(--color-muted);
+}
+.day-pick__low-num {
+  margin-left: auto;
+  font-family: var(--font-serif);
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 날 목록 `.versus-days`("예상은 맞았을까?", 최근 10 — 낱장에 그래프가 없어 작은 글씨 바로 아래, 위에 녹갈 0.5px 괘선 한 줄): 날짜 송명 15px muted | "좋을 날로 봄" 15px 먹 | → muted | "행복도 N" | 같은 쪽이었던 날만 옥색 도장 14px.
+   다른 쪽이었던 날은 표시 없음(빨간 표시를 하지 않는다). 줄 사이 kv와 같은 녹갈 점선 */
+.versus-days {
+  display: flex;
+  flex-direction: column;
+  margin: -4px 0 0;
+  padding: 6px 0 0;
+  border-top: 0.5px solid color-mix(in srgb, var(--color-frame) 55%, transparent);
+  list-style: none;
+}
+.versus-day {
+  display: grid;
+  grid-template-columns: 44px max-content 14px minmax(0, 1fr) 14px;
+  align-items: center;
+  column-gap: 8px;
+  min-height: 38px;
+  border-bottom: 0.5px dashed color-mix(in srgb, var(--color-frame) 25%, transparent);
+  font-size: 15px;
+  line-height: 1.3;
+  color: var(--color-ink);
+}
+.versus-day:last-child {
+  border-bottom: 0;
+}
+.versus-day__date {
+  font-family: var(--font-serif);
+  color: var(--color-muted);
+  font-variant-numeric: tabular-nums;
+}
+.versus-day__arrow {
+  color: var(--color-muted);
+  text-align: center;
+}
+.versus-day__h {
+  font-variant-numeric: tabular-nums;
+}
+.versus-day__mark {
+  width: 14px;
+  height: 14px;
+}
+.versus-day[data-hit] .versus-day__mark {
+  background: var(--color-jade);
+  -webkit-mask: url("/ui/stamp-inked-red-clean.png") center / contain no-repeat;
+  mask: url("/ui/stamp-inked-red-clean.png") center / contain no-repeat;
+}
+
+/* 10. 그래프(자세한 통계 · 두 답 낱장 공통): 날마다의 점 없음. 행복도 = 먹에 가까운 녹갈(괘선색 line) 2px 한 줄, 예상 = 같은 색 1.25px 45%(점선 아님).
+   가장 높은 날 · 낮은 날 두 곳만 도장 22px(키트 도장 알파 — 옥색 · 주홍 면 + 종이색 값 송명 12px 굵게). 날짜 5일 간격, 세로 0 · 5 · 10.
+   건드린 날: 가는 세로선 + 빈 고리 하나, 그래프 위 띠의 구석 `.hchart__read`에 날짜와 값(가장 높은 날 도장의 반대쪽 — 자리를 따로 잡지 않아 그래프가 밀리지 않는다).
+   안내 "선을 누르면 그날 값이 보여요" `.hchart__hint`는 그래프 아래 범례 줄 오른쪽 끝에 12px muted */
+.hchart__read {
+  position: absolute;
+  top: 0;
+  left: 7%;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--color-ink);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+.hchart__read[data-side="right"] {
+  right: 4%;
+  left: auto;
+}
+.hchart__read-date {
+  font-family: var(--font-serif);
+  font-size: 15px;
+}
+.hchart__read b {
+  font-family: var(--font-serif);
+  font-size: 15px;
+  font-weight: 400;
+}
+.hchart__hint {
+  margin-left: auto;
+  font-size: 12px;
+  line-height: 1.4;
+}
+.hchart__plot {
+  position: relative;
+  touch-action: pan-y;
+  cursor: crosshair;
+  -webkit-tap-highlight-color: transparent;
+}
+.hchart__tick {
+  stroke: color-mix(in srgb, var(--color-frame) 55%, transparent);
+}
+.hchart__cursor line {
+  stroke: color-mix(in srgb, var(--color-frame) 60%, transparent);
+  stroke-width: 0.75;
+}
+.hchart__cursor circle {
+  fill: var(--color-paper-2);
+  stroke: var(--color-line);
+  stroke-width: 1.5;
+}
+.hchart__peak {
+  position: absolute;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  transform: translate(-50%, -50%);
+  isolation: isolate;
+  font-family: var(--font-serif);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--color-paper-2);
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+.hchart__peak::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: var(--color-jade);
+  -webkit-mask: url("/ui/stamp-inked-red-clean.png") center / contain no-repeat;
+  mask: url("/ui/stamp-inked-red-clean.png") center / contain no-repeat;
+}
+.hchart__peak[data-kind="lo"]::before {
+  background: var(--color-seal);
+}
+.hchart__key--line::before {
+  width: 16px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--color-line);
+}
+/* 자세한 통계 서랍 안 그래프: 달력 아래 한 덩어리였던 때의 −8px 당김을 푼다 */
+.more-stats .hchart-wrap {
+  margin-top: 0;
 }

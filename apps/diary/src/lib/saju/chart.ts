@@ -125,6 +125,12 @@ export interface SajuChart {
   hourUnknown: boolean;
   /** 오행 분포율 (엔진 calculateElementDistribution — 합·조후 반영). 목화토금수 순, 정수 % */
   elements: { el: Element; ko: string; pct: number }[];
+  /**
+   * 다섯 힘 (2026-11-17, 명세 48): 코어가 신강약·중심 기운을 정할 때 쓴 세력(판정용 %)을 오행 순(목화토금수)으로.
+   * 유료 풀이의 진단 낱장과 같은 값이다. 오행마다 내 일간 기준 갈래(비겁…)와 쉬운 말, 용신 역할(용·희·기·구·한, 용신을 못 정했으면 null).
+   * 위 elements(엔진 분포율 — 합·조후 반영)와는 다른 계산이라 숫자가 다르다. 한 화면에 둘을 같이 내지 않는다.
+   */
+  power: { el: Element; ko: string; pct: number; group: Group; plain: string; role: string | null }[];
 }
 
 const EL_EN: Record<string, Element> = { 목: "wood", 화: "fire", 토: "earth", 금: "metal", 수: "water" };
@@ -230,6 +236,10 @@ export function sajuChart(pillars: PillarsSnapshot, birth: BirthProfile, today: 
     daeun,
     hourUnknown: !pillars.hour,
     elements: elementPercents(pillars),
+    power: ELEMENT_ORDER.map((ko) => {
+      const group = (Object.keys(b.그룹오행) as Group[]).find((k) => b.그룹오행[k] === ko)!;
+      return { el: ELEMENT_KO_TO_EN[ko], ko, pct: Math.round(b.판정용퍼센트[ko]), group, plain: GROUP_PLAIN[group], role: y ? y.역할[group] : null };
+    }),
   };
 }
 
