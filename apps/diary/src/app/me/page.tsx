@@ -19,6 +19,7 @@ import { paidReadingOpen } from "@/lib/sajucow";
 import { SajuChartPanel } from "@/components/SajuChartPanel";
 import { Sheet, SheetTrigger } from "@/components/Sheet";
 import { MeForecastChips } from "@/components/MeForecastChips";
+import { SajuNewDot } from "@/components/SajuNewDot";
 import { HappyAnswer, InsightSeals, VersusAnswer } from "@/components/InsightSeals";
 import { areaAverages, areaRadar, bestWorstDays, fortuneAccuracy, growingSeries, habitOf, happinessSeries, monthlySeries, moodTop, nextUnlock, streakOf, type PickedDay } from "@/lib/stats/extra";
 import { BestWorstDays, type DayCard, type ForecastCard } from "@/components/BestWorstDays";
@@ -202,24 +203,34 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
         </p>
       </header>
 
-      {/* 명세 47 여덟 글자 한 줄: 줄 전체가 버튼, 누르면 만세력 낱장. 중심 기운 · 용신 · 희신 · 오행 방울은 낱장 안으로.
+      {/* 명세 48 내 사주 접힌 줄(+ 더하기): 중심 · 힘 두 줄(한자와 사주 용어 없이 쉬운 말만) + 오른쪽에 다섯 힘 막대 맛보기(숫자 · 글자 없이 오행 색, 꾸밈).
+          버튼 글귀 "내 사주 그림 보기", 이 기기에서 한 번도 안 열었으면 붉은 점(SajuNewDot). 줄 전체가 버튼, 누르면 만세력 낱장.
           id="saju"는 옛 주소(/me/saju → /me?saju=open#saju)가 닿는 자리 */}
-      <SheetTrigger id="saju" target="sheet-saju" className="saju-line card-light card-paper" aria-label="내 사주 여덟 글자, 만세력 열기">
-        <span className="saju-line__chars font-serif" lang="zh-Hant" aria-hidden>
-          {chart.columns.map((c) =>
-            c.unknown ? (
-              <span key={c.pos} className="saju-summary__pillar text-muted">
-                ??
-              </span>
-            ) : (
-              <span key={c.pos} className="saju-summary__pillar">
-                <span className={c.stemElement ? ELEMENT_TEXT[c.stemElement] : undefined}>{c.stem}</span>
-                <span className={c.branchElement ? ELEMENT_TEXT[c.branchElement] : undefined}>{c.branch}</span>
-              </span>
-            ),
-          )}
+      <SheetTrigger id="saju" target="sheet-saju" className="saju-line card-light card-paper">
+        <span className="saju-line__head">
+          <span className="saju-line__title">내 사주</span>
+          <span className="saju-line__more">
+            <SajuNewDot sheetId="sheet-saju" />
+            내 사주 그림 보기
+          </span>
         </span>
-        <span className="saju-line__more">만세력</span>
+        <span className="saju-line__body">
+          <span className="saju-line__rows">
+            <span className="saju-line__row">
+              <span className="saju-line__k">중심</span>
+              <span className="saju-line__v">{chart.center.centerPlain.split(" — ")[0]}</span>
+            </span>
+            <span className="saju-line__row">
+              <span className="saju-line__k">힘</span>
+              <span className="saju-line__v">{chart.center.strengthPlain}</span>
+            </span>
+          </span>
+          <span className="saju-line__mini" aria-hidden>
+            {chart.power.map((p) => (
+              <span key={p.el} className="saju-line__bar" data-el={p.el} data-zero={p.pct === 0 ? "" : undefined} style={{ "--h": p.pct / Math.max(1, ...chart.power.map((x) => x.pct)) } as React.CSSProperties} />
+            ))}
+          </span>
+        </span>
       </SheetTrigger>
 
       <section id="me-records" className="me-sep me-sep--wide flex flex-col gap-4">
@@ -270,75 +281,24 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
       {/* ── 낱장 셋 (명세 47): 같은 틀(Sheet). 한 번에 하나만 열린다. 저장 직후(?saved=)에도 저절로 열리지 않는다 ── */}
       {/* 만세력 낱장: 본문에서 옮겨 온 오행 방울 · 중심 기운 · 용신 · 희신 → 생년월일 → 만세력 한 판 → 맨 끝 유료 풀이 권유 한 곳. ?saju=open이면 열린 채 시작 */}
       <Sheet id="sheet-saju" name="saju" title="만세력" initialOpen={saju === "open"}>
-        <div className="saju-sheet flex flex-col gap-5">
-          <div className="saju-sheet__summary flex flex-col gap-4">
-            <p className="saju-sheet__chars font-serif" lang="zh-Hant" aria-label="내 사주 여덟 글자">
-              {chart.columns.map((c) =>
-                c.unknown ? (
-                  <span key={c.pos} className="saju-summary__pillar text-muted">
-                    ??
-                  </span>
-                ) : (
-                  <span key={c.pos} className="saju-summary__pillar">
-                    <span className={c.stemElement ? ELEMENT_TEXT[c.stemElement] : undefined}>{c.stem}</span>
-                    <span className={c.branchElement ? ELEMENT_TEXT[c.branchElement] : undefined}>{c.branch}</span>
-                  </span>
-                ),
-              )}
+        {/* 명세 48: 맨 위 여덟 글자 · 오행 방울 · 요약 세 줄은 뺐다(명식 표 · 다섯 힘 · 풀이 낱말 줄이 맡는다). 생년월일 줄은 표 아래로 */}
+        <SajuChartPanel
+          chart={chart}
+          ganjiKo={me.ganjiKo}
+          faceSrc={me.faceSrc}
+          open={paidOpen}
+          birth={
+            <p className="saju-sheet__birth flex items-center justify-between text-sm text-muted">
+              <span>
+                {profile.calendar === "lunar" ? "음력" : "양력"} {profile.birth_year}.{profile.birth_month}.{profile.birth_day}
+                {profile.birth_hour !== null ? ` ${String(profile.birth_hour).padStart(2, "0")}:${String(profile.birth_minute).padStart(2, "0")}` : " 시간 모름"}
+              </span>
+              <Link href="/onboarding?next=/me" className="tap underline underline-offset-4">
+                고치기
+              </Link>
             </p>
-            {/* 2026-10-31 사용자 Q5: 오행을 그림으로 — 다섯 동그라미, 크기·채움이 분포율(--pct 0~1). 모양은 디자이너(.saju-summary__elements) */}
-            <ul className="saju-summary__elements" aria-label="오행 분포">
-              {chart.elements.map((e) => (
-                <li key={e.el} className="saju-summary__element" data-el={e.el} data-zero={e.pct === 0 ? "" : undefined} style={{ "--pct": e.pct / 100 } as React.CSSProperties} aria-label={`${e.ko} ${e.pct}%`}>
-                  <span className="saju-summary__el-dot" aria-hidden />
-                  <span className={`saju-summary__el-label font-serif ${ELEMENT_TEXT[e.el]}`}>{e.ko}</span>
-                  <span className="saju-summary__el-pct text-[12px] tabular-nums text-muted">{e.pct}%</span>
-                </li>
-              ))}
-            </ul>
-            {/* 중심 기운 · 용신 · 희신 — 이름 열과 값 열을 맞춘 세 줄. 용신·희신 오행은 만세력 안과 같은 오행 도장(.saju-yongsin__el) */}
-            <dl className="kv saju-summary__rows">
-              <div className="kv__row">
-                <dt>중심 기운</dt>
-                <dd>
-                  {chart.center.centerGroup}, {chart.center.strengthPlain}
-                </dd>
-              </div>
-              {chart.yongsin && (
-                <>
-                  <div className="kv__row">
-                    <dt>용신</dt>
-                    <dd>
-                      <span className="saju-yongsin__el" data-el={chart.yongsin.use} data-rank="use">
-                        {ELEMENT_KO[chart.yongsin.use]}
-                      </span>{" "}
-                      <span className="text-muted">{chart.yongsin.useGroup}</span>
-                    </dd>
-                  </div>
-                  <div className="kv__row">
-                    <dt>희신</dt>
-                    <dd>
-                      <span className="saju-yongsin__el" data-el={chart.yongsin.hee} data-rank="hee">
-                        {ELEMENT_KO[chart.yongsin.hee]}
-                      </span>{" "}
-                      <span className="text-muted">{chart.yongsin.heeGroup}</span>
-                    </dd>
-                  </div>
-                </>
-              )}
-            </dl>
-          </div>
-          <p className="saju-sheet__birth flex items-center justify-between text-sm text-muted">
-            <span>
-              {profile.calendar === "lunar" ? "음력" : "양력"} {profile.birth_year}.{profile.birth_month}.{profile.birth_day}
-              {profile.birth_hour !== null ? ` ${String(profile.birth_hour).padStart(2, "0")}:${String(profile.birth_minute).padStart(2, "0")}` : " 시간 모름"}
-            </span>
-            <Link href="/onboarding?next=/me" className="tap underline underline-offset-4">
-              고치기
-            </Link>
-          </p>
-          <SajuChartPanel chart={chart} ganjiKo={me.ganjiKo} faceSrc={me.faceSrc} open={paidOpen} />
-        </div>
+          }
+        />
       </Sheet>
       {/* 물음 인장의 답 낱장 둘 — 인장이 열렸을 때만 그린다 */}
       {insightOpen && (

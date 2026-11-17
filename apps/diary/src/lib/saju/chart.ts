@@ -80,6 +80,8 @@ export const GROUP_PLAIN: Record<Group, string> = {
   관성: "규칙과 책임의 기운",
   인성: "배우고 받아들이는 기운",
 };
+/** 짧은 꼴 (명세 48): 막대 아래 말·문장 속에 쓴다. 모두 "기운"으로 끝나 조사 "이"가 맞는다 */
+export const GROUP_SHORT: Record<Group, string> = { 비겁: "나와 같은 기운", 식상: "표현하는 기운", 재성: "거두는 기운", 관성: "책임의 기운", 인성: "배우는 기운" };
 const STRENGTH_PLAIN = { 신강: "기운이 센 편", 중화: "기운이 고른 편", 신약: "기운이 여린 편" } as const;
 
 // ---- 결과 -------------------------------------------------------------------
@@ -130,7 +132,7 @@ export interface SajuChart {
    * 유료 풀이의 진단 낱장과 같은 값이다. 오행마다 내 일간 기준 갈래(비겁…)와 쉬운 말, 용신 역할(용·희·기·구·한, 용신을 못 정했으면 null).
    * 위 elements(엔진 분포율 — 합·조후 반영)와는 다른 계산이라 숫자가 다르다. 한 화면에 둘을 같이 내지 않는다.
    */
-  power: { el: Element; ko: string; pct: number; group: Group; plain: string; role: string | null }[];
+  power: { el: Element; ko: string; pct: number; group: Group; plain: string; short: string; role: string | null }[];
 }
 
 const EL_EN: Record<string, Element> = { 목: "wood", 화: "fire", 토: "earth", 금: "metal", 수: "water" };
@@ -238,7 +240,7 @@ export function sajuChart(pillars: PillarsSnapshot, birth: BirthProfile, today: 
     elements: elementPercents(pillars),
     power: ELEMENT_ORDER.map((ko) => {
       const group = (Object.keys(b.그룹오행) as Group[]).find((k) => b.그룹오행[k] === ko)!;
-      return { el: ELEMENT_KO_TO_EN[ko], ko, pct: Math.round(b.판정용퍼센트[ko]), group, plain: GROUP_PLAIN[group], role: y ? y.역할[group] : null };
+      return { el: ELEMENT_KO_TO_EN[ko], ko, pct: Math.round(b.판정용퍼센트[ko]), group, plain: GROUP_PLAIN[group], short: GROUP_SHORT[group], role: y ? y.역할[group] : null };
     }),
   };
 }

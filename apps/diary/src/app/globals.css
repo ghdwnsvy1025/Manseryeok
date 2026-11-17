@@ -6654,17 +6654,16 @@ input:checked + .tag.state-tag {
   font-variant-numeric: tabular-nums;
 }
 
-/* 2. 여덟 글자 한 줄 `.saju-line`: 줄 전체가 버튼(56px). 왼쪽 여덟 글자 송명 22px(오행 글자색 그대로, 기둥 사이 10px), 오른쪽 "만세력" 14px muted + 꺾쇠 12px.
-   틀은 보조 카드와 같은 녹갈 한 줄(card-light) + 한지 결. 누르면 .985 */
+/* 2. 내 사주 접힌 줄 `.saju-line` (v3.52, 명세 48 — v3.51의 여덟 글자 한 줄을 대신한다): 줄 전체가 버튼. 머리 = 왼쪽 "내 사주" 13px muted · 오른쪽 "만세력" 14px muted + 꺾쇠 12px.
+   머리 오른쪽 글귀는 "내 사주 그림 보기"(더하기). 그 아래 몸통은 아래 "명세 48 더하기" 규칙.
+   한자와 사주 용어는 없다. 틀은 보조 카드와 같은 녹갈 한 줄(card-light) + 한지 결. 누르면 .985 */
 .saju-line {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  flex-direction: column;
+  gap: 10px;
   width: 100%;
-  min-height: 56px;
   margin: 0;
-  padding: 0 14px 0 18px;
+  padding: 14px 14px 14px 18px;
   font: inherit;
   color: var(--color-ink);
   text-align: left;
@@ -6675,12 +6674,16 @@ input:checked + .tag.state-tag {
 .saju-line:active {
   transform: scale(0.985);
 }
-.saju-line__chars {
-  display: inline-flex;
-  gap: 10px;
-  font-size: 22px;
-  line-height: 1;
-  white-space: nowrap;
+.saju-line__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.saju-line__title {
+  font-size: 13px;
+  line-height: 1.2;
+  color: var(--color-muted);
 }
 .saju-line__more {
   display: inline-flex;
@@ -6699,6 +6702,76 @@ input:checked + .tag.state-tag {
   transform: rotate(-90deg);
   -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 14' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 5.5l4 4 4-4'/%3E%3C/svg%3E") center / contain no-repeat;
   mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 14' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 5.5l4 4 4-4'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+/* 명세 48 더하기: 몸통 = 왼쪽 두 줄(중심 · 힘, 이름 열 34px) + 오른쪽 다섯 힘 막대 맛보기 76 × 44px(오행 색 막대 다섯, 숫자 · 글자 · 도장 없이 먹 1px 바닥선만, 0%는 납작한 획) —
+   "누르면 그림이 나온다"를 그림으로 말한다. 버튼 글귀 옆 붉은 점 6px(seal)은 이 기기에서 한 번도 안 열었을 때만 */
+.saju-line__body {
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+}
+.saju-line__rows {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+}
+.saju-line__row {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  align-items: baseline;
+  column-gap: 10px;
+  padding: 7px 0;
+  border-bottom: 0.5px dashed color-mix(in srgb, var(--color-frame) 25%, transparent);
+}
+.saju-line__row:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+.saju-line__k {
+  font-size: 14px;
+  line-height: 1.4;
+  color: var(--color-muted);
+}
+.saju-line__v {
+  font-size: 15px;
+  line-height: 1.4;
+  word-break: keep-all;
+}
+.saju-line__mini {
+  display: flex;
+  flex: none;
+  width: 76px;
+  height: 44px;
+  align-items: flex-end;
+  justify-content: space-between;
+  padding: 0 4px;
+  border-bottom: 1px solid var(--color-ink);
+}
+.saju-line__bar {
+  --el: var(--color-ink);
+  width: 9px;
+  height: calc(var(--h, 0) * 40px);
+  min-height: 2px;
+  border-radius: 1px 1px 0 0;
+  background: var(--el);
+}
+.saju-line__bar[data-zero] {
+  height: 2px;
+  background: color-mix(in srgb, var(--el) 35%, transparent);
+}
+.saju-line__bar[data-el="wood"] { --el: var(--color-el-wood); }
+.saju-line__bar[data-el="fire"] { --el: var(--color-el-fire); }
+.saju-line__bar[data-el="earth"] { --el: var(--color-el-earth); }
+.saju-line__bar[data-el="metal"] { --el: var(--color-el-metal); }
+.saju-line__bar[data-el="water"] { --el: var(--color-el-water); }
+.saju-line__new {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  margin-right: 2px;
+  border-radius: 50%;
+  background: var(--color-seal);
 }
 
 /* 3. 칩 둘 `.me-chips`: 머리말 13px muted 두 덩이(간격 10px) → 두 칸. 칩 = 얼굴 동그라미 40px + 이름 13px(테와 같은 색) + 날짜 송명 22px 먹.
@@ -7125,21 +7198,9 @@ dialog.sheet::backdrop {
   padding: 16px 0 0;
 }
 
-/* 7. 만세력 낱장 `.saju-sheet`: 맨 위 = 본문에서 옮겨 온 요약(여덟 글자 송명 30px 가운데 · 오행 방울 · 중심 기운/용신/희신 세 줄 — v3.34 재료 그대로),
-   생년월일 줄, 만세력 한 판(SajuChartPanel), 맨 끝 권유 */
-.saju-sheet__chars {
-  display: flex;
-  justify-content: center;
-  gap: 14px;
-  margin: 0;
-  font-size: 30px;
-  line-height: 1.1;
-  white-space: nowrap;
-}
+/* 7. 만세력 낱장의 생년월일 줄 `.saju-sheet__birth`: 명식 표 바로 아래 한 줄(v3.52 — 맨 위 여덟 글자 · 오행 방울 요약은 뺐다) */
 .saju-sheet__birth {
-  margin: 0;
-  padding-top: 12px;
-  border-top: 0.5px solid color-mix(in srgb, var(--color-frame) 55%, transparent);
+  margin: 10px 0 0;
 }
 
 /* 8. 유료 풀이 권유 `.paid-invite`(만세력 낱장 맨 끝 한 곳): 괘선 → 한 줄 송명 20px → 작은 글씨 13px muted → [금색 면 버튼 56px | "다음에" 15px 먹 글자 버튼].
@@ -7498,4 +7559,410 @@ dialog.sheet::backdrop {
 /* 자세한 통계 서랍 안 그래프: 달력 아래 한 덩어리였던 때의 −8px 당김을 푼다 */
 .more-stats .hchart-wrap {
   margin-top: 0;
+}
+
+/* ── v3.52 만세력 낱장: 명식 표 · 다섯 힘 · 힘의 균형 · 풀이 낱말 줄 (명세 48, 2026-11-17) ──────────────────────────────
+   앱 주인 "그냥 좀 일반적인 만세력이었으면 … 펼치면 사주 코어에 있는 그래프처럼". 모양은 사주 코어 진단 낱장(정사각 글자 칸 · 세로 막대 · 반원 게이지)을 참고하되
+   톤은 일기 것 — 오행 색은 el-* 토큰, 게이지 · 테는 녹갈과 먹, 도장은 인주(seal). 분홍 · 옥색 · 주홍 글자 · 금색 글자 없음. 코어의 금테 뇌문 틀 · 도화 가지는 가져오지 않는다.
+   한 화면에 % 계산은 한 가지(chart.power). 나무 패 표(.saju-table*) · 오행 방울(.saju-summary__elements) · 오행 분포 막대는 이 낱장에서 더 쓰지 않는다.
+   새 그림 없음 — 키트 재사용: stamp-inked-red 알파(마스크) · card-paper. 새 모션 둘(막대 자람 300ms · 표식 400ms, 낱장이 열릴 때 한 번), reduced-motion이면 없음 */
+
+/* 0. 낱장 안 작은 머리말 · 한 문장 · 작은 글씨 */
+.saju-h {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--color-ink);
+}
+.saju-say {
+  margin: 14px 0 0;
+  font-family: var(--font-serif);
+  font-size: 18px;
+  line-height: 1.45;
+  color: var(--color-ink);
+  word-break: keep-all;
+}
+.saju-fine {
+  margin: 8px 0 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--color-muted);
+  word-break: keep-all;
+}
+.sheet .saju-page > section + section {
+  padding-top: 20px;
+  border-top: 0.5px solid color-mix(in srgb, var(--color-frame) 55%, transparent);
+}
+
+/* 1. 명식 표 `.ms`: 행 이름 열 42px(12px muted) + 네 열(시주 · 일주 · 월주 · 연주). 천간 · 지지는 정사각 글자 칸 — 바탕 = 그 글자 오행 색 12%를 카드 종이에 섞은 옅은 면,
+   글자 = 오행 진한 색(목 4.6:1 · 화 5.2:1 · 토 4.7:1 · 금 5.1:1 · 수 9.5:1), 한자 30px 굵게(송명에 한자가 없어 고운바탕 700으로 그려진다) + 아래 한글 12px. 나머지 줄은 13px 먹.
+   일주 열 = 먹 55% 1px 가는 테가 머리부터 마지막 줄까지 한 기둥으로 닫힌다 + 머리 "일주"와 "나" 굵게. 시간 모름 = 녹갈 점선 빈 칸에 "?" + "시간 모름" */
+.ms__table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: separate;
+  border-spacing: 0;
+  text-align: center;
+  font-size: 13px;
+  line-height: 1.3;
+  color: var(--color-ink);
+}
+.ms__corner {
+  width: 42px;
+}
+.ms__head {
+  padding: 7px 0 6px;
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--color-muted);
+}
+.ms__head[data-day] {
+  font-weight: 700;
+  color: var(--color-ink);
+}
+.ms__label {
+  padding: 0;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--color-muted);
+  text-align: left;
+  white-space: nowrap;
+}
+.ms__td {
+  padding: 5px 3px;
+  word-break: keep-all;
+}
+.ms__row[data-row="stem"] .ms__td,
+.ms__row[data-row="branch"] .ms__td {
+  padding: 2px 3px;
+}
+.ms__row[data-row="hidden"] .ms__td {
+  font-family: var(--font-serif);
+  letter-spacing: 0.02em;
+}
+.ms__row:last-child .ms__td {
+  padding-bottom: 8px;
+}
+.ms__me {
+  font-weight: 700;
+}
+.ms__unknown {
+  font-size: 12px;
+  color: var(--color-muted);
+  white-space: nowrap;
+}
+.ms__glyph {
+  --el: var(--color-frame);
+  --el-ink: var(--color-ink);
+  display: flex;
+  aspect-ratio: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--el) 12%, var(--color-paper-2));
+  box-shadow: inset 0 0 0 0.5px color-mix(in srgb, var(--el) 45%, transparent);
+  color: var(--el-ink);
+}
+.ms__glyph[data-el="wood"] { --el: var(--color-el-wood); --el-ink: var(--color-el-wood); }
+.ms__glyph[data-el="fire"] { --el: var(--color-el-fire); --el-ink: var(--color-el-fire-ink); }
+.ms__glyph[data-el="earth"] { --el: var(--color-el-earth); --el-ink: var(--color-el-earth-ink); }
+.ms__glyph[data-el="metal"] { --el: var(--color-el-metal); --el-ink: var(--color-el-metal-ink); }
+.ms__glyph[data-el="water"] { --el: var(--color-el-water); --el-ink: var(--color-el-water); }
+.ms__glyph[data-unknown] {
+  background: none;
+  box-shadow: none;
+  border: 1px dashed color-mix(in srgb, var(--color-frame) 45%, transparent);
+  color: var(--color-muted);
+}
+.ms__han {
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 1;
+}
+.ms__ko {
+  font-size: 12px;
+  line-height: 1;
+}
+.ms__head[data-day],
+.ms__td[data-day] {
+  border-inline: 1px solid color-mix(in srgb, var(--color-ink) 55%, transparent);
+}
+.ms__head[data-day] {
+  border-top: 1px solid color-mix(in srgb, var(--color-ink) 55%, transparent);
+  border-radius: 2px 2px 0 0;
+}
+.ms__row:last-child .ms__td[data-day] {
+  border-bottom: 1px solid color-mix(in srgb, var(--color-ink) 55%, transparent);
+  border-radius: 0 0 2px 2px;
+}
+
+/* 2. 다섯 힘 `.power`: 다섯 칸 균등. 그림 높이 132px(위 인장 · % 글자 자리 포함), 막대 = 오행 색 면(폭 칸의 46%, 높이 = --h × 96px — 가장 큰 값이 9할),
+   바닥선 = 먹 1px. 막대 위 "NN%" 13px 먹 tabular, 그 위 (용신 · 희신만) 인주 도장 "필요 / 도움"(seal 면 + 종이색 12px 굵게 5.0:1, 모서리 2px).
+   0% = 바닥선 위 납작한 옅은 획 3px(오행 색 35%). 아래 오행 한 글자 송명 17px(오행 진한 색) + 짧은 쉬운 말 12px muted 두 줄까지.
+   낱장이 열릴 때 막대가 바닥에서 한 번 자란다(300ms) */
+.power__bars {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.power__col {
+  --el: var(--color-ink);
+  --el-ink: var(--color-ink);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+.power__col[data-el="wood"] { --el: var(--color-el-wood); --el-ink: var(--color-el-wood); }
+.power__col[data-el="fire"] { --el: var(--color-el-fire); --el-ink: var(--color-el-fire-ink); }
+.power__col[data-el="earth"] { --el: var(--color-el-earth); --el-ink: var(--color-el-earth-ink); }
+.power__col[data-el="metal"] { --el: var(--color-el-metal); --el-ink: var(--color-el-metal-ink); }
+.power__col[data-el="water"] { --el: var(--color-el-water); --el-ink: var(--color-el-water); }
+.power__plot {
+  display: flex;
+  width: 100%;
+  height: 150px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  border-bottom: 1px solid var(--color-ink);
+}
+.power__top {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+.power__pct {
+  font-size: 13px;
+  line-height: 1;
+  color: var(--color-ink);
+  font-variant-numeric: tabular-nums;
+}
+.power__seal {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: 2px;
+  background: var(--color-seal);
+  font-family: var(--font-serif);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--color-paper-2);
+  white-space: nowrap;
+  transform: rotate(-3deg);
+}
+.power__bar {
+  flex: none;
+  width: 46%;
+  height: calc(var(--h, 0) * 106px);
+  min-height: 3px;
+  border-radius: 1px 1px 0 0;
+  background: var(--el);
+  transform-origin: center bottom;
+}
+.power__col[data-zero] .power__bar {
+  height: 3px;
+  background: color-mix(in srgb, var(--el) 35%, transparent);
+}
+.power__el {
+  margin-top: 8px;
+  font-size: 17px;
+  line-height: 1;
+  color: var(--el-ink);
+}
+.power__word {
+  margin-top: 5px;
+  max-width: 4.6em;
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--color-muted);
+  word-break: keep-all;
+}
+.sheet[open] .power__col:not([data-zero]) .power__bar {
+  animation: power-grow 300ms cubic-bezier(0.3, 0.7, 0.3, 1) backwards;
+}
+@keyframes power-grow {
+  from {
+    transform: scaleY(0);
+  }
+}
+
+/* 3. 힘의 균형 `.balance`: 반원 게이지 280 × 150(가운데 정렬). 트랙 = 녹갈 22% 7px 둥근 끝, 채움 = 괘선색 line 7px(왼쪽 끝 → 표식), 눈금 셋(25 · 50 · 75, 녹갈 60% 1px — 가운데가 길다),
+   표식 = 카드 종이 면 + 먹 2px 테 동그라미 r 8. 반원 안 큰 숫자 송명 44px 먹 + % 18px muted, 그 아래 "나를 돕는 기운" 13px muted.
+   끝 말 13px muted: 왼쪽 아래 "여린 쪽" · 위 가운데 "고른 쪽" · 오른쪽 아래 "센 쪽". 그 아래 인주 도장 하나(strengthPlain — seal 면 + 종이색 송명 17px + 안쪽 종이색 1px 테, −2°).
+   낱장이 열릴 때 표식과 채움이 왼쪽 끝에서 제자리로 한 번(400ms) */
+.balance__gauge {
+  position: relative;
+  width: 280px;
+  max-width: 100%;
+  margin: 26px auto 0;
+  padding-bottom: 22px;
+}
+.balance__svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+.balance__track {
+  stroke: color-mix(in srgb, var(--color-frame) 22%, transparent);
+  stroke-width: 7;
+  stroke-linecap: round;
+}
+.balance__fill {
+  stroke: var(--color-line);
+  stroke-width: 7;
+  stroke-linecap: round;
+  stroke-dasharray: calc(var(--p) * 100) 100;
+}
+.balance__tick {
+  stroke: color-mix(in srgb, var(--color-frame) 60%, transparent);
+  stroke-width: 1;
+}
+.balance__mark {
+  fill: var(--color-paper-2);
+  stroke: var(--color-ink);
+  stroke-width: 2;
+  transform-box: view-box;
+  transform-origin: 140px 132px;
+  transform: rotate(calc(var(--p) * 180deg));
+}
+.balance__num {
+  position: absolute;
+  top: 34%;
+  left: 0;
+  right: 0;
+  margin: 0;
+  font-size: 44px;
+  line-height: 1;
+  text-align: center;
+  color: var(--color-ink);
+  font-variant-numeric: tabular-nums;
+}
+.balance__num small {
+  margin-left: 2px;
+  font-size: 18px;
+  color: var(--color-muted);
+}
+.balance__cap {
+  position: absolute;
+  top: 66%;
+  left: 0;
+  right: 0;
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.2;
+  text-align: center;
+  color: var(--color-muted);
+}
+.balance__end {
+  position: absolute;
+  font-size: 13px;
+  line-height: 1.2;
+  color: var(--color-muted);
+  white-space: nowrap;
+}
+.balance__end--mid {
+  top: -22px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+.balance__end--low {
+  bottom: 0;
+  left: 0;
+}
+.balance__end--high {
+  right: 0;
+  bottom: 0;
+}
+.balance__seal {
+  position: relative;
+  display: flex;
+  width: fit-content;
+  align-items: center;
+  margin: 16px auto 0;
+  padding: 10px 16px;
+  border-radius: 2px;
+  background: var(--color-seal);
+  font-size: 17px;
+  line-height: 1;
+  color: var(--color-paper-2);
+  white-space: nowrap;
+  transform: rotate(-2deg);
+}
+.balance__seal::before {
+  content: "";
+  position: absolute;
+  inset: 3px;
+  border: 1px solid color-mix(in srgb, var(--color-paper-2) 75%, transparent);
+  border-radius: 1px;
+}
+.balance .saju-fine {
+  margin-top: 14px;
+  text-align: center;
+}
+.sheet[open] .balance__mark {
+  animation: balance-mark 400ms cubic-bezier(0.3, 0.7, 0.3, 1) backwards;
+}
+.sheet[open] .balance__fill {
+  animation: balance-fill 400ms cubic-bezier(0.3, 0.7, 0.3, 1) backwards;
+}
+@keyframes balance-mark {
+  from {
+    transform: rotate(0deg);
+  }
+}
+@keyframes balance-fill {
+  from {
+    stroke-dasharray: 0 100;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sheet[open] .power__col:not([data-zero]) .power__bar,
+  .sheet[open] .balance__mark,
+  .sheet[open] .balance__fill {
+    animation: none;
+  }
+}
+
+/* 4. 풀이 낱말 줄 `.saju-terms`: kv 줄(이름 열 58px 고정이라 값 시작선이 한 줄). 값 = 용어 송명 15px + 쉬운 말 13px muted(줄바꿈 허용). 용신 · 희신 오행은 원형 도장 28px.
+   사주 용어는 낱장에서 여기에만 */
+.saju-terms__rows {
+  margin-top: 12px;
+}
+.saju-terms__rows .kv__row {
+  justify-content: flex-start;
+  gap: 12px;
+  min-height: 30px;
+}
+.saju-terms__rows dt {
+  flex: none;
+  width: 58px;
+}
+.saju-terms__rows dd {
+  flex: 1;
+  min-width: 0;
+  flex-wrap: wrap;
+  gap: 2px 8px;
+  white-space: normal;
+}
+.saju-terms__plain {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  color: var(--color-muted);
+  word-break: keep-all;
+}
+.saju-terms__rows .saju-yongsin__el {
+  width: 28px;
+  height: 28px;
+  font-size: 14px;
 }
