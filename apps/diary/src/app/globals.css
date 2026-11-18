@@ -7979,3 +7979,391 @@ dialog.sheet::backdrop {
 .saju-viral .paid-invite + .saju-viral__card {
   margin-top: 6px;
 }
+
+/* ── v3.53 "나는 언제 행복했지?" 순서와 풀이 · 운세 카드(인장안) 내 기록 위로 (명세 49, 2026-11-19) ──────────────────────────────
+   낱장: 두 날(나란히 두 칸) → 그래프(도장 옆 날짜) → 괘선 → "어떤 날에 행복했나"(설명 한 줄 → 한 문장 → 다섯 줄: 그런 날이 어떤 날인지 큰 글씨, 갈래 낱말 작게, 숫자 앞 "평균").
+   운세 카드: 인장안의 펼친 안에서 "내 기록으로 본 오늘"이 맨 위로(.fc-mine), "풀어서 읽기"는 처음부터 펼쳐 둔다. 닫힌 머리 · 인장 · 게이지 · 개운 · 투표 · 로딩 규칙은 한 줄도 고치지 않았다.
+   새 그림 · 새 토큰 · 새 모션 없음 — 키트 재사용: stamp-inked-red 알파(마스크) · gold-wash · card-paper · brush-stroke */
+
+/* A1. 두 날 `.two-days`: 같은 크기 두 칸(힘든 날이 없으면 한 칸 넓게). 칸 = card-paper 면 + 녹갈 55% 1px 한 줄 테(보조 카드와 같은 무게) — 금 테 · 색 테 없이 도장만 색을 갖는다.
+   머리말 13px muted → 얼굴 동그라미 40px + 일진 이름 송명 17px · 날짜 13px muted → 행복도 도장 30px(행복 = 옥색, 힘듦 = 주홍 면 + 종이색 숫자 송명 15px 굵게 — 아래 그래프 도장과 같은 색) + 기분 띠 최대 둘.
+   칸 전체가 링크, 누르면 .98 */
+.two-days {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.two-days[data-one] {
+  grid-template-columns: minmax(0, 1fr);
+}
+.day-cell {
+  border: 1px solid color-mix(in srgb, var(--color-frame) 55%, transparent);
+  border-radius: 2px;
+  background: var(--color-paper-2) url("/ui/card-paper.webp") center / 512px 512px;
+  transition: transform 120ms ease-out;
+}
+.day-cell:active {
+  transform: scale(0.98);
+}
+.day-cell__link {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 10px 10px 12px;
+  color: var(--color-ink);
+  text-decoration: none;
+}
+.day-cell__title {
+  font-size: 13px;
+  line-height: 1.2;
+  color: var(--color-muted);
+  white-space: nowrap;
+}
+.day-cell__who {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.day-cell__face {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  padding: 3px;
+  border-radius: 50%;
+  object-fit: contain;
+  background: var(--color-paper) url("/ui/paper-bg.webp") center / 256px 256px;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-frame) 40%, transparent);
+}
+.day-cell__name {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+}
+.day-cell__ganji {
+  font-family: var(--font-serif);
+  font-size: 17px;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+.day-cell__date {
+  font-size: 13px;
+  line-height: 1.2;
+  color: var(--color-muted);
+  white-space: nowrap;
+}
+.day-cell__foot {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+}
+.day-cell__stamp {
+  position: relative;
+  isolation: isolate;
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  font-family: var(--font-serif);
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--color-paper-2);
+  font-variant-numeric: tabular-nums;
+}
+.day-cell__stamp::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: var(--color-jade);
+  -webkit-mask: url("/ui/stamp-inked-red-clean.png") center / contain no-repeat;
+  mask: url("/ui/stamp-inked-red-clean.png") center / contain no-repeat;
+}
+.day-cell[data-kind="worst"] .day-cell__stamp::before {
+  background: var(--color-seal);
+}
+.day-cell__moods {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.day-cell__moods .metric__chip {
+  padding: 1px 7px;
+}
+
+/* A2. 낱장 순서: 두 날 → 12px → 그래프(위 괘선 없이 두 날과 한 묶음) → 괘선 → "어떤 날에 행복했나" */
+.answer__graph {
+  margin-top: -12px;
+}
+.answer__when {
+  display: flex;
+  flex-direction: column;
+  padding-top: 20px;
+  border-top: 0.5px solid color-mix(in srgb, var(--color-frame) 55%, transparent);
+}
+.answer__h {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--color-ink);
+}
+.answer__how,
+.answer__foot {
+  margin: 6px 0 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--color-muted);
+  word-break: keep-all;
+}
+.answer__when .answer__lead {
+  margin: 16px 0 18px;
+  font-size: 20px;
+}
+.answer__when .answer__lead[data-empty] {
+  font-size: 16px;
+}
+.answer__foot {
+  margin-top: 16px;
+}
+/* 그래프 도장 옆 날짜: 12px muted, 도장 오른쪽 4px(그림 오른쪽 끝에 가까우면 왼쪽) */
+.hchart__peak-date {
+  position: absolute;
+  top: 50%;
+  left: calc(100% + 3px);
+  transform: translateY(-50%);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1;
+  color: var(--color-muted);
+  white-space: nowrap;
+}
+.hchart__peak-date[data-side="left"] {
+  right: calc(100% + 3px);
+  left: auto;
+}
+
+/* A3. 다섯 줄(v3.51 .group-row를 고쳐 쓴다): 왼쪽 = 그런 날이 어떤 날인지 16px 먹(1등 굵게) + 그 아래 갈래 낱말 13px muted,
+   오른쪽 = "평균" 12px muted + 값 송명 17px, 날 수 12px muted. 3일 미만 = 왼쪽 muted + 오른쪽 "N일뿐이라 아직 몰라요" 13px muted, 막대 없음 */
+.group-rows {
+  gap: 16px;
+}
+.group-row {
+  align-items: center;
+}
+.group-row__what {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+.group-row__hint {
+  font-size: 16px;
+  line-height: 1.35;
+  color: var(--color-ink);
+  word-break: keep-all;
+}
+.group-row__word {
+  font-size: 13px;
+  line-height: 1.3;
+  color: var(--color-muted);
+}
+.group-row[data-top] .group-row__word {
+  font-weight: 400;
+}
+.group-row[data-top] .group-row__hint {
+  font-weight: 700;
+}
+.group-row__avg {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+}
+.group-row__avg small {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  color: var(--color-muted);
+}
+.group-row__few {
+  font-size: 13px;
+  line-height: 1.3;
+  color: var(--color-muted);
+  text-align: right;
+  white-space: nowrap;
+}
+.group-row[data-thin] .group-row__hint {
+  color: var(--color-muted);
+}
+
+/* B. 운세 카드(인장안) "내 기록으로 본 오늘" `.fc-mine` — 펼친 안 맨 위. 앱 주인 "가시성이 안 좋아".
+   묶음 = 왼쪽 굵은 괘선 3px(괘선색 line, 카드 여백 안쪽 x = 축 − 12px — 글자의 왼쪽 축은 그대로): 이 카드는 v3.43에서 베이지 상자 면을 버렸으므로 면 대신 선으로 "내 것"을 묶는다.
+   판정 한 문장 = 송명 20px 먹(제목 26px 다음 크기 — 이 카드의 다섯째 글자 크기) → 기준 한 줄 13px muted →
+   막대 둘: 줄 이름 13px 먹 | 트랙 10px(녹갈 12%) 안 속이 찬 채움 — 운세 = 남색 sky-2(card-paper 위 12.6:1 · 트랙 위 11.0:1), 내 기록 = 괘선색 line(5.6:1 · 4.9:1). 빈 테 막대 · 금 선은 쓰지 않는다.
+   눈금 말 셋 13px muted가 트랙 아래 왼쪽 · 가운데 · 오른쪽(숫자 없음). 옥색 · 주홍은 쓰지 않는다(좋을 · 조심할 전용).
+   같은 날: 그날 행복도 도장 24px(달력 칸과 같은 네 단계 면 — top moss · high gold-wash · mid 녹갈 28% · low 남색) + 날짜 15px 먹, 그 아래 기분 · 있었던 일 띠(1px 녹갈 테 · 모서리 2px · 13px 먹 —
+   이 카드는 찢긴 한지 띠지를 쓰지 않아 선 띠로). 이런 날: 16px 먹 그대로. 줄 이름은 먹 */
+.fortune-card--seal .fc-mine {
+  position: relative;
+}
+.fortune-card--seal .fc-mine::before {
+  content: "";
+  position: absolute;
+  top: 16px;
+  bottom: 24px;
+  left: -12px;
+  width: 3px;
+  background: var(--color-line);
+}
+.fortune-card--seal .fc-mine__verdict {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: 20px;
+  line-height: 1.3;
+  color: var(--color-ink);
+  word-break: keep-all;
+}
+.fortune-card--seal .fc-mine__basis,
+.fortune-card--seal .fc-mine__note {
+  margin: 4px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--color-muted);
+  word-break: keep-all;
+}
+.fortune-card--seal .fc-mine__bars {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 16px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.fortune-card--seal .fc-mine__row {
+  display: grid;
+  grid-template-columns: var(--fc-col) minmax(0, 1fr);
+  align-items: center;
+  column-gap: var(--fc-gap);
+}
+.fortune-card--seal .fc-mine .fc-mine__name {
+  font-size: 13px;
+  line-height: 16px;
+  letter-spacing: 0.08em;
+  color: var(--color-ink);
+}
+.fortune-card--seal .fc-mine__track {
+  display: block;
+  height: 10px;
+  overflow: hidden;
+  border-radius: 1px;
+  background: color-mix(in srgb, var(--color-frame) 12%, transparent);
+}
+.fortune-card--seal .fc-mine__fill {
+  display: block;
+  height: 100%;
+  border-radius: 1px;
+  background: var(--color-line);
+}
+.fortune-card--seal .fc-mine__row[data-kind="fortune"] .fc-mine__fill {
+  background: var(--color-sky-2);
+}
+.fortune-card--seal .fc-mine__scale {
+  display: flex;
+  justify-content: space-between;
+  margin: 6px 0 0;
+  padding-left: calc(var(--fc-col) + var(--fc-gap));
+  font-size: 13px;
+  line-height: 1.2;
+  color: var(--color-muted);
+}
+.fortune-card--seal .fc-mine__note {
+  margin-top: 12px;
+}
+.fortune-card--seal .fc-mine__recall {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 20px;
+}
+.fortune-card--seal .fc-mine__days {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.fortune-card--seal .fc-mine__day {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.fortune-card--seal .fc-mine__date {
+  font-size: 15px;
+  line-height: 1.4;
+  color: var(--color-ink);
+}
+.fortune-card--seal .fc-mine__stamp {
+  --stamp-face: color-mix(in srgb, var(--color-frame) 28%, var(--color-paper-2));
+  --stamp-num: var(--color-ink);
+  position: relative;
+  isolation: isolate;
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  font-family: var(--font-serif);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--stamp-num);
+  font-variant-numeric: tabular-nums;
+}
+.fortune-card--seal .fc-mine__stamp::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: var(--stamp-face);
+  -webkit-mask: url("/ui/stamp-inked-red-clean.png") center / contain no-repeat;
+  mask: url("/ui/stamp-inked-red-clean.png") center / contain no-repeat;
+}
+.fortune-card--seal .fc-mine__stamp[data-tier="top"] {
+  --stamp-face: var(--color-moss);
+  --stamp-num: var(--color-paper-2);
+}
+.fortune-card--seal .fc-mine__stamp[data-tier="high"] {
+  --stamp-face: var(--color-gold) url("/ui/gold-wash.webp") center / 128px 128px;
+}
+.fortune-card--seal .fc-mine__stamp[data-tier="low"] {
+  --stamp-face: color-mix(in srgb, var(--color-sky) 82%, var(--color-paper-2));
+  --stamp-num: var(--color-paper-2);
+}
+.fortune-card--seal .fc-mine__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+.fortune-card--seal .fc-mine__tag {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 8px;
+  border: 1px solid color-mix(in srgb, var(--color-frame) 55%, transparent);
+  border-radius: 2px;
+  font-size: 13px;
+  line-height: 1;
+  color: var(--color-ink);
+  white-space: nowrap;
+}

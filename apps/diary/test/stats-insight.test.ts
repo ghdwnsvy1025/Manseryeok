@@ -14,7 +14,8 @@ describe("나 탭 물음 인장의 답", () => {
     ];
     const r = happyWhen(rows, ME);
     expect(r.top).toMatchObject({ group: "식상", n: 3, avg: 8.7 });
-    expect(r.sentence).toBe("표현하는 기운이 들어온 날에 가장 행복했어요");
+    expect(r.sentence).toBe("말하고 만들고 싶어지는 날에 가장 행복했어요");
+    expect(r.top!.hint).toBe("말하고 만들고 싶어지는 날");
     expect(r.rows.find((x) => x.group === "관성")).toMatchObject({ n: 1, avg: 10 });
     expect(r.rows.findIndex((x) => x.group === "관성")).toBeGreaterThan(r.rows.findIndex((x) => x.group === "재성"));   // 표본 모자란 갈래는 뒤
     expect(GROUP_MIN_DAYS).toBe(3);

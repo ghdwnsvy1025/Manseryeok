@@ -8,6 +8,7 @@ import { areaTo10, type SeriesPoint } from "@/lib/stats/extra";
  * 행복도 그래프 (2026-10-09 Q7 = C → 2026-10-31 개편 → 명세 47, 톤 v3.51 → 같은 날 "그래프 더 다듬기"). SVG 좌표 계산만 여기, 모양(색·굵기·글자)은 디자이너(.hchart*).
  * 명세 47(앱 주인: "점들이 너무 많고 색깔이 이상해서 가시성이 없어. 점을 빼 주고 날짜를 기입"):
  * - 날마다 찍던 점은 없다. 가장 높은 날 · 낮은 날 두 곳에만 작은 도장(옥색 · 주홍)과 그 값 — 도장은 선을 덮지 않게 점 위(높은 날) · 점 아래(낮은 날)로 비켜 앉는다.
+ *   도장 옆에 그날 날짜를 적는다(명세 49: 11.14, 11.7 — 낱장 위 두 칸과 같은 날).
  * - 가로축에 날짜를 5일 간격으로(11.3  11.8  11.13 …), 세로축은 0 · 5 · 10.
  * - **한 그림에 선 모양은 둘까지, 점선은 없다.**
  *     예상 선이 없는 그림(happy, full의 영역 보기): 행복도 굵은 선 + 기록 없는 날을 건너는 같은 색 가는 선(이어 준다 — 흐름이 한 줄로 읽힌다).
@@ -229,6 +230,10 @@ export function HappinessChart({ series: monthSeries, yearSeries, emptyArt, vari
         {peaks.map((p) => (
           <span key={p.kind} className="hchart__peak" data-kind={p.kind} style={{ left: `${(p.cx / W) * 100}%`, top: `${(p.cy / H) * 100}%` }} aria-hidden>
             {shown(p.i)}
+            {/* 도장 옆 날짜(명세 49) — 낱장 위 두 칸과 같은 날임이 보이게. 그림 오른쪽 끝에 가까우면 도장 왼쪽에 */}
+            <span className="hchart__peak-date" data-side={p.cx > W - 58 ? "left" : "right"}>
+              {label(series[p.i]!.date)}
+            </span>
           </span>
         ))}
         {/* 건드린 날의 날짜와 값 — 그래프 위 띠, 높은 날 도장의 반대쪽 구석 */}

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { happinessTier, moodTone } from "@/lib/entry";
+import { moodTone } from "@/lib/entry";
 
 export interface DayCard {
   date: string;
@@ -21,51 +21,45 @@ export interface ForecastCard {
 }
 
 /**
- * 가장 행복했던 날 카드 + 그 아래 작게 힘든 날 한 줄 (2026-10-31 → 명세 47, 톤 v3.51).
- * 본문의 두 장 · 기간 전환 · 다음 달 예상 두 칸은 없앴다 — "나는 언제 행복했지?" 낱장 안으로 옮겨 전체 기록의 하루씩만.
- * 카드 = 그날의 간지 얼굴 + 날짜 + 행복도 도장 + 기분(최대 3개). 누르면 낱장이 걷히고 달력의 그날 상세로(/me?d=).
- * 모양은 디자이너(.day-pick*).
+ * 가장 행복했던 날 · 가장 힘들었던 날 — 나란히 두 칸, 같은 크기 (2026-10-31 → 명세 47 → 명세 49, 톤 v3.53).
+ * "나는 언제 행복했지?" 낱장 맨 위, 그래프 바로 위에 놓인다. 앱 주인: "가장 행복했던 날, 힘들었던 날을 그래프와 맨 위에".
+ * 칸 = 작은 머리말 · 얼굴 동그라미 · 일진 이름 · 날짜 · 행복도 도장(행복 = 옥색, 힘듦 = 주홍 — 아래 그래프의 도장과 같은 색) · 기분 띠 최대 둘.
+ * 누르면 낱장이 걷히고 달력의 그날 상세로(/me?d=). 힘든 날이 없으면(기록이 하루뿐이거나 모두 같은 점수) 한 칸만 넓게.
+ * 모양은 디자이너(.two-days · .day-cell*).
  */
 export function BestWorstDays({ best, worst }: { best: DayCard | null; worst: DayCard | null }) {
   if (!best) return null;
+  const cells = [{ kind: "best" as const, title: "가장 행복했던 날", day: best }, ...(worst ? [{ kind: "worst" as const, title: "가장 힘들었던 날", day: worst }] : [])];
   return (
-    <div className="day-pick">
-      <div className="metric day-pick__card" data-kind="best">
-        <Link href={`/me?d=${best.date}#me-records`} scroll={false} className="day-pick__link day-pick__link--wide">
-          <span className="day-pick__main">
-            <span className="metric__label">가장 행복했던 날</span>
-            <span className="day-pick__face">
-              <img src={best.faceSrc} alt="" width={48} height={48} />
-              <span className="day-pick__who">
-                <span className="day-pick__ganji text-ganji">{best.ganjiKo}일</span>
-                <span className="day-pick__date text-[13px] text-muted">{best.label}</span>
+    <ul className="two-days" data-one={cells.length === 1 ? "" : undefined}>
+      {cells.map(({ kind, title, day }) => (
+        <li key={kind} className="day-cell" data-kind={kind}>
+          <Link href={`/me?d=${day.date}#me-records`} scroll={false} className="day-cell__link">
+            <span className="day-cell__title">{title}</span>
+            <span className="day-cell__who">
+              <img src={day.faceSrc} alt="" width={40} height={40} className="day-cell__face" />
+              <span className="day-cell__name">
+                <span className="day-cell__ganji text-ganji">{day.ganjiKo}일</span>
+                <span className="day-cell__date">{day.label}</span>
               </span>
             </span>
-            {best.moods.length > 0 && (
-              <span className="metric__chips">
-                {best.moods.slice(0, 3).map((m) => (
-                  <span key={m} className="metric__chip" data-tone={moodTone(m)}>
-                    {m}
-                  </span>
-                ))}
+            <span className="day-cell__foot">
+              <span className="day-cell__stamp" role="img" aria-label={`행복도 ${day.happiness}`}>
+                {day.happiness}
               </span>
-            )}
-          </span>
-          {/* 숫자는 그날 도장(달력·날짜 상세와 같은 네 단계 면) 안에 — 금색은 글자가 아니라 면으로만(v3.26) */}
-          <span className="metric__value" data-tier={happinessTier(best.happiness)} aria-label={`행복도 ${best.happiness}`}>
-            <span className="day-pick__num">{best.happiness}</span>
-          </span>
-        </Link>
-      </div>
-      {worst && (
-        <Link href={`/me?d=${worst.date}#me-records`} scroll={false} className="day-pick__low tap">
-          <span className="day-pick__low-label">가장 힘들었던 날</span>
-          <span className="day-pick__low-date">
-            {worst.label} <span className="text-ganji">{worst.ganjiKo}일</span>
-          </span>
-          <span className="day-pick__low-num">행복도 {worst.happiness}</span>
-        </Link>
-      )}
-    </div>
+              {day.moods.length > 0 && (
+                <span className="day-cell__moods">
+                  {day.moods.slice(0, 2).map((m) => (
+                    <span key={m} className="metric__chip" data-tone={moodTone(m)}>
+                      {m}
+                    </span>
+                  ))}
+                </span>
+              )}
+            </span>
+          </Link>
+        </li>
+      ))}
+    </ul>
   );
 }

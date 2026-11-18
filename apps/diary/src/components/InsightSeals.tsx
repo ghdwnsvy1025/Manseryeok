@@ -32,35 +32,53 @@ export function InsightSeals({ open, left }: { open: boolean; /** 열릴 때까�
 }
 
 /**
- * "나는 언제 행복했지?" 낱장의 안 (명세 47 Q17): 한 문장 → 다섯 갈래 줄 → 가장 행복했던 날(+ 작게 힘든 날) → 행복도 그래프.
- * 갈래 줄 = 낱말 + 붓 가로 막대(평균, 10이 끝) + 날 수. 3일 미만인 갈래는 옅게, 평균 대신 "N일"만. 1등 갈래만 옥색, 나머지는 먹.
+ * "나는 언제 행복했지?" 낱장의 안 (명세 47 Q17 → 명세 49, 톤 v3.53): 두 날(가장 행복했던 날 · 힘들었던 날) → 행복도 그래프 → 괘선 → "어떤 날에 행복했나".
+ * 앱 주인: "표현하는 기운~책임의 기운 값이 있는데 이게 뭔지 모르겠어" — 줄마다 그런 날이 어떤 날인지(hint)를 큰 글씨로, 갈래 낱말(word)은 작게,
+ * 숫자 앞에는 반드시 "평균". 막대는 그대로(평균, 10이 끝 — 1등만 옥색). 3일 미만인 줄은 옅게, 평균 대신 "N일뿐이라 아직 몰라요".
  */
-export function HappyAnswer({ happy, days, chart }: { happy: HappyWhen; /** 가장 행복했던 날 카드 (BestWorstDays) */ days: ReactNode; /** 행복도 그래프 (HappinessChart variant="happy") */ chart: ReactNode }) {
+export function HappyAnswer({ happy, days, chart }: { happy: HappyWhen; /** 두 날 (BestWorstDays) */ days: ReactNode; /** 행복도 그래프 (HappinessChart variant="happy") */ chart: ReactNode }) {
   return (
     <div className="answer">
-      <p className="answer__lead" data-empty={happy.sentence ? undefined : ""}>
-        {happy.sentence ?? "아직 뚜렷한 차이가 없어요. 기록이 더 쌓이면 보여요"}
-      </p>
-      <ol className="group-rows" aria-label="날의 성격별 내 행복도 평균">
-        {happy.rows.map((r) => {
-          const thin = r.n < GROUP_MIN_DAYS || r.avg === null;
-          const top = happy.top?.group === r.group;
-          return (
-            <li key={r.group} className="group-row" data-thin={thin ? "" : undefined} data-top={top ? "" : undefined} aria-label={thin ? `${r.word} ${r.n}일` : `${r.word} 평균 ${r.avg}, ${r.n}일`}>
-              <span className="group-row__word">{r.word}</span>
-              <span className="group-row__nums">
-                {!thin && <span className="group-row__avg">{r.avg}</span>}
-                <span className="group-row__n">{r.n}일</span>
-              </span>
-              <span className="group-row__track" aria-hidden>
-                {!thin && <span className="group-row__fill" style={{ width: `${Math.max(4, (r.avg! / 10) * 100)}%` }} />}
-              </span>
-            </li>
-          );
-        })}
-      </ol>
       {days}
-      <div className="answer__chart">{chart}</div>
+      <div className="answer__graph">{chart}</div>
+      <section className="answer__when" aria-labelledby="happy-when-title">
+        <h3 id="happy-when-title" className="answer__h">
+          어떤 날에 행복했나
+        </h3>
+        <p className="answer__how">날마다 들어오는 기운이 달라요. 기운별로 그날의 내 행복도를 평균 냈어요</p>
+        <p className="answer__lead" data-empty={happy.sentence ? undefined : ""}>
+          {happy.sentence ?? "아직 뚜렷한 차이가 없어요. 기록이 더 쌓이면 보여요"}
+        </p>
+        <ol className="group-rows" aria-label="들어온 기운별 내 행복도 평균">
+          {happy.rows.map((r) => {
+            const thin = r.n < GROUP_MIN_DAYS || r.avg === null;
+            const top = happy.top?.group === r.group;
+            return (
+              <li key={r.group} className="group-row" data-thin={thin ? "" : undefined} data-top={top ? "" : undefined}>
+                <span className="group-row__what">
+                  <span className="group-row__hint">{r.hint}</span>
+                  <span className="group-row__word">{r.word}</span>
+                </span>
+                {thin ? (
+                  <span className="group-row__few">{r.n === 0 ? "아직 그런 날의 기록이 없어요" : `${r.n}일뿐이라 아직 몰라요`}</span>
+                ) : (
+                  <span className="group-row__nums">
+                    <span className="group-row__avg">
+                      <small>평균</small>
+                      {r.avg}
+                    </span>
+                    <span className="group-row__n">{r.n}일</span>
+                  </span>
+                )}
+                <span className="group-row__track" aria-hidden>
+                  {!thin && <span className="group-row__fill" style={{ width: `${Math.max(4, (r.avg! / 10) * 100)}%` }} />}
+                </span>
+              </li>
+            );
+          })}
+        </ol>
+        <p className="answer__foot">하루에 두 기운이 같이 들어오기도 해서, 날 수를 더하면 기록한 날보다 많아요</p>
+      </section>
     </div>
   );
 }

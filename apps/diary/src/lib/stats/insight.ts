@@ -25,12 +25,22 @@ export interface InsightEntry {
 }
 
 const round1 = (x: number): number => Math.round(x * 10) / 10;
+/** 갈래가 들어온 날이 어떤 날인지 한 줄 (2026-11-19 앱 주인: "표현하는 기운~책임의 기운 값이 뭔지 모르겠어", 명세 49). 낱말 옆에 붙인다 */
+export const GROUP_DAY_HINT: Record<TenGodFamily, string> = {
+  비겁: "내 뜻대로 하고 싶어지는 날",
+  식상: "말하고 만들고 싶어지는 날",
+  재성: "돈과 실속을 챙기게 되는 날",
+  관성: "맡은 일과 책임이 커지는 날",
+  인성: "배우고 쉬며 생각하게 되는 날",
+};
 const FAMILIES: TenGodFamily[] = ["비겁", "식상", "재성", "관성", "인성"];
 
 export interface GroupHappiness {
   group: TenGodFamily;
   /** 쉬운 말 (recall.ts FAMILY_WORD — 기록 한 줄과 같은 낱말) */
   word: string;
+  /** 그런 날이 어떤 날인지 한 줄 (GROUP_DAY_HINT) */
+  hint: string;
   /** 그 갈래가 온 날 수 */
   n: number;
   /** 그날들의 행복도 평균 (n이 0이면 null) */
@@ -59,12 +69,12 @@ export function happyWhen(entries: InsightEntry[], dayMaster: string): HappyWhen
   }
   const rows: GroupHappiness[] = FAMILIES.map((group) => {
     const c = sum.get(group);
-    return { group, word: FAMILY_WORD[group], n: c?.n ?? 0, avg: c && c.n ? round1(c.s / c.n) : null };
+    return { group, word: FAMILY_WORD[group], hint: GROUP_DAY_HINT[group], n: c?.n ?? 0, avg: c && c.n ? round1(c.s / c.n) : null };
   }).sort((a, b) => Number(b.n >= GROUP_MIN_DAYS) - Number(a.n >= GROUP_MIN_DAYS) || (b.avg ?? -1) - (a.avg ?? -1));
   const overall = entries.length ? round1(entries.reduce((a, e) => a + e.happiness, 0) / entries.length) : null;
   const first = rows[0];
   const top = first && first.n >= GROUP_MIN_DAYS && first.avg !== null && overall !== null && first.avg - overall >= GROUP_MIN_GAP ? first : null;
-  return { rows, overall, top, sentence: top ? `${top.word}이 들어온 날에 가장 행복했어요` : null };
+  return { rows, overall, top, sentence: top ? `${top.hint}에 가장 행복했어요` : null };
 }
 
 export interface VersusDay {

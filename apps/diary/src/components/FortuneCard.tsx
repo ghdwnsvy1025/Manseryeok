@@ -9,6 +9,7 @@ import { areaScoreView, dayShapeView, flowNumber, sixAreaView } from "@/lib/fort
 import { AreaSignalGrid } from "@/components/AreaSignalGrid";
 import type { AreaSignal, FortuneContent } from "@/lib/fortune/types";
 import type { FortuneRecall } from "@/lib/fortune/recall";
+import { happinessTier } from "@/lib/entry";
 
 /** 화살표 색: ↑ 금색(사용자 결정 2026-10-15, v3.26 예외), → 보조, ↓ 먹색. 빨강 없음 (톤 결정표 "길흉을 색으로 말하지 않는다") */
 const SIGNAL_COLOR: Record<AreaSignal, string> = { "↑": "text-gold font-bold", "→": "text-muted", "↓": "text-ink" };
@@ -244,6 +245,100 @@ function RecallRows({ recall }: { recall: FortuneRecall }) {
   );
 }
 
+/**
+ * 인장안(variant "seal") "내 기록으로 본 오늘" — 명세 49 (톤 v3.53, 앱 주인 "가시성이 안 좋아 … 오늘 해 볼 것 위에 올릴까?").
+ * 말할 것이 있을 때(막대로 견줄 만큼 기록이 있거나 지난 기록이 있을 때) 펼친 안 맨 위에 온다. story · score와 기록이 없을 때는 PersonalCompare 그대로.
+ *   판정 한 문장(지금 글귀 그대로)이 맨 위에 크게 → 기준 한 줄 작게 → 속이 찬 막대 둘(운세 = 남색, 내 기록 = 녹갈) + 눈금 말 셋(낮음 · 보통 · 높음) →
+ *   같은 날 · 이런 날(날짜 먹색, 그날 행복도는 작은 도장 — 달력 칸과 같은 네 단계 색, 기분 · 있었던 일은 작은 띠).
+ * 운세 점수 숫자는 여전히 쓰지 않는다(명세 45). 블록은 왼쪽 굵은 괘선 한 줄로 묶인다(globals.css .fc-mine*)
+ */
+function MineBlock({ personal, fortune, recall }: { personal: ReturnType<typeof personalLines>; fortune: FortuneContent; recall?: FortuneRecall | null }) {
+  const mean = personal.mean;
+  const ok = mean !== null && personal.count >= COMPARE_MIN;
+  const mine = ok ? happinessMeanToTen(mean) : 0;
+  const verdict = compareVerdict(mine - fortune.score);
+  const rows: { label: string; value: number; kind: "fortune" | "mine" }[] = [
+    { label: "운세", value: fortune.score, kind: "fortune" },
+    { label: "내 기록", value: mine, kind: "mine" },
+  ];
+  return (
+    <section className="fc-section fc-mine" aria-labelledby="compare-title">
+      <h3 id="compare-title" className="fc-label">
+        내 기록으로 본 오늘
+      </h3>
+      {ok ? (
+        <div className="fc-mine__compare" role="group" aria-label={`운세와 내 기록 비교: ${verdict}`}>
+          <p className="fc-mine__verdict">{verdict === "비슷해요" ? "운세와 내 기록이 비슷해요" : `이런 날 내 기록은 운세보다 ${mine > fortune.score ? "좋았어요" : "낮았어요"}`}</p>
+          <p className="fc-mine__basis">{personal.main}</p>
+          <ul className="fc-mine__bars">
+            {rows.map((r) => (
+              <li key={r.kind} className="fc-mine__row" data-kind={r.kind}>
+                <span className="fc-mine__name">{r.label}</span>
+                <span className="fc-mine__track">
+                  <span className="fc-mine__fill" style={{ width: `${Math.max(4, Math.min(100, r.value * 10))}%` }} />
+                </span>
+              </li>
+            ))}
+          </ul>
+          {/* 눈금 말: 막대 칸 아래 왼쪽 · 가운데 · 오른쪽. 숫자는 없다 */}
+          <p className="fc-mine__scale" aria-hidden>
+            <span>낮음</span>
+            <span>보통</span>
+            <span>높음</span>
+          </p>
+          {fortune.fitNote && <p className="fc-mine__note">{fortune.fitNote}</p>}
+        </div>
+      ) : (
+        <p className="compare__empty">{mean === null ? "오늘 글자가 든 날의 기록은 아직 없어요" : `아직 기록이 ${personal.count}번뿐이라 운세와 견주기엔 적어요`}</p>
+      )}
+      {recall && (
+        <div className="fc-mine__recall">
+          {recall.same.length > 0 && (
+            <div className="fc-row">
+              <span className="fc-label fc-row__label fc-mine__name">같은 날</span>
+              <ul className="fc-row__text fc-mine__days">
+                {recall.same.map((d) => (
+                  <li key={d.date}>
+                    <span className="fc-mine__day">
+                      <span className="fc-mine__stamp" data-tier={happinessTier(d.happiness)} role="img" aria-label={`행복도 ${d.happiness}`}>
+                        {d.happiness}
+                      </span>
+                      <span className="fc-mine__date">
+                        {monthDay(d.date)} {d.ganjiKo}일
+                      </span>
+                    </span>
+                    {(d.moods.length > 0 || d.states.length > 0) && (
+                      <span className="fc-mine__tags">
+                        {[...d.moods, ...d.states].map((w) => (
+                          <span key={w} className="fc-mine__tag">
+                            {w}
+                          </span>
+                        ))}
+                      </span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {recall.tendency.length > 0 && (
+            <div className="fc-row">
+              <span className="fc-label fc-row__label fc-mine__name">이런 날</span>
+              <ul className="fc-row__text fc-recall__list">
+                {recall.tendency.map((t) => (
+                  <li key={t.family} className="break-keep">
+                    {joinDots(t.familyWord)}이 온 날 {t.n}번 중 {t.count}번 ‘{t.axisLabel} {t.word}’
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+    </section>
+  );
+}
+
 export function FortuneCard({ fortune, ganjiKo, canVote, vote, defaultOpen, version, variant = "story", recall, theme }: Props) {
   /** 카드 시험 1안: 인장 (기능 쪽이 fortune.seals에 넣은 것만. 없으면 줄째 없음) */
   const seals = variant === "seal" ? fortune.seals ?? [] : [];
@@ -262,6 +357,8 @@ export function FortuneCard({ fortune, ganjiKo, canVote, vote, defaultOpen, vers
   const areaRows = [...areas.filter((a) => a.line && a.signal === "↑"), ...areas.filter((a) => a.line && a.signal === "→"), ...areas.filter((a) => a.line && a.signal === "↓")];
   const areaChips = areas.filter((a) => !a.line);
   const personal = personalLines(fortune, ganjiKo);
+  /** 명세 49: 인장안에서 "내 기록으로 본 오늘"이 맨 위로 오는가 — 막대로 견줄 만큼 기록이 있거나(5번 이상) 지난 기록(같은 날 · 이런 날)이 있을 때만. 말할 것이 없으면 옛 자리에 한 줄 */
+  const mineTop = variant === "seal" && ((personal.mean !== null && personal.count >= COMPARE_MIN) || !!recall);
   const gaewoon = fortune.core?.luckEls ? gaewoonOf(fortune.core, fortune.date) : null;
   /** v3.36 "오늘 힘이 되는 것": 코어 키워드 긍정 앞 3개 (v4.19는 fortune.keywords, 옛 캐시는 core.keywords). 없으면 줄째 없음 */
   const power = variant === "seal" ? [] : (fortune.keywords?.positive ?? fortune.core?.keywords?.positive ?? []).slice(0, 3);   // 인장 카드에서는 인장이 같은 일을 한다 (2026-11-15 "추천대로" 10번)
@@ -602,26 +699,31 @@ export function FortuneCard({ fortune, ganjiKo, canVote, vote, defaultOpen, vers
             {trial ? (
               <>
                 {/* 카드 시험(명세 38): 오늘 해 볼 것 → 오늘의 특징 → 풀어서 읽기(긴 본문, 기본 접힘) → 내 기록으로 본 오늘 → 오늘 챙기면 좋은 것.
-                    내용·로직은 story와 같고 순서와 접힘만 다르다. "풀어서 읽기"는 15px muted 한 줄 + 꺾쇠 — 금색 버튼이 아니다(.fortune-more*) */}
+                    내용·로직은 story와 같고 순서와 접힘만 다르다. "풀어서 읽기"는 15px muted 한 줄 + 꺾쇠 — 금색 버튼이 아니다(.fortune-more*)
+                    명세 49(인장안만): 내 기록으로 본 오늘(말할 것이 있을 때) → 오늘 해 볼 것 → 오늘의 특징 → 풀어서 읽기(처음부터 펼쳐 둠) → 오늘 챙기면 좋은 것 */}
+                {mineTop && <MineBlock personal={personal} fortune={fortune} recall={recall} />}
                 {actions}
                 {/* 인장안(명세 39)은 붓선 없이 구역마다 가는 선 + 작은 라벨(.fc-body의 자식마다 위 1px 선) */}
                 {traits && !neat && <span aria-hidden className="rule rule--light mt-6" />}
                 {traits}
                 {paragraphs.length > 0 && (
-                  <details className="fortune-more">
+                  <details className="fortune-more" open={neat || undefined}>
                     <summary className="fortune-more__summary">풀어서 읽기</summary>
                     {bodyText}
                   </details>
                 )}
                 {neat ? (
-                  <section className="fc-section" aria-labelledby="compare-title">
-                    <h3 id="compare-title" className="fc-label">
-                      내 기록으로 본 오늘
-                    </h3>
-                    <PersonalCompare personal={personal} fortune={fortune} hasRecall={!!recall} numbers={false} />
-                    {/* 명세 41: 지난 기록의 사실(같은 날 · 이런 날). recall이 없으면(기록 없음) 그리지 않는다 */}
-                    {recall && <RecallRows recall={recall} />}
-                  </section>
+                  /* 명세 49: 말할 것이 있으면 맨 위(MineBlock)에 이미 그렸다. 여기는 기록이 없거나 적어 한 줄뿐일 때의 옛 자리 */
+                  !mineTop && (
+                    <section className="fc-section" aria-labelledby="compare-title">
+                      <h3 id="compare-title" className="fc-label">
+                        내 기록으로 본 오늘
+                      </h3>
+                      <PersonalCompare personal={personal} fortune={fortune} hasRecall={!!recall} numbers={false} />
+                      {/* 명세 41: 지난 기록의 사실(같은 날 · 이런 날). recall이 없으면(기록 없음) 그리지 않는다 */}
+                      {recall && <RecallRows recall={recall} />}
+                    </section>
+                  )
                 ) : (
                   <PersonalCompare personal={personal} fortune={fortune} />
                 )}
