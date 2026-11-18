@@ -247,41 +247,23 @@ function RecallRows({ recall }: { recall: FortuneRecall }) {
 
 /**
  * 인장안(variant "seal") "내 기록으로 본 오늘" — 명세 49 (톤 v3.53, 앱 주인 "가시성이 안 좋아 … 오늘 해 볼 것 위에 올릴까?").
- * 말할 것이 있을 때(막대로 견줄 만큼 기록이 있거나 지난 기록이 있을 때) 펼친 안 맨 위에 온다. story · score와 기록이 없을 때는 PersonalCompare 그대로.
- *   판정 한 문장이 맨 위에 크게(끝에 윗첨자 별표, 세기는 말로 — 조금 · 많이. 막대는 2026-11-20 "막대 빼기"로 없다) →
- *   같은 날 · 이런 날(날짜 먹색, 그날 행복도는 작은 도장 — 달력 칸과 같은 네 단계 색, 기분 · 있었던 일은 작은 띠).
- *   기준 한 줄("임이나 자가 든 날 기록 6번 기준")은 블록 맨 아래 별표 각주로.
- * 운세 점수 숫자는 여전히 쓰지 않는다(명세 45). 블록은 왼쪽 굵은 괘선 한 줄로 묶인다(globals.css .fc-mine*)
+ * 2026-11-20 후속(앱 주인, 배포된 화면을 보고 "너무 어렵게 표현하면 안 돼. 그냥 이런 특징이 있었다라는 것만 남기는 것이 나을 것 같아"):
+ *   **운세와 견주는 것은 전부 없다** — 판정 문장 · 별표 각주 · 막대 · "견주기엔 적어요" 줄 · fitNote. 남는 것은 지난 기록의 사실 두 가지뿐:
+ *   "지난 같은 날"(그날 행복도 도장 — 달력 칸과 같은 네 단계 색, 날짜, 기분 · 있었던 일 띠) · "비슷한 날엔"("3번 중 2번 ‘돈 많이 나감’이었어요" — 갈래 이름은 쓰지 않는다).
+ * 지난 기록(recall)이 있을 때만 펼친 안 맨 위에 온다. 없으면 인장안에는 이 블록이 아예 없다(말할 사실이 없으면 아무것도 없다). story · score는 PersonalCompare 그대로.
+ * 블록은 왼쪽 굵은 괘선 한 줄로 묶인다(globals.css .fc-mine*)
  */
-function MineBlock({ personal, fortune, recall }: { personal: ReturnType<typeof personalLines>; fortune: FortuneContent; recall?: FortuneRecall | null }) {
-  const mean = personal.mean;
-  const ok = mean !== null && personal.count >= COMPARE_MIN;
-  const mine = ok ? happinessMeanToTen(mean) : 0;
-  const verdict = compareVerdict(mine - fortune.score);
-  // 판정 한 문장 — 막대가 하던 "얼마나"를 말이 맡는다(2026-11-20 앱 주인 "막대 빼기"): 비슷해요 / 조금 · 많이 + 좋았어요(내 기록이 높음) · 낮았어요
-  const sentence = verdict === "비슷해요" ? "운세와 내 기록이 비슷해요" : `이런 날 내 기록은 운세보다 ${verdict === "차이 커요" ? "많이" : "조금"} ${mine > fortune.score ? "좋았어요" : "낮았어요"}`;
+function MineBlock({ recall }: { recall: FortuneRecall }) {
   return (
     <section className="fc-section fc-mine" aria-labelledby="compare-title">
       <h3 id="compare-title" className="fc-label">
         내 기록으로 본 오늘
       </h3>
-      {ok ? (
-        /* 판정 한 문장 + 윗첨자 별표(블록 맨 아래 각주 "* … 기준"과 잇는다). 별표는 마지막 글자에 붙어 혼자 다음 줄로 떨어지지 않는다.
-           막대 둘과 눈금 말은 없다 — 운세 점수와 내가 매긴 행복도는 다른 자라 나란히 재면 정밀한 비교처럼 보인다(명세 45와 같은 방향, 기록은 거울이지 채점이 아니다) */
-        <p className="fc-mine__verdict">
-          {sentence}
-          <sup className="fc-mine__star" aria-hidden>
-            *
-          </sup>
-        </p>
-      ) : (
-        <p className="compare__empty">{mean === null ? "오늘 글자가 든 날의 기록은 아직 없어요" : `아직 기록이 ${personal.count}번뿐이라 운세와 견주기엔 적어요`}</p>
-      )}
-      {recall && (
+      {(
         <div className="fc-mine__recall">
           {recall.same.length > 0 && (
             <div className="fc-row">
-              <span className="fc-label fc-row__label fc-mine__name">같은 날</span>
+              <span className="fc-label fc-row__label fc-mine__name">지난 같은 날</span>
               <ul className="fc-row__text fc-mine__days">
                 {recall.same.map((d) => (
                   <li key={d.date}>
@@ -289,9 +271,7 @@ function MineBlock({ personal, fortune, recall }: { personal: ReturnType<typeof 
                       <span className="fc-mine__stamp" data-tier={happinessTier(d.happiness)} role="img" aria-label={`행복도 ${d.happiness}`}>
                         {d.happiness}
                       </span>
-                      <span className="fc-mine__date">
-                        {monthDay(d.date)} {d.ganjiKo}일
-                      </span>
+                      <span className="fc-mine__date">{monthDay(d.date)}</span>
                     </span>
                     {(d.moods.length > 0 || d.states.length > 0) && (
                       <span className="fc-mine__tags">
@@ -309,11 +289,13 @@ function MineBlock({ personal, fortune, recall }: { personal: ReturnType<typeof 
           )}
           {recall.tendency.length > 0 && (
             <div className="fc-row">
-              <span className="fc-label fc-row__label fc-mine__name">이런 날</span>
+              <span className="fc-label fc-row__label fc-mine__name">비슷한 날엔</span>
               <ul className="fc-row__text fc-recall__list">
                 {recall.tendency.map((t) => (
                   <li key={t.family} className="break-keep">
-                    {joinDots(t.familyWord)}이 온 날 {t.n}번 중 {t.count}번 ‘{t.axisLabel} {t.word}’
+                    {/* 닫는 따옴표와 어미 사이에 낱말 이음표(U+2060) — 좁은 폭에서 "이었어요"만 다음 줄로 떨어지지 않게 */}
+                    {t.n}번 중 {t.count}번 ‘{t.axisLabel} {t.word}’{"⁠"}
+                    {batchim(t.word) ? "이었어요" : "였어요"}
                   </li>
                 ))}
               </ul>
@@ -321,9 +303,6 @@ function MineBlock({ personal, fortune, recall }: { personal: ReturnType<typeof 
           )}
         </div>
       )}
-      {/* 각주(2026-11-20 앱 주인 "'정이나 유가~' 이 부분은 별표로 작게 빼 줘"): 무엇을 기준으로 견줬는지 — 블록 맨 아래, 이 카드의 가장 작은 글자 */}
-      {ok && fortune.fitNote && <p className="fc-mine__note">{fortune.fitNote}</p>}
-      {ok && <p className="fc-mine__foot">* {personal.main}</p>}
     </section>
   );
 }
@@ -346,8 +325,8 @@ export function FortuneCard({ fortune, ganjiKo, canVote, vote, defaultOpen, vers
   const areaRows = [...areas.filter((a) => a.line && a.signal === "↑"), ...areas.filter((a) => a.line && a.signal === "→"), ...areas.filter((a) => a.line && a.signal === "↓")];
   const areaChips = areas.filter((a) => !a.line);
   const personal = personalLines(fortune, ganjiKo);
-  /** 명세 49: 인장안에서 "내 기록으로 본 오늘"이 맨 위로 오는가 — 막대로 견줄 만큼 기록이 있거나(5번 이상) 지난 기록(같은 날 · 이런 날)이 있을 때만. 말할 것이 없으면 옛 자리에 한 줄 */
-  const mineTop = variant === "seal" && ((personal.mean !== null && personal.count >= COMPARE_MIN) || !!recall);
+  /** 명세 49(2026-11-20 후속): 인장안에서 "내 기록으로 본 오늘"은 지난 기록의 사실(지난 같은 날 · 비슷한 날엔)이 하나라도 있을 때만, 펼친 안 맨 위에. 없으면 블록이 없다 */
+  const mineRecall = variant === "seal" && recall && (recall.same.length > 0 || recall.tendency.length > 0) ? recall : null;
   const gaewoon = fortune.core?.luckEls ? gaewoonOf(fortune.core, fortune.date) : null;
   /** v3.36 "오늘 힘이 되는 것": 코어 키워드 긍정 앞 3개 (v4.19는 fortune.keywords, 옛 캐시는 core.keywords). 없으면 줄째 없음 */
   const power = variant === "seal" ? [] : (fortune.keywords?.positive ?? fortune.core?.keywords?.positive ?? []).slice(0, 3);   // 인장 카드에서는 인장이 같은 일을 한다 (2026-11-15 "추천대로" 10번)
@@ -690,7 +669,7 @@ export function FortuneCard({ fortune, ganjiKo, canVote, vote, defaultOpen, vers
                 {/* 카드 시험(명세 38): 오늘 해 볼 것 → 오늘의 특징 → 풀어서 읽기(긴 본문, 기본 접힘) → 내 기록으로 본 오늘 → 오늘 챙기면 좋은 것.
                     내용·로직은 story와 같고 순서와 접힘만 다르다. "풀어서 읽기"는 15px muted 한 줄 + 꺾쇠 — 금색 버튼이 아니다(.fortune-more*)
                     명세 49(인장안만): 내 기록으로 본 오늘(말할 것이 있을 때) → 오늘 해 볼 것 → 오늘의 특징 → 풀어서 읽기(처음부터 펼쳐 둠) → 오늘 챙기면 좋은 것 */}
-                {mineTop && <MineBlock personal={personal} fortune={fortune} recall={recall} />}
+                {mineRecall && <MineBlock recall={mineRecall} />}
                 {actions}
                 {/* 인장안(명세 39)은 붓선 없이 구역마다 가는 선 + 작은 라벨(.fc-body의 자식마다 위 1px 선) */}
                 {traits && !neat && <span aria-hidden className="rule rule--light mt-6" />}
@@ -701,21 +680,9 @@ export function FortuneCard({ fortune, ganjiKo, canVote, vote, defaultOpen, vers
                     {bodyText}
                   </details>
                 )}
-                {neat ? (
-                  /* 명세 49: 말할 것이 있으면 맨 위(MineBlock)에 이미 그렸다. 여기는 기록이 없거나 적어 한 줄뿐일 때의 옛 자리 */
-                  !mineTop && (
-                    <section className="fc-section" aria-labelledby="compare-title">
-                      <h3 id="compare-title" className="fc-label">
-                        내 기록으로 본 오늘
-                      </h3>
-                      <PersonalCompare personal={personal} fortune={fortune} hasRecall={!!recall} numbers={false} />
-                      {/* 명세 41: 지난 기록의 사실(같은 날 · 이런 날). recall이 없으면(기록 없음) 그리지 않는다 */}
-                      {recall && <RecallRows recall={recall} />}
-                    </section>
-                  )
-                ) : (
-                  <PersonalCompare personal={personal} fortune={fortune} />
-                )}
+                {/* 인장안(명세 49, 2026-11-20 후속): 여기(풀어서 읽기 아래)에는 아무것도 그리지 않는다 — 지난 기록의 사실이 있으면 맨 위 MineBlock이 말하고,
+                    없으면 말할 것이 없다(운세와 견주는 줄 · "아직 기록이 없어…" 한 줄도 없다). 2안(score)은 PersonalCompare 그대로 */}
+                {!neat && <PersonalCompare personal={personal} fortune={fortune} />}
                 {gaewoonBlock}
               </>
             ) : (
