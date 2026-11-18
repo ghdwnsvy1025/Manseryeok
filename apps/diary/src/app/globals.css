@@ -7203,7 +7203,7 @@ dialog.sheet::backdrop {
   margin: 10px 0 0;
 }
 
-/* 8. 유료 풀이 권유 `.paid-invite`(만세력 낱장 맨 끝 한 곳): 괘선 → 한 줄 송명 20px → 작은 글씨 13px muted → [금색 면 버튼 56px | "다음에" 15px 먹 글자 버튼].
+/* 8. 유료 풀이 권유 `.paid-invite`(만세력 낱장의 "사주카우에서 더 보기" 칸 안 한 곳 — 아래 `.saju-viral .paid-invite`가 칸 안 모양을 잡는다): 괘선 → 한 줄 송명 20px → 작은 글씨 13px muted → [금색 면 버튼 56px | "다음에" 15px 먹 글자 버튼].
    금색 면은 낱장 안에서 이것 하나. (닫혔을 때) 그 아래 "초대 코드가 있어요" 14px muted 밑줄 */
 .paid-invite {
   display: flex;
@@ -7965,4 +7965,17 @@ dialog.sheet::backdrop {
   width: 28px;
   height: 28px;
   font-size: 14px;
+}
+
+/* v3.52 후속(2026-11-18, 앱 주인 "유료풀이광고는 사주카우와 같이 놓아줘"): 권유는 "사주카우에서 더 보기" 칸 안 첫 자리 — 머리말 → 권유 → 직업 카드 → 궁합이 한 묶음.
+   칸 안에서는 권유의 위 괘선 · 여백을 지우고(머리말 바로 아래), 권유 아래에 kv와 같은 녹갈 점선 한 줄로 카드 보기 · 궁합 보기와 가른다 — 실선은 구역 사이에만.
+   "다음에"로 접히면 권유째 사라져 점선도 없다 */
+.saju-viral .paid-invite {
+  margin-top: 2px;
+  padding: 0 0 18px;
+  border-top: 0;
+  border-bottom: 0.5px dashed color-mix(in srgb, var(--color-frame) 45%, transparent);
+}
+.saju-viral .paid-invite + .saju-viral__card {
+  margin-top: 6px;
 }

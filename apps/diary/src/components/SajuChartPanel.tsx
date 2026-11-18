@@ -49,8 +49,9 @@ interface Props {
  * 만세력 낱장의 안 (2026-10-31 → 명세 47 낱장 → 명세 48, 톤 v3.52). 서버 컴포넌트, 계산은 lib/saju/chart.ts.
  * 앱 주인: "그냥 좀 일반적인 만세력이었으면 좋겠어 … 펼치면 사주 코어에 있는 그래프처럼".
  * 순서: 명식(흔히 보는 만세력 표 — 시·일·월·연 × 십신 / 천간 칸 / 지지 칸 / 십신 / 지장간 / 12운성 / 12신살) + 생년월일 줄 →
- * 다섯 힘(세로 막대, SajuPowerBars) → 힘의 균형(반원 게이지, SajuBalanceGauge) → 유료 풀이 권유(PaidInvite, 한 곳 — 명세 48 더하기로 여기까지 올렸다) →
- * 풀이 낱말 줄(중심 기운 · 격 · 용신 · 희신 · 기신 — 사주 용어는 여기서만) → 신살 → 십이운성 → 대운 → 바이럴(내 조선시대 직업 카드·궁합).
+ * 다섯 힘(세로 막대, SajuPowerBars) → 힘의 균형(반원 게이지, SajuBalanceGauge) →
+ * 풀이 낱말 줄(중심 기운 · 격 · 용신 · 희신 · 기신 — 사주 용어는 여기서만) → 신살 → 십이운성 → 대운 →
+ * 사주카우에서 더 보기(유료 풀이 권유 PaidInvite 한 곳 → 내 조선시대 직업 카드 → 궁합. 2026-11-18 권유를 이 칸으로 모았다).
  * 한 화면에 % 계산은 한 가지: chart.power(판정용 세력)만 쓰고 chart.elements(엔진 분포율 — 오행 방울 · 오행 분포 막대)는 내지 않는다.
  * 나무 패 표(.saju-table)는 더 쓰지 않는다. 십이운성·신살은 이름과 한 줄 뜻만, 길흉 단정 없음. 모양은 디자이너(.ms*, .power*, .balance*).
  */
@@ -105,10 +106,6 @@ export function SajuChartPanel({ chart, ganjiKo, faceSrc, open, birth }: Props) 
       {/* 다섯 힘 · 힘의 균형 — 유료 풀이 진단 낱장과 같은 판정용 세력(chart.power · center.inbi) */}
       <SajuPowerBars power={chart.power} hourUnknown={chart.hourUnknown} />
       <SajuBalanceGauge center={chart.center} />
-
-      {/* 유료 풀이 권유 — "힘의 균형" 바로 아래 한 곳(명세 48 더하기: 낱장 맨 끝에서 올렸다). 결제가 열렸으면 풀이로, 닫혔으면 알림 받기.
-          "다음에"로 30일 접히면 이 자리가 비고 아래가 올라붙는다(PaidInvite). 낱장 안의 금색 면 버튼은 이 안의 하나뿐 */}
-      <PaidInvite open={open} readingHref={sajucowReadingUrl()} notifyHref={`${KAKAO_CHANNEL_URL}/friend`} price={PAID_PRICE} />
 
       {/* 풀이 낱말 줄 — 사주 용어는 여기서만 */}
       <section className="saju-terms" aria-label="풀이 낱말">
@@ -232,6 +229,9 @@ export function SajuChartPanel({ chart, ganjiKo, faceSrc, open, birth }: Props) 
       {/* 바이럴(사주카우)로 — 생년월일은 주소에 싣지 않는다. 일주 카드 페이지는 일주 이름만으로 정해진다 */}
       <section className="saju-viral card-frame card-light card-paper flex flex-col gap-3 p-5" aria-label="사주카우">
         <h2 className="text-[15px] font-bold">사주카우에서 더 보기</h2>
+        {/* 유료 풀이 권유 — 이 칸 안 한 곳(2026-11-18 앱 주인 "유료풀이광고는 사주카우와 같이 놓아줘"). 같은 서비스의 세 가지가 한 묶음: 풀이 → 직업 카드 → 궁합.
+            결제가 열렸으면 풀이로, 닫혔으면 알림 받기. "다음에"로 30일 접히면 카드 보기 · 궁합 보기 둘만 남는다(PaidInvite). 낱장 안의 금색 면 버튼은 이 하나뿐 */}
+        <PaidInvite open={open} readingHref={sajucowReadingUrl()} notifyHref={`${KAKAO_CHANNEL_URL}/friend`} price={PAID_PRICE} />
         <TrackedLink event="sajucow_link_click" eventProps={{ at: "saju", to: "card" }} href={sajucowCardUrl(me.ganjiKo)} target="_blank" rel="noopener" className="saju-viral__card flex h-13 items-center justify-center rounded-xl border border-frame text-[16px] font-bold text-ink">
           {/* 버튼 왼쪽 내 얼굴 28px (있는 얼굴 faces/, 새 그림 아님) */}
           <img src={me.faceSrc} alt="" width={28} height={28} className="saju-viral__face" />
