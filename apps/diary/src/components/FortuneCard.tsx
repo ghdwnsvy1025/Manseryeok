@@ -248,8 +248,9 @@ function RecallRows({ recall }: { recall: FortuneRecall }) {
 /**
  * 인장안(variant "seal") "내 기록으로 본 오늘" — 명세 49 (톤 v3.53, 앱 주인 "가시성이 안 좋아 … 오늘 해 볼 것 위에 올릴까?").
  * 말할 것이 있을 때(막대로 견줄 만큼 기록이 있거나 지난 기록이 있을 때) 펼친 안 맨 위에 온다. story · score와 기록이 없을 때는 PersonalCompare 그대로.
- *   판정 한 문장(지금 글귀 그대로)이 맨 위에 크게 → 기준 한 줄 작게 → 속이 찬 막대 둘(운세 = 남색, 내 기록 = 녹갈) + 눈금 말 셋(낮음 · 보통 · 높음) →
+ *   판정 한 문장이 맨 위에 크게(끝에 윗첨자 별표, 세기는 말로 — 조금 · 많이. 막대는 2026-11-20 "막대 빼기"로 없다) →
  *   같은 날 · 이런 날(날짜 먹색, 그날 행복도는 작은 도장 — 달력 칸과 같은 네 단계 색, 기분 · 있었던 일은 작은 띠).
+ *   기준 한 줄("임이나 자가 든 날 기록 6번 기준")은 블록 맨 아래 별표 각주로.
  * 운세 점수 숫자는 여전히 쓰지 않는다(명세 45). 블록은 왼쪽 굵은 괘선 한 줄로 묶인다(globals.css .fc-mine*)
  */
 function MineBlock({ personal, fortune, recall }: { personal: ReturnType<typeof personalLines>; fortune: FortuneContent; recall?: FortuneRecall | null }) {
@@ -257,37 +258,22 @@ function MineBlock({ personal, fortune, recall }: { personal: ReturnType<typeof 
   const ok = mean !== null && personal.count >= COMPARE_MIN;
   const mine = ok ? happinessMeanToTen(mean) : 0;
   const verdict = compareVerdict(mine - fortune.score);
-  const rows: { label: string; value: number; kind: "fortune" | "mine" }[] = [
-    { label: "운세", value: fortune.score, kind: "fortune" },
-    { label: "내 기록", value: mine, kind: "mine" },
-  ];
+  // 판정 한 문장 — 막대가 하던 "얼마나"를 말이 맡는다(2026-11-20 앱 주인 "막대 빼기"): 비슷해요 / 조금 · 많이 + 좋았어요(내 기록이 높음) · 낮았어요
+  const sentence = verdict === "비슷해요" ? "운세와 내 기록이 비슷해요" : `이런 날 내 기록은 운세보다 ${verdict === "차이 커요" ? "많이" : "조금"} ${mine > fortune.score ? "좋았어요" : "낮았어요"}`;
   return (
     <section className="fc-section fc-mine" aria-labelledby="compare-title">
       <h3 id="compare-title" className="fc-label">
         내 기록으로 본 오늘
       </h3>
       {ok ? (
-        <div className="fc-mine__compare" role="group" aria-label={`운세와 내 기록 비교: ${verdict}`}>
-          <p className="fc-mine__verdict">{verdict === "비슷해요" ? "운세와 내 기록이 비슷해요" : `이런 날 내 기록은 운세보다 ${mine > fortune.score ? "좋았어요" : "낮았어요"}`}</p>
-          <p className="fc-mine__basis">{personal.main}</p>
-          <ul className="fc-mine__bars">
-            {rows.map((r) => (
-              <li key={r.kind} className="fc-mine__row" data-kind={r.kind}>
-                <span className="fc-mine__name">{r.label}</span>
-                <span className="fc-mine__track">
-                  <span className="fc-mine__fill" style={{ width: `${Math.max(4, Math.min(100, r.value * 10))}%` }} />
-                </span>
-              </li>
-            ))}
-          </ul>
-          {/* 눈금 말: 막대 칸 아래 왼쪽 · 가운데 · 오른쪽. 숫자는 없다 */}
-          <p className="fc-mine__scale" aria-hidden>
-            <span>낮음</span>
-            <span>보통</span>
-            <span>높음</span>
-          </p>
-          {fortune.fitNote && <p className="fc-mine__note">{fortune.fitNote}</p>}
-        </div>
+        /* 판정 한 문장 + 윗첨자 별표(블록 맨 아래 각주 "* … 기준"과 잇는다). 별표는 마지막 글자에 붙어 혼자 다음 줄로 떨어지지 않는다.
+           막대 둘과 눈금 말은 없다 — 운세 점수와 내가 매긴 행복도는 다른 자라 나란히 재면 정밀한 비교처럼 보인다(명세 45와 같은 방향, 기록은 거울이지 채점이 아니다) */
+        <p className="fc-mine__verdict">
+          {sentence}
+          <sup className="fc-mine__star" aria-hidden>
+            *
+          </sup>
+        </p>
       ) : (
         <p className="compare__empty">{mean === null ? "오늘 글자가 든 날의 기록은 아직 없어요" : `아직 기록이 ${personal.count}번뿐이라 운세와 견주기엔 적어요`}</p>
       )}
@@ -335,6 +321,9 @@ function MineBlock({ personal, fortune, recall }: { personal: ReturnType<typeof 
           )}
         </div>
       )}
+      {/* 각주(2026-11-20 앱 주인 "'정이나 유가~' 이 부분은 별표로 작게 빼 줘"): 무엇을 기준으로 견줬는지 — 블록 맨 아래, 이 카드의 가장 작은 글자 */}
+      {ok && fortune.fitNote && <p className="fc-mine__note">{fortune.fitNote}</p>}
+      {ok && <p className="fc-mine__foot">* {personal.main}</p>}
     </section>
   );
 }

@@ -8231,27 +8231,18 @@ dialog.sheet::backdrop {
   color: var(--color-ink);
   word-break: keep-all;
 }
-.fortune-card--seal .fc-mine__basis,
+/* v3.53 후속(2026-11-20): 판정 아래 기준 줄(.fc-mine__basis)은 블록 맨 아래 별표 각주로 갔고, 막대 둘과 눈금 말(.fc-mine__bars · __row · __track · __fill · __scale)은 "막대 빼기"로 지웠다 —
+   운세 점수와 내가 매긴 행복도는 다른 자라 나란히 재면 정밀한 비교처럼 보인다(점수를 뺀 v3.45와 같은 방향, 기록은 거울이지 채점이 아니다). 세기는 판정 문장이 말로 한다.
+   블록 = 머리말 → 판정 문장(별표) → 16px → 같은 날 · 이런 날 → (fitNote 13px muted) → 각주 */
 .fortune-card--seal .fc-mine__note {
-  margin: 4px 0 0;
+  margin: 16px 0 0;
   font-size: 13px;
   line-height: 1.5;
   color: var(--color-muted);
   word-break: keep-all;
 }
-.fortune-card--seal .fc-mine__bars {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  margin: 16px 0 0;
-  padding: 0;
-  list-style: none;
-}
-.fortune-card--seal .fc-mine__row {
-  display: grid;
-  grid-template-columns: var(--fc-col) minmax(0, 1fr);
-  align-items: center;
-  column-gap: var(--fc-gap);
+.fortune-card--seal .fc-mine__note + .fc-mine__foot {
+  margin-top: 4px;
 }
 .fortune-card--seal .fc-mine .fc-mine__name {
   font-size: 13px;
@@ -8259,39 +8250,11 @@ dialog.sheet::backdrop {
   letter-spacing: 0.08em;
   color: var(--color-ink);
 }
-.fortune-card--seal .fc-mine__track {
-  display: block;
-  height: 10px;
-  overflow: hidden;
-  border-radius: 1px;
-  background: color-mix(in srgb, var(--color-frame) 12%, transparent);
-}
-.fortune-card--seal .fc-mine__fill {
-  display: block;
-  height: 100%;
-  border-radius: 1px;
-  background: var(--color-line);
-}
-.fortune-card--seal .fc-mine__row[data-kind="fortune"] .fc-mine__fill {
-  background: var(--color-sky-2);
-}
-.fortune-card--seal .fc-mine__scale {
-  display: flex;
-  justify-content: space-between;
-  margin: 6px 0 0;
-  padding-left: calc(var(--fc-col) + var(--fc-gap));
-  font-size: 13px;
-  line-height: 1.2;
-  color: var(--color-muted);
-}
-.fortune-card--seal .fc-mine__note {
-  margin-top: 12px;
-}
 .fortune-card--seal .fc-mine__recall {
   display: flex;
   flex-direction: column;
   gap: 16px;
-  margin-top: 20px;
+  margin-top: 16px;
 }
 .fortune-card--seal .fc-mine__days {
   display: flex;
@@ -8366,4 +8329,22 @@ dialog.sheet::backdrop {
   line-height: 1;
   color: var(--color-ink);
   white-space: nowrap;
+}
+
+/* v3.53 후속(2026-11-20, 앱 주인 "'정이나 유가~' 이 부분은 별표로 작게 빼 줘"): 기준 한 줄은 판정 아래에서 빼 블록 맨 아래 각주로 — "* 임이나 자가 든 날 기록 6번 기준" 13px muted.
+   판정 문장 끝의 별표는 윗첨자 13px muted(산세리프), 마지막 글자에 붙는다 */
+.fortune-card--seal .fc-mine__star {
+  margin-left: 1px;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 0;
+  color: var(--color-muted);
+  vertical-align: super;
+}
+.fortune-card--seal .fc-mine__foot {
+  margin: 16px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--color-muted);
+  word-break: keep-all;
 }
