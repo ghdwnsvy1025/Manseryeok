@@ -9054,3 +9054,284 @@ button.board-cell {
 .day-detail__moods + .day-detail__note {
   margin-top: 16px;
 }
+
+/* ── v3.56 자세한 통계 덜기 · 글자별 내 행복도: 기록 수가 읽히게, 칸을 누르면 글자 낱장 (명세 52, 2026-11-21) ──────────────────────────────
+   서랍에서 연속 기록 칸(.habit*)과 있었던 일별 행복도 칸(.state-happy*)을 뺐다. 순서 = 그래프 → 자주 고른 기분 → 글자별 내 행복도 → 맞춤도 → 운세에 답한 날.
+   새 그림 · 새 토큰 · 새 모션 없음(키트 재사용: stamp-inked-red 알파 · gold-wash). 글자 낱장의 세 칸 자는 "어느 쪽이었나"이지 좋고 나쁨이 아니다 —
+   표식은 먹색 하나, 옥색 · 주홍 · 행복도 단계 색을 쓰지 않는다 */
+
+/* 1. 글자별 내 행복도: 풀이 한 줄 13px muted. 묶음마다 왼쪽에 줄 이름 열 46px(11px muted) — 위 "평균"은 막대 위 숫자 줄, 아래 "기록한 날"은 글자 아래 숫자 줄과 같은 높이.
+   360px 지지 열두 칸에는 숫자마다 "일"을 붙일 폭이 없어(칸 19px) 줄 이름을 골랐다. 칸은 버튼(누르면 글자 낱장) — 손가락 자리는 칸 전체 높이.
+   가장 높은 · 낮은 글자(기록 3일 이상)만 막대 위 숫자 굵게. 기록 0인 글자는 점선 빈 자리 + 아래 "-". 막대 색은 그대로(금빛 · 오행 줄은 오행 색) */
+.glyph-card__how {
+  margin: 4px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--color-muted);
+  word-break: keep-all;
+}
+.bars__body {
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr);
+  column-gap: 4px;
+}
+.bars__names {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  margin: 0;
+  font-size: 11px;
+  color: var(--color-muted);
+  white-space: nowrap;
+}
+.bars__names > span:first-child {
+  line-height: 14px;
+}
+.bars__names > span:last-child {
+  line-height: 12px;
+}
+.bars__row > li {
+  min-width: 0;
+}
+button.bars__col {
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+button.bars__col:active .bars__track {
+  transform: scale(0.96);
+}
+.bars__value[data-peak] {
+  font-weight: 700;
+}
+/* 열두 칸(지지)은 칸이 17~19px이라 숫자가 서로 닿는다 — 한 단계 작게 */
+.bars__row:has(> li:nth-child(12)) .bars__value {
+  font-size: 10px;
+  letter-spacing: -0.03em;
+}
+.bars__track[data-el="목"] .bars__fill { background: var(--color-el-wood); }
+.bars__track[data-el="화"] .bars__fill { background: var(--color-el-fire); }
+.bars__track[data-el="토"] .bars__fill { background: var(--color-el-earth); }
+.bars__track[data-el="금"] .bars__fill { background: var(--color-el-metal); }
+.bars__track[data-el="수"] .bars__fill { background: var(--color-el-water); }
+.bars__track[data-empty] {
+  background: transparent;
+  border: 1px dashed color-mix(in srgb, var(--color-frame) 55%, transparent);
+}
+.bars__label[data-empty] {
+  color: var(--color-muted);
+}
+
+/* 2. 글자 낱장 `.glyph-sheet`: 머리 = 평균 행복도 도장 48px(달력 칸과 같은 네 단계 면) + "평균 행복도" 12px muted / "N일 기록" 17px 먹.
+   그날 있었던 일 = 여섯 줄 `.ruler-row`: 축 이름 14px 먹(열 64px) | 세 칸 자 | "N일" 12px muted, 그 아래(자의 왼쪽 선에 맞춰) 한마디.
+   세 칸 자 `.ruler` = 녹갈 12% 6px 트랙을 종이색 틈 둘로 세 칸 낸 것 + 그 위 먹 동그라미 표식 12px(자리 = (평균 − 1) ÷ 2 — 1 왼쪽 끝 · 2 가운데 · 3 오른쪽 끝),
+   아래 양 끝 말 12px muted. 한마디 = 기운 쪽(lean 1 · 3)이면 15px 먹, 가운데(lean 2)면 muted, 2일 미만이면 자도 말도 옅게 "아직 몰라요".
+   자주 고른 낱말 = 녹갈 1px 테 띠 28px(13px 먹 + 횟수 muted). 맨 아래 "이 글자가 든 날 보기" = 녹갈 1px 테 버튼 44px(펼치면 전체 목록과 같은 줄) */
+.glyph-sheet__none,
+.glyph-sheet__nostate {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--color-muted);
+  word-break: keep-all;
+}
+.glyph-sheet__nostate {
+  margin-top: 10px;
+}
+.glyph-sheet__head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 0;
+}
+.glyph-sheet__stamp {
+  --stamp-face: color-mix(in srgb, var(--color-frame) 28%, var(--color-paper-2));
+  --stamp-num: var(--color-ink);
+  position: relative;
+  isolation: isolate;
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  font-family: var(--font-serif);
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--stamp-num);
+  font-variant-numeric: tabular-nums;
+}
+.glyph-sheet__stamp::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: var(--stamp-face);
+  -webkit-mask: url("/ui/stamp-inked-red-clean.png") center / contain no-repeat;
+  mask: url("/ui/stamp-inked-red-clean.png") center / contain no-repeat;
+}
+.glyph-sheet__stamp[data-tier="top"] {
+  --stamp-face: var(--color-moss);
+  --stamp-num: var(--color-paper-2);
+}
+.glyph-sheet__stamp[data-tier="high"] {
+  --stamp-face: var(--color-gold) url("/ui/gold-wash.webp") center / 128px 128px;
+}
+.glyph-sheet__stamp[data-tier="low"] {
+  --stamp-face: color-mix(in srgb, var(--color-sky) 82%, var(--color-paper-2));
+  --stamp-num: var(--color-paper-2);
+}
+.glyph-sheet__count {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 17px;
+  line-height: 1.2;
+  color: var(--color-ink);
+}
+.glyph-sheet__count small {
+  font-size: 12px;
+  color: var(--color-muted);
+}
+.glyph-sheet__states,
+.glyph-sheet__days {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 0.5px solid color-mix(in srgb, var(--color-frame) 55%, transparent);
+}
+.glyph-sheet__states .saju-fine {
+  margin-top: 4px;
+}
+.ruler-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin: 16px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.ruler-row {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr) 30px;
+  column-gap: 10px;
+  row-gap: 6px;
+  align-items: start;
+}
+.ruler-row__name {
+  font-size: 14px;
+  line-height: 14px;
+  color: var(--color-ink);
+  word-break: keep-all;
+}
+.ruler-row__n {
+  font-size: 12px;
+  line-height: 14px;
+  color: var(--color-muted);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.ruler-row__word {
+  grid-column: 2 / -1;
+  font-size: 15px;
+  line-height: 1.3;
+  color: var(--color-ink);
+  word-break: keep-all;
+}
+.ruler-row[data-lean="2"] .ruler-row__word,
+.ruler-row[data-thin] .ruler-row__word {
+  color: var(--color-muted);
+}
+.ruler-row[data-thin] .ruler-row__word {
+  font-size: 13px;
+}
+.ruler {
+  display: block;
+  padding: 4px 6px 0;
+}
+.ruler__track {
+  position: relative;
+  display: block;
+  height: 6px;
+  border-radius: 1px;
+  background:
+    linear-gradient(var(--color-paper-2), var(--color-paper-2)) calc(100% / 3) 0 / 2px 100% no-repeat,
+    linear-gradient(var(--color-paper-2), var(--color-paper-2)) calc(200% / 3) 0 / 2px 100% no-repeat,
+    color-mix(in srgb, var(--color-frame) 22%, var(--color-paper-2));
+}
+.ruler__mark {
+  position: absolute;
+  top: 50%;
+  left: calc(var(--at, 0.5) * 100%);
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--color-ink);
+  box-shadow: 0 0 0 2px var(--color-paper-2);
+  transform: translate(-50%, -50%);
+}
+.ruler__ends {
+  display: flex;
+  justify-content: space-between;
+  margin: 7px -6px 0;
+  font-size: 12px;
+  line-height: 1.2;
+  color: var(--color-muted);
+  white-space: nowrap;
+}
+.ruler-row[data-thin] .ruler {
+  opacity: 0.55;
+}
+.glyph-sheet__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 18px 0 0;
+}
+.glyph-sheet__tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 28px;
+  padding: 0 9px;
+  border: 1px solid color-mix(in srgb, var(--color-frame) 55%, transparent);
+  border-radius: 2px;
+  font-size: 13px;
+  line-height: 1;
+  color: var(--color-ink);
+  white-space: nowrap;
+}
+.glyph-sheet__tag small {
+  font-size: 12px;
+  color: var(--color-muted);
+}
+.glyph-sheet__toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  height: 44px;
+  margin: 0;
+  border: 1px solid color-mix(in srgb, var(--color-frame) 70%, transparent);
+  border-radius: 2px;
+  background: none;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--color-ink);
+  cursor: pointer;
+}
+.glyph-sheet__toggle small {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--color-muted);
+}
+.glyph-sheet__days .day-list__rows {
+  margin-top: 8px;
+}

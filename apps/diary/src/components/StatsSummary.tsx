@@ -73,13 +73,14 @@ export function StatsSummary({ h, fitPercent, stems, branches, elements, moods, 
   // "적중"이라는 말과 백분율은 쓰지 않는다(명세 47) — 다음에 열리는 것의 이름도 화면에서는 "운세에 답한 날"로 읽는다(이름은 lib/stats/extra.ts nextUnlock이 준다)
   // 명세 51: 영역 통계는 없다 — "다음에 열리는 것"이 영역 항목이면(lib nextUnlock이 준다) 그 줄을 그리지 않는다
   const unlockIsArea = unlock ? unlock.title.includes("영역") : false;
+  const unlockIsVote = unlock ? unlock.title === "운세 적중률" : false;
   const unlockTitle = unlock ? (unlock.title === "운세 적중률" ? "운세에 답한 날" : unlock.title) : "";
   return (
     <details className="more-stats me-sep card-frame card-light card-paper">
       <summary className="more-stats__summary tap cursor-pointer list-none [&::-webkit-details-marker]:hidden">자세한 통계</summary>
       <div className="mt-3 flex flex-col gap-4">
         {/* 다음에 열리는 통계 하나 — 진행 점(have/need)과 한 줄. 모양은 디자이너(.unlock*) */}
-        {unlock && !unlockIsArea && (
+        {unlock && !unlockIsArea && !unlockIsVote && (
           <div className="unlock card-frame card-light card-paper flex items-center gap-3 px-5 py-3.5" aria-label={`다음에 열리는 것: ${unlockTitle}`}>
             <span className="unlock__dots flex gap-1" aria-hidden>
               {Array.from({ length: unlock.need }, (_, i) => (
@@ -93,46 +94,10 @@ export function StatsSummary({ h, fitPercent, stems, branches, elements, moods, 
           </div>
         )}
 
-        {/* 영역 칩이 달린 그래프(한 달 · 1년). 그릴 기록이 모자라면 자리째 빼고 위 "다음에 열리는 것"이 말한다 */}
+        {/* 그래프(한 달 · 1년, 행복도 선 하나). 그릴 기록이 모자라면 자리째 빼고 "다음에 열리는 것"이 말한다 */}
         {chartReady && <div className="hchart-wrap card-frame card-light card-paper px-5 py-4">{chart}</div>}
 
-        {/* v3.22 기록 습관: 큰 숫자 "N일째" + 최고, 최근 30일 도장 점 30개, 이번 달·30일 기록률. 모양은 디자이너(.habit*) */}
-        {habit && (
-          <div className="habit card-frame card-light card-paper px-5 py-4" aria-label="기록 습관">
-            <div className="habit__head">
-              <span className="habit__label">연속 기록</span>
-              <span className="habit__value">
-                {habit.current}
-                <small>일째</small>
-              </span>
-              <span className="habit__best">최고 {habit.best}일</span>
-            </div>
-            <ol className="habit__dots" aria-label={`최근 30일 중 ${habit.last30.filter(Boolean).length}일 기록`}>
-              {habit.last30.map((on, k) => (
-                <li key={k} className="habit__dot" data-on={on ? "" : undefined} data-today={k === habit.last30.length - 1 ? "" : undefined} />
-              ))}
-            </ol>
-            {/* v3.23: 점 줄의 뜻 — 양 끝에 "30일 전"과 "오늘" 두 단어만 */}
-            <p className="habit__ends" aria-hidden>
-              <span>30일 전</span>
-              <span>오늘</span>
-            </p>
-            <dl className="kv habit__kv mt-3">
-              <div className="kv__row">
-                <dt>이번 달 기록</dt>
-                <dd>{habit.thisMonth}일</dd>
-              </div>
-              <div className="kv__row">
-                <dt>최근 30일 기록률</dt>
-                <dd>{habit.rate30}%</dd>
-              </div>
-            </dl>
-          </div>
-        )}
-
-        {/* 명세 50 8번: 영역별 행복도(최근 30일 평균 막대) 칸은 뺐다 — 있었던 일별 행복도(StateStats)가 같은 꼴로 그 일을 한다. 영역 육각형 · 글자 막대 · 영역 칩 그래프는 그대로 */}
-
-        {/* 명세 51(앱 주인 "영역별 행복도와 그에 해당하는 값들을 없애 줘"): 영역 육각형 · 영역별 글자 막대 칸은 뺐다 */}
+        {/* 명세 52(앱 주인 "이 부분은 빼 줘" · "연속 기록 창 이 영역도 빼 줘"): 연속 기록 칸(v3.22)과 있었던 일별 행복도 칸(v3.54)은 없다. 나 탭 맨 위 기록 한 줄은 그대로 */}
 
         {/* 자주 고른 기분 — 지표 두 칸에서 한 줄로 */}
         <div className="metric metric--moods card-frame card-light card-paper px-5 py-4">
@@ -151,21 +116,17 @@ export function StatsSummary({ h, fitPercent, stems, branches, elements, moods, 
           )}
         </div>
 
-        {/* 2026-11-14 있었던 일(상태) 통계 — 부모가 그려 넘긴다(StateStats). 쓰기 화면의 "있었던 일 → 그래서 마음은"과 같은 묶음 */}
-        {states}
-
-        {/* 운세 카드의 맞아요/아니에요를 모은 것(2026-10-31). 명세 47: "적중" · 백분율 없이 날 수와 최근 열 번 점만. 점수 계산에는 쓰지 않는다 */}
-        {accuracy && accuracy.answered > 0 && (
-          <div className="accuracy metric card-frame card-light card-paper px-5 py-4">
-            <span className="metric__label">운세에 답한 날</span>
-            <span className="metric__sub">
-              맞아요 {accuracy.hit}일, 답한 날 {accuracy.answered}일
-            </span>
-            <span className="accuracy__dots flex gap-1" aria-label={`최근 ${accuracy.recent.length}번 중 맞아요 ${accuracy.recent.filter((v) => v === 1).length}번`}>
-              {accuracy.recent.map((v, i) => (
-                <span key={i} className="accuracy__dot" data-hit={v === 1 ? "" : undefined} />
-              ))}
-            </span>
+        {/* 글자별 내 행복도 — 천간·지지·오행 한 판 (Q6 = A). 기록 3건 전엔 아무것도 그리지 않는다.
+            명세 52(앱 주인 "글자별 행복도가 중요한데"): 그래프 다음다음으로 올렸다. 풀이 한 줄 + 줄 이름(평균 / 기록한 날) + 칸을 누르면 글자 낱장 */}
+        {h.total < 3 ? null : (
+          <div className="glyph-card card-frame card-light card-paper flex flex-col gap-5 px-5 py-4">
+            <div>
+              <p className="text-[15px] font-bold">글자별 내 행복도</p>
+              <p className="glyph-card__how">그 글자가 든 날의 내 행복도 평균이에요. 칸을 누르면 그날들에 있었던 일이 보여요</p>
+            </div>
+            <Bars title="천간" items={stems} kind="stem" />
+            <Bars title="지지" items={branches} kind="branch" />
+            <Bars title="오행" items={elements} element kind="element" />
           </div>
         )}
 
@@ -226,15 +187,36 @@ export function StatsSummary({ h, fitPercent, stems, branches, elements, moods, 
           </dl>
         )}
 
-        {/* 천간·지지·오행 한 판 (Q6 = A). 접기 없음. v3.14: 기록 3건 전엔 아무것도 그리지 않는다(안내 카드 없음) */}
-        {h.total < 3 ? null : (
-          <div className="card-frame card-light card-paper flex flex-col gap-5 px-5 py-4">
-            <p className="text-[15px] font-bold">글자별 내 행복도</p>
-            <Bars title="천간" items={stems} />
-            <Bars title="지지" items={branches} />
-            <Bars title="오행" items={elements} element />
+        {/* 운세 카드의 맞아요/아니에요를 모은 것(2026-10-31). 명세 47: "적중" · 백분율 없이 날 수와 최근 열 번 점만. 점수 계산에는 쓰지 않는다 */}
+        {accuracy && accuracy.answered > 0 && (
+          <div className="accuracy metric card-frame card-light card-paper px-5 py-4">
+            <span className="metric__label">운세에 답한 날</span>
+            <span className="metric__sub">
+              맞아요 {accuracy.hit}일, 답한 날 {accuracy.answered}일
+            </span>
+            <span className="accuracy__dots flex gap-1" aria-label={`최근 ${accuracy.recent.length}번 중 맞아요 ${accuracy.recent.filter((v) => v === 1).length}번`}>
+              {accuracy.recent.map((v, i) => (
+                <span key={i} className="accuracy__dot" data-hit={v === 1 ? "" : undefined} />
+              ))}
+            </span>
           </div>
         )}
+
+        {/* 명세 52: "운세에 답한 날" 안내는 서랍 맨 아래로 — 다음에 열리는 통계 하나 — 진행 점(have/need)과 한 줄. 모양은 디자이너(.unlock*) */}
+        {unlock && !unlockIsArea && unlockIsVote && (
+          <div className="unlock card-frame card-light card-paper flex items-center gap-3 px-5 py-3.5" aria-label={`다음에 열리는 것: ${unlockTitle}`}>
+            <span className="unlock__dots flex gap-1" aria-hidden>
+              {Array.from({ length: unlock.need }, (_, i) => (
+                <span key={i} className="unlock__dot" data-on={i < unlock.have ? "" : undefined} />
+              ))}
+            </span>
+            <span className="flex min-w-0 flex-col">
+              <span className="unlock__title text-[15px] font-bold">{unlockTitle}</span>
+              <span className="unlock__how text-[13px] text-muted">{unlock.how}</span>
+            </span>
+          </div>
+        )}
+
       </div>
     </details>
   );

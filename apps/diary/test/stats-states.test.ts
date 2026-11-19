@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { groupsOfDay, stateByGroup, stateHappiness, stateIntensity, stateSummary, stateTagTop, STATE_RATIO_MIN } from "@/lib/stats/states";
+import { groupsOfDay, stateByGroup, stateByGlyph, stateHappiness, stateIntensity, stateSummary, stateTagTop, STATE_RATIO_MIN } from "@/lib/stats/states";
 
 // 내 일간 己(기토): 甲·乙 = 관성, 丙·丁 = 인성, 戊·己 = 비겁, 庚·辛 = 식상, 壬·癸 = 재성
 const ME = "己";
@@ -77,5 +77,28 @@ describe("있었던 일(상태) 통계", () => {
     // 한 번뿐인 축은 평균은 내되 차이는 내지 않는다
     expect(rows.find((r) => r.axis === "express")).toMatchObject({ on: { n: 1, mean: 3 }, off: { n: 0, mean: null }, diff: null });
     expect(stateIntensity([]).every((r) => r.all.n === 0 && r.diff === null)).toBe(true);
+  });
+  test("글자별 있었던 일: 천간 · 지지 · 오행마다 축의 평균과 기운 쪽, 두 번 이상일 때만 말한다", () => {
+    const g = stateByGlyph([
+      e("2026-12-01", "임", "자", { money: 3, pace: 3, tags: ["treat"] }),
+      e("2026-12-11", "임", "술", { money: 3, pace: 1, tags: ["treat", "tidy"] }),
+      e("2026-12-21", "임", "신", { money: 2 }),
+      e("2026-12-02", "계", "자", { money: 1 }),
+      e("2026-12-03", "갑", "인", null),
+      e("2026-12-04", "갑", "인", {}),
+    ]);
+    const im = g["stem:임"]!;
+    expect(im.days).toBe(3);
+    expect(im.rows.find((r) => r.axis === "money")).toMatchObject({ n: 3, mean: 2.7, lean: 3, word: "돈 많이 나감", ends: ["거의 안 씀", "많이 나감"] });
+    expect(im.rows.find((r) => r.axis === "pace")).toMatchObject({ n: 2, mean: 2, lean: 2, word: "속도 보통" });
+    expect(im.rows.find((r) => r.axis === "people")).toMatchObject({ n: 0, mean: null, lean: null, word: null });
+    expect(im.tags).toEqual([{ label: "사 줬음", n: 2 }]);
+    // 지지 자: 임자 · 계자 두 날 — 돈 3과 1의 평균 2
+    expect(g["branch:자"]!.rows.find((r) => r.axis === "money")).toMatchObject({ n: 2, mean: 2, lean: 2 });
+    // 오행 수 = 임 · 계 네 날
+    expect(g["element:수"]!.days).toBe(4);
+    // 한 번뿐이면 평균은 있어도 기운 쪽은 말하지 않는다. 있었던 일을 안 고른 글자는 열쇠가 없다
+    expect(g["stem:계"]!.rows.find((r) => r.axis === "money")).toMatchObject({ n: 1, mean: 1, lean: null, word: null });
+    expect(g["stem:갑"]).toBeUndefined();
   });
 });

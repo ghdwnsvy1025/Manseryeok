@@ -8,8 +8,7 @@ import { SaveBurst } from "@/components/SaveBurst";
 import { Booting } from "@/components/Booting";
 import { characterOf, characterOfGanji } from "@/lib/character";
 import { StatsSummary } from "@/components/StatsSummary";
-import { StateStats } from "@/components/StateStats";
-import { stateHappiness } from "@/lib/stats/states";
+import { stateByGlyph } from "@/lib/stats/states";
 import { TrackOnMount } from "@/components/track/TrackOnMount";
 import { birthProfileOf, countEntries, getEntry, getSajuProfile, listEntries, listEntriesInMonth, listEntriesForStats, listFortuneScores, listFortuneVotes } from "@/lib/db";
 import { sajuChart } from "@/lib/saju/chart";
@@ -19,6 +18,7 @@ import { Sheet, SheetTrigger } from "@/components/Sheet";
 import { MeForecastChips } from "@/components/MeForecastChips";
 import { DaySheet, DayListButton } from "@/components/DaySheet";
 import { GanjiSheet } from "@/components/GanjiSheet";
+import { GlyphSheet } from "@/components/GlyphSheet";
 import { SajuNewDot } from "@/components/SajuNewDot";
 import { HappyAnswer, InsightSeals, VersusAnswer } from "@/components/InsightSeals";
 import { bestWorstDays, fortuneAccuracy, growingSeries, habitOf, happinessSeries, monthlySeries, moodTop, nextUnlock, streakOf, type PickedDay } from "@/lib/stats/extra";
@@ -116,7 +116,8 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
   const happy = happyWhen(all, profile.pillars.day.stem);
   const versus = forecastVersus(all, fortuneScores);
   // 명세 50: 있었던 일마다 그날의 행복도 평균(영역별 행복도 자리를 대신한다), 전체 기록 목록(최근 것부터)
-  const stateHappy = stateHappiness(all);
+  // 명세 52 (2026-11-21): 글자별 행복도의 칸을 누르면 뜨는 낱장 — 그 글자의 날에 있었던 일의 경향. 열쇠 "stem:갑" · "branch:자" · "element:목"
+  const glyphStates = stateByGlyph(all);
   const records = recordRows.map((e) => ({
     date: e.entry_date,
     ganjiKo: dayGanji(e.entry_date).ko,
@@ -144,9 +145,6 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
   const chart = sajuChart(profile.pillars, birthProfileOf(profile), today);
   // v3.10: 오늘 화면에서 뺀 "기록 N일째"를 여기로. 60칸 중 채운 칸 = 기록이 1건 이상인 간지 수
   const filledCells = cells.filter((c) => c.n > 0).length;
-  // 2026-11-14 있었던 일(상태) 통계: 최근 30일 + 십신 갈래가 온 날의 상태. 상태 기록이 없으면 안 그린다 (명세 37).
-  // 자리(명세 47): "자세한 통계" 서랍 안 — "자주 고른 기분" 바로 아래(StatsSummary의 states 자리)
-  const stateStats = <StateStats rows={stateHappy} />;
   // 명세 47 기록 한 줄에 쓰는 "이번 달 N일" — 전에는 StatsSummary에 넘기는 자리에서 바로 불렀다(같은 habitOf, 한 번만 부르게 올렸다)
   const habit = habitOf(all, today);
 
@@ -270,7 +268,7 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
         {/* 명세 47 물음 인장 둘: 기록 7일부터 열린다. 누르면 답 낱장 */}
         <InsightSeals open={insightOpen} left={insightLeft} />
         {/* 기록 0일 = 첫 기록 카드, 그 뒤 = 접힌 "자세한 통계" 서랍 하나(그래프 · 습관 · 기분 · 있었던 일 · 맞춤도 · 글자별) */}
-        <StatsSummary h={h} fitPercent={fitPercent(all.length)} stems={byStem(all)} branches={byBranch(all)} elements={byElement(all)} states={stateStats} moods={moods} streak={streak} habit={habit} chart={<HappinessChart series={series} yearSeries={yearSeries} emptyArt={me.characterSrc} />} chartReady={chartReady} unlock={unlock} accuracy={accuracy} writeHref="/write" />
+        <StatsSummary h={h} fitPercent={fitPercent(all.length)} stems={byStem(all)} branches={byBranch(all)} elements={byElement(all)} moods={moods} streak={streak} chart={<HappinessChart series={series} yearSeries={yearSeries} emptyArt={me.characterSrc} />} chartReady={chartReady} unlock={unlock} accuracy={accuracy} writeHref="/write" />
       </section>
 
       {/* ── 낱장 셋 (명세 47): 같은 틀(Sheet). 한 번에 하나만 열린다. 저장 직후(?saved=)에도 저절로 열리지 않는다 ── */}
@@ -295,6 +293,17 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
           }
         />
       </Sheet>
+      {/* 글자 낱장(명세 52): "글자별 내 행복도"의 막대 칸을 누르면 뜬다 — 그 글자가 든 날에 있었던 일의 경향(glyphStates)과 그날들 */}
+      <GlyphSheet
+        glyphs={[
+          ...byStem(all).map((b) => ({ id: `stem:${b.ko}`, kind: "stem" as const, name: b.ko, n: b.n, mean: b.mean })),
+          ...byBranch(all).map((b) => ({ id: `branch:${b.ko}`, kind: "branch" as const, name: b.ko, n: b.n, mean: b.mean })),
+          ...byElement(all).map((b) => ({ id: `element:${b.key}`, kind: "element" as const, name: b.key, n: b.n, mean: b.mean })),
+        ]}
+        states={glyphStates}
+        records={records}
+        today={today}
+      />
       {/* 간지 낱장(명세 51): 60갑자 칸을 누르면 뜬다. 주소 ?cell=N으로 들어오면 뜬 채 시작한다 */}
       <GanjiSheet cells={cells.map((c) => ({ index: c.index, ko: c.ko, n: c.n, mean: c.mean }))} records={records} todayIndex={todayIndex} today={today} />
       {/* 날짜 낱장과 전체 목록(명세 50): 달력 칸 · 두 날 · 예상의 날 줄 · 목록 어디서 누르든 같은 낱장. 주소 ?d=로 들어오면 뜬 채 시작한다 */}

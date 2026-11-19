@@ -206,3 +206,65 @@ export function stateIntensity(entries: (StateEntry & { dayMaster: string })[]):
     };
   });
 }
+
+// ---------- 글자별 있었던 일 (2026-11-21 앱 주인: "각각의 칸을 누르면 오늘 있었던 일들의 각 영역마다 평균 값이나 상태를", 명세 52) ----------
+/** 경향을 말해도 되는 최소 날 수 */
+export const GLYPH_STATE_MIN = 2;
+export interface GlyphStateRow {
+  axis: StateKey;
+  /** 축 이름: "하루의 속도", "사람", "말·표현", "돈", "책임", "생각" */
+  label: string;
+  /** 양 끝 말 [1단계, 3단계]: ["여유", "바쁨"], ["거의 안 씀", "많이 나감"] … */
+  ends: readonly [string, string];
+  /** 그 글자의 날 가운데 이 축을 고른 날 수 */
+  n: number;
+  /** 고른 단계(1~3)의 평균, 소수 한 자리. n이 0이면 null */
+  mean: number | null;
+  /** 평균이 기운 쪽: 1(앞쪽 말) · 2(가운데) · 3(뒤쪽 말). n이 GLYPH_STATE_MIN 미만이면 null */
+  lean: 1 | 2 | 3 | null;
+  /** 혼자 읽히는 말: "돈 많이 나감", "돈 평소만큼" … lean이 null이면 null */
+  word: string | null;
+}
+export interface GlyphState {
+  /** 그 글자의 날 가운데 있었던 일을 하나라도 고른 날 수 */
+  days: number;
+  rows: GlyphStateRow[];
+  /** 자주 고른 세부 낱말 (두 번 이상, 많은 순 셋까지) */
+  tags: { label: string; n: number }[];
+}
+const STEM_EL: Record<string, string> = { 갑: "목", 을: "목", 병: "화", 정: "화", 무: "토", 기: "토", 경: "금", 신: "금", 임: "수", 계: "수" };
+
+/**
+ * 글자(천간 · 지지 · 오행)마다 그날 있었던 일의 경향. 열쇠는 "stem:갑", "branch:자", "element:목"(오행은 그날 천간의 오행 — 글자별 행복도 막대와 같은 기준).
+ * 있었던 일을 고른 날이 하나도 없는 글자는 열쇠를 만들지 않는다.
+ */
+export function stateByGlyph(entries: StateEntry[]): Record<string, GlyphState> {
+  const groups = new Map<string, StateEntry[]>();
+  for (const e of entries) {
+    if (!e.states) continue;
+    const has = STATE_AXES.some((a) => typeof e.states![a.key] === "number") || (e.states.tags?.length ?? 0) > 0;
+    if (!has) continue;
+    const keys = [`stem:${e.day_stem}`, `branch:${e.day_branch}`];
+    if (STEM_EL[e.day_stem]) keys.push(`element:${STEM_EL[e.day_stem]}`);
+    for (const k of keys) groups.set(k, [...(groups.get(k) ?? []), e]);
+  }
+  const out: Record<string, GlyphState> = {};
+  for (const [k, list] of groups) {
+    const rows: GlyphStateRow[] = STATE_AXES.map((a) => {
+      const lv = list.flatMap((e) => (typeof e.states![a.key] === "number" ? [e.states![a.key] as number] : []));
+      const n = lv.length;
+      const mean = n ? Math.round((lv.reduce((x, y) => x + y, 0) / n) * 10) / 10 : null;
+      const lean: 1 | 2 | 3 | null = mean === null || n < GLYPH_STATE_MIN ? null : mean <= 1.6 ? 1 : mean >= 2.4 ? 3 : 2;
+      return { axis: a.key, label: a.label, ends: [a.levels[0], a.levels[2]] as const, n, mean, lean, word: lean === null ? null : stateSay(a.key, lean) };
+    });
+    const tagN = new Map<string, number>();
+    for (const e of list) for (const t of e.states!.tags ?? []) if (STATE_TAG_LABEL[t]) tagN.set(t, (tagN.get(t) ?? 0) + 1);
+    const tags = [...tagN.entries()]
+      .filter(([, n]) => n >= GLYPH_STATE_MIN)
+      .sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1))
+      .slice(0, 3)
+      .map(([t, n]) => ({ label: STATE_TAG_LABEL[t]!, n }));
+    out[k] = { days: list.length, rows, tags };
+  }
+  return out;
+}
