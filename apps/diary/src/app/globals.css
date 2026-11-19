@@ -8961,3 +8961,96 @@ button.paid-invite__go {
 .saju-viral__faces > .saju-viral__face + .saju-viral__face {
   margin-left: -10px;
 }
+
+/* ── v3.55 나 탭: 영역 통계 빼기 · 60갑자 칸도 낱장 (명세 51, 2026-11-20) ──────────────────────────────
+   자세한 통계 서랍에서 영역 육각형 · 영역별 글자 막대 · 그래프의 영역 칩과 예상 선을 뺐다 — 그래프는 행복도 선 하나(범례 없음, 안내 한 줄만).
+   60갑자 격자의 칸은 버튼이고 누르면 간지 낱장 `.ganji-sheet`가 뜬다(격자 아래 상세 없음). 새 그림 · 새 토큰 · 새 모션 없음 */
+/* 격자 칸이 링크에서 버튼이 되었다 — 버튼 기본 모양만 지운다(칸 모양 .album-cell · .board-cell은 그대로) */
+button.album-cell,
+button.board-cell {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+/* 간지 낱장: 머리 = 얼굴 동그라미 96px(달력 날짜 상세와 같은 처리) + 오른쪽에 (오늘이면 "오늘" 한지 띠지 24px) · 평균 행복도 도장과 "N번 기록"(.cell-stat 그대로).
+   기록 없는 간지 = 얼굴 실루엣(먹 14%) + "아직 이 날의 기록이 없어요" 15px muted + 다음에 오는 날 한 줄 15px 먹. 아래 그 간지였던 날 목록은 전체 목록과 같은 줄(.day-list__row) */
+.ganji-sheet__head {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+}
+.ganji-sheet__face {
+  flex: none;
+  width: 96px;
+  height: 96px;
+  padding: 8px;
+  border-radius: 50%;
+  object-fit: contain;
+  background: var(--color-paper) url("/ui/paper-bg.webp") center / 256px 256px;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-frame) 40%, transparent);
+}
+.ganji-sheet__face[data-unmet] {
+  filter: brightness(0) opacity(0.14);
+  box-shadow: none;
+  background: none;
+}
+.ganji-sheet__stat {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+.ganji-sheet__stat .cell-stat {
+  margin: 0;
+}
+.ganji-sheet__today {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 3px;
+  border-style: solid;
+  border-width: 0 10px;
+  border-image: url("/ui/tag-strip-paper-clean.webp") 0 44 fill / 0 10px / 0 stretch;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--color-ink);
+}
+.ganji-sheet__none {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--color-muted);
+  word-break: keep-all;
+}
+.ganji-sheet__next {
+  margin: 20px 0 0;
+  padding-top: 16px;
+  border-top: 0.5px solid color-mix(in srgb, var(--color-frame) 55%, transparent);
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--color-ink);
+  text-align: center;
+  word-break: keep-all;
+}
+.ganji-sheet__days {
+  margin-top: 20px;
+  border-top: 0.5px solid color-mix(in srgb, var(--color-frame) 55%, transparent);
+}
+.ganji-sheet__more {
+  margin: 10px 0 0;
+  font-size: 13px;
+  color: var(--color-muted);
+}
+
+/* v3.55 더하기(명세 51 더하기, 2026-11-20 앱 주인 "입력도 빼기"): 쓰기 화면의 영역 점수 접힘 칸과 날짜 상세의 영역 줄을 뺐다.
+   날짜 상세는 기분 띠 → 있었던 일 띠 → (16px) → 메모로 바로 이어진다 */
+.day-detail__states + .day-detail__note,
+.day-detail__moods + .day-detail__note {
+  margin-top: 16px;
+}

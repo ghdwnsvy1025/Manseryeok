@@ -272,3 +272,12 @@ export function DayButton({ date, className, children, "aria-label": ariaLabel }
     </button>
   );
 }
+
+/** 전체 목록을 여는 글자 버튼 — 서버 조각(60갑자 보기 머리) 안에서 쓴다. 달력의 "전체 보기"와 같은 말씨(.cal__all) */
+export function DayListButton({ className = "cal__all tap" }: { className?: string }) {
+  return (
+    <button type="button" className={className} aria-haspopup="dialog" onClick={() => openDayList()}>
+      전체 보기
+    </button>
+  );
+}

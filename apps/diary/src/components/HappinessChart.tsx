@@ -137,7 +137,8 @@ export function HappinessChart({ series: monthSeries, yearSeries, emptyArt, vari
     );
   }
   const n = series.length;
-  const areaChips = full ? AREAS.filter((a) => series.some((p) => typeof p.areas?.[a.key] === "number")) : [];
+  // 명세 51(앱 주인 "그래프도 그냥 기본 행복도로만"): 영역 칩은 없다 — 선은 행복도 하나. (view 상태는 늘 "all")
+  const areaChips: { key: AreaKey; label: string }[] = [];
   const values =
     view === "all"
       ? series.map((p) => p.happiness10)
@@ -152,7 +153,8 @@ export function HappinessChart({ series: monthSeries, yearSeries, emptyArt, vari
     return view === "all" ? (series[i]!.happiness === null ? null : round1(series[i]!.happiness!)) : round1(v);
   };
   const line = bridgedPaths(values);
-  const fortune = full && view === "all" ? bridgedPaths(series.map((p) => p.fortune)) : { solid: "", gap: "", lone: "" };
+  // 명세 51: 예상(운세) 선도 그리지 않는다
+  const fortune = { solid: "", gap: "", lone: "" };
   // 예상 선이 그려지는 그림인가 — 그러면 행복도의 빈 날은 잇지 않는다(선 모양은 둘까지)
   const hasForecast = Boolean(fortune.solid || fortune.gap || fortune.lone);
   const label = (d: string) => (year ? `${Number(d.slice(5, 7))}월` : `${Number(d.slice(5, 7))}.${Number(d.slice(8, 10))}`);
@@ -263,7 +265,7 @@ export function HappinessChart({ series: monthSeries, yearSeries, emptyArt, vari
         </p>
       </div>
       <figcaption className="hchart__legend mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-muted">
-        {(full || hasForecast) && <span className="hchart__key hchart__key--line">{view === "all" ? `내 행복도${year ? " (월 평균)" : ""}` : viewLabel}</span>}
+        {hasForecast && <span className="hchart__key hchart__key--line">{view === "all" ? `내 행복도${year ? " (월 평균)" : ""}` : viewLabel}</span>}
         {hasForecast && <span className="hchart__key hchart__key--fortune">사주로 본 예상</span>}
         <span className="hchart__hint">선을 누르면 그날 값이 보여요</span>
       </figcaption>

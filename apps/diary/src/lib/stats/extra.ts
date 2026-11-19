@@ -312,12 +312,12 @@ export interface Unlock {
 /**
  * 다음에 열리는 통계 하나 (2026-10-31 사용자: 데이터가 없을 때 설명은 깔끔하게, 매일 기록하고 싶게).
  * 빈 블록마다 안내문을 늘어놓지 않고 "다음에 열리는 것" 하나만 보인다. 다 열렸으면 null.
- * 순서: 그래프(2일) → 글자별 행복도(3일) → 영역 점수 → 운세 적중률 → 1년 그래프(두 달)
+ * 순서: 그래프(2일) → 글자별 행복도(3일) → 운세 적중률 → 1년 그래프(두 달)
  */
-export function nextUnlock(input: { days: number; areaDays: number; votes: number; months: number }): Unlock | null {
+export function nextUnlock(input: { days: number; areaDays?: number; votes: number; months: number }): Unlock | null {
   if (input.days < 2) return { title: "행복도 그래프", have: input.days, need: 2, how: "하루 더 기록하면 열려요" };
   if (input.days < 3) return { title: "글자별 내 행복도", have: input.days, need: 3, how: "하루 더 기록하면 열려요" };
-  if (input.areaDays < 1) return { title: "영역별 행복도", have: 0, need: 1, how: "기록할 때 영역에 도장을 찍으면 열려요" };
+  // 2026-11-20 (명세 51): 영역 통계와 영역 입력을 없앴다 — "영역별 행복도"는 더 열리는 것이 아니다. areaDays는 받기만 한다
   if (input.votes < 1) return { title: "운세 적중률", have: 0, need: 1, how: "운세 아래에서 한 번 답하면 열려요" };
   if (input.months < 2) return { title: "1년 그래프", have: input.months, need: 2, how: "다음 달에도 기록하면 열려요" };
   return null;

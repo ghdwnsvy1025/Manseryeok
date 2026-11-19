@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { GanjiCellButton } from "@/components/GanjiSheet";
 import { STEMS, STEM_META, type StemHanja } from "@saju/engine";
 import type { GanjiCell } from "@/lib/stats/ganji";
 import { characterOfGanji } from "@/lib/character";
@@ -19,10 +19,11 @@ interface Props {
  * 60갑자 도장판 10×6 (톤 v3.3). 자바스크립트 없이 링크로 칸을 고른다 (?cell=N).
  * 모은 칸 = 그 간지의 캐릭터만(contain) + 금 테두리. 농도 = 평균 행복도(옅음 1px → 진함 2px, --ink).
  * 약속 지킨 날이 있는 칸은 두 겹(금 2px + 안쪽 한지 1px + 금 1px). 카드 틀·썸네일·인장 없음.
+ * 명세 51 (톤 v3.55): 칸은 링크(?cell=N)가 아니라 버튼 — 누르면 서버를 거치지 않고 간지 낱장이 뜬다. 격자 아래 상세는 없다.
  * 안 모은 칸 = 빈 도장 자리 + 지지 한 글자. 숫자·이모지는 넣지 않는다. 전환 효과 없음.
  */
 export function GanjiGrid({ cells, selected, todayIndex, basePath, pickedEntries = [] }: Props) {
-  const picked = selected !== null ? cells[selected] : null;
+  void selected; void basePath; void pickedEntries; // 명세 51: 칸을 누르면 간지 낱장 — 서버가 고른 칸 · 그 날 목록은 더 쓰지 않는다(부르는 쪽 호환으로 받기만 한다)
   return (
     // 좌우 여백을 화면 가장자리까지 줄여 칸이 36px 이상 (375px 기준 36.6px). 칸 사이 1px
     <div className="-mx-5">
@@ -34,23 +35,19 @@ export function GanjiGrid({ cells, selected, todayIndex, basePath, pickedEntries
       </div>
       <ol className="grid grid-cols-10 gap-px" aria-label="60갑자별 내 행복도">
         {cells.map((c) => {
-          const isSel = c.index === selected;
           const isToday = c.index === todayIndex;
           // 1~10 → 0.35~1.0. 기록이 없으면 금 테두리 없음
           const ink = c.mean === null ? 0 : 0.35 + ((c.mean - 1) / 9) * 0.65;
-          // v3.14: 테두리는 선택한 칸 하나만. 오늘 칸은 테두리 대신 data-today(작은 점, CSS). 배경은 그 간지 천간의 오행 색 옅게(data-el, CSS)
-          const ring = isSel ? "outline-2 outline-offset-1 outline-ink" : "";
+          // v3.14: 오늘 칸은 data-today(작은 점, CSS). 배경은 그 간지 천간의 오행 색 옅게(data-el, CSS). 명세 51: 고른 칸 테두리는 없다(낱장이 뜬다)
           const el = STEM_META[c.hanja[0] as StemHanja]?.element;
           return (
             <li key={c.index}>
-              <Link
-                href={isSel ? basePath : `${basePath}${basePath.includes("?") ? "&" : "?"}cell=${c.index}`}
-                scroll={false}
+              <GanjiCellButton
+                index={c.index}
                 aria-label={`${c.ko}일 ${c.n ? `${c.n}번, 평균 ${c.mean}` : "기록 없음"}`}
-                aria-current={isSel ? "true" : undefined}
                 data-today={isToday ? "" : undefined}
                 data-el={el}
-                className={`flex aspect-square items-center justify-center rounded-[18%] ${c.n ? "album-cell" : "board-cell"} ${ring}`}
+                className={`flex aspect-square w-full items-center justify-center rounded-[18%] ${c.n ? "album-cell" : "board-cell"}`}
                 style={{ "--ink": ink } as React.CSSProperties}
               >
                 {c.n ? (
@@ -59,58 +56,14 @@ export function GanjiGrid({ cells, selected, todayIndex, basePath, pickedEntries
                 ) : (
                   <span className="font-serif text-[12px] leading-none text-muted">{c.hanja[1]}</span>
                 )}
-              </Link>
+              </GanjiCellButton>
             </li>
           );
         })}
       </ol>
 
-      {/* 선택 칸 상세: 캐릭터만 + "을묘 · 토끼" 글자 + 숫자 줄 (카드 전체는 안 쓴다 — 작은 글씨). 기록 목록은 아래 "내 기록"이 맡는다 */}
-      <div className="mx-5 mt-3 min-h-6 text-[15px]" aria-live="polite">
-        {picked ? (
-          picked.n ? (
-            <div className="flex flex-col items-center gap-2">
-              {/* 2026-10-09 Q5: 캐릭터 대신 그 간지의 정사각 카드 */}
-              <img src={characterOfGanji(picked.ko).cardSrc} alt={`${picked.ko} 카드`} width={1080} height={1080} className="grid-card block h-auto w-[56%] max-w-[220px]" />
-              <p className="font-serif text-[20px] leading-none text-ganji">{picked.ko}</p>
-              {/* 2026-10-09 Q2 = A: 인주 도장 안에 평균 + 옆에 횟수만. 도장 농도 = 평균(--h 0~1). 모양은 디자이너(.cell-stamp) */}
-              <p className="cell-stat flex items-center gap-3">
-                <span className="cell-stamp" style={{ "--h": picked.mean === null ? 0 : (picked.mean - 1) / 9 } as React.CSSProperties} aria-label={`평균 행복도 ${picked.mean}`}>
-                  {picked.mean}
-                </span>
-                <span className="text-[15px] text-muted">{picked.n}번 기록</span>
-              </p>
-              {pickedEntries.length > 0 && (
-                <details className="w-full">
-                  <summary className="tap cursor-pointer list-none text-center text-[14px] text-muted underline underline-offset-4 [&::-webkit-details-marker]:hidden">날짜 보기</summary>
-                <ul className="mt-2 flex w-full flex-col gap-1.5 text-[15px]">
-                  {pickedEntries.map((e) => (
-                    <li key={e.entry_date}>
-                      <Link href={`/write?date=${e.entry_date}`} className="flex items-baseline justify-between gap-3 px-1 underline-offset-4 hover:underline">
-                        <span>{e.entry_date.replace(/-/g, ".")}</span>
-                        <span className="font-serif tabular-nums">
-                          행복도 {e.happiness}
-                        </span>
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-                </details>
-              )}
-            </div>
-          ) : (
-            // 기록 없는 칸: 흐린 카드 = "아직 못 만난 카드" (Q5)
-            <div className="flex flex-col items-center gap-2">
-              <img src={characterOfGanji(picked.ko).cardSrc} alt={`${picked.ko} 카드 (아직 못 만남)`} width={1080} height={1080} data-unmet="" className="grid-card block h-auto w-[56%] max-w-[220px]" />
-              <p>
-                <b className="text-ganji">{picked.ko}일</b>은 아직 못 만난 카드예요.
-              </p>
-            </div>
-          )
-        ) : (
-          <p className="text-muted">칸을 누르면 그 간지의 카드가 보여요. 작은 점이 있는 칸이 오늘이에요.</p>
-        )}
-      </div>
+      {/* 명세 51: 격자 아래 상세는 없다 — 칸을 누르면 간지 낱장(GanjiSheet)이 뜬다 */}
+      <p className="mx-5 mt-3 text-[15px] text-muted">칸을 누르면 그 간지의 기록이 보여요. 작은 점이 있는 칸이 오늘이에요.</p>
     </div>
   );
 }

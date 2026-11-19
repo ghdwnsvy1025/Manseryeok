@@ -25,7 +25,7 @@ describe("다음에 열리는 것 하나", () => {
   test("순서대로 하나만, 다 열리면 null", () => {
     expect(nextUnlock({ days: 1, areaDays: 0, votes: 0, months: 1 })).toMatchObject({ title: "행복도 그래프", have: 1, need: 2 });
     expect(nextUnlock({ days: 2, areaDays: 0, votes: 0, months: 1 })?.title).toBe("글자별 내 행복도");
-    expect(nextUnlock({ days: 5, areaDays: 0, votes: 3, months: 1 })?.title).toBe("영역별 행복도");
+    expect(nextUnlock({ days: 5, areaDays: 0, votes: 3, months: 1 })?.title).toBe("1년 그래프");   // 명세 51: 영역 항목은 없다
     expect(nextUnlock({ days: 5, areaDays: 2, votes: 0, months: 1 })?.title).toBe("운세 적중률");
     expect(nextUnlock({ days: 5, areaDays: 2, votes: 1, months: 1 })?.title).toBe("1년 그래프");
     expect(nextUnlock({ days: 40, areaDays: 9, votes: 4, months: 2 })).toBeNull();

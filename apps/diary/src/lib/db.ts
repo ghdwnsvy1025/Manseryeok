@@ -283,7 +283,9 @@ export async function saveEntry(sb: SupabaseClient, userId: string, input: Entry
   const upsert = (row: Record<string, unknown>) => sb.from("night_entries").upsert(row, { onConflict: "user_id,entry_date" });
   // 약속은 폼이 보냈을 때만(2026-10-31부터 쓰기 화면에 없다) — 안 보냈으면 지난 값을 그대로 둔다
   const promise = input.promise === undefined ? {} : { promise: input.promise, promise_text: input.promiseText ?? null };
-  const v5 = { ...base, ...promise, areas: input.areas, tomorrow_note: input.tomorrowNote };
+  // 영역 점수도 폼이 보냈을 때만(2026-11-20부터 쓰기 화면에 없다, 명세 51) — 안 보냈으면(null) 지난 값을 그대로 둔다
+  const areas = input.areas === null ? {} : { areas: input.areas };
+  const v5 = { ...base, ...promise, ...areas, tomorrow_note: input.tomorrowNote };
   let { error } = await upsert({ ...v5, states: input.states });
   if (!error) return;
   // 0007 적용 전: 상태 열만 빼고 다시 저장 (상태값만 버려진다)

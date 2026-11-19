@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { characterOfGanji } from "@/lib/character";
-import { AREA_LEVELS, AREAS, happinessTier, moodTone, stateWords, type Areas, type States } from "@/lib/entry";
+import { happinessTier, moodTone, stateWords, type Areas, type States } from "@/lib/entry";
 
 interface Props {
   date: string;
@@ -52,17 +52,7 @@ export function CalendarDayDetail({ date, ganjiKo, entry }: Props) {
               ))}
             </ul>
           )}
-          {/* 2026-10-31 영역별 단계 (매긴 영역만) */}
-          {entry.areas && AREAS.some((a) => typeof entry.areas?.[a.key] === "number") && (
-            <dl className="day-detail__areas kv mt-3">
-              {AREAS.filter((a) => typeof entry.areas?.[a.key] === "number").map((a) => (
-                <div key={a.key} className="kv__row">
-                  <dt>{a.label}</dt>
-                  <dd>{AREA_LEVELS[entry.areas![a.key]! - 1]}</dd>
-                </div>
-              ))}
-            </dl>
-          )}
+          {/* 명세 51(2026-11-20 "입력도 빼기"): 영역 줄(일·공부 보통 / 돈 좋음 …)은 그리지 않는다. 저장된 값은 그대로 둔다 */}
           {entry.note && <p className="day-detail__note ruled mt-3 font-hand text-[17px] break-keep text-ink">{entry.note}</p>}
           {entry.tomorrowNote && (
             <div className="day-detail__tomorrow note-slip mt-3">

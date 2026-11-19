@@ -125,9 +125,10 @@ describe("컬럼이 아직 없을 때 (0003_promise.sql 적용 전)", () => {
     expect(u[0]!.row).toHaveProperty("promise", "kept");
     expect(u[0]!.row).toHaveProperty("states");
     expect(u[1]!.row).not.toHaveProperty("states");
-    expect(u[1]!.row).toHaveProperty("areas");
+    expect(u[1]!.row).toHaveProperty("tomorrow_note");
+    expect(u[1]!.row).not.toHaveProperty("areas");   // 2026-11-20 (명세 51): 쓰기 폼이 영역을 안 보낸다 — 안 보냈으면 열을 건드리지 않아 지난 값이 남는다
     expect(u[2]!.row).toHaveProperty("promise", "kept");
-    expect(u[2]!.row).not.toHaveProperty("areas");
+    expect(u[2]!.row).not.toHaveProperty("tomorrow_note");
     expect(u[3]!.row).not.toHaveProperty("promise");
     expect(u[3]!.row).not.toHaveProperty("promise_text");
     expect(u[3]!.row).toMatchObject({ happiness: 8, entry_date: "2026-10-06" });

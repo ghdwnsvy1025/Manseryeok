@@ -9,20 +9,19 @@ import { Booting } from "@/components/Booting";
 import { characterOf, characterOfGanji } from "@/lib/character";
 import { StatsSummary } from "@/components/StatsSummary";
 import { StateStats } from "@/components/StateStats";
-import { stateByGroup, stateHappiness, stateSummary, stateTagTop } from "@/lib/stats/states";
+import { stateHappiness } from "@/lib/stats/states";
 import { TrackOnMount } from "@/components/track/TrackOnMount";
 import { birthProfileOf, countEntries, getEntry, getSajuProfile, listEntries, listEntriesInMonth, listEntriesForStats, listFortuneScores, listFortuneVotes } from "@/lib/db";
-import { AreaRadar } from "@/components/AreaRadar";
-import { AreaGlyphBars } from "@/components/AreaGlyphBars";
 import { sajuChart } from "@/lib/saju/chart";
 import { paidReadingOpen } from "@/lib/sajucow";
 import { SajuChartPanel } from "@/components/SajuChartPanel";
 import { Sheet, SheetTrigger } from "@/components/Sheet";
 import { MeForecastChips } from "@/components/MeForecastChips";
-import { DaySheet } from "@/components/DaySheet";
+import { DaySheet, DayListButton } from "@/components/DaySheet";
+import { GanjiSheet } from "@/components/GanjiSheet";
 import { SajuNewDot } from "@/components/SajuNewDot";
 import { HappyAnswer, InsightSeals, VersusAnswer } from "@/components/InsightSeals";
-import { areaAverages, areaRadar, bestWorstDays, fortuneAccuracy, growingSeries, habitOf, happinessSeries, monthlySeries, moodTop, nextUnlock, streakOf, type PickedDay } from "@/lib/stats/extra";
+import { bestWorstDays, fortuneAccuracy, growingSeries, habitOf, happinessSeries, monthlySeries, moodTop, nextUnlock, streakOf, type PickedDay } from "@/lib/stats/extra";
 import { BestWorstDays, type DayCard, type ForecastCard } from "@/components/BestWorstDays";
 import { forecastWindow, type ForecastDay } from "@/lib/stats/forecast";
 import { forecastVersus, happyWhen, INSIGHT_UNLOCK_DAYS } from "@/lib/stats/insight";
@@ -32,7 +31,7 @@ import { buildMonth, resolveMonth } from "@/lib/calendar";
 import { addDays, formatKoreanDate, parseYmd } from "@/lib/time";
 import { fitPercent } from "@/lib/fortune/personal";
 import { dayGanji } from "@/lib/ganji";
-import { areaGlyphs, byBranch, byElement, byStem, ganjiGrid, highlights } from "@/lib/stats/ganji";
+import { byBranch, byElement, byStem, ganjiGrid, highlights } from "@/lib/stats/ganji";
 import { todayKST } from "@/lib/time";
 
 export const dynamic = "force-dynamic";
@@ -132,29 +131,14 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
   const allPick = bestWorstDays(all);
   // 명세 47: 가장 행복했던 날(+ 작게 힘든 날)은 "나는 언제 행복했지?" 낱장 안으로 — 전체 기록의 하루씩
   const dayCards = <BestWorstDays best={toCard(allPick.best)} worst={toCard(allPick.worst)} />;
-  const areaAvg = areaAverages(all, today, 30);
   const moods = moodTop(all, 3);
   const streak = streakOf(all, today);
   const series = growingSeries(happinessSeries(all, fortuneScores, today, 30));
   const yearSeries = growingSeries(monthlySeries(all, fortuneScores, today, 12));
   // 2026-10-31: 빈 자리는 블록마다 안내하지 않고 "다음에 열리는 것" 하나. 그래프는 최근 30일 기록 2일부터
   const chartReady = series.filter((p) => p.happiness !== null).length >= 2;
-  const areaDays = all.filter((e) => e.areas && Object.keys(e.areas).length > 0).length;
-  const unlock = nextUnlock({ days: all.length, areaDays, votes: votes.length, months: yearSeries.filter((p) => p.happiness !== null).length });
+  const unlock = nextUnlock({ days: all.length, votes: votes.length, months: yearSeries.filter((p) => p.happiness !== null).length });
   const accuracy = fortuneAccuracy(votes);
-  // 영역 자세히: 육각형(이번 달·지난달) + 영역별 글자 막대. 영역 점수가 하나도 없으면 칸째 빼고 unlock이 말한다
-  const thisYm = today.slice(0, 7);
-  const lastYm = (() => {
-    const [yy, mm] = thisYm.split("-").map(Number) as [number, number];
-    return mm === 1 ? `${yy - 1}-12` : `${yy}-${String(mm - 1).padStart(2, "0")}`;
-  })();
-  const areaDetail =
-    areaDays > 0 ? (
-      <>
-        <AreaRadar rows={areaRadar(all, thisYm)} curLabel={`${Number(thisYm.slice(5))}월`} prevLabel={`${Number(lastYm.slice(5))}월`} />
-        <AreaGlyphBars areas={areaGlyphs(all)} />
-      </>
-    ) : null;
   const cells = ganjiGrid(all);
   // 2026-10-31: 내 사주는 요약 카드, 누르면 그 아래에 만세력이 펼쳐진다 (SajuChartPanel)
   const chart = sajuChart(profile.pillars, birthProfileOf(profile), today);
@@ -270,6 +254,8 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
                   <span className="kv__bar" aria-hidden>
                     <span style={{ width: `${(filledCells / 60) * 100}%` }} />
                   </span>
+                  {/* 명세 51: 60갑자 보기에도 전체 목록으로 가는 글자 버튼 */}
+                  <DayListButton />
                 </dd>
               </div>
             </dl>
@@ -278,14 +264,13 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
               selected={selected}
               todayIndex={todayIndex}
               basePath="/me?view=grid"
-              pickedEntries={selected === null ? [] : all.filter((e) => e.day_ganji_index === selected)}
             />
           </>
         )}
         {/* 명세 47 물음 인장 둘: 기록 7일부터 열린다. 누르면 답 낱장 */}
         <InsightSeals open={insightOpen} left={insightLeft} />
-        {/* 기록 0일 = 첫 기록 카드, 그 뒤 = 접힌 "자세한 통계" 서랍 하나(그래프 · 습관 · 영역 · 기분 · 있었던 일 · 맞춤도 · 글자별) */}
-        <StatsSummary h={h} fitPercent={fitPercent(all.length)} stems={byStem(all)} branches={byBranch(all)} elements={byElement(all)} states={stateStats} areas={areaAvg} moods={moods} streak={streak} habit={habit} chart={<HappinessChart series={series} yearSeries={yearSeries} emptyArt={me.characterSrc} />} chartReady={chartReady} unlock={unlock} accuracy={accuracy} areaDetail={areaDetail} writeHref="/write" />
+        {/* 기록 0일 = 첫 기록 카드, 그 뒤 = 접힌 "자세한 통계" 서랍 하나(그래프 · 습관 · 기분 · 있었던 일 · 맞춤도 · 글자별) */}
+        <StatsSummary h={h} fitPercent={fitPercent(all.length)} stems={byStem(all)} branches={byBranch(all)} elements={byElement(all)} states={stateStats} moods={moods} streak={streak} habit={habit} chart={<HappinessChart series={series} yearSeries={yearSeries} emptyArt={me.characterSrc} />} chartReady={chartReady} unlock={unlock} accuracy={accuracy} writeHref="/write" />
       </section>
 
       {/* ── 낱장 셋 (명세 47): 같은 틀(Sheet). 한 번에 하나만 열린다. 저장 직후(?saved=)에도 저절로 열리지 않는다 ── */}
@@ -310,6 +295,8 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
           }
         />
       </Sheet>
+      {/* 간지 낱장(명세 51): 60갑자 칸을 누르면 뜬다. 주소 ?cell=N으로 들어오면 뜬 채 시작한다 */}
+      <GanjiSheet cells={cells.map((c) => ({ index: c.index, ko: c.ko, n: c.n, mean: c.mean }))} records={records} todayIndex={todayIndex} today={today} />
       {/* 날짜 낱장과 전체 목록(명세 50): 달력 칸 · 두 날 · 예상의 날 줄 · 목록 어디서 누르든 같은 낱장. 주소 ?d=로 들어오면 뜬 채 시작한다 */}
       <DaySheet records={records} days={calDays} forecast={forecastMarks} forecastCards={windowCards} today={today} />
       {/* 물음 인장의 답 낱장 둘 — 인장이 열렸을 때만 그린다 */}

@@ -3,7 +3,7 @@
 import { startTransition, useActionState, useEffect, useRef, useState, type FormEvent } from "react";
 import { saveEntryAction, type FormState } from "@/app/actions";
 import { DeleteEntryButton } from "@/components/DeleteEntryButton";
-import { AREA_LEVELS, AREAS, MAX_NOTE, MAX_TOMORROW_NOTE, MOOD_PICK, STATE_AXES, areaCount, canonicalMood, isPickMood, moodTone, stateCount, type AreaKey, type Areas, type StateKey, type StateLevel, type States } from "@/lib/entry";
+import { MAX_NOTE, MAX_TOMORROW_NOTE, MOOD_PICK, STATE_AXES, canonicalMood, isPickMood, moodTone, stateCount, type Areas, type StateKey, type StateLevel, type States } from "@/lib/entry";
 import { track } from "@/lib/analytics";
 import { lengthBucket } from "@/lib/analytics/core";
 
@@ -49,12 +49,11 @@ function hint(n: number): string {
  * - 영역: 여섯 영역 5단계 도장, 선택. 2026-11-14부터 접어 둔다(지난 기록과 영역 통계는 그대로). 같은 도장을 다시 누르면 비운다.
  * - 그래서 마음은: 기분 네 갈래(들뜸·편안·날카로움·가라앉음) 21개, 개수 제한 없음. 저장 이름은 예전 기분 이름 그대로.
  * - 한 줄 메모, 그리고 "내일의 나에게" 쪽지(100자, 다음 날 오늘 화면 위에 펼쳐진다) — "오늘의 포인트" 자리를 대신한다.
- * 폼 필드: happiness=1~10, state_<key>=1~3, state_tags(여러 개), area_<key>=1~5, moods, note, tomorrow_note.
+ * 폼 필드: happiness=1~10, state_<key>=1~3, state_tags(여러 개), moods, note, tomorrow_note.
  */
 export function EntryForm({ date, when = "today", notePlaceholder, initial, warmAssets = [] }: Props) {
   const [state, action, pending] = useActionState<FormState, FormData>(saveEntryAction, { error: null });
   const [happiness, setHappiness] = useState<number | null>(initial?.happiness ?? null);
-  const [areas, setAreas] = useState<Areas>(initial?.areas ?? {});
   const [states, setStates] = useState<States>(initial?.states ?? {});
   const [moods, setMoods] = useState<string[]>(toPick(initial?.moods ?? []));
   const [note, setNote] = useState(initial?.note ?? "");
@@ -83,12 +82,6 @@ export function EntryForm({ date, when = "today", notePlaceholder, initial, warm
     const fd = new FormData(form);
     const h = Number(fd.get("happiness"));
     if (h >= 1 && h <= 10) setHappiness((cur) => cur ?? h);
-    const picked: Areas = {};
-    for (const a of AREAS) {
-      const v = Number(fd.get(`area_${a.key}`));
-      if (v >= 1 && v <= 5) picked[a.key] = v;
-    }
-    if (areaCount(picked)) setAreas((cur) => (areaCount(cur) ? cur : picked));
     const st: States = {};
     for (const a of STATE_AXES) {
       const v = Number(fd.get(`state_${a.key}`));
@@ -108,16 +101,6 @@ export function EntryForm({ date, when = "today", notePlaceholder, initial, warm
   function pickHappiness(n: number) {
     setMissingHappiness(false);
     setHappiness(n);
-  }
-
-  function pickArea(key: AreaKey, level: number) {
-    // 같은 도장을 다시 누르면 비운다 — 오늘 해당 없는 영역
-    setAreas((cur) => {
-      const next = { ...cur };
-      if (next[key] === level) delete next[key];
-      else next[key] = level;
-      return next;
-    });
   }
 
   function pickState(key: StateKey, level: StateLevel) {
@@ -170,7 +153,6 @@ export function EntryForm({ date, when = "today", notePlaceholder, initial, warm
       when,
       edit: Boolean(initial),
       happiness,
-      areas_count: areaCount(areas),
       states_count: stateCount(states),
       state_tags_count: states.tags?.length ?? 0,
       mood: moods[0] ?? null,
@@ -187,7 +169,6 @@ export function EntryForm({ date, when = "today", notePlaceholder, initial, warm
     startTransition(() => action(data));
   }
 
-  const count = areaCount(areas);
   const stCount = stateCount(states);
   const stateTags = states.tags ?? [];
 
@@ -352,65 +333,8 @@ export function EntryForm({ date, when = "today", notePlaceholder, initial, warm
             ))}
         </fieldset>
 
-        {/* 영역 점수는 접어 둔다 (2026-11-14): 좋았거나 힘들었던 날에만 펼쳐 매긴다. 지난 기록에 영역이 있으면 펼친 채로 */}
-        <details className="entry-areas-fold" open={count > 0 || undefined}>
-          <summary className="entry-areas-fold__head">
-            <span className="entry-areas-fold__title">영역 점수</span>{" "}
-            <span className="entry-areas__note">좋았거나 힘들었던 영역만 {count > 0 && <span className="text-ganji">({count})</span>}</span>
-          </summary>
-          {/* 영역은 선택 중의 선택 — 접힌 한 줄이 머리다(톤 v3.41). 펼친 안쪽의 legend는 같은 말이라 보조 기술에만 남긴다. 여섯 줄·도장·양 끝 글은 v3.32·v3.38 그대로 */}
-          <fieldset className="entry-areas">
-            <legend className="sr-only">
-              영역
-              <span>
-                오늘 있었던 것만, 안 골라도 돼요 {count > 0 && <span>({count})</span>}
-              </span>
-            </legend>
-            <div className="entry-areas__rows flex flex-col gap-2">
-              {AREAS.map((a) => (
-                <div key={a.key} className="entry-area" role="radiogroup" aria-label={a.label}>
-                  <span className="entry-area__label">{a.label}</span>
-                  <div className="entry-area__stamps">
-                    {AREA_LEVELS.map((word, i) => {
-                      const level = i + 1;
-                      const on = areas[a.key] === level;
-                      return (
-                        <label key={level} className="relative">
-                          <input
-                            type="radio"
-                            name={`area_${a.key}`}
-                            value={level}
-                            checked={on}
-                            onChange={() => pickArea(a.key, level)}
-                            onClick={() => {
-                              // 이미 고른 도장을 누르면 change가 안 난다 — 여기서 비운다
-                              if (on) pickArea(a.key, level);
-                            }}
-                            aria-label={`${a.label} ${word}`}
-                            className="peer sr-only"
-                          />
-                          {/* 단계 색은 data-level(1~2 남색 · 3 종이 · 4~5 금빛, 달력 네 단계와 같은 계열). 찍힘은 CSS `input:checked +`가 바로 그린다 */}
-                          <span
-                            data-level={level}
-                            className={`stamp entry-stamp flex aspect-square cursor-pointer items-center justify-center font-serif peer-focus-visible:outline-2 peer-focus-visible:outline-ink ${
-                              on ? "stamp--on" : ""
-                            }`}
-                          >
-                            {level}
-                          </span>
-                        </label>
-                      );
-                    })}
-                  </div>
-                </div>
-              ))}
-            </div>
-            <p className="entry-areas__ends mt-2 flex justify-between text-[12px] text-muted" aria-hidden>
-              <span>{AREA_LEVELS[0]}</span>
-              <span>{AREA_LEVELS[4]}</span>
-            </p>
-          </fieldset>
-        </details>
+        {/* 명세 51(2026-11-20 앱 주인 "입력도 빼기"): 영역 점수 접힘 칸은 없다 — 통계에서 영역을 뺐으니 받기만 하고 쓰이지 않는 입력이 된다.
+            있었던 일과 마음이 그 자리를 맡는다. 이미 저장된 영역 값은 지우지 않는다(서버는 영역 입력이 없으면 지난 값을 건드리지 않는다) */}
 
         <div>
           <label htmlFor="note" className="text-[17px] font-bold">

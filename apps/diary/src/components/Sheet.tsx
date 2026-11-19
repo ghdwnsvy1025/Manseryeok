@@ -20,7 +20,7 @@ export function openSheet(id: string): void {
   document.getElementById(id)?.dispatchEvent(new CustomEvent(OPEN_EVENT));
 }
 
-export function Sheet({ id, name, title, initialOpen = false, children }: { id: string; /** 이용 통계에 남는 이름 */ name: "saju" | "happy" | "versus" | "day"; title: string; initialOpen?: boolean; children: ReactNode }) {
+export function Sheet({ id, name, title, initialOpen = false, children }: { id: string; /** 이용 통계에 남는 이름 */ name: "saju" | "happy" | "versus" | "day" | "ganji"; title: string; initialOpen?: boolean; children: ReactNode }) {
   const ref = useRef<HTMLDialogElement>(null);
   const paper = useRef<HTMLDivElement>(null);
   const opener = useRef<HTMLElement | null>(null);

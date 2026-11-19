@@ -71,13 +71,15 @@ export function StatsSummary({ h, fitPercent, stems, branches, elements, moods, 
   // 명세 47 (톤 v3.51): 본문에는 통계 카드가 없다 — 그래프 · 기록 습관 · 영역 · 기분 · 있었던 일 · 맞춤도 · 글자별 막대가 전부 "자세한 통계" 서랍 안으로 내려왔다.
   // 빼는 것은 없고 자리만 옮겼다. 서랍 안은 카드 속 카드가 되지 않게 틀을 벗기고 녹갈 0.5px 괘선으로만 나눈다(.more-stats .card-light)
   // "적중"이라는 말과 백분율은 쓰지 않는다(명세 47) — 다음에 열리는 것의 이름도 화면에서는 "운세에 답한 날"로 읽는다(이름은 lib/stats/extra.ts nextUnlock이 준다)
+  // 명세 51: 영역 통계는 없다 — "다음에 열리는 것"이 영역 항목이면(lib nextUnlock이 준다) 그 줄을 그리지 않는다
+  const unlockIsArea = unlock ? unlock.title.includes("영역") : false;
   const unlockTitle = unlock ? (unlock.title === "운세 적중률" ? "운세에 답한 날" : unlock.title) : "";
   return (
     <details className="more-stats me-sep card-frame card-light card-paper">
       <summary className="more-stats__summary tap cursor-pointer list-none [&::-webkit-details-marker]:hidden">자세한 통계</summary>
       <div className="mt-3 flex flex-col gap-4">
         {/* 다음에 열리는 통계 하나 — 진행 점(have/need)과 한 줄. 모양은 디자이너(.unlock*) */}
-        {unlock && (
+        {unlock && !unlockIsArea && (
           <div className="unlock card-frame card-light card-paper flex items-center gap-3 px-5 py-3.5" aria-label={`다음에 열리는 것: ${unlockTitle}`}>
             <span className="unlock__dots flex gap-1" aria-hidden>
               {Array.from({ length: unlock.need }, (_, i) => (
@@ -130,15 +132,7 @@ export function StatsSummary({ h, fitPercent, stems, branches, elements, moods, 
 
         {/* 명세 50 8번: 영역별 행복도(최근 30일 평균 막대) 칸은 뺐다 — 있었던 일별 행복도(StateStats)가 같은 꼴로 그 일을 한다. 영역 육각형 · 글자 막대 · 영역 칩 그래프는 그대로 */}
 
-        {/* 2026-10-31 사용자 Q4: 영역별 점수 — 육각형(이번 달·지난달) + 영역 칩으로 천간·지지·오행 막대 */}
-        {areaDetail && (
-          <div className="area-detail card-frame card-light card-paper flex flex-col gap-5 px-5 py-4">
-            <p className="text-[15px] font-bold">
-              영역별 행복도 <span className="text-[13px] font-normal text-muted">10점 기준</span>
-            </p>
-            {areaDetail}
-          </div>
-        )}
+        {/* 명세 51(앱 주인 "영역별 행복도와 그에 해당하는 값들을 없애 줘"): 영역 육각형 · 영역별 글자 막대 칸은 뺐다 */}
 
         {/* 자주 고른 기분 — 지표 두 칸에서 한 줄로 */}
         <div className="metric metric--moods card-frame card-light card-paper px-5 py-4">
