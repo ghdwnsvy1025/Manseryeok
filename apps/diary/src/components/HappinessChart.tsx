@@ -18,7 +18,7 @@ import { areaTo10, type SeriesPoint } from "@/lib/stats/extra";
  * - 예상 선(그날 본 운세)은 뒤에 깔리고, 행복도 선은 종이색 테를 두르고 그 위에 — 겹치는 곳에서도 행복도가 먼저 읽힌다. 주황 · 분홍은 쓰지 않는다. 예상의 숫자는 어디에도 적지 않는다.
  * - 선을 건드리면(누르거나 끌면) 그날 날짜와 값이 그래프 위 띠(도장 반대쪽 구석)에 뜬다. 안내 "선을 누르면 그날 값이 보여요"는 그래프 아래 범례 줄에 작게.
  * variant:
- *   full   = 자세한 통계 안. 한 달 / 1년 전환 + 영역 칩(전체 · 일·공부 …) + 예상 선("전체"에서만)
+ *   full   = 자세한 통계 안. 한 달 / 1년 전환 + 운세 선(명세 53, 톤 v3.57 — 밤 남색 1.5px 실선, 범례 한 줄)
  *   happy  = "나는 언제 행복했지?" 낱장. 행복도 선 하나, 전환 없음, 예상 선 없음
  *   (versus 변형은 지웠다 — "예상은 맞았을까?" 낱장은 그래프 없이 문장과 날 목록만. 2026-11-17 후속)
  */
@@ -153,10 +153,11 @@ export function HappinessChart({ series: monthSeries, yearSeries, emptyArt, vari
     return view === "all" ? (series[i]!.happiness === null ? null : round1(series[i]!.happiness!)) : round1(v);
   };
   const line = bridgedPaths(values);
-  // 명세 51: 예상(운세) 선도 그리지 않는다
-  const fortune = { solid: "", gap: "", lone: "" };
-  // 예상 선이 그려지는 그림인가 — 그러면 행복도의 빈 날은 잇지 않는다(선 모양은 둘까지)
-  const hasForecast = Boolean(fortune.solid || fortune.gap || fortune.lone);
+  // 명세 53(앱 주인 "자세한 통계에서 운세 그래프도 다른 색으로 넣어 줘"): 자세한 통계(full)에만 운세 선 — 밤 남색, 행복도보다 조금 가늘게.
+  // 운세를 안 연 날은 건너 잇고, 값이 하루뿐이면 짧은 가로 획(joined). 운세 값이 하나도 없으면 선도 범례 항목도 없다.
+  // 운세 점수 숫자는 어디에도 적지 않는다(읽기 값 · 범례 · 축 · aria) — 높낮이로만
+  const fortuneValues = full && view === "all" ? series.map((p) => (p.fortune === undefined ? null : p.fortune)) : [];
+  const hasForecast = fortuneValues.some((v) => v !== null);
   const label = (d: string) => (year ? `${Number(d.slice(5, 7))}월` : `${Number(d.slice(5, 7))}.${Number(d.slice(8, 10))}`);
   const viewLabel = view === "all" ? "행복도" : (AREAS.find((a) => a.key === view)?.label ?? "");
 
@@ -210,7 +211,7 @@ export function HappinessChart({ series: monthSeries, yearSeries, emptyArt, vari
         </div>
       )}
       <div className="hchart__plot" onPointerDown={touch} onPointerMove={(e) => (e.pointerType === "mouse" && e.buttons === 0 ? undefined : touch(e))}>
-        <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`${n}${unit} ${viewLabel} 그래프. 기록 ${idx.length}${unit}, 가장 높은 값 ${shown(hi)}, 가장 낮은 값 ${shown(lo)}`} className="hchart__svg block h-auto w-full">
+        <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`${n}${unit} ${viewLabel} 그래프. 기록 ${idx.length}${unit}, 가장 높은 값 ${shown(hi)}, 가장 낮은 값 ${shown(lo)}${hasForecast ? ". 그날 본 운세 흐름 선이 함께 그려져 있어요" : ""}`} className="hchart__svg block h-auto w-full">
           {/* 눈금: 0 · 5 · 10 */}
           {[0, 5, 10].map((v) => (
             <g key={v}>
@@ -230,8 +231,8 @@ export function HappinessChart({ series: monthSeries, yearSeries, emptyArt, vari
             </g>
           ))}
           {/* 명세 50 7번(앱 주인 "그래프가 끊기면 안 돼. 쭉 그려 줘"): 기록 없는 날을 건너 같은 선으로 쭉 잇는다 — 가는 이음선 · 끊김 · 혼자 있는 날의 가로 획은 없다.
-              예상 선도 한 줄로 이어 뒤에 옅게, 행복도 선은 종이색 테 위에 */}
-          {hasForecast && <path d={joined(series.map((p) => p.fortune))} className="hchart__fortune" fill="none" />}
+              운세 선(명세 53)도 한 줄로 이어 뒤에, 행복도 선은 종이색 테 위에 — 겹치는 곳에서 행복도가 먼저 읽힌다 */}
+          {hasForecast && <path d={joined(fortuneValues)} className="hchart__fortune" fill="none" />}
           {hasForecast && <path d={joined(values)} className="hchart__halo" fill="none" />}
           <path d={joined(values)} className="hchart__line" fill="none" />
           {atOk !== null && (
@@ -264,9 +265,10 @@ export function HappinessChart({ series: monthSeries, yearSeries, emptyArt, vari
           )}
         </p>
       </div>
-      <figcaption className="hchart__legend mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-muted">
+      <figcaption className="hchart__legend mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-muted" data-two={hasForecast ? "" : undefined}>
         {hasForecast && <span className="hchart__key hchart__key--line">{view === "all" ? `내 행복도${year ? " (월 평균)" : ""}` : viewLabel}</span>}
-        {hasForecast && <span className="hchart__key hchart__key--fortune">사주로 본 예상</span>}
+        {hasForecast && <span className="hchart__key hchart__key--fortune">운세</span>}
+        {hasForecast && <span className="hchart__note">운세는 그날 본 오늘의 운세 흐름이에요</span>}
         <span className="hchart__hint">선을 누르면 그날 값이 보여요</span>
       </figcaption>
     </figure>

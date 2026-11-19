@@ -5,6 +5,7 @@ import { PaidInvite } from "@/components/PaidInvite";
 import { SajuPowerBars } from "@/components/SajuPowerBars";
 import { SajuBalanceGauge } from "@/components/SajuBalanceGauge";
 import { SajuUnseongCurve } from "@/components/SajuUnseongCurve";
+import { SajuSinsalCards } from "@/components/SajuSinsalCards";
 import { GROUP_SHORT, UNSEONG_NOTE, type ChartColumn, type SajuChart } from "@/lib/saju/chart";
 import { KAKAO_CHANNEL_URL, PAID_PRICE, sajucowCardUrl, sajucowHomeUrl, sajucowReadingUrl } from "@/lib/sajucow";
 
@@ -51,7 +52,7 @@ interface Props {
  * 앱 주인: "그냥 좀 일반적인 만세력이었으면 좋겠어 … 펼치면 사주 코어에 있는 그래프처럼".
  * 순서: 명식(흔히 보는 만세력 표 — 시·일·월·연 × 십신 / 천간 칸 / 지지 칸 / 십신 / 지장간 / 12운성 / 12신살) + 생년월일 줄 →
  * 다섯 힘(세로 막대, SajuPowerBars) → 힘의 균형(반원 게이지, SajuBalanceGauge) →
- * 풀이 낱말 줄(중심 기운 · 격 · 용신 · 희신 · 기신 — 사주 용어는 여기서만) → 신살 → 십이운성 → 대운 →
+ * 풀이 낱말 줄(중심 기운 · 격 · 용신 · 희신 · 기신 — 사주 용어는 여기서만) → 신살(기호 카드, SajuSinsalCards — 명세 53) → 십이운성 → 대운 →
  * 사주카우에서 더 보기(유료 풀이 권유 PaidInvite 한 곳 → 내 조선시대 직업 카드 → 궁합. 2026-11-18 권유를 이 칸으로 모았다).
  * 한 화면에 % 계산은 한 가지: chart.power(판정용 세력)만 쓰고 chart.elements(엔진 분포율 — 오행 방울 · 오행 분포 막대)는 내지 않는다.
  * 나무 패 표(.saju-table)는 더 쓰지 않는다. 십이운성·신살은 이름과 한 줄 뜻만, 길흉 단정 없음. 모양은 디자이너(.ms*, .power*, .balance*).
@@ -168,23 +169,8 @@ export function SajuChartPanel({ chart, ganjiKo, faceSrc, open, birth }: Props) 
         )}
       </section>
 
-      {/* 특별한 신살 — 이름과 한 줄 뜻만 */}
-      {chart.specials.length > 0 && (
-        <section className="saju-sinsal card-frame card-light card-paper p-5" aria-label="신살">
-          <h2 className="text-[15px] font-bold">신살</h2>
-          <ul className="mt-3 flex flex-col gap-2">
-            {chart.specials.map((s) => (
-              <li key={`${s.name}${s.where}`} className="saju-sinsal__item flex items-baseline gap-2 text-[14px]">
-                <span className="tag tag--on saju-sinsal__name h-8 shrink-0 px-1 text-[14px] text-paper-2">{s.name}</span>
-                <span className="text-muted">
-                  {s.note} <span className="text-[12px]">({s.where})</span>
-                </span>
-              </li>
-            ))}
-          </ul>
-          <p className="mt-3 text-[12px] text-muted">신살은 옛 표식일 뿐, 좋고 나쁨을 정하지 않아요.</p>
-        </section>
-      )}
+      {/* 특별한 신살 — 기호 카드(명세 53). 하나도 없으면 칸을 그리지 않는다 */}
+      <SajuSinsalCards specials={chart.specials} />
 
       {/* 12운성 한살이 곡선(명세 50 1번) — 예전 "십이운성" 뜻풀이 칸을 대신한다. 명식 표 안의 12운성 행은 그대로 */}
       <SajuUnseongCurve columns={chart.columns} />
