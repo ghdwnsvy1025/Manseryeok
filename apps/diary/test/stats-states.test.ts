@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { groupsOfDay, stateByGroup, stateHappiness, stateSummary, stateTagTop, STATE_RATIO_MIN } from "@/lib/stats/states";
+import { groupsOfDay, stateByGroup, stateHappiness, stateIntensity, stateSummary, stateTagTop, STATE_RATIO_MIN } from "@/lib/stats/states";
 
 // 내 일간 己(기토): 甲·乙 = 관성, 丙·丁 = 인성, 戊·己 = 비겁, 庚·辛 = 식상, 壬·癸 = 재성
 const ME = "己";
@@ -61,5 +61,21 @@ describe("있었던 일(상태) 통계", () => {
       ["돈 많이 나감", 1, null],   // 한 번뿐이라 평균을 말하지 않는다. "돈 평소만큼"(2단계)은 줄이 없다
     ]);
     expect(stateHappiness([])).toEqual([]);
+  });
+  test("있었던 일 세기: 축마다 1~3 평균, 그 갈래가 온 날과 다른 날을 견준다(다섯 날씩 있어야 차이를 낸다)", () => {
+    // 일간 己: 壬·癸 = 재성(돈), 庚·辛 = 식상(말). 임자일 = 재성만, 경신일 = 식상만
+    const m = (date: string, stem: string, branch: string, states: Record<string, unknown>) => ({ ...e(date, stem, branch, states), dayMaster: ME });
+    const rows = stateIntensity([
+      ...[1, 2, 3, 4, 5].map((d) => m(`2026-12-0${d}`, "임", "자", { money: 3, pace: 2 })),
+      ...[1, 2, 3, 4, 5].map((d) => m(`2026-12-1${d}`, "경", "신", { money: d <= 3 ? 1 : 2, pace: 3 })),
+      m("2026-12-20", "경", "신", { express: 3 }),
+    ]);
+    const money = rows.find((r) => r.axis === "money")!;
+    expect(money).toMatchObject({ group: "재성", all: { n: 10, mean: 2.2 }, on: { n: 5, mean: 3 }, off: { n: 5, mean: 1.4 }, diff: 1.6 });
+    const pace = rows.find((r) => r.axis === "pace")!;
+    expect(pace).toMatchObject({ group: null, all: { n: 10, mean: 2.5 }, on: { n: 0, mean: null }, diff: null });
+    // 한 번뿐인 축은 평균은 내되 차이는 내지 않는다
+    expect(rows.find((r) => r.axis === "express")).toMatchObject({ on: { n: 1, mean: 3 }, off: { n: 0, mean: null }, diff: null });
+    expect(stateIntensity([]).every((r) => r.all.n === 0 && r.diff === null)).toBe(true);
   });
 });

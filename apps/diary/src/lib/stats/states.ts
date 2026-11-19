@@ -164,3 +164,45 @@ export function stateHappiness(entries: (StateEntry & { happiness: number })[]):
     .map(([key, v]) => ({ key, label: v.label, axis: v.axis, n: v.n, avg: v.n >= STATE_HAPPY_MIN ? Math.round((v.s / v.n) * 10) / 10 : null }))
     .sort((a, b) => Number(b.avg !== null) - Number(a.avg !== null) || (b.avg ?? 0) - (a.avg ?? 0) || b.n - a.n || (a.key < b.key ? -1 : 1));
 }
+
+// ---------- 있었던 일 세기 점수 (2026-11-20 앱 주인: "오늘 있었던 일에서 측정값으로 변환해서 점수화" → "뒤에서만 재기") ----------
+// 손님 화면에는 내지 않는다. 운영 숫자 화면(/stats)에서 합계로만 본다.
+//   세기 = 고른 단계 그대로 1~3 (좋고 나쁨이 아니다 — "얼마나 드러났나"). 예: 돈 거의 안 씀 1 · 평소만큼 2 · 많이 나감 3.
+//   다섯 축(사람·말·돈·책임·생각)은 운세의 다섯 갈래(비겁·식상·재성·관성·인성)에 하나씩 맞춰 만든 확인 칸이라,
+//   "그 갈래가 온 날의 세기 평균"과 "다른 날의 세기 평균"을 견주면 운세가 말한 기운이 실제로 그날 더 드러났는지 보인다.
+export interface IntensityRow {
+  axis: StateKey;
+  label: string;
+  /** 이 축에 맞는 갈래. 속도(pace)는 갈래가 없어 null — on/off 없이 전체 평균만 */
+  group: TenGodFamily | null;
+  /** 이 축을 고른 날 전체 */
+  all: { n: number; mean: number | null };
+  /** 그 갈래가 온 날 / 오지 않은 날 */
+  on: { n: number; mean: number | null };
+  off: { n: number; mean: number | null };
+  /** on.mean − off.mean (둘 다 STATE_RATIO_MIN일 이상일 때만). 양수면 그 갈래가 온 날 더 드러났다 */
+  diff: number | null;
+}
+const r2 = (x: number): number => Math.round(x * 100) / 100;
+const meanOf = (xs: number[]): number | null => (xs.length ? r2(xs.reduce((a, b) => a + b, 0) / xs.length) : null);
+
+/** dayMaster = 그 기록을 쓴 사람의 일간(한자). 여러 사람의 기록을 섞어 넣어도 된다 */
+export function stateIntensity(entries: (StateEntry & { dayMaster: string })[]): IntensityRow[] {
+  return STATE_AXES.map((a) => {
+    const picked = entries.filter((e) => typeof e.states?.[a.key] === "number");
+    const lv = (e: StateEntry) => e.states![a.key] as number;
+    const group = a.group as TenGodFamily | null;
+    const on = group ? picked.filter((e) => groupsOfDay(e, e.dayMaster).includes(group)) : [];
+    const off = group ? picked.filter((e) => !groupsOfDay(e, e.dayMaster).includes(group)) : [];
+    const onMean = meanOf(on.map(lv)), offMean = meanOf(off.map(lv));
+    return {
+      axis: a.key,
+      label: a.label,
+      group,
+      all: { n: picked.length, mean: meanOf(picked.map(lv)) },
+      on: { n: on.length, mean: onMean },
+      off: { n: off.length, mean: offMean },
+      diff: onMean !== null && offMean !== null && on.length >= STATE_RATIO_MIN && off.length >= STATE_RATIO_MIN ? r2(onMean - offMean) : null,
+    };
+  });
+}

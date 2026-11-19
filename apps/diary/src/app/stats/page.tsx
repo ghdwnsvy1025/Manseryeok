@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import { adminClient } from "@/lib/supabase/admin";
 import { dailyMetrics, kstDay, retention, type MetricRows } from "@/lib/metrics";
 import { addDays, todayKST } from "@/lib/time";
+import { stateIntensity } from "@/lib/stats/states";
+import type { States } from "@/lib/entry";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "운영 숫자", robots: { index: false, follow: false } };
@@ -35,7 +37,7 @@ export default async function StatsPage({ searchParams }: { searchParams: Promis
   const fromIso = `${addDays(fromDay, -1)}T15:00:00Z`; // 한국 fromDay 0시
   const sb = adminClient();
 
-  const [visits, signups, records, votes, shares, totalUsers, totalRecords] = await Promise.all([
+  const [visits, signups, records, votes, shares, totalUsers, totalRecords, stateRows, masters] = await Promise.all([
     fetchAll<{ user_id: string; fortune_date: string }>((a, b) => sb.from("night_fortunes").select("user_id, fortune_date").not("user_id", "is", null).gte("fortune_date", fromDay).range(a, b)),
     fetchAll<{ user_id: string; created_at: string }>((a, b) => sb.from("night_saju_profiles").select("user_id, created_at").gte("created_at", fromIso).range(a, b)),
     fetchAll<{ user_id: string; created_at: string }>((a, b) => sb.from("night_entries").select("user_id, created_at").gte("created_at", fromIso).range(a, b)),
@@ -44,7 +46,18 @@ export default async function StatsPage({ searchParams }: { searchParams: Promis
     fetchAll<{ created_at: string }>((a, b) => sb.from("night_share_events").select("created_at").gte("created_at", fromIso).range(a, b)).catch(() => []),
     sb.from("night_saju_profiles").select("user_id", { count: "exact", head: true }),
     sb.from("night_entries").select("id", { count: "exact", head: true }),
+    // 있었던 일 세기 (2026-11-20, 뒤에서만 재기): 상태를 고른 기록 전부와 그 사람의 일간. 0007 적용 전이면 빈 배열
+    fetchAll<{ user_id: string; day_stem: string; day_branch: string; states: States | null }>((a, b) => sb.from("night_entries").select("user_id, day_stem, day_branch, states").not("states", "is", null).range(a, b)).catch(() => []),
+    fetchAll<{ user_id: string; pillars: { day?: { stem?: string } } | null }>((a, b) => sb.from("night_saju_profiles").select("user_id, pillars").range(a, b)).catch(() => []),
   ]);
+  const masterOf = new Map(masters.flatMap((p) => (p.pillars?.day?.stem ? [[p.user_id, p.pillars.day.stem] as [string, string]] : [])));
+  const intensity = stateIntensity(
+    stateRows.flatMap((r) => {
+      const dm = masterOf.get(r.user_id);
+      return dm ? [{ entry_date: "", day_stem: r.day_stem, day_branch: r.day_branch, states: r.states, dayMaster: dm }] : [];
+    }),
+  );
+  const fx = (x: number | null) => (x === null ? "-" : x.toFixed(2));
 
   const rows: MetricRows = {
     visits: visits.map((v) => ({ user_id: v.user_id, day: v.fortune_date })),
@@ -148,6 +161,39 @@ export default async function StatsPage({ searchParams }: { searchParams: Promis
           </table>
         </div>
         <p className="mt-3 text-[12px] text-muted">방문은 오늘 화면을 연 사람 수예요(생년월일을 넣은 사람만). 기록은 쓴 날 기준이에요.</p>
+      </section>
+
+      <section className="card-frame card-paper p-5">
+        <h2 className="text-[15px] font-bold">있었던 일 세기 (상태를 고른 기록 {stateRows.length}건)</h2>
+        <div className="mt-3 overflow-x-auto">
+          <table className="w-full text-right text-[13px] tabular-nums">
+            <thead className="text-muted">
+              <tr>
+                <th className="py-1 text-left font-normal">축</th>
+                <th className="font-normal">전체</th>
+                <th className="font-normal">그 기운 온 날</th>
+                <th className="font-normal">다른 날</th>
+                <th className="font-normal">차이</th>
+              </tr>
+            </thead>
+            <tbody>
+              {intensity.map((r) => (
+                <tr key={r.axis} className="border-t border-line/40">
+                  <td className="py-1.5 text-left">{r.label}</td>
+                  <td>
+                    {fx(r.all.mean)} ({r.all.n})
+                  </td>
+                  <td>{r.group ? `${fx(r.on.mean)} (${r.on.n})` : "-"}</td>
+                  <td>{r.group ? `${fx(r.off.mean)} (${r.off.n})` : "-"}</td>
+                  <td>{r.diff === null ? "-" : `${r.diff > 0 ? "+" : ""}${r.diff.toFixed(2)}`}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <p className="mt-3 text-[12px] text-muted">
+          세기는 고른 단계 그대로 1~3이에요(좋고 나쁨이 아니라 얼마나 드러났나). 괄호는 날 수. 차이가 +면 운세가 말한 기운이 온 날에 그 일이 실제로 더 있었다는 뜻이고, 양쪽 다 5일 이상일 때만 내요.
+        </p>
       </section>
     </main>
   );
