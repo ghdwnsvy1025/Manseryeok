@@ -4,6 +4,7 @@ import { TrackedLink } from "@/components/track/TrackedLink";
 import { PaidInvite } from "@/components/PaidInvite";
 import { SajuPowerBars } from "@/components/SajuPowerBars";
 import { SajuBalanceGauge } from "@/components/SajuBalanceGauge";
+import { SajuUnseongCurve } from "@/components/SajuUnseongCurve";
 import { GROUP_SHORT, UNSEONG_NOTE, type ChartColumn, type SajuChart } from "@/lib/saju/chart";
 import { KAKAO_CHANNEL_URL, PAID_PRICE, sajucowCardUrl, sajucowHomeUrl, sajucowReadingUrl } from "@/lib/sajucow";
 
@@ -185,19 +186,8 @@ export function SajuChartPanel({ chart, ganjiKo, faceSrc, open, birth }: Props) 
         </section>
       )}
 
-      {/* 십이운성 뜻 — 표에 나온 것만 */}
-      <section className="card-frame card-light card-paper p-5" aria-label="십이운성">
-        <h2 className="text-[15px] font-bold">십이운성</h2>
-        <p className="mt-1 text-[13px] text-muted">일간의 기운이 각 기둥에서 어떤 때에 있는지를 사람의 한살이에 빗댄 이름이에요.</p>
-        <dl className="kv saju-unseong mt-3">
-          {unseongSeen.map((u) => (
-            <div key={u} className="kv__row">
-              <dt>{u}</dt>
-              <dd className="text-muted">{UNSEONG_NOTE[u]}</dd>
-            </div>
-          ))}
-        </dl>
-      </section>
+      {/* 12운성 한살이 곡선(명세 50 1번) — 예전 "십이운성" 뜻풀이 칸을 대신한다. 명식 표 안의 12운성 행은 그대로 */}
+      <SajuUnseongCurve columns={chart.columns} />
 
       {/* 대운 */}
       {chart.daeun && (chart.daeun.current || chart.daeun.next) && (
@@ -232,14 +222,22 @@ export function SajuChartPanel({ chart, ganjiKo, faceSrc, open, birth }: Props) 
         {/* 유료 풀이 권유 — 이 칸 안 한 곳(2026-11-18 앱 주인 "유료풀이광고는 사주카우와 같이 놓아줘"). 같은 서비스의 세 가지가 한 묶음: 풀이 → 직업 카드 → 궁합.
             결제가 열렸으면 풀이로, 닫혔으면 알림 받기. "다음에"로 30일 접히면 카드 보기 · 궁합 보기 둘만 남는다(PaidInvite). 낱장 안의 금색 면 버튼은 이 하나뿐 */}
         <PaidInvite open={open} readingHref={sajucowReadingUrl()} notifyHref={`${KAKAO_CHANNEL_URL}/friend`} price={PAID_PRICE} />
-        <TrackedLink event="sajucow_link_click" eventProps={{ at: "saju", to: "card" }} href={sajucowCardUrl(me.ganjiKo)} target="_blank" rel="noopener" className="saju-viral__card flex h-13 items-center justify-center rounded-xl border border-frame text-[16px] font-bold text-ink">
-          {/* 버튼 왼쪽 내 얼굴 28px (있는 얼굴 faces/, 새 그림 아님) */}
-          <img src={me.faceSrc} alt="" width={28} height={28} className="saju-viral__face" />
-          내 조선시대 직업 카드 보기 ({me.ganjiKo})
-        </TrackedLink>
-        <TrackedLink event="sajucow_link_click" eventProps={{ at: "saju", to: "pair" }} href={sajucowHomeUrl()} target="_blank" rel="noopener" className="tap text-center text-[15px] text-muted underline underline-offset-4">
-          친구와 궁합 보기
-        </TrackedLink>
+        {/* 명세 50 3번(앱 주인 "둘 다 동등한 버튼으로"): 같은 테 버튼 둘 — 같은 높이 · 같은 글자 크기, 왼쪽에 작은 얼굴(궁합은 같은 얼굴 둘을 겹친 꼴, 새 그림 아님) */}
+        <div className="saju-viral__pair">
+          <TrackedLink event="sajucow_link_click" eventProps={{ at: "saju", to: "card" }} href={sajucowCardUrl(me.ganjiKo)} target="_blank" rel="noopener" className="saju-viral__btn">
+            <span className="saju-viral__faces" aria-hidden>
+              <img src={me.faceSrc} alt="" width={28} height={28} className="saju-viral__face" />
+            </span>
+            직업 카드 보기
+          </TrackedLink>
+          <TrackedLink event="sajucow_link_click" eventProps={{ at: "saju", to: "pair" }} href={sajucowHomeUrl()} target="_blank" rel="noopener" className="saju-viral__btn">
+            <span className="saju-viral__faces" aria-hidden>
+              <img src={me.faceSrc} alt="" width={28} height={28} className="saju-viral__face" />
+              <img src={me.faceSrc} alt="" width={28} height={28} className="saju-viral__face" />
+            </span>
+            궁합 보기
+          </TrackedLink>
+        </div>
       </section>
     </div>
   );

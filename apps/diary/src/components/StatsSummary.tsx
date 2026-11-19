@@ -128,27 +128,7 @@ export function StatsSummary({ h, fitPercent, stems, branches, elements, moods, 
           </div>
         )}
 
-        {/* 2026-10-31: 영역별 평균(최근 30일) — 막대 길이 = 평균 단계(1~5). 모양은 디자이너(.area-bars*) */}
-        {areaRows && (
-          <div className="area-bars card-frame card-light card-paper px-5 py-4" aria-label="영역별 행복도, 최근 30일">
-            <p className="text-[15px] font-bold">
-              영역별 행복도 <span className="text-[13px] font-normal text-muted">최근 30일 평균, 10점 기준</span>
-            </p>
-            <ol className="area-bars__list mt-3 flex flex-col gap-2">
-              {areaRows.map((a) => (
-                <li key={a.key} className="area-bars__row" data-empty={a.n ? undefined : ""} aria-label={`${a.label} ${a.n && a.mean !== null ? `평균 ${Math.round(a.mean * 20) / 10}점, ${a.n}일` : "기록 없음"}`}>
-                  <span className="area-bars__label">{a.label}</span>
-                  <span className="area-bars__track">
-                    <span className="area-bars__fill" style={{ width: `${a.mean === null ? 0 : (a.mean / 5) * 100}%` }} data-tier={a.mean === null ? undefined : happinessTier(a.mean * 2)} />
-                  </span>
-                  {/* 2026-10-31: 하루 행복도와 같은 10점 기준으로 (단계 평균 × 2) */}
-                  <span className="area-bars__value">{a.mean === null ? "–" : Math.round(a.mean * 20) / 10}</span>
-                  <span className="area-bars__n">{a.n ? `${a.n}일` : ""}</span>
-                </li>
-              ))}
-            </ol>
-          </div>
-        )}
+        {/* 명세 50 8번: 영역별 행복도(최근 30일 평균 막대) 칸은 뺐다 — 있었던 일별 행복도(StateStats)가 같은 꼴로 그 일을 한다. 영역 육각형 · 글자 막대 · 영역 칩 그래프는 그대로 */}
 
         {/* 2026-10-31 사용자 Q4: 영역별 점수 — 육각형(이번 달·지난달) + 영역 칩으로 천간·지지·오행 막대 */}
         {areaDetail && (

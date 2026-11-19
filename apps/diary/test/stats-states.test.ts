@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { groupsOfDay, stateByGroup, stateSummary, stateTagTop, STATE_RATIO_MIN } from "@/lib/stats/states";
+import { groupsOfDay, stateByGroup, stateHappiness, stateSummary, stateTagTop, STATE_RATIO_MIN } from "@/lib/stats/states";
 
 // 내 일간 己(기토): 甲·乙 = 관성, 丙·丁 = 인성, 戊·己 = 비겁, 庚·辛 = 식상, 壬·癸 = 재성
 const ME = "己";
@@ -44,5 +44,22 @@ describe("있었던 일(상태) 통계", () => {
     expect(g.find((x) => x.group === "관성")).toMatchObject({ axis: "duty", n: 1, top: { level: 3, word: "무거웠음", count: 1, ratio: null }, otherRatio: null });
     // 고른 날이 없는 갈래는 top이 null
     expect(g.find((x) => x.group === "식상")).toMatchObject({ n: 0, top: null });
+  });
+  test("있었던 일별 행복도: 양 끝 단계와 세부 낱말만, 두 번 이상이면 평균, 평균 높은 순", () => {
+    const h = (date: string, states: Record<string, unknown> | null, happiness: number) => ({ ...e(date, "경", "술", states), happiness });
+    const rows = stateHappiness([
+      h("2026-12-01", { pace: 3, money: 3, tags: ["treat"] }, 4),
+      h("2026-12-02", { pace: 3, money: 2 }, 6),
+      h("2026-12-03", { pace: 1, tags: ["treat"] }, 9),
+      h("2026-12-04", { pace: 1 }, 8),
+      h("2026-12-05", null, 10),
+    ]);
+    expect(rows.map((r) => [r.label, r.n, r.avg])).toEqual([
+      ["여유", 2, 8.5],
+      ["사 줬음", 2, 6.5],
+      ["바쁨", 2, 5],
+      ["돈 많이 나감", 1, null],   // 한 번뿐이라 평균을 말하지 않는다. "돈 평소만큼"(2단계)은 줄이 없다
+    ]);
+    expect(stateHappiness([])).toEqual([]);
   });
 });

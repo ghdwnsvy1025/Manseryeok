@@ -1,84 +1,57 @@
-import { stateSay } from "@/lib/entry";
-import type { GroupStateRow, StateAxisSummary, StateTagCount } from "@/lib/stats/states";
+"use client";
 
-interface Props {
-  /** 최근 30일, 축마다 세 단계가 몇 번이었나 */
-  summary: StateAxisSummary[];
-  /** 최근 30일 자주 고른 세부 낱말 */
-  tags: StateTagCount[];
-  /** 십신 갈래가 온 날의 상태 (내 일간 기준) */
-  groups: GroupStateRow[];
-}
+import { useState } from "react";
+import { happinessTier } from "@/lib/entry";
+import type { StateHappyRow } from "@/lib/stats/states";
 
-/** 갈래 이름을 쉬운 말로 */
-const GROUP_WORD: Record<string, string> = { 비겁: "내 고집·경쟁", 식상: "표현·여유", 재성: "돈·실속", 관성: "책임·규칙", 인성: "배움·생각" };
+/** 처음 보이는 줄 수 */
+const FIRST = 8;
 
 /**
- * 나 화면 "있었던 일" 통계 (2026-11-14, 명세 37). 상태 기록이 하나도 없으면 그리지 않는다.
- *  1) 최근 30일: 축마다 세 단계 횟수 ("하루의 속도 — 여유 5 · 보통 9 · 바쁨 12")
- *  2) 글자별: 십신 갈래가 온 날에 그 갈래의 축이 어땠나 ("책임·규칙 기운이 온 날 7번 중 5번 무거웠음"). 표본 5번 미만이면 비율 없이 횟수만.
- * 서버 컴포넌트. 계산은 lib/stats/states.ts.
- * 모양(톤 v3.41, globals.css .state-stats*): 다른 통계와 같은 card-light 카드 한 장. 축 한 줄 = 이름 58px + 붓 가로획 한 줄(세 단계 횟수가 너비,
- * 녹갈 한 색의 세 농도) + 그 아래 세 단계 말과 횟수(왼·가운데·오른 — 막대의 순서 그대로). 횟수 0인 단계는 막대에서 빠지고 말만 흐리게 남는다.
+ * 나 화면 "있었던 일별 행복도" (2026-11-14 명세 37 → 명세 50 8번, 톤 v3.54).
+ * 앱 주인: "영역별 행복도는 빼 주고, 있었던 일에 있는 거를 영역별 행복도처럼 계산해 줘."
+ * 그 일이 있었던 날의 내 행복도 평균을 한 줄씩 — 왼쪽 말("여유", "돈 많이 나감"), 가운데 막대(평균, 10이 끝. 색은 행복도 네 단계 색),
+ * 오른쪽 "평균 8.5"와 날 수. 한 번뿐인 줄(avg null)은 옅게 "1일뿐이라 아직 몰라요". 처음 8줄, "더 보기".
+ * 예전에 그리던 축별 세 단계 횟수 · 자주 고른 낱말 · 갈래별 경향은 이 칸 하나로 바꿨다. 계산은 lib/stats/states.ts stateHappiness.
+ * 모양은 globals.css .state-happy* (막대는 영역별 행복도 막대 .area-bars와 같은 재료)
  */
-export function StateStats({ summary, tags, groups }: Props) {
-  if (!summary.some((s) => s.n > 0)) return null;
-  const groupRows = groups.filter((g) => g.top);
+export function StateStats({ rows }: { rows: StateHappyRow[] }) {
+  const [all, setAll] = useState(false);
+  const shown = all ? rows : rows.slice(0, FIRST);
   return (
-    <section className="state-stats card-frame card-light card-paper px-5 py-4" aria-label="있었던 일 통계">
-      <div className="state-stats__head">
-        <h3 className="state-stats__title">있었던 일</h3>
-        <p className="state-stats__sub">최근 30일</p>
-      </div>
-      <dl className="state-stats__rows">
-        {summary.filter((s) => s.n > 0).map((s) => (
-          <div key={s.key} className="state-stats__row" data-axis={s.key}>
-            <dt className="state-stats__label">{s.label}</dt>
-            <dd className="state-stats__bar" aria-label={s.levels.map((w, i) => `${w} ${s.counts[i]}일`).join(", ")}>
-              {/* 붓 한 획: 세 단계가 횟수만큼 너비를 나눠 갖는다 (글자는 아래 줄에) */}
-              <span className="state-stats__stroke" aria-hidden>
-                {s.levels.map((w, i) => (
-                  <span key={w} className="state-stats__seg" data-level={i + 1} style={{ flexGrow: s.counts[i] }} hidden={s.counts[i] === 0} />
-                ))}
-              </span>
-              <span className="state-stats__words">
-                {s.levels.map((w, i) => (
-                  <span key={w} className="state-stats__word" data-level={i + 1} data-zero={s.counts[i] === 0 ? "" : undefined}>
-                    <span className="state-stats__seg-word">{w}</span> <span className="state-stats__seg-n">{s.counts[i]}</span>
+    <section className="state-happy card-frame card-light card-paper px-5 py-4" aria-label="있었던 일별 행복도">
+      <p className="text-[15px] font-bold">
+        있었던 일별 행복도 <span className="text-[13px] font-normal text-muted">그 일이 있었던 날의 내 행복도 평균</span>
+      </p>
+      {rows.length === 0 ? (
+        <p className="state-happy__empty">있었던 일을 고른 기록이 쌓이면 보여요</p>
+      ) : (
+        <ol className="state-happy__list">
+          {shown.map((r) => (
+            <li key={r.key} className="state-happy__row" data-thin={r.avg === null ? "" : undefined} aria-label={r.avg === null ? `${r.label}, ${r.n}일뿐이라 아직 몰라요` : `${r.label} 평균 ${r.avg}, ${r.n}일`}>
+              <span className="state-happy__label">{r.label}</span>
+              {r.avg === null ? (
+                <span className="state-happy__few">{r.n}일뿐이라 아직 몰라요</span>
+              ) : (
+                <>
+                  <span className="area-bars__track" aria-hidden>
+                    <span className="area-bars__fill" style={{ width: `${(r.avg / 10) * 100}%` }} data-tier={happinessTier(r.avg)} />
                   </span>
-                ))}
-              </span>
-            </dd>
-          </div>
-        ))}
-      </dl>
-      {tags.length > 0 && (
-        <ul className="state-stats__tags" aria-label="자주 있었던 일">
-          {tags.map((t) => (
-            <li key={t.key} className="tag state-tag">
-              {t.label} <span className="state-stats__tag-n">{t.n}</span>
+                  <span className="state-happy__avg">
+                    <small>평균</small>
+                    {r.avg}
+                  </span>
+                  <span className="state-happy__n">{r.n}일</span>
+                </>
+              )}
             </li>
           ))}
-        </ul>
+        </ol>
       )}
-      {groupRows.length > 0 && (
-        <div className="state-stats__groups">
-          <h4 className="state-stats__groups-title">글자별로 보면</h4>
-          <ul className="state-stats__group-list">
-            {groupRows.map((g) => (
-              <li key={g.group} className="state-stats__group" data-group={g.group} data-thin={g.top!.ratio === null ? "" : undefined}>
-                <span className="state-stats__group-name">{GROUP_WORD[g.group]} 기운이 온 날</span>{" "}
-                <span className="state-stats__group-fact">
-                  {g.n}번 중 {g.top!.count}번 <strong>{stateSay(g.axis, g.top!.level)}</strong>
-                </span>
-                {g.top!.ratio !== null && g.otherRatio !== null && (
-                  <span className="state-stats__group-vs"> (다른 날은 {Math.round(g.otherRatio * 100)}%)</span>
-                )}
-              </li>
-            ))}
-          </ul>
-          {groupRows.some((g) => g.top!.ratio === null) && <p className="state-stats__note">기록이 5번보다 적은 갈래는 횟수만 보여 줘요.</p>}
-        </div>
+      {rows.length > FIRST && !all && (
+        <button type="button" className="state-happy__more tap" onClick={() => setAll(true)}>
+          더 보기 <small>{rows.length - FIRST}줄</small>
+        </button>
       )}
     </section>
   );

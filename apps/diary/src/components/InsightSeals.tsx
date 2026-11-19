@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { SheetTrigger } from "@/components/Sheet";
+import { VersusDays } from "@/components/VersusDays";
 import { GROUP_MIN_DAYS, type ForecastVersus, type HappyWhen } from "@/lib/stats/insight";
 
 /** "2026-11-23" → "11.23" */
@@ -84,41 +85,49 @@ export function HappyAnswer({ happy, days, chart }: { happy: HappyWhen; /** 두 
 }
 
 /**
- * "예상은 맞았을까?" 낱장의 안 (명세 47 Q18): 문장 → 작은 글씨 한 줄 → 날 목록(최근 10).
- * 그래프는 뺐다(2026-11-17 후속, 앱 주인 "추천대로"): 기록이 띄엄띄엄하면 행복도 선이 토막 나 읽히지 않고, 답은 문장과 목록이 이미 말한다.
- * 백분율 · "적중" · 운세 점수 숫자는 쓰지 않는다. 같은 쪽이었던 날에만 옥색 작은 도장, 다른 쪽이었던 날은 표시 없음(틀렸다는 표시를 하지 않는다).
+ * "예상은 맞았을까?" 낱장의 안 (명세 47 Q18 → 명세 50 6번, 톤 v3.54). 앱 주인: "글들이 너무 많아서 가독성이 안 좋아. 정렬도 깔끔하게 핵심만 간결하게."
+ * 숫자 두 칸(좋을 날로 본 N일 → M일 좋았어요 / 조심할 날로 본 N일 → M일 힘들었어요, 칸 테는 옥색 · 주홍 — 칩과 같은 말씨) → 안내 한 줄 →
+ * 세 열로 맞춘 날 목록(VersusDays: 날짜 · 예상 · 내 행복도 도장, 처음 7줄). 큰 문장 둘(versus.sentences)은 화면에 쓰지 않고 읽어 주는 글로만 남긴다.
+ * 백분율 · "적중" · 운세 점수 숫자는 쓰지 않는다.
  */
 export function VersusAnswer({ versus }: { versus: ForecastVersus }) {
-  const days = versus.days.slice(0, 10);
-  return (
-    <div className="answer">
-      {versus.sentences.length > 0 ? (
-        <div className="answer__lead">
-          {versus.sentences.map((s) => (
-            <p key={s}>{s}</p>
-          ))}
-        </div>
-      ) : (
+  if (versus.days.length === 0) {
+    return (
+      <div className="answer">
         <p className="answer__lead" data-empty="">
           아직 견줄 날이 없어요. 운세를 본 날에 기록을 남기면 쌓여요
         </p>
-      )}
-      <p className="answer__note">사주로 본 예상과 내가 매긴 행복도를 나란히 놓은 거예요. 맞히기 시합이 아니에요</p>
-      {days.length > 0 && (
-        <ol className="versus-days" aria-label="예상과 내 기록, 최근 날부터">
-          {days.map((d) => (
-            <li key={d.date} className="versus-day" data-hit={d.hit ? "" : undefined}>
-              <span className="versus-day__date">{shortDate(d.date)}</span>
-              <span className="versus-day__band">{d.band === "좋음" ? "좋을 날로 봄" : "조심할 날로 봄"}</span>
-              <span className="versus-day__arrow" aria-hidden>
-                →
+      </div>
+    );
+  }
+  const cells = [
+    { kind: "good" as const, head: `좋을 날로 본 ${versus.good.days}일`, days: versus.good.days, big: `${versus.good.good}일`, word: "좋았어요", off: versus.good.hard > 0 ? `${versus.good.hard}일은 힘들었어요` : null },
+    { kind: "care" as const, head: `조심할 날로 본 ${versus.caution.days}일`, days: versus.caution.days, big: `${versus.caution.hard}일`, word: "힘들었어요", off: versus.caution.good > 0 ? `${versus.caution.good}일은 오히려 좋았어요` : null },
+  ];
+  return (
+    <div className="answer answer--versus">
+      <div className="sr-only">
+        {versus.sentences.map((s) => (
+          <p key={s}>{s}</p>
+        ))}
+      </div>
+      <ul className="versus-cells" aria-hidden>
+        {cells.map((c) => (
+          <li key={c.kind} className="versus-cell" data-kind={c.kind}>
+            <span className="versus-cell__head">{c.head}</span>
+            {c.days === 0 ? (
+              <span className="versus-cell__none">아직 없어요</span>
+            ) : (
+              <span className="versus-cell__big">
+                <b>{c.big}</b> {c.word}
               </span>
-              <span className="versus-day__h">행복도 {d.happiness}</span>
-              {d.hit ? <span className="versus-day__mark" role="img" aria-label="같은 쪽이었어요" /> : <span className="versus-day__mark" aria-hidden />}
-            </li>
-          ))}
-        </ol>
-      )}
+            )}
+            {c.days > 0 && c.off && <span className="versus-cell__off">{c.off}</span>}
+          </li>
+        ))}
+      </ul>
+      <p className="answer__note">예상과 내 행복도를 나란히 본 거예요</p>
+      <VersusDays days={versus.days} />
     </div>
   );
 }

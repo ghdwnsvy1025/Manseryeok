@@ -9,7 +9,7 @@ import { Booting } from "@/components/Booting";
 import { characterOf, characterOfGanji } from "@/lib/character";
 import { StatsSummary } from "@/components/StatsSummary";
 import { StateStats } from "@/components/StateStats";
-import { stateByGroup, stateSummary, stateTagTop } from "@/lib/stats/states";
+import { stateByGroup, stateHappiness, stateSummary, stateTagTop } from "@/lib/stats/states";
 import { TrackOnMount } from "@/components/track/TrackOnMount";
 import { birthProfileOf, countEntries, getEntry, getSajuProfile, listEntries, listEntriesInMonth, listEntriesForStats, listFortuneScores, listFortuneVotes } from "@/lib/db";
 import { AreaRadar } from "@/components/AreaRadar";
@@ -19,6 +19,7 @@ import { paidReadingOpen } from "@/lib/sajucow";
 import { SajuChartPanel } from "@/components/SajuChartPanel";
 import { Sheet, SheetTrigger } from "@/components/Sheet";
 import { MeForecastChips } from "@/components/MeForecastChips";
+import { DaySheet } from "@/components/DaySheet";
 import { SajuNewDot } from "@/components/SajuNewDot";
 import { HappyAnswer, InsightSeals, VersusAnswer } from "@/components/InsightSeals";
 import { areaAverages, areaRadar, bestWorstDays, fortuneAccuracy, growingSeries, habitOf, happinessSeries, monthlySeries, moodTop, nextUnlock, streakOf, type PickedDay } from "@/lib/stats/extra";
@@ -58,7 +59,7 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
   const calYm = resolveMonth(dParam ? dParam.slice(0, 7) : m, today);
   // 2026-10-24: 저장하면 쓰기 폼이 여기로 온다 (/me?d=날짜&saved=날짜&at=시각, actions.ts). 팡은 저장한 날의 기록으로 — 오늘 화면에서 옮겨 왔다
   const savedDate = saved && parseYmd(saved) && saved <= today ? saved : null;
-  const [profile, total, all, fortuneScores, monthEntries, savedEntry, recent, paidOpen, votes] = await Promise.all([
+  const [profile, total, all, fortuneScores, monthEntries, savedEntry, recent, paidOpen, votes, recordRows] = await Promise.all([
     getSajuProfile(supabase, user.id),
     countEntries(supabase, user.id),
     listEntriesForStats(supabase, user.id),
@@ -71,6 +72,8 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
     paidReadingOpen(),
     // 운세 적중률 (맞아요/아니에요)
     listFortuneVotes(supabase, user.id),
+    // 명세 50 (2026-11-20): 날짜 낱장의 "전체 보기" 목록과, 달력에 없는 달의 날짜 낱장(가장 행복했던 날 등)에 쓴다. 최근 400개
+    listEntries(supabase, user.id, 400),
   ]);
   // 생년월일이 없으면 먼저 받는다 (로그인 사용자와 같은 규칙)
   if (!profile) redirect("/onboarding?next=/me");
@@ -113,6 +116,13 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
   const windowCards = { best: window30.best.map((f) => toForecast(f)!), worst: window30.worst.map((f) => toForecast(f)!) };
   const happy = happyWhen(all, profile.pillars.day.stem);
   const versus = forecastVersus(all, fortuneScores);
+  // 명세 50: 있었던 일마다 그날의 행복도 평균(영역별 행복도 자리를 대신한다), 전체 기록 목록(최근 것부터)
+  const stateHappy = stateHappiness(all);
+  const records = recordRows.map((e) => ({
+    date: e.entry_date,
+    ganjiKo: dayGanji(e.entry_date).ko,
+    entry: { happiness: e.happiness, moods: e.moods, note: e.note, areas: e.areas ?? null, states: e.states ?? null, tomorrowNote: e.tomorrow_note ?? null },
+  }));
   const insightOpen = all.length >= INSIGHT_UNLOCK_DAYS;
   const insightLeft = Math.max(0, INSIGHT_UNLOCK_DAYS - all.length);
   // 달력 도장(표시 재료): 앞으로 30일의 좋을 날 셋 · 조심할 날 셋 (명세 47 — 전에는 다음 달 하루씩 fc)
@@ -152,7 +162,7 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
   const filledCells = cells.filter((c) => c.n > 0).length;
   // 2026-11-14 있었던 일(상태) 통계: 최근 30일 + 십신 갈래가 온 날의 상태. 상태 기록이 없으면 안 그린다 (명세 37).
   // 자리(명세 47): "자세한 통계" 서랍 안 — "자주 고른 기분" 바로 아래(StatsSummary의 states 자리)
-  const stateStats = <StateStats summary={stateSummary(all, today, 30)} tags={stateTagTop(all, today, 30, 5)} groups={stateByGroup(all, profile.pillars.day.stem)} />;
+  const stateStats = <StateStats rows={stateHappy} />;
   // 명세 47 기록 한 줄에 쓰는 "이번 달 N일" — 전에는 StatsSummary에 넘기는 자리에서 바로 불렀다(같은 habitOf, 한 번만 부르게 올렸다)
   const habit = habitOf(all, today);
 
@@ -248,7 +258,7 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
           </nav>
         </div>
         {isCal ? (
-          <MonthCalendar cal={calMonth} days={calDays} initialSelected={pickedDay} today={today} forecast={forecastMarks} forecastCards={windowCards} />
+          <MonthCalendar cal={calMonth} days={calDays} today={today} forecast={forecastMarks} />
         ) : (
           <>
             {/* 명세 47: 모은 카드 수는 머리에서 격자 보기 머리로 */}
@@ -300,6 +310,8 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
           }
         />
       </Sheet>
+      {/* 날짜 낱장과 전체 목록(명세 50): 달력 칸 · 두 날 · 예상의 날 줄 · 목록 어디서 누르든 같은 낱장. 주소 ?d=로 들어오면 뜬 채 시작한다 */}
+      <DaySheet records={records} days={calDays} forecast={forecastMarks} forecastCards={windowCards} today={today} />
       {/* 물음 인장의 답 낱장 둘 — 인장이 열렸을 때만 그린다 */}
       {insightOpen && (
         <Sheet id="sheet-happy" name="happy" title="나는 언제 행복했지?">

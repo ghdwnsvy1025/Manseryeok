@@ -65,6 +65,21 @@ export function bridgedPaths(values: (number | null)[]): { solid: string; gap: s
   return { solid: solid.trim(), gap: gap.trim(), lone: lone.trim() };
 }
 
+/**
+ * 기록한 날을 차례로 잇는 한 줄(명세 50 7번) — 빈 날을 건너도 같은 선으로 이어진다. 값이 하루뿐이면 그날 자리에 짧은 가로 획 하나.
+ * bridgedPaths(시험이 본다)의 돌려주는 값은 그대로 두고, 그리는 쪽은 이 한 줄을 쓴다
+ */
+function joined(values: (number | null)[]): string {
+  const n = values.length;
+  const pts = values.map((v, i) => (v === null || v === undefined ? null : `${x(i, n).toFixed(1)},${y(v).toFixed(1)}`)).filter((p): p is string => p !== null);
+  if (pts.length === 0) return "";
+  if (pts.length === 1) {
+    const i = values.findIndex((v) => v !== null && v !== undefined);
+    return `M${(x(i, n) - LONE).toFixed(1)},${y(values[i]!).toFixed(1)} L${(x(i, n) + LONE).toFixed(1)},${y(values[i]!).toFixed(1)}`;
+  }
+  return `M${pts.join(" L")}`;
+}
+
 type View = "all" | AreaKey;
 type Variant = "full" | "happy";
 
@@ -212,13 +227,11 @@ export function HappinessChart({ series: monthSeries, yearSeries, emptyArt, vari
               </text>
             </g>
           ))}
-          {/* 예상 선: 뒤에, 옅고 가늘게. 운세를 안 본 날은 그대로 이어 한 줄로 */}
-          {hasForecast && <path d={`${fortune.gap} ${fortune.solid} ${fortune.lone}`.trim()} className="hchart__fortune" fill="none" />}
-          {/* 기록 없는 날을 건너는 가는 선 — 예상 선이 없는 그림에서만 */}
-          {!hasForecast && line.gap && <path d={line.gap} className="hchart__line hchart__line--gap" fill="none" />}
-          {/* 행복도: 종이색 테(겹치는 예상 선을 끊어 준다) 위에 굵은 선 + 혼자 있는 날의 짧은 가로 획 */}
-          {hasForecast && <path d={`${line.solid} ${line.lone}`.trim()} className="hchart__halo" fill="none" />}
-          <path d={`${line.solid} ${line.lone}`.trim()} className="hchart__line" fill="none" />
+          {/* 명세 50 7번(앱 주인 "그래프가 끊기면 안 돼. 쭉 그려 줘"): 기록 없는 날을 건너 같은 선으로 쭉 잇는다 — 가는 이음선 · 끊김 · 혼자 있는 날의 가로 획은 없다.
+              예상 선도 한 줄로 이어 뒤에 옅게, 행복도 선은 종이색 테 위에 */}
+          {hasForecast && <path d={joined(series.map((p) => p.fortune))} className="hchart__fortune" fill="none" />}
+          {hasForecast && <path d={joined(values)} className="hchart__halo" fill="none" />}
+          <path d={joined(values)} className="hchart__line" fill="none" />
           {atOk !== null && (
             <g className="hchart__cursor">
               <line x1={x(atOk, n)} x2={x(atOk, n)} y1={PAD.t - 4} y2={y(0)} />

@@ -7,7 +7,7 @@
 import { STEMS, STEMS_KO, getTenGod, type StemHanja } from "@saju/engine";
 import { FAMILY_OF } from "../fortune/base";
 import type { TenGodFamily } from "../fortune/types";
-import { STATE_AXES, STATE_TAG_LABEL, type StateKey, type States } from "../entry";
+import { STATE_AXES, STATE_TAG_LABEL, stateSay, type StateKey, type States } from "../entry";
 import { addDays } from "../time";
 
 export interface StateEntry {
@@ -121,4 +121,46 @@ export function stateByGroup(entries: StateEntry[], dayMaster: string): GroupSta
     }
     return { group, axis: a.key, label: a.label, levels: a.levels, n, counts, top, otherRatio };
   });
+}
+
+// ---------- 있었던 일별 행복도 (2026-11-20 앱 주인: "있었던 일에 있는 거를 영역별 행복도처럼 계산해 줘", 명세 50) ----------
+/** 평균을 말해도 되는 최소 날 수 */
+export const STATE_HAPPY_MIN = 2;
+export interface StateHappyRow {
+  /** "pace:3", "tag:treat" 꼴 */
+  key: string;
+  /** 혼자 읽히는 말: "바쁨", "돈 많이 나감", "사 줬음" */
+  label: string;
+  axis: StateKey;
+  /** 그 일을 고른 날 수 */
+  n: number;
+  /** 그날들의 행복도 평균(1~10, 소수 한 자리). n이 STATE_HAPPY_MIN 미만이면 null */
+  avg: number | null;
+}
+/**
+ * 있었던 일마다 그날의 내 행복도 평균. 축의 가운데 단계("보통", "평소만큼")는 빼고 양 끝 단계와 세부 낱말만 센다.
+ * 한 번도 고르지 않은 것은 줄을 만들지 않는다. 평균 높은 순(평균을 못 내는 줄은 뒤, 그 안에서는 날 수 많은 순).
+ */
+export function stateHappiness(entries: (StateEntry & { happiness: number })[]): StateHappyRow[] {
+  const acc = new Map<string, { label: string; axis: StateKey; s: number; n: number }>();
+  const put = (key: string, label: string, axis: StateKey, h: number) => {
+    const cur = acc.get(key) ?? { label, axis, s: 0, n: 0 };
+    acc.set(key, { ...cur, s: cur.s + h, n: cur.n + 1 });
+  };
+  const tagAxis = new Map<string, StateKey>(STATE_AXES.flatMap((a) => a.tags.map((t) => [t.key, a.key] as [string, StateKey])));
+  for (const e of entries) {
+    if (!e.states) continue;
+    for (const a of STATE_AXES) {
+      const lv = e.states[a.key];
+      if (typeof lv !== "number" || lv === 2) continue;
+      put(`${a.key}:${lv}`, stateSay(a.key, lv), a.key, e.happiness);
+    }
+    for (const t of e.states.tags ?? []) {
+      const axis = tagAxis.get(t);
+      if (axis && STATE_TAG_LABEL[t]) put(`tag:${t}`, STATE_TAG_LABEL[t]!, axis, e.happiness);
+    }
+  }
+  return [...acc.entries()]
+    .map(([key, v]) => ({ key, label: v.label, axis: v.axis, n: v.n, avg: v.n >= STATE_HAPPY_MIN ? Math.round((v.s / v.n) * 10) / 10 : null }))
+    .sort((a, b) => Number(b.avg !== null) - Number(a.avg !== null) || (b.avg ?? 0) - (a.avg ?? 0) || b.n - a.n || (a.key < b.key ? -1 : 1));
 }

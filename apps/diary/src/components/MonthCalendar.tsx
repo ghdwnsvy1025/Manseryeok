@@ -5,8 +5,8 @@ import { useSearchParams } from "next/navigation";
 import { happinessTier, type Areas, type States } from "@/lib/entry";
 import { useEffect, useState } from "react";
 import type { CalendarMonth } from "@/lib/calendar";
-import { CalendarDayDetail } from "@/components/CalendarDayDetail";
 import type { ForecastCard } from "@/components/BestWorstDays";
+import { DAY_STATE, openDay, openDayList } from "@/components/DaySheet";
 import { celebrate } from "@/lib/fx";
 
 const DOW = ["일", "월", "화", "수", "목", "금", "토"];
@@ -19,44 +19,42 @@ export interface DayInfo {
 /** 행복도 세 단계 (2026-10-10 Q2 = A): 7~10 high(금빛) · 4~6 mid(옅은 녹갈) · 1~3 low(차분한 남색). 빨강 없음 */
 
 /**
- * 나 화면 달력 (v3.15). 날짜를 누르면 서버를 거치지 않고 아래 상세가 바로 바뀐다 — 그 달 기록(행복도·기분·메모·간지)을 서버가 미리 담아 준다
- * (예전엔 ?d= 링크라 누를 때마다 나 화면 전체를 다시 받아 렉). 주소의 ?d=는 replaceState로만 맞춘다(새로고침해도 같은 날).
- * 달 이동(‹ ›)은 링크(서버) 그대로. 오늘 기록이 있고 이 세션에서 처음 보면 오늘 칸에 data-stamp-in(도장 꽝 한 번, CSS).
+ * 나 화면 달력 (v3.15). 달 이동(‹ ›)은 링크(서버) 그대로. 오늘 기록이 있고 이 세션에서 처음 보면 오늘 칸에 data-stamp-in(도장 꽝 한 번, CSS).
  * 모양은 디자이너(.cal*). 칸: data-tier, data-selected, data-today, data-future.
- * 명세 47 (톤 v3.51): 앞날 칸 가운데 좋을 날 셋 · 조심할 날 셋에만 도장(옥색 · 주홍), 나머지 앞날은 빈 칸. 도장 찍힌 앞날 칸은 누를 수 있고,
- * 날짜 상세 자리에 그날을 그렇게 본 까닭 한 줄(ForecastCard.reason)이 나온다 — 점수는 없다. 위의 칩을 누르면 주소에 fd=날짜가 실려 오고
- * (MeForecastChips), 그 칸이 골라지며 도장이 한 번 "꽝"(오늘 도장과 같은 cal-stamp-in).
+ * 명세 47 (톤 v3.51): 앞날 칸 가운데 좋을 날 셋 · 조심할 날 셋에만 도장(옥색 · 주홍), 나머지 앞날은 빈 칸. 위의 칩을 누르면 주소에 fd=날짜가 실려 오고
+ * (MeForecastChips) 그 칸의 도장이 한 번 "꽝"(오늘 도장과 같은 cal-stamp-in).
+ * 명세 50 (톤 v3.54): 칸을 누르면 달력 아래에 펼쳐지던 상세 대신 **날짜 낱장**(DaySheet)이 뜬다 — 지난 날(기록 있음 · 없음)도 앞날 도장 칸도.
+ * 고른 칸 표시(data-selected)는 낱장이 떠 있는 동안만(DaySheet가 알려 준다). "이 달 기록" 줄 오른쪽에 전체 목록으로 가는 글자 버튼 "전체 보기",
+ * 달력 아래 기호 풀이 한 줄(옥색 점 좋을 날 · 주홍 점 조심할 날 · 사주로 본 예상이에요 — 그 달에 앞날 도장이 있을 때만).
  */
 export function MonthCalendar({
   cal,
   days,
-  initialSelected = null,
   today,
   forecast = {},
-  forecastCards,
 }: {
   cal: CalendarMonth;
   days: Record<string, DayInfo>;
+  /** 명세 50부터 쓰지 않는다(?d=는 DaySheet가 읽는다). 부르는 쪽 호환으로 남겨 둔다 */
   initialSelected?: string | null;
   today: string;
   /** 앞으로 30일의 좋을 날(best)·조심할 날(worst) 여섯 날 (명세 47). 미래 칸에 data-forecast로 표시 */
   forecast?: Record<string, "best" | "worst">;
-  /** 같은 여섯 날의 얼굴 · 간지 · 까닭 — 앞날 칸을 골랐을 때 상세 자리에 쓴다 */
+  /** 명세 50부터 쓰지 않는다(까닭 한 줄은 DaySheet가 그린다) */
   forecastCards?: { best: ForecastCard[]; worst: ForecastCard[] };
 }) {
-  const cardOf = (date: string | null): ForecastCard | undefined => (date ? [...(forecastCards?.best ?? []), ...(forecastCards?.worst ?? [])].find((f) => f.date === date) : undefined);
   // 칩이 실어 보낸 날 (?fd=). 이 달의 예상 날일 때만 받는다
   const fdParam = useSearchParams().get("fd");
   const fd = fdParam && forecast[fdParam] && fdParam.startsWith(cal.ym) ? fdParam : null;
-  const [selected, setSelected] = useState<string | null>(initialSelected ?? fd);
+  /** 날짜 낱장에 떠 있는 날 — 낱장이 떠 있는 동안만 칸에 표시한다 */
+  const [selected, setSelected] = useState<string | null>(null);
   const [stampIn, setStampIn] = useState(false);
-  const [slam, setSlam] = useState<string | null>(null);
 
-  // 칩을 눌러 넘어왔을 때: 그 칸을 고르고 도장을 한 번 찍는다
   useEffect(() => {
-    setSlam(fd);
-    if (fd) setSelected(fd);
-  }, [fd]);
+    const onState = (e: Event) => setSelected((e as CustomEvent<string | null>).detail);
+    window.addEventListener(DAY_STATE, onState);
+    return () => window.removeEventListener(DAY_STATE, onState);
+  }, []);
 
   useEffect(() => {
     if (!days[today]?.entry) return;
@@ -72,24 +70,7 @@ export function MonthCalendar({
     }
   }, [days, today]);
 
-  const pick = (date: string, future = false) => {
-    const next = selected === date ? null : date;
-    setSelected(next);
-    try {
-      const url = new URL(window.location.href);
-      url.searchParams.set("m", cal.ym);
-      // 앞날 칸은 주소에 남기지 않는다(?d=는 기록이 있을 수 있는 날만, ?fd=는 칩이 싣는다)
-      url.searchParams.delete("fd");
-      if (next && !future) url.searchParams.set("d", next);
-      else url.searchParams.delete("d");
-      window.history.replaceState(window.history.state, "", url.toString());
-    } catch {
-      /* 주소를 못 고쳐도 화면은 바뀐다 */
-    }
-  };
-
-  const info = selected ? days[selected] : undefined;
-  const picked = selected && selected.startsWith(cal.ym) && forecast[selected] ? cardOf(selected) : undefined;
+  const hasForecast = cal.weeks.flat().some((c) => c.date !== null && c.isFuture && forecast[c.date]);
 
   return (
     <div className="cal">
@@ -115,7 +96,13 @@ export function MonthCalendar({
       <dl className="kv mt-1">
         <div className="kv__row">
           <dt>이 달 기록</dt>
-          <dd>{cal.count}일</dd>
+          <dd>
+            {cal.count}일
+            {/* 명세 50: 전체 목록으로 바로 — 글자 버튼 */}
+            <button type="button" className="cal__all tap" aria-haspopup="dialog" onClick={() => openDayList()}>
+              전체 보기
+            </button>
+          </dd>
         </div>
         {cal.mean !== null && (
           <div className="kv__row">
@@ -138,13 +125,13 @@ export function MonthCalendar({
               <li key={c.date}>
                 <button
                   type="button"
-                  onClick={() => pick(c.date!, true)}
+                  onClick={() => openDay(c.date!)}
                   className="cal__cell w-full"
                   data-future=""
                   data-forecast={forecast[c.date]}
                   data-selected={selected === c.date ? "" : undefined}
-                  aria-pressed={selected === c.date}
-                  data-stamp-in={slam === c.date ? "" : undefined}
+                  aria-haspopup="dialog"
+                  data-stamp-in={fd === c.date ? "" : undefined}
                   aria-label={`${cal.month}월 ${c.day}일 ${forecast[c.date] === "best" ? "좋을 날로 봤어요" : "조심할 날로 봤어요"}`}
                 >
                   <span className="cal__day">{c.day}</span>
@@ -161,10 +148,10 @@ export function MonthCalendar({
             <li key={c.date}>
               <button
                 type="button"
-                onClick={() => pick(c.date!)}
+                onClick={() => openDay(c.date!)}
                 className="cal__cell w-full"
                 data-selected={selected === c.date ? "" : undefined}
-                aria-pressed={selected === c.date}
+                aria-haspopup="dialog"
                 data-today={c.isToday ? "" : undefined}
                 data-has={c.happiness !== null ? "" : undefined}
                 data-tier={c.happiness !== null ? happinessTier(c.happiness) : undefined}
@@ -179,21 +166,17 @@ export function MonthCalendar({
           ),
         )}
       </ol>
-      {selected && info && <CalendarDayDetail date={selected} ganjiKo={info.ganjiKo} entry={info.entry} />}
-      {/* 앞날 칸: 기록이 없으니 상세 자리에 그날을 그렇게 본 까닭 한 줄. 인장(1px 선 + 같은 색 글자)이 좋을 날 · 조심할 날을 말한다 */}
-      {picked && selected && (
-        <section className="cal-forecast mt-4" data-kind={forecast[selected]} aria-label={`${picked.label} ${picked.ganjiKo}일, 사주로 본 예상`} aria-live="polite">
-          <img src={picked.faceSrc} alt="" width={48} height={48} className="cal-forecast__face" />
-          <div className="cal-forecast__text">
-            <p className="cal-forecast__top">
-              <span className="cal-forecast__seal">{forecast[selected] === "best" ? "좋을 날" : "조심할 날"}</span>
-              <span className="cal-forecast__date">
-                {picked.label} <span className="text-ganji">{picked.ganjiKo}일</span>
-              </span>
-            </p>
-            <p className="cal-forecast__reason">{picked.reason}</p>
-          </div>
-        </section>
+      {/* 기호 풀이 한 줄 (명세 50 4번) — 이 달에 앞날 도장이 있을 때만 */}
+      {hasForecast && (
+        <p className="cal__legend">
+          <span className="cal__legend-key" data-kind="best">
+            좋을 날
+          </span>
+          <span className="cal__legend-key" data-kind="worst">
+            조심할 날
+          </span>
+          <span>사주로 본 예상이에요</span>
+        </p>
       )}
     </div>
   );
