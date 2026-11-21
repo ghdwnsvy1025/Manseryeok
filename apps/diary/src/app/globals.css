@@ -9673,7 +9673,7 @@ button.bars__col:active .bars__track {
   font-variant-numeric: tabular-nums;
 }
 .pick,
-.seg__cell {
+.axis-seg__cell {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -9688,14 +9688,14 @@ button.bars__col:active .bars__track {
 }
 @media (prefers-reduced-motion: no-preference) {
   .pick,
-  .seg__cell {
+  .axis-seg__cell {
     transition:
       background-color 80ms ease-out,
       color 80ms ease-out;
   }
 }
 input:focus-visible + .pick,
-input:focus-visible + .seg__cell {
+input:focus-visible + .axis-seg__cell {
   outline: 2px solid var(--color-ink);
   outline-offset: 2px;
 }
@@ -9710,7 +9710,7 @@ input:focus-visible + .seg__cell {
   border-radius: 6px;
 }
 
-/* 3-2. 있었던 일: 축 여섯 줄(사이 12px, 점선 없음). 한 줄 = 이름 열 56px + 세 칸 자 `.seg` — 한 덩어리 테 안에서 가는 세로선으로만 나뉘는 같은 폭 세 칸, 높이 44px.
+/* 3-2. 있었던 일: 축 여섯 줄(사이 12px, 점선 없음). 한 줄 = 이름 열 56px + 세 칸 자 `.axis-seg`(온보딩의 `.seg`와 이름이 겹치지 않게) — 한 덩어리 테 안에서 가는 세로선으로만 나뉘는 같은 폭 세 칸, 높이 44px.
    글자 낱장의 세 칸 자(v3.56)와 같은 말씨. "자세히 ▾"는 자 아래 오른쪽 끝 글자 버튼 13px, 펼치면 작은 칸 36px이 한 줄로 흐른다 */
 .axis-rows {
   clear: both;
@@ -9734,25 +9734,25 @@ input:focus-visible + .seg__cell {
   color: var(--color-ink);
   word-break: keep-all;
 }
-.seg {
+.axis-seg {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   border: 1px solid color-mix(in srgb, var(--color-frame) 55%, transparent);
   border-radius: 6px;
   overflow: hidden;
 }
-.seg__slot {
+.axis-seg__slot {
   display: block;
   min-width: 0;
 }
-.seg__slot + .seg__slot {
+.axis-seg__slot + .axis-seg__slot {
   border-left: 1px solid color-mix(in srgb, var(--color-frame) 55%, transparent);
 }
-.seg__cell {
+.axis-seg__cell {
   min-height: 44px;
   padding: 2px 4px;
 }
-input:checked + .seg__cell {
+input:checked + .axis-seg__cell {
   background: var(--color-sky);
   color: var(--color-paper-2);
   font-weight: 700;
@@ -9874,4 +9874,84 @@ input:checked + .pick--mood[data-tone="pos"] {
 .entry-happy__stamp[data-level="5"] {
   --stamp-face: color-mix(in srgb, var(--color-frame) 60%, var(--color-paper-2));
   --stamp-num: var(--color-ink);
+}
+
+/* ── v3.58 후속: "자세히"를 펼쳤을 때 (2026-11-21, 앱 주인 "토글을 펼쳤을 때 더 깔끔하게 보였으면 좋겠어. 정렬도 깔끔하게 되고") ──
+   1. "자세히" / "접기"는 축 이름 아래(왼쪽 열)의 작은 글자 버튼 12px muted — 자 아래에 떠 있던 줄이 없어져 닫힌 여섯 축의 높이가 같다(44px).
+   2. 펼친 낱말은 자의 왼쪽 끝에서 오른쪽 끝까지, **자의 세 칸과 같은 세로선의 세 칸 격자** `.axis__tags`(칸 38px, 13px, 긴 말은 두 줄). 자 바로 아래 5px에 붙어 한 덩어리로 읽힌다.
+      칸끼리 테를 겹쳐 세로선이 자의 세로선과 한 줄로 이어진다. 테 · 면을 더 두르지 않는다 — 정렬과 간격으로만 묶는다. 펼친 축 아래는 18px 띄운다 */
+.axis {
+  position: relative;
+}
+.axis[data-more] .axis__name {
+  align-self: start;
+  padding-top: 4px;
+}
+.axis__more {
+  margin: 0;
+}
+.axis__more-head {
+  position: absolute;
+  top: 23px;
+  left: 0;
+  justify-content: flex-start;
+  width: auto;
+  min-height: 18px;
+  margin: 0;
+  padding: 0;
+  font-size: 12px;
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--color-frame) 55%, transparent);
+  text-underline-offset: 3px;
+}
+.axis__more-head::after {
+  inset: -4px -8px -10px -4px;
+}
+.axis__more-word[data-when="open"],
+.axis__more[open] .axis__more-word[data-when="closed"] {
+  display: none;
+}
+.axis__more[open] .axis__more-word[data-when="open"] {
+  display: inline;
+}
+.axis__more-head .entry-count {
+  display: inline-block;
+  margin-left: 4px;
+  font-size: 12px;
+}
+.axis__tags {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px 0;
+  margin: 5px 0 0 64px;
+  padding: 0 1px;
+}
+.axis:has(.axis__more[open]) {
+  padding-bottom: 6px;
+}
+.axis__tags > .pick-slot {
+  position: relative;
+  margin-right: -1px;
+}
+.axis__tags > .pick-slot:nth-child(3n + 1) {
+  margin-left: -1px;
+}
+.axis__tags > .pick-slot:has(input:checked) {
+  z-index: 1;
+}
+.pick--sub {
+  height: 100%;
+  min-height: 38px;
+  padding: 2px 4px;
+  border-radius: 0;
+  font-size: 13px;
+}
+.axis__tags > .pick-slot:nth-child(3n + 1) > .pick--sub {
+  border-top-left-radius: 6px;
+  border-bottom-left-radius: 6px;
+}
+.axis__tags > .pick-slot:nth-child(3n) > .pick--sub,
+.axis__tags > .pick-slot:last-child > .pick--sub {
+  border-top-right-radius: 6px;
+  border-bottom-right-radius: 6px;
 }

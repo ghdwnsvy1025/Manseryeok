@@ -224,7 +224,7 @@ export function EntryForm({ date, when = "today", notePlaceholder, initial, warm
 
         {/* 오늘 있었던 일 (2026-11-14, 명세 37 → 명세 54 · 톤 v3.58): 하루의 속도 + 십신 다섯 갈래. 줄마다 세 단계 라디오(state_<key>), 갈래 줄은 "자세히"를 펼치면 세부 낱말(state_tags).
             명세 54(앱 주인 "선택하는 것들이 조금 더 깔끔하고 가시성 있게"): 안 고른 칸은 종이(가는 선과 먹 글자), 고른 칸만 남색 면 — 찢긴 띠지 재료는 이 화면에서 쓰지 않는다.
-            한 줄 = 이름 열 + 이어 붙은 세 칸 자(.seg). 폼 필드의 name · value · 동작은 그대로. 모양은 globals.css v3.58 블록 */}
+            한 줄 = 이름 열 + 이어 붙은 세 칸 자(.axis-seg). 같은 날 후속(앱 주인 "토글을 펼쳤을 때 더 깔끔하게 … 정렬도 깔끔하게"): "자세히"는 축 이름 아래로, 펼친 낱말은 자와 같은 세로선의 세 칸 격자. 폼 필드의 name · value · 동작은 그대로. 모양은 globals.css v3.58 블록 */}
         <fieldset className="entry-states">
           <legend className="entry-states__legend">
             <span className="entry-states__title">
@@ -239,15 +239,15 @@ export function EntryForm({ date, when = "today", notePlaceholder, initial, warm
             {STATE_AXES.map((a) => {
               const picked = a.tags.filter((t) => stateTags.includes(t.key)).length;
               return (
-                <div key={a.key} className="axis" data-axis={a.key} data-group={a.group ?? undefined}>
+                <div key={a.key} className="axis" data-axis={a.key} data-group={a.group ?? undefined} data-more={a.tags.length > 0 ? "" : undefined}>
                   <div className="axis__main" role="radiogroup" aria-label={a.label}>
                     <span className="axis__name">{a.label}</span>
-                    <div className="seg">
+                    <div className="axis-seg">
                       {a.levels.map((word, i) => {
                         const level = (i + 1) as StateLevel;
                         const on = states[a.key] === level;
                         return (
-                          <label key={level} className="seg__slot">
+                          <label key={level} className="axis-seg__slot">
                             <input
                               type="radio"
                               name={`state_${a.key}`}
@@ -261,7 +261,7 @@ export function EntryForm({ date, when = "today", notePlaceholder, initial, warm
                               className="peer sr-only"
                             />
                             {/* 찍힘은 CSS `input:checked +`가 바로 그린다 (하이드레이션 전 첫 탭) */}
-                            <span data-level={level} className="seg__cell">
+                            <span data-level={level} className="axis-seg__cell">
                               {word}
                             </span>
                           </label>
@@ -272,11 +272,14 @@ export function EntryForm({ date, when = "today", notePlaceholder, initial, warm
                   {a.tags.length > 0 && (
                     <details className="axis__more" open={picked > 0 || undefined}>
                       <summary className="axis__more-head">
-                        <span className="axis__more-word">자세히</span>
-                        {picked > 0 && <span className="entry-count">{picked}</span>}
-                        <span className="axis__more-caret" aria-hidden>
-                          ▾
+                        {/* 축 이름 아래(왼쪽 열)의 작은 글자 버튼: 닫힘 "자세히" / 열림 "접기" — 어느 쪽을 보일지는 CSS(details[open]) */}
+                        <span className="axis__more-word" data-when="closed">
+                          자세히
                         </span>
+                        <span className="axis__more-word" data-when="open">
+                          접기
+                        </span>
+                        {picked > 0 && <span className="entry-count">{picked}</span>}
                       </summary>
                       <div className="axis__tags">
                         {a.tags.map((t) => {
@@ -284,7 +287,7 @@ export function EntryForm({ date, when = "today", notePlaceholder, initial, warm
                           return (
                             <label key={t.key} className="pick-slot">
                               <input type="checkbox" name="state_tags" value={t.key} checked={on} onChange={() => toggleStateTag(t.key)} className="peer sr-only" />
-                              <span className="pick pick--small">{t.label}</span>
+                              <span className="pick pick--sub">{t.label}</span>
                             </label>
                           );
                         })}
