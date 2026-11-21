@@ -222,31 +222,32 @@ export function EntryForm({ date, when = "today", notePlaceholder, initial, warm
           </div>
         </fieldset>
 
-        {/* 오늘 있었던 일 (2026-11-14, 명세 37 · 톤 v3.41): 하루의 속도 + 십신 다섯 갈래. 줄마다 세 단계 라디오(state_<key>), 갈래 줄은 "더 적기"를 펼치면 세부 낱말(state_tags).
-            한 줄 = 이름 열 52px + 세 단계 띠지 세 열(줄마다 같은 세로선). "더 적기"는 이름 아래 작은 글자 — 이름 칸 전체가 손가락 자리. 모양은 globals.css v3.41 블록 */}
+        {/* 오늘 있었던 일 (2026-11-14, 명세 37 → 명세 54 · 톤 v3.58): 하루의 속도 + 십신 다섯 갈래. 줄마다 세 단계 라디오(state_<key>), 갈래 줄은 "자세히"를 펼치면 세부 낱말(state_tags).
+            명세 54(앱 주인 "선택하는 것들이 조금 더 깔끔하고 가시성 있게"): 안 고른 칸은 종이(가는 선과 먹 글자), 고른 칸만 남색 면 — 찢긴 띠지 재료는 이 화면에서 쓰지 않는다.
+            한 줄 = 이름 열 + 이어 붙은 세 칸 자(.seg). 폼 필드의 name · value · 동작은 그대로. 모양은 globals.css v3.58 블록 */}
         <fieldset className="entry-states">
           <legend className="entry-states__legend">
-            <span className="entry-states__title">오늘 있었던 일</span>
-            <span className="entry-states__note">
-              별일 없으면 안 골라도 돼요 {stCount > 0 && <span className="text-ganji">({stCount})</span>}
+            <span className="entry-states__title">
+              오늘 있었던 일{stCount > 0 && <span className="entry-count">{stCount}</span>}
             </span>
+            <span className="entry-states__note">별일 없으면 안 골라도 돼요</span>
           </legend>
-          <button type="button" className="entry-states__plain" onClick={fillPlain} disabled={stCount === STATE_AXES.length}>
+          <button type="button" className="entry-states__plain pick-plain" onClick={fillPlain} disabled={stCount === STATE_AXES.length}>
             평범한 하루
           </button>
-          <div className="entry-states__rows">
+          <div className="axis-rows">
             {STATE_AXES.map((a) => {
               const picked = a.tags.filter((t) => stateTags.includes(t.key)).length;
               return (
-                <div key={a.key} className="entry-state" data-axis={a.key} data-group={a.group ?? undefined}>
-                  <div className="entry-state__main" role="radiogroup" aria-label={a.label}>
-                    <span className="entry-state__label">{a.label}</span>
-                    <div className="entry-state__levels">
+                <div key={a.key} className="axis" data-axis={a.key} data-group={a.group ?? undefined}>
+                  <div className="axis__main" role="radiogroup" aria-label={a.label}>
+                    <span className="axis__name">{a.label}</span>
+                    <div className="seg">
                       {a.levels.map((word, i) => {
                         const level = (i + 1) as StateLevel;
                         const on = states[a.key] === level;
                         return (
-                          <label key={level} className="entry-state__level">
+                          <label key={level} className="seg__slot">
                             <input
                               type="radio"
                               name={`state_${a.key}`}
@@ -259,7 +260,8 @@ export function EntryForm({ date, when = "today", notePlaceholder, initial, warm
                               }}
                               className="peer sr-only"
                             />
-                            <span data-level={level} className={`tag state-tag cursor-pointer peer-focus-visible:outline-2 peer-focus-visible:outline-ink ${on ? "tag--on" : ""}`}>
+                            {/* 찍힘은 CSS `input:checked +`가 바로 그린다 (하이드레이션 전 첫 탭) */}
+                            <span data-level={level} className="seg__cell">
                               {word}
                             </span>
                           </label>
@@ -268,17 +270,21 @@ export function EntryForm({ date, when = "today", notePlaceholder, initial, warm
                     </div>
                   </div>
                   {a.tags.length > 0 && (
-                    <details className="entry-state__more" open={picked > 0 || undefined}>
-                      <summary className="entry-state__more-head">
-                        <span className="entry-state__more-word">더 적기</span> {picked > 0 && <span className="entry-state__more-n text-ganji">({picked})</span>}
+                    <details className="axis__more" open={picked > 0 || undefined}>
+                      <summary className="axis__more-head">
+                        <span className="axis__more-word">자세히</span>
+                        {picked > 0 && <span className="entry-count">{picked}</span>}
+                        <span className="axis__more-caret" aria-hidden>
+                          ▾
+                        </span>
                       </summary>
-                      <div className="entry-state__tags">
+                      <div className="axis__tags">
                         {a.tags.map((t) => {
                           const on = stateTags.includes(t.key);
                           return (
-                            <label key={t.key} className="entry-state__tag">
+                            <label key={t.key} className="pick-slot">
                               <input type="checkbox" name="state_tags" value={t.key} checked={on} onChange={() => toggleStateTag(t.key)} className="peer sr-only" />
-                              <span className={`tag state-tag state-tag--detail cursor-pointer peer-focus-visible:outline-2 peer-focus-visible:outline-ink ${on ? "tag--on" : ""}`}>{t.label}</span>
+                              <span className="pick pick--small">{t.label}</span>
                             </label>
                           );
                         })}
@@ -291,32 +297,31 @@ export function EntryForm({ date, when = "today", notePlaceholder, initial, warm
           </div>
         </fieldset>
 
-        {/* 그래서 마음은 (2026-11-14, 명세 37): 기분 네 갈래 21개. value는 예전 기분 이름 그대로(name), 화면 말은 label */}
-        {/* 무리 = 이름 열(상태 줄과 같은 52px 세로선) + 오른쪽 띠지 — 무리 이름이 띠지와 섞이지 않는다 (톤 v3.41) */}
+        {/* 그래서 마음은 (2026-11-14, 명세 37 → 명세 54): 기분 네 갈래 21개. value는 예전 기분 이름 그대로(name), 화면 말은 label.
+            무리 이름은 칸들 위 작은 머리말, 칸은 폭이 같은 세 칸 격자. 안 고른 칸은 결과 상관없이 같은 종이 칸, 고른 칸만 그 기분의 결(moodTone)대로 금빛 면 또는 남색 면 */}
         <fieldset className="entry-moods">
           <legend className="entry-moods__legend">
-            <span className="entry-moods__title">그래서 마음은</span>
-            <span className="entry-moods__note">
-              몇 개든, 안 골라도 돼요 {moods.length > 0 && <span className="text-ganji">({moods.length})</span>}
+            <span className="entry-moods__title">
+              그래서 마음은{moods.length > 0 && <span className="entry-count">{moods.length}</span>}
             </span>
+            <span className="entry-moods__note">몇 개든, 안 골라도 돼요</span>
           </legend>
-          <div className="entry-moods__groups">
+          <div className="mood-groups">
             {MOOD_PICK.map((sec) => (
-              <div key={sec.key} className="entry-moods__group" data-group={sec.key}>
-                <p className="entry-moods__head">{sec.label}</p>
-                <div className="entry-moods__tags">
+              <div key={sec.key} className="mood-group" data-group={sec.key} role="group" aria-label={sec.label}>
+                <p className="mood-group__head">{sec.label}</p>
+                <div className="mood-grid">
                   {sec.moods.map((m) => {
                     const on = moods.includes(m.name);
+                    // 긴 이름(따뜻함·사랑받음 …)은 가운뎃점 자리에서 두 줄로 나눠 한 칸에 넣는다 — 줄이 들쭉날쭉 꺾이지 않는다
+                    const parts = m.label.length >= 7 ? m.label.split("·") : [m.label];
                     return (
-                      <label key={m.name}>
+                      <label key={m.name} className="pick-slot">
                         <input type="checkbox" name="moods" value={m.name} checked={on} onChange={() => toggleMood(m.name)} className="peer sr-only" />
-                        <span
-                          data-tone={moodTone(m.name)}
-                          className={`tag mood-tag h-9 cursor-pointer text-[14px] peer-focus-visible:outline-2 peer-focus-visible:outline-ink ${
-                            on ? "tag--on font-bold text-paper-2" : "text-ink"
-                          }`}
-                        >
-                          {m.label}
+                        <span data-tone={moodTone(m.name)} className="pick pick--mood" aria-label={m.label}>
+                          {parts.map((part) => (
+                            <span key={part}>{part}</span>
+                          ))}
                         </span>
                       </label>
                     );
@@ -336,7 +341,7 @@ export function EntryForm({ date, when = "today", notePlaceholder, initial, warm
         {/* 명세 51(2026-11-20 앱 주인 "입력도 빼기"): 영역 점수 접힘 칸은 없다 — 통계에서 영역을 뺐으니 받기만 하고 쓰이지 않는 입력이 된다.
             있었던 일과 마음이 그 자리를 맡는다. 이미 저장된 영역 값은 지우지 않는다(서버는 영역 입력이 없으면 지난 값을 건드리지 않는다) */}
 
-        <div>
+        <div className="entry-note">
           <label htmlFor="note" className="text-[17px] font-bold">
             한 줄
           </label>

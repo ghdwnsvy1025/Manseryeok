@@ -33,6 +33,8 @@ export const GROUP_DAY_HINT: Record<TenGodFamily, string> = {
   관성: "맡은 일과 책임이 커지는 날",
   인성: "배우고 쉬며 생각하게 되는 날",
 };
+/** 오각형 꼭짓점에 적는 짧은 이름 (명세 54). 풀어 쓴 말은 GROUP_DAY_HINT */
+export const GROUP_DAY_SHORT: Record<TenGodFamily, string> = { 비겁: "내 뜻", 식상: "표현", 재성: "실속", 관성: "책임", 인성: "배움" };
 const FAMILIES: TenGodFamily[] = ["비겁", "식상", "재성", "관성", "인성"];
 
 export interface GroupHappiness {
@@ -41,6 +43,8 @@ export interface GroupHappiness {
   word: string;
   /** 그런 날이 어떤 날인지 한 줄 (GROUP_DAY_HINT) */
   hint: string;
+  /** 오각형 꼭짓점에 적는 짧은 이름 (GROUP_DAY_SHORT) */
+  short: string;
   /** 그 갈래가 온 날 수 */
   n: number;
   /** 그날들의 행복도 평균 (n이 0이면 null) */
@@ -50,6 +54,8 @@ export interface GroupHappiness {
 export interface HappyWhen {
   /** 다섯 갈래 전부 (평균 높은 순, 표본 모자란 갈래는 뒤) */
   rows: GroupHappiness[];
+  /** 오각형용: 늘 같은 차례(내 뜻 → 표현 → 실속 → 책임 → 배움)의 다섯 줄. rows와 같은 값이고 차례만 다르다 */
+  ring: GroupHappiness[];
   /** 전체 평균 */
   overall: number | null;
   /** 말해도 되는 갈래 가운데 평균이 가장 높고, 전체 평균보다 높은 것. 없으면 null */
@@ -69,12 +75,12 @@ export function happyWhen(entries: InsightEntry[], dayMaster: string): HappyWhen
   }
   const rows: GroupHappiness[] = FAMILIES.map((group) => {
     const c = sum.get(group);
-    return { group, word: FAMILY_WORD[group], hint: GROUP_DAY_HINT[group], n: c?.n ?? 0, avg: c && c.n ? round1(c.s / c.n) : null };
+    return { group, word: FAMILY_WORD[group], hint: GROUP_DAY_HINT[group], short: GROUP_DAY_SHORT[group], n: c?.n ?? 0, avg: c && c.n ? round1(c.s / c.n) : null };
   }).sort((a, b) => Number(b.n >= GROUP_MIN_DAYS) - Number(a.n >= GROUP_MIN_DAYS) || (b.avg ?? -1) - (a.avg ?? -1));
   const overall = entries.length ? round1(entries.reduce((a, e) => a + e.happiness, 0) / entries.length) : null;
   const first = rows[0];
   const top = first && first.n >= GROUP_MIN_DAYS && first.avg !== null && overall !== null && first.avg - overall >= GROUP_MIN_GAP ? first : null;
-  return { rows, overall, top, sentence: top ? `${top.hint}에 가장 행복했어요` : null };
+  return { rows, ring: FAMILIES.map((g) => rows.find((r) => r.group === g)!), overall, top, sentence: top ? `${top.hint}에 가장 행복했어요` : null };
 }
 
 export interface VersusDay {
@@ -84,6 +90,11 @@ export interface VersusDay {
   happiness: number;
   /** 예상과 같은 쪽이었나 (좋음 → 행복도 7 이상, 주의 → 4 이하) */
   hit: boolean;
+  /**
+   * 한눈에 보는 표시 (명세 54): same = 예상과 같은 쪽(○), opposite = 반대쪽(× — 좋을 날인데 4 이하, 조심할 날인데 7 이상),
+   * between = 그 사이(△ — 행복도 5·6)
+   */
+  result: "same" | "opposite" | "between";
 }
 
 export interface ForecastVersus {
@@ -105,7 +116,9 @@ export function forecastVersus(entries: Pick<InsightEntry, "entry_date" | "happi
     const h = byDate.get(f.fortune_date);
     const band = bandOf(f.score);
     if (h === undefined || band === "무난") continue;
-    days.push({ date: f.fortune_date, band, happiness: h, hit: band === "좋음" ? h >= ACTUAL_GOOD : h <= ACTUAL_HARD });
+    const hit = band === "좋음" ? h >= ACTUAL_GOOD : h <= ACTUAL_HARD;
+    const opposite = band === "좋음" ? h <= ACTUAL_HARD : h >= ACTUAL_GOOD;
+    days.push({ date: f.fortune_date, band, happiness: h, hit, result: hit ? "same" : opposite ? "opposite" : "between" });
   }
   days.sort((a, b) => (a.date < b.date ? 1 : -1));
   const g = days.filter((d) => d.band === "좋음");

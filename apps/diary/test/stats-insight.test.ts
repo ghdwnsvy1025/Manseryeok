@@ -16,6 +16,9 @@ describe("나 탭 물음 인장의 답", () => {
     expect(r.top).toMatchObject({ group: "식상", n: 3, avg: 8.7 });
     expect(r.sentence).toBe("말하고 만들고 싶어지는 날에 가장 행복했어요");
     expect(r.top!.hint).toBe("말하고 만들고 싶어지는 날");
+    // 오각형용 ring은 늘 같은 차례
+    expect(r.ring.map((x) => x.short)).toEqual(["내 뜻", "표현", "실속", "책임", "배움"]);
+    expect(r.ring.find((x) => x.group === "식상")).toMatchObject({ n: 3, avg: 8.7 });
     expect(r.rows.find((x) => x.group === "관성")).toMatchObject({ n: 1, avg: 10 });
     expect(r.rows.findIndex((x) => x.group === "관성")).toBeGreaterThan(r.rows.findIndex((x) => x.group === "재성"));   // 표본 모자란 갈래는 뒤
     expect(GROUP_MIN_DAYS).toBe(3);
@@ -42,7 +45,10 @@ describe("나 탭 물음 인장의 답", () => {
     expect(r.caution).toEqual({ days: 2, hard: 1, good: 1 });
     expect(r.sentences).toEqual(["좋을 날로 본 3일 중 2일이 실제로 좋았어요. 1일은 힘들었어요", "조심할 날로 본 2일 중 1일이 실제로 힘들었어요. 1일은 오히려 좋았어요"]);
     expect(r.days.map((d) => d.date)).toEqual(["2026-12-05", "2026-12-04", "2026-12-03", "2026-12-02", "2026-12-01"]);
-    expect(r.days[0]).toMatchObject({ band: "주의", happiness: 8, hit: false });
+    expect(r.days[0]).toMatchObject({ band: "주의", happiness: 8, hit: false, result: "opposite" });
+    expect(r.days.map((d) => d.result)).toEqual(["opposite", "same", "opposite", "same", "same"]);
+    // 그 사이(행복도 5·6)는 between
+    expect(forecastVersus([e("2026-12-09", "경", "신", 6)], [{ fortune_date: "2026-12-09", score: 8 }]).days[0]!.result).toBe("between");
     expect(r.sentences.join("")).not.toMatch(/%/);
   });
 

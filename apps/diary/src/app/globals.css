@@ -9445,3 +9445,433 @@ button.bars__col:active .bars__track {
 .sinsal__foot {
   margin-top: 10px;
 }
+
+/* ── v3.58 오각형 · 맞음 표시 · 쓰기의 고르기 (명세 54, 2026-11-21) ──────────────────────────────
+   세 화면을 꿰는 한 가지: **안 고른 것 · 뜻 없는 것은 종이, 고른 것 · 말하는 것만 면과 색.**
+   앱 주인 "가시성이 좋지 않아. 차라리 5각형 그래프로" · "맞았는지 … 기호나 UI가 없으니까 바로 보이지가 않아" · "쓰기에서 선택하는 것들이 조금 더 깔끔하고 가시성 있게".
+   새 그림 · 새 토큰 없음. 쓰기의 찢긴 띠지(tag-strip) 재료는 이 화면의 고르는 칸에서 내려놓는다 — 고르기 전부터 39칸이 모두 면을 가져 고른 칸이 묻혔다.
+   모션 둘: 칸 면이 차는 80ms(눌림 응답) · 오각형이 가운데에서 펴지는 300ms 한 번. reduced-motion이면 없음 */
+
+/* 1. 오각형 `.penta`: 그림 폭 = 낱장 안쪽 폭(최대 340px), 판 320 × 276. 고리 셋 — 안쪽(평균 − 2) · 바깥(평균 + 2)은 녹갈 30% 1px, 평균 고리는 녹갈 80% 1.25px 실선 + "내 평균 6.5" 11px muted.
+   값 도형 = 녹갈 12% 면 + 녹갈 2px 테(3일 미만 꼭짓점에 닿는 변은 30%), 점 지름 6.4px 녹갈. 1등만 옥색 점 10px + 이름 · 숫자 굵게. 3일 미만 = 평균 고리 위 빈 점 + "?".
+   이름 13px 먹, 숫자 명조 15px. 아래 풀이 다섯 줄 13px muted(이름 굵게 44px 열 | 풀이 | 날 수), 1등 줄만 먹 */
+.penta {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.penta__svg {
+  display: block;
+  width: 100%;
+  max-width: 340px;
+  height: auto;
+  overflow: visible;
+}
+.penta__ring {
+  fill: none;
+  stroke: color-mix(in srgb, var(--color-frame) 30%, transparent);
+  stroke-width: 1;
+  stroke-linejoin: round;
+}
+.penta__ring--mid {
+  stroke: color-mix(in srgb, var(--color-frame) 80%, transparent);
+  stroke-width: 1.25;
+}
+.penta__spoke {
+  stroke: color-mix(in srgb, var(--color-frame) 18%, transparent);
+  stroke-width: 1;
+}
+.penta__value {
+  transform-box: view-box;
+  transform-origin: 160px 146px;
+}
+.penta__face {
+  fill: color-mix(in srgb, var(--color-line) 12%, transparent);
+  stroke: none;
+}
+.penta__edge {
+  stroke: var(--color-line);
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+.penta__edge[data-faint] {
+  opacity: 0.3;
+}
+.penta__dot {
+  fill: var(--color-line);
+}
+.penta__dot[data-top] {
+  fill: var(--color-jade);
+  stroke: var(--color-paper-2);
+  stroke-width: 1.5;
+}
+.penta__dot[data-thin] {
+  fill: var(--color-paper-2);
+  stroke: var(--color-line);
+  stroke-width: 1.5;
+}
+.penta__mid-label {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  fill: var(--color-muted);
+  stroke: var(--color-paper-2);
+  stroke-width: 3px;
+  stroke-linejoin: round;
+  paint-order: stroke;
+}
+.penta__label {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  fill: var(--color-ink);
+}
+.penta__num {
+  font-family: var(--font-serif);
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+}
+.penta__q {
+  fill: var(--color-muted);
+}
+.penta__label[data-thin] {
+  fill: var(--color-muted);
+}
+.penta__label[data-top] {
+  font-weight: 700;
+}
+.penta__label[data-top] .penta__num {
+  fill: var(--color-jade);
+}
+.penta[data-none] .penta__label {
+  fill: var(--color-muted);
+}
+.penta__none {
+  margin: 4px 0 0;
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--color-muted);
+  text-align: center;
+  word-break: keep-all;
+}
+.penta-keys {
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 14px 0 0;
+  padding: 12px 0 0;
+  border-top: 0.5px dashed color-mix(in srgb, var(--color-frame) 35%, transparent);
+  list-style: none;
+}
+.penta-key {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) auto;
+  align-items: baseline;
+  column-gap: 8px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--color-muted);
+}
+.penta-key__name {
+  font-weight: 700;
+}
+.penta-key__hint {
+  word-break: keep-all;
+}
+.penta-key__n {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.penta-key[data-top] {
+  color: var(--color-ink);
+}
+.penta-key[data-top] .penta-key__n {
+  color: var(--color-muted);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .penta__value {
+    animation: penta-open 300ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  }
+}
+@keyframes penta-open {
+  from {
+    transform: scale(0.24);
+    opacity: 0;
+  }
+}
+
+/* 2. 채점 붓 표시 `.vmark`: ○ 인주 · △ muted · × 먹 — 옥색 · 주홍은 "좋을 날 · 조심할 날"에만. 선 굵기 2.4(판 24) · 둥근 끝.
+   두 칸 = 머리(옥색 · 주홍 13px) → 표시 띠 16px(○ → △ → ×, 넘치면 줄바꿈) → "N일 같았어요"(명조 22px + 15px) → 나머지 13px muted.
+   풀이 한 줄 12px muted. 날 목록은 네 열: 날짜 52 | 예상 | 내 행복도 도장 56 | 결과 32(표시 20px) */
+.vmark {
+  flex: none;
+  display: inline-block;
+  vertical-align: middle;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  overflow: visible;
+}
+.vmark[data-result="same"] {
+  color: var(--color-seal);
+}
+.vmark[data-result="between"] {
+  color: var(--color-muted);
+}
+.vmark[data-result="opposite"] {
+  color: var(--color-ink);
+}
+.versus-cell__marks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px 2px;
+  min-height: 16px;
+  margin: 2px 0;
+}
+.versus-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--color-muted);
+}
+.versus-legend > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+.versus-table__head,
+.versus-table__row {
+  grid-template-columns: 52px minmax(0, 1fr) 56px 32px;
+}
+.versus-table__head > span:nth-child(3),
+.versus-table__head > span:nth-child(4) {
+  text-align: right;
+}
+.versus-table__result {
+  justify-self: end;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+}
+
+/* 3. 쓰기의 고르는 칸. 안 고른 칸 = 종이: 면 없음, 녹갈 55% 1px 선, 먹 글자 14px. 고른 칸 = 도장: 면이 꽉 차고 글자 색이 뒤집힌다.
+   고른 색은 둘 — 있었던 일 · 차가운 결의 마음 = 밤 남색 면(sky) + 종이색 글자, 따뜻한 결의 마음 = 금빛 면(gold-wash) + 먹 글자.
+   찍힘은 `input:checked +`가 그린다(하이드레이션 전 첫 탭). 포커스 = 먹 2px 테 */
+.entry-count {
+  margin-left: 6px;
+  font-family: var(--font-serif);
+  font-size: 15px;
+  font-weight: 400;
+  color: var(--color-ganji);
+  font-variant-numeric: tabular-nums;
+}
+.pick,
+.seg__cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  line-height: 1.25;
+  color: var(--color-ink);
+  text-align: center;
+  word-break: keep-all;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .pick,
+  .seg__cell {
+    transition:
+      background-color 80ms ease-out,
+      color 80ms ease-out;
+  }
+}
+input:focus-visible + .pick,
+input:focus-visible + .seg__cell {
+  outline: 2px solid var(--color-ink);
+  outline-offset: 2px;
+}
+
+/* 3-1. "평범한 하루": 종이 선 버튼 30px(손가락 자리는 ::after 44px) */
+.entry-states__plain.pick-plain {
+  top: 12px;
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid color-mix(in srgb, var(--color-frame) 55%, transparent);
+  border-image: none;
+  border-radius: 6px;
+}
+
+/* 3-2. 있었던 일: 축 여섯 줄(사이 12px, 점선 없음). 한 줄 = 이름 열 56px + 세 칸 자 `.seg` — 한 덩어리 테 안에서 가는 세로선으로만 나뉘는 같은 폭 세 칸, 높이 44px.
+   글자 낱장의 세 칸 자(v3.56)와 같은 말씨. "자세히 ▾"는 자 아래 오른쪽 끝 글자 버튼 13px, 펼치면 작은 칸 36px이 한 줄로 흐른다 */
+.axis-rows {
+  clear: both;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-top: 12px;
+}
+.axis {
+  min-width: 0;
+}
+.axis__main {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr);
+  align-items: center;
+  column-gap: 8px;
+}
+.axis__name {
+  font-size: 14px;
+  line-height: 1.3;
+  color: var(--color-ink);
+  word-break: keep-all;
+}
+.seg {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  border: 1px solid color-mix(in srgb, var(--color-frame) 55%, transparent);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.seg__slot {
+  display: block;
+  min-width: 0;
+}
+.seg__slot + .seg__slot {
+  border-left: 1px solid color-mix(in srgb, var(--color-frame) 55%, transparent);
+}
+.seg__cell {
+  min-height: 44px;
+  padding: 2px 4px;
+}
+input:checked + .seg__cell {
+  background: var(--color-sky);
+  color: var(--color-paper-2);
+  font-weight: 700;
+}
+.axis__more {
+  margin-top: 0;
+  margin-bottom: -4px;
+}
+.axis__more-head {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2px;
+  width: fit-content;
+  min-height: 24px;
+  margin-left: auto;
+  padding: 0 2px;
+  font-size: 13px;
+  line-height: 1;
+  color: var(--color-muted);
+  list-style: none;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.axis__more-head::-webkit-details-marker {
+  display: none;
+}
+.axis__more-head::after {
+  content: "";
+  position: absolute;
+  inset: -8px -10px;
+}
+.axis__more-head:focus-visible {
+  outline: 2px solid var(--color-ink);
+  outline-offset: 2px;
+}
+.axis__more-head .entry-count {
+  margin-left: 4px;
+  font-size: 13px;
+}
+.axis__more-caret {
+  margin-left: 3px;
+  font-size: 11px;
+}
+.axis__more[open] .axis__more-caret {
+  transform: rotate(180deg);
+}
+.axis__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 6px 0 4px;
+}
+.pick-slot {
+  display: block;
+  min-width: 0;
+}
+.pick {
+  min-height: 44px;
+  padding: 3px 6px;
+  border: 1px solid color-mix(in srgb, var(--color-frame) 55%, transparent);
+  border-radius: 6px;
+}
+.pick--small {
+  min-height: 36px;
+  padding: 2px 12px;
+  white-space: nowrap;
+}
+input:checked + .pick {
+  border-color: var(--color-sky);
+  background: var(--color-sky);
+  color: var(--color-paper-2);
+  font-weight: 700;
+}
+
+/* 3-3. 마음: 무리 이름은 칸들 위 작은 머리말 12px muted, 칸은 폭이 같은 세 칸 격자(틈 6px), 높이 44px. 긴 이름은 두 줄로 한 칸에.
+   안 고른 칸은 결과 상관없이 같은 종이 칸. 고른 칸 = 따뜻한 결은 금빛 면 + 먹 글자, 차가운 결은 남색 면 + 종이색 글자 */
+.mood-groups {
+  clear: both;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding-top: 12px;
+}
+.mood-group__head {
+  margin: 0 0 6px;
+  font-size: 12px;
+  line-height: 1.3;
+  color: var(--color-muted);
+}
+.mood-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+.mood-grid > .pick-slot,
+.mood-grid .pick {
+  height: 100%;
+}
+.pick--mood {
+  flex-direction: column;
+}
+input:checked + .pick--mood[data-tone="pos"] {
+  border-color: color-mix(in srgb, var(--color-gold) 70%, var(--color-ink));
+  background: var(--color-gold) url("/ui/gold-wash.webp") center / 256px 256px;
+  color: var(--color-ink);
+}
+
+/* 3-4. 한 줄 칸 위에도 같은 괘선(있었던 일 · 마음과 같은 선) — 행복도 / 있었던 일 / 마음 / 한 줄 네 칸 사이에 선 하나씩 */
+.entry-note {
+  margin-top: -8px;
+  padding-top: 16px;
+  border-top: 0.5px solid color-mix(in srgb, var(--color-frame) 45%, transparent);
+}
+
+/* 3-5. 행복도 도장: 고른 4 · 5(종이 단계)의 면이 옅어 고른 줄 모르게 약했다 — 녹갈 60%를 종이에 섞은 면 + 먹 굵은 숫자로 다른 단계와 같은 무게(쓰기 화면에서만. 달력 칸의 네 단계 색은 그대로) */
+.entry-happy__stamp[data-level="4"],
+.entry-happy__stamp[data-level="5"] {
+  --stamp-face: color-mix(in srgb, var(--color-frame) 60%, var(--color-paper-2));
+  --stamp-num: var(--color-ink);
+}
