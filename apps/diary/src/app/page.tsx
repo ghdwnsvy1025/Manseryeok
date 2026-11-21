@@ -133,7 +133,7 @@ export default async function TodayPage() {
     <section className={card}>
       <h2 className="font-serif text-[24px] leading-snug">{carry ? "어젯밤 하루, 어땠어요?" : "오늘 하루, 어땠어요?"}</h2>
       <p className="mt-2 text-[15px] text-muted">
-        {carry ? "자정이 지났지만 아직 어젯밤이에요. 어제 날짜로 남겨요." : "영역 하나만 매겨도 돼요. 30초면 끝나요."}
+        {carry ? "자정이 지났지만 아직 어젯밤이에요. 어제 날짜로 남겨요." : "행복도 하나만 골라도 돼요. 30초면 끝나요."}
       </p>
       {/* 금색 면 버튼은 화면에 하나 — 이것 */}
       <Link href="/write" className={goldButton}>

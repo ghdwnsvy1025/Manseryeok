@@ -51,9 +51,10 @@ export function StatsSummary({ h, fitPercent, stems, branches, elements, moods, 
         {/* v3.35: 날짜 자리 = 빈 도장판 칸(키트 stamp-board-cell-empty), 열리는 것은 15px 먹색. 모양은 .first-record__* */}
         <ol className="first-record__ladder flex flex-col text-[15px]">
           {[
-            ["1일", "가장 행복한 날과 연속 기록"],
+            ["1일", "달력과 카드에 첫 도장"],
             ["2일", "행복도 그래프"],
             ["3일", "글자별 내 행복도"],
+            ["7일", "나는 언제 행복했지?"],
           ].map(([day, what]) => (
             <li key={day} className="first-record__step flex">
               <span className="first-record__day">{day}</span>

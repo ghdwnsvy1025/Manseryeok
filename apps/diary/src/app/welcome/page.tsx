@@ -48,7 +48,7 @@ export default async function WelcomePage() {
             행복도 하나, 한 줄이면 돼요<span className="day-flow__aside">30초</span>
           </dd>
           <dt className="day-flow__head">쌓이면</dt>
-          <dd className="day-flow__text">운세와 내 하루가 얼마나 맞았는지 보여요</dd>
+          <dd className="day-flow__text">내가 어떤 날에 행복했는지 보여요</dd>
         </dl>
       </div>
       {/* 금색 면 버튼 — 이 화면에 하나. 자동 이동 없음 */}
